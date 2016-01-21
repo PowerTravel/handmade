@@ -1,5 +1,0 @@
-﻿  win32_handmade.cpp
-c:\users\mother shabobo\desktop\handmade\code\win32_handmade.cpp(63): error C2440: '=': cannot convert from 'LPCSTR' to 'LPCWSTR'
-  c:\users\mother shabobo\desktop\handmade\code\win32_handmade.cpp(63): note: Types pointed to are unrelated; conversion requires reinterpret_cast, C-style cast or function-style cast
-c:\users\mother shabobo\desktop\handmade\code\win32_handmade.cpp(79): error C2664: 'HWND CreateWindowExW(DWORD,LPCWSTR,LPCWSTR,DWORD,int,int,int,int,HWND,HMENU,HINSTANCE,LPVOID)': cannot convert argument 3 from 'LPCSTR' to 'LPCWSTR'
-  c:\users\mother shabobo\desktop\handmade\code\win32_handmade.cpp(79): note: Types pointed to are unrelated; conversion requires reinterpret_cast, C-style cast or function-style cast
