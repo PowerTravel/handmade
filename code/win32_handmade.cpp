@@ -67,6 +67,11 @@ global_variable x_input_set_state* XInputSetState_ = XInputSetStateStub;
 #define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name( LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter )
 typedef DIRECT_SOUND_CREATE(direct_sound_create );
 
+// TODO: Clobal for now
+global_variable bool GlobalRunning;
+global_variable win32_offscreen_buffer GlobalBackBuffer;
+global_variable LPDIRECTSOUNDBUFFER GlobalSecondaryBuffer;	
+
 internal void 
 Win32_LoadXInput(void) 
 {  
@@ -175,12 +180,11 @@ Win32InitDSound(HWND Window, int32 SamplesPerSecond, int32 BufferSize)
 			BufferDescription.dwFlags = 0;
 			BufferDescription.dwBufferBytes = BufferSize;
 			BufferDescription.lpwfxFormat = &WaveFormat;
-			LPDIRECTSOUNDBUFFER SecondaryBuffer;	
 			HRESULT Error =DirectSound->CreateSoundBuffer
-								(&BufferDescription ,&SecondaryBuffer,0);
+								(&BufferDescription ,&GlobalSecondaryBuffer,0);
 			if(SUCCEEDED(Error))
 			{
-						OutputDebugStringA("Secondary buffer created successfully.\n");
+				OutputDebugStringA("Secondary buffer created successfully.\n");
 			}else{
 		 		// TODO: Diagnostic 
 			}
@@ -205,10 +209,6 @@ internal win32_window_dimension Win32GetWindowDimension( HWND Window )
 	
 	return Result;
 }
-
-// TODO: Clobal for now
-global_variable bool GlobalRunning;
-global_variable win32_offscreen_buffer GlobalBackBuffer = {};
 
 
 internal void 
@@ -441,10 +441,24 @@ WinMain(HINSTANCE Instance,
 			// The function used to realese is ReleaseDC(Window, DeviceContext);
 			HDC DeviceContext = GetDC(Window);
 
+			// NOTE: Graphics test
 			int XOffset = 0;
 			int YOffset = 0;
 
-			Win32InitDSound(Window,48000,48000*sizeof(int16)*2);
+			// NOTE: Sound test
+			local_persist int frame =0;
+			frame++;
+			int SamplesPerSecond = 48000;
+			int ToneHz = 556;
+			int16 ToneVolume = 500;
+			uint32 RunningSampleIndex = 0;
+			int SquareWavePeriod = SamplesPerSecond/ToneHz;
+			int HalfSquareWavePeriod = SquareWavePeriod/2;
+			int BytesPerSample = sizeof(int16)*2;
+			int SecondaryBufferSize =SamplesPerSecond*BytesPerSample;
+
+			Win32InitDSound(Window,SamplesPerSecond,SecondaryBufferSize);
+			HRESULT SoundError = GlobalSecondaryBuffer->Play(0,0, DSBPLAY_LOOPING);
 
 			GlobalRunning = true;
 			while(GlobalRunning)
@@ -517,6 +531,70 @@ WinMain(HINSTANCE Instance,
 
 				// Render
 				RenderWeirdGradient(&GlobalBackBuffer, XOffset, YOffset);
+
+				// Note: DirectSound output test
+				DWORD PlayCursor;
+				DWORD WriteCursor;
+				if( SUCCEEDED(GlobalSecondaryBuffer->GetCurrentPosition( &PlayCursor, &WriteCursor)))
+				{
+
+					DWORD ByteToLock = (RunningSampleIndex * BytesPerSample) % SecondaryBufferSize;
+					DWORD BytesToWrite;
+					// BUG: Somehow we get BytesToWrite == 0 which causes Lock() to fail.
+					if(ByteToLock == PlayCursor)
+					{
+						BytesToWrite = SecondaryBufferSize;
+					}
+					else if(ByteToLock > PlayCursor)
+					{
+						BytesToWrite = (SecondaryBufferSize - ByteToLock);
+						BytesToWrite += PlayCursor;
+					}else{
+						BytesToWrite = PlayCursor - ByteToLock;
+					}
+					VOID* Region1;
+					DWORD Region1Size;
+					VOID* Region2;
+					DWORD Region2Size;
+
+					SoundError = GlobalSecondaryBuffer->Lock( ByteToLock, BytesToWrite,
+								        						 &Region1, &Region1Size,
+								        						 &Region2, &Region2Size,
+								        						 0);
+					if( SUCCEEDED(SoundError) )
+					{
+						// TODO: assert that region1size / region2size is valid
+
+						DWORD Region1SampleCount = Region1Size/BytesPerSample;
+						int16* SampleOut = ( int16* ) Region1;
+						for(DWORD SampleIndex = 0; 
+							SampleIndex < Region1SampleCount; 
+							++SampleIndex)
+						{
+							int16 SampleValue = 
+							((RunningSampleIndex++/ HalfSquareWavePeriod ) %2 ) ? ToneVolume : -ToneVolume;
+							*SampleOut++ = SampleValue;
+							*SampleOut++ = SampleValue;
+						}
+						
+						DWORD Region2SampleCount = Region2Size/BytesPerSample;
+						SampleOut = (int16*) Region2;
+						for(DWORD SampleIndex = 0; 
+							SampleIndex < Region2SampleCount;
+							++SampleIndex)
+						{
+							int16 SampleValue = 
+							((RunningSampleIndex++/ HalfSquareWavePeriod ) %2) ? ToneVolume : -ToneVolume;
+							*SampleOut++ = SampleValue;
+							*SampleOut++ = SampleValue;
+						}
+
+						GlobalSecondaryBuffer->Unlock(Region1, Region1Size,
+								Region2, Region2Size);
+					}
+
+
+				}
 
 				win32_window_dimension Dimension = Win32GetWindowDimension( Window );
 				Win32DisplayBufferInWindow(&GlobalBackBuffer, DeviceContext, 
