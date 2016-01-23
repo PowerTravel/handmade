@@ -1,7 +1,7 @@
-
 #include <windows.h>
 #include <stdint.h>
 #include <xinput.h>
+#include <dsound.h>
 
 #define internal		 static
 #define local_persist    static
@@ -12,10 +12,14 @@ typedef int16_t int16;
 typedef int32_t int32;
 typedef int64_t int64;
 
+typedef int32 bool32;
+
 typedef uint8_t uint8;
 typedef uint16_t uint16;
 typedef uint32_t uint32;
 typedef uint64_t uint64;
+
+
 
 struct win32_offscreen_buffer
 {
@@ -42,7 +46,7 @@ struct win32_window_dimension{
 typedef X_INPUT_GET_STATE(x_input_get_state);
 X_INPUT_GET_STATE( XInputGetStateStub )
 {
-	return 0;
+	return ERROR_DEVICE_NOT_CONNECTED;
 }
 global_variable x_input_get_state* XInputGetState_ = XInputGetStateStub;
 #define XInputSetState XInputSetState_
@@ -53,10 +57,15 @@ global_variable x_input_get_state* XInputGetState_ = XInputGetStateStub;
 typedef X_INPUT_SET_STATE(x_input_set_state);
 X_INPUT_SET_STATE( XInputSetStateStub )
 {
-	return 0;
+	return ERROR_DEVICE_NOT_CONNECTED;
 }
 global_variable x_input_set_state* XInputSetState_ = XInputSetStateStub;
 #define XInputGetState XInputGetState_
+
+
+
+#define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name( LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter )
+typedef DIRECT_SOUND_CREATE(direct_sound_create );
 
 internal void 
 Win32_LoadXInput(void) 
@@ -73,16 +82,116 @@ Win32_LoadXInput(void)
 	for (int DLLIndex = 0; DLLIndex < XInputDLLCount; DLLIndex++) 
 	{
 		XInputLibrary = LoadLibraryA(XInputDLLs[DLLIndex]);
-		if (XInputLibrary) {
-
-			XInputGetState = (x_input_get_state *)GetProcAddress(XInputLibrary, "XInputGetState");
-			if(!XInputGetState){ XInputGetState = XInputGetStateStub; }
+		if (XInputLibrary) 
+		{
+			XInputGetState = (x_input_get_state* )GetProcAddress(XInputLibrary, "XInputGetState");
+			if(!XInputGetState)
+			{ 
+				XInputGetState = XInputGetStateStub; 
+			}
 		
-			XInputSetState = (x_input_set_state *)GetProcAddress(XInputLibrary,"XInputSetState");
-			if(!XInputSetState){ XInputSetState = XInputSetStateStub; }
+			XInputSetState = (x_input_set_state* )GetProcAddress(XInputLibrary,"XInputSetState");
+			if(!XInputSetState)
+			{ 
+				XInputSetState = XInputSetStateStub; 
+			}
+
+		 	// TODO: Diagnostic 
 			break;     
-		}   
+		}else{
+		 	// TODO: Diagnostic 
+		}
+   
 	} 
+}
+
+internal void
+Win32InitDSound(HWND Window, int32 SamplesPerSecond, int32 BufferSize)
+{
+	// Note: load the library
+	HMODULE DSoundLibrary = LoadLibraryA("dsound.dll");
+	if(DSoundLibrary)
+	{
+		// Note: Get a DirectSound object - cooperative mode
+		direct_sound_create* DirectSoundCreate = (direct_sound_create* )
+								GetProcAddress(DSoundLibrary, "DirectSoundCreate");
+
+		// TODO Double-check that this works on XP - Directsound8 or 7?
+		LPDIRECTSOUND DirectSound;
+		if(DirectSoundCreate && SUCCEEDED(DirectSoundCreate(0, &DirectSound, 0)) )
+		{
+			WAVEFORMATEX WaveFormat = {};
+			WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
+			WaveFormat.nChannels = 2;		// sterio sound
+			WaveFormat.nSamplesPerSec = SamplesPerSecond;
+			WaveFormat.wBitsPerSample = 16; // cd-quality
+			// EXP: Audio samples for 2 channels is stored as
+			// 		LEFT RIGHT LEFT RIGHT LEFT RIGHT etc.
+			//		nBlockAlign wants the size of one [LEFT RIGHT]
+			//		block in bytes. For us this becomes
+			//		(2 channels) X (nr of bits per sample) / (bits in a byte) = 
+			//			2 * 16 /8 = 4 bytes per sample.
+			WaveFormat.nBlockAlign = 
+					(WaveFormat.nChannels * WaveFormat.wBitsPerSample ) / 8 ;
+			WaveFormat.nAvgBytesPerSec = 
+				WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
+			WaveFormat.cbSize = 0;
+
+			if(SUCCEEDED(DirectSound->SetCooperativeLevel(Window, DSSCL_PRIORITY)) )
+			{
+				DSBUFFERDESC BufferDescription = {};
+				BufferDescription.dwSize = sizeof(BufferDescription);
+				BufferDescription.dwFlags = DSBCAPS_PRIMARYBUFFER;
+					
+				// NOTE: "Create" a primary buffer
+				// EXP:	 The primary buffer is only for setting the format of our primary
+				// 		 sound device to what we want. The secondary buffer is the actual
+				// 		 buffer we will write.
+				// TODO: DBCAPS_GLOBALFOCUS?
+				LPDIRECTSOUNDBUFFER PrimaryBuffer;	
+				if(SUCCEEDED(DirectSound->CreateSoundBuffer
+											(&BufferDescription ,&PrimaryBuffer,0)))
+				{
+					HRESULT Error= PrimaryBuffer->SetFormat(&WaveFormat);
+					if(SUCCEEDED(Error))
+					{
+						OutputDebugStringA("Primary buffer format was set.\n");
+						// NOTE: We have finally set the format	
+					}else{
+						// TODO: Diagnostics
+					}
+				}else{
+					// TODO: diagnostics
+				}
+			}else{
+				// TODO: diagnostics
+			}
+
+
+			// NOTE: "Create" a secondary buffer
+			// TODO: DSBCAPS_GETCURRENTPOSITION2  ? 
+			DSBUFFERDESC BufferDescription = {};
+			BufferDescription.dwSize = sizeof(BufferDescription);
+			BufferDescription.dwFlags = 0;
+			BufferDescription.dwBufferBytes = BufferSize;
+			BufferDescription.lpwfxFormat = &WaveFormat;
+			LPDIRECTSOUNDBUFFER SecondaryBuffer;	
+			HRESULT Error =DirectSound->CreateSoundBuffer
+								(&BufferDescription ,&SecondaryBuffer,0);
+			if(SUCCEEDED(Error))
+			{
+						OutputDebugStringA("Secondary buffer created successfully.\n");
+			}else{
+		 		// TODO: Diagnostic 
+			}
+		
+		}else{
+		 	// TODO: Diagnostic 
+		}
+	}else{
+	 	// TODO: Diagnostic 
+	}
+
 }
 
 internal win32_window_dimension Win32GetWindowDimension( HWND Window )
@@ -160,7 +269,7 @@ Win32ResizeDIBSection(win32_offscreen_buffer* Buffer, int Width, int Height)
 
 
 	int BitmapMemorySize = (Buffer->Width*Buffer->Height)*BytesPerPixel;
-	Buffer->Memory = VirtualAlloc(NULL, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
+	Buffer->Memory = VirtualAlloc(NULL, BitmapMemorySize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 	Buffer->Pitch = Buffer->Width * BytesPerPixel;
 
 	// TODO: Probably clear this to black
@@ -258,7 +367,11 @@ MainWindowCallback(	HWND Window,
 				}
 			}
 		
-		
+			bool AltKeyWasDown = ((LParam & (1<<29)) != 0);
+			if(VKCode==VK_F4 && AltKeyWasDown)
+			{
+				GlobalRunning=false;
+			}	
 		}break;
 
 		case WM_PAINT:
@@ -297,7 +410,7 @@ WinMain(HINSTANCE Instance,
 
 	Win32ResizeDIBSection(&GlobalBackBuffer, 1280, 720);
 
-	WindowClass.style = CS_HREDRAW|CS_VREDRAW;
+	WindowClass.style = CS_OWNDC|CS_HREDRAW|CS_VREDRAW;
 	WindowClass.lpfnWndProc = MainWindowCallback;
 	WindowClass.hInstance = PrevInstance; 
 // 	WindowClass.hIcon;	// window icon (for later)
@@ -322,15 +435,17 @@ WinMain(HINSTANCE Instance,
 		// Handle window messages
 		if(Window != NULL)
 		{
-			// NOTE: Since we are specifying CS_OWNDC, we can just
-			// get one device context and use it forever because we
-			// are not sharing it with anyone. 
+			// NOTE: Since we are specifying CS_OWNDC in our WindowClass, we can just
+			// get one device context and use it forever because we are not sharing it 
+			// with anyone. 
 			// The function used to realese is ReleaseDC(Window, DeviceContext);
 			HDC DeviceContext = GetDC(Window);
 
-
 			int XOffset = 0;
 			int YOffset = 0;
+
+			Win32InitDSound(Window,48000,48000*sizeof(int16)*2);
+
 			GlobalRunning = true;
 			while(GlobalRunning)
 			{	
@@ -353,6 +468,8 @@ WinMain(HINSTANCE Instance,
 					ControllerIndex< XUSER_MAX_COUNT; 
 					++ControllerIndex )
 				{
+					// Note: Performancebug in XInputGetControllerstate.
+					//		 See HH007 at 15 min. To be ironed out in optimization
 					XINPUT_STATE ControllerState;
 					if(XInputGetState(ControllerIndex, &ControllerState) == ERROR_SUCCESS)
 					{
