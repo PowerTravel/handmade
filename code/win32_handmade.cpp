@@ -1,8 +1,25 @@
-#include <windows.h>
+/*
+  TODO:
+  - Saved game locations
+  - Getting a handle to our own executable file
+  - Asset loading path
+  - Threading (launch a thread)
+  - Raw Input (support for multiple keyboards)
+  - Sleep/timeBeginPeriod
+  - ClipCursor() (for multimonitor support)
+  - Fullscreen support
+  - WM_SETCURSOR (control cursor visibility)
+  - QueryCancelAutoplay
+  - WM_ACTIVATEAPP (for when we are not the active application)
+  - Blit speed improvements (BitBlt)
+  - Hardware acceleration (OpenGL or Direct3D or BOTH??)
+  - GetKeyboardLayout (for French keyboards, international WASD support)
+
+  Just a partial list of stuff!!
+*/
+
+
 #include <stdint.h>
-#include <xinput.h>
-#include <dsound.h>
-#include <math.h>
 
 #define internal		 static
 #define local_persist    static
@@ -25,16 +42,26 @@ typedef uint64_t uint64;
 typedef float real32;
 typedef double real64;
 
+#include "handmade.hpp"
+#include "handmade.cpp"
+
+#include <windows.h>
+#include <xinput.h>
+#include <dsound.h>
+
+
+#include <math.h>
+#include <stdio.h>
+
 struct win32_offscreen_buffer
 {
-	// Note: Pixels are always 32-bits wide: Memory Order BB GG RR XX
-	BITMAPINFO Info;
-	void* Memory;
-	int Width;
-	int Height;
-	int Pitch;
+    // NOTE(casey): Pixels are alwasy 32-bits wide, Memory Order BB GG RR XX
+    BITMAPINFO Info;
+    void *Memory;
+    int Width;
+    int Height;
+    int Pitch;
 };
-
 
 struct win32_window_dimension{
 	int Width;
@@ -214,34 +241,6 @@ internal win32_window_dimension Win32GetWindowDimension( HWND Window )
 	return Result;
 }
 
-
-internal void 
-RenderWeirdGradient(win32_offscreen_buffer* Buffer, int XOffset, int YOffset)
-{	
-	uint8* Row = (uint8*)Buffer->Memory;
-
-	for(int Y= 0; Y< Buffer->Height; ++Y)
-	{
-		uint32* Pixel = (uint32*)Row;
-		for(int X= 0; X < Buffer->Width; ++X)
-		{
-
-			uint8 Blue = (X+XOffset);			
-			uint8 Green = (Y+YOffset);
-			uint8 Red = 0;
-	
-			/*
-						  8b 8b 8b 8b = 36bit
-				Memmory   BB GG RR xx
-				Registry  xx RR GG BB
-			*/
-
-			*Pixel++ = ( (Red << 16 )  | ( Green << 8) | Blue);
-		}
-
-		Row += Buffer->Pitch;
-	}
-}
 
 internal void 
 Win32ResizeDIBSection(win32_offscreen_buffer* Buffer, int Width, int Height)
@@ -433,6 +432,10 @@ Win32_FillSoundBuffer(win32_sound_output* SoundOutput, DWORD ByteToLock, DWORD B
 		// TODO: tSin drifts after a while.
 		DWORD Region1SampleCount = Region1Size/SoundOutput->BytesPerSample;
 		int16* SampleOut = ( int16* ) Region1;
+		
+		real32 twopi = 2.0f*Pi32;
+		real32 dr = twopi/(real32)SoundOutput->SamplesPerPeriod;
+
 		for(DWORD SampleIndex = 0; 
 			SampleIndex < Region1SampleCount; 
 			++SampleIndex)
@@ -441,7 +444,6 @@ Win32_FillSoundBuffer(win32_sound_output* SoundOutput, DWORD ByteToLock, DWORD B
 			int16 SampleValue = (int16)(SineValue * SoundOutput->ToneVolume);
 			*SampleOut++ = SampleValue; // Left Speker
 			*SampleOut++ = SampleValue; // Rright speaker
-			real32 dr = 2.0f*Pi32*1.0f/(real32)SoundOutput->SamplesPerPeriod;
 			SoundOutput->tSine += dr;
 			SoundOutput->RunningSampleIndex++;
 		}
@@ -456,10 +458,15 @@ Win32_FillSoundBuffer(win32_sound_output* SoundOutput, DWORD ByteToLock, DWORD B
 			int16 SampleValue = (int16)(SineValue * SoundOutput->ToneVolume);
 			*SampleOut++ = SampleValue;
 			*SampleOut++ = SampleValue;
-			real32 dr = 2.0f*Pi32*1.0f/(real32)SoundOutput->SamplesPerPeriod;
 			SoundOutput->tSine += dr;
 			SoundOutput->RunningSampleIndex++;
 
+		}
+
+		// This does not solve the bug, just delays the ptich change from 9 sec to 16
+		if(SoundOutput->tSine > twopi)
+		{
+			SoundOutput->tSine -= twopi;
 		}
 		
 
@@ -474,9 +481,17 @@ WinMain(HINSTANCE Instance,
 			LPSTR CommandLine, 
 			int ShowCode )
 {
+
+	LARGE_INTEGER PerfCounterFrequencyResult;
+	QueryPerformanceFrequency(&PerfCounterFrequencyResult);
+
+	int64 PerfCounterFrequency = PerfCounterFrequencyResult.QuadPart;
+
+
+	Win32_LoadXInput();
+
 	WNDCLASSA WindowClass = {};
 	
-	Win32_LoadXInput();
 
 	Win32ResizeDIBSection(&GlobalBackBuffer, 1280, 720);
 
@@ -485,6 +500,7 @@ WinMain(HINSTANCE Instance,
 	WindowClass.hInstance = PrevInstance; 
 // 	WindowClass.hIcon;	// window icon (for later)
 	WindowClass.lpszClassName = "HandmadeWindowClass";	// Name for the window class
+			
 	
 	if(RegisterClass(&WindowClass) != 0)
 	{
@@ -533,8 +549,12 @@ WinMain(HINSTANCE Instance,
 
 
 			GlobalRunning = true;
+			LARGE_INTEGER LastCounter;
+			QueryPerformanceCounter(&LastCounter);
+			int64 LastCycleCount = __rdtsc();
 			while(GlobalRunning)
 			{	
+
 				MSG Message;
 				while(PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
 				{
@@ -548,7 +568,7 @@ WinMain(HINSTANCE Instance,
 				}
 			
 				// Input
-				// TODO: Should we poll this more frequently
+				// TODO: Should we poll this more frequently?
 
 				for( DWORD ControllerIndex = 0; 
 					ControllerIndex< XUSER_MAX_COUNT; 
@@ -589,14 +609,17 @@ WinMain(HINSTANCE Instance,
 				
 
 						
-						XOffset +=LeftStickX /7096;
-						YOffset +=LeftStickY /7096;
+						XOffset +=LeftStickX /5096;
+						YOffset +=LeftStickY /5096;
 
-
-						SoundOutput.ToneHz = 261 + (int) (131* ((real32)LeftStickY/32000.0f));
-						SoundOutput.SamplesPerPeriod = SoundOutput.SamplesPerSecond/SoundOutput.ToneHz;
-						// NOTE: Resettign this parameter gets rid of the glitch
-						//		 So the sinvalue seems to get out of sync after a while
+						// This code is buggy so i enclose it in a toggle 
+						if(XButton)
+						{
+							SoundOutput.ToneHz = 261 + (int) (131* ((real32)LeftStickY/32000.0f));
+							SoundOutput.SamplesPerPeriod = SoundOutput.SamplesPerSecond/SoundOutput.ToneHz;
+						}
+						// NOTE: Resettign this parameter resets the glitch
+						//		 The sinvalue seems to get out of sync after a while
 						if(AButton)
 						{
 							SoundOutput.tSine = 0;
@@ -610,14 +633,17 @@ WinMain(HINSTANCE Instance,
 						// NOTE: The controller is not available
 					}
 				}
+				
+				// Render
+				//RenderWeirdGradient(&GlobalBackBuffer, XOffset, YOffset);
+				game_offscreen_buffer Buffer= {};
+				Buffer.Memory= GlobalBackBuffer.Memory;
+				Buffer.Width=  GlobalBackBuffer.Width;
+				Buffer.Height= GlobalBackBuffer.Height;
+				Buffer.Pitch=  GlobalBackBuffer.Pitch;
+				GameUpdateAndRender(&Buffer, XOffset, YOffset);
 
 				// Sound
-				// TODO: 	Bug! The sine value gets out of sync as the time increases whitch
-				// 			introduce skippinig when pitch shifts with the analog.
-				//			Think it may have to do with something getting rounded incorrectly
-				//			whitch propagates some error whichincreases as time passes by
-				// 			The bug soudglitch gets fixed by resetting the tSin value to zero
-				// 			Somehow its drifting.
 				DWORD PlayCursor;
 				DWORD WriteCursor;
 				if(SUCCEEDED(GlobalSecondaryBuffer->GetCurrentPosition( &PlayCursor, &WriteCursor)))
@@ -640,11 +666,28 @@ WinMain(HINSTANCE Instance,
 					Win32_FillSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite);
 				}
 
-				// Render
-				RenderWeirdGradient(&GlobalBackBuffer, XOffset, YOffset);
+				// Update Window
 				win32_window_dimension Dimension = Win32GetWindowDimension( Window );
 				Win32DisplayBufferInWindow(&GlobalBackBuffer, DeviceContext, 
 									Dimension.Width, Dimension.Height);
+				
+				int64 EndCycleCount = __rdtsc();
+
+				LARGE_INTEGER EndCounter;
+				QueryPerformanceCounter(&EndCounter);
+
+				uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
+				int64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
+				real64 MSPerFrame = ((1000.0f*(real64)CounterElapsed)/(real64)PerfCounterFrequency);
+				real64 FPS = (real64)PerfCounterFrequency/(real64)CounterElapsed;
+				real64 MCFP =  ((real64)CyclesElapsed /(1000.0f*1000.0f));
+#ifdef APA
+				char txtBuffer[256];
+				snprintf(txtBuffer, sizeof(txtBuffer), "%.02f ms/f, %.02f f/s, %.02f Mc/f \n", MSPerFrame, FPS, MCFP);
+				OutputDebugString(Buffer);
+#endif		
+				LastCounter = EndCounter;
+				LastCycleCount = EndCycleCount;
 			}
 		}else{	
 		//	TODO: Logging	
