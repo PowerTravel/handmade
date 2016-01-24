@@ -446,19 +446,19 @@ WinMain(HINSTANCE Instance,
 			int YOffset = 0;
 
 			// NOTE: Sound test
-			local_persist int frame =0;
-			frame++;
 			int SamplesPerSecond = 48000;
-			int ToneHz = 556;
+			int ToneHz = 256;
 			int16 ToneVolume = 500;
 			uint32 RunningSampleIndex = 0;
 			int SquareWavePeriod = SamplesPerSecond/ToneHz;
 			int HalfSquareWavePeriod = SquareWavePeriod/2;
 			int BytesPerSample = sizeof(int16)*2;
 			int SecondaryBufferSize =SamplesPerSecond*BytesPerSample;
+			bool SoundIsRunning = false;
+
 
 			Win32InitDSound(Window,SamplesPerSecond,SecondaryBufferSize);
-			HRESULT SoundError = GlobalSecondaryBuffer->Play(0,0, DSBPLAY_LOOPING);
+			GlobalSecondaryBuffer->Play(0,0, DSBPLAY_LOOPING);
 
 			GlobalRunning = true;
 			while(GlobalRunning)
@@ -535,21 +535,17 @@ WinMain(HINSTANCE Instance,
 				// Note: DirectSound output test
 				DWORD PlayCursor;
 				DWORD WriteCursor;
+
 				if( SUCCEEDED(GlobalSecondaryBuffer->GetCurrentPosition( &PlayCursor, &WriteCursor)))
 				{
 
 					DWORD ByteToLock = (RunningSampleIndex * BytesPerSample) % SecondaryBufferSize;
-					DWORD BytesToWrite;
-					// BUG: Somehow we get BytesToWrite == 0 which causes Lock() to fail.
-					if(ByteToLock == PlayCursor)
-					{
-						BytesToWrite = SecondaryBufferSize;
-					}
-					else if(ByteToLock > PlayCursor)
+					DWORD BytesToWrite = 0;
+					if(ByteToLock > PlayCursor)
 					{
 						BytesToWrite = (SecondaryBufferSize - ByteToLock);
 						BytesToWrite += PlayCursor;
-					}else{
+					}else {//if(ByteToLock == PlayCursor){
 						BytesToWrite = PlayCursor - ByteToLock;
 					}
 					VOID* Region1;
@@ -557,11 +553,10 @@ WinMain(HINSTANCE Instance,
 					VOID* Region2;
 					DWORD Region2Size;
 
-					SoundError = GlobalSecondaryBuffer->Lock( ByteToLock, BytesToWrite,
+					if( SUCCEEDED(GlobalSecondaryBuffer->Lock( ByteToLock, BytesToWrite,
 								        						 &Region1, &Region1Size,
 								        						 &Region2, &Region2Size,
-								        						 0);
-					if( SUCCEEDED(SoundError) )
+								        						 0)))
 					{
 						// TODO: assert that region1size / region2size is valid
 
@@ -592,6 +587,7 @@ WinMain(HINSTANCE Instance,
 						GlobalSecondaryBuffer->Unlock(Region1, Region1Size,
 								Region2, Region2Size);
 					}
+					
 
 
 				}
