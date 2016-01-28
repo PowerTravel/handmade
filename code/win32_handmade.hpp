@@ -1,4 +1,6 @@
 
+#include "handmade.hpp"
+#include "handmade.cpp"
 
 struct win32_offscreen_buffer
 {

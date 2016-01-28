@@ -75,6 +75,13 @@ GameUpdateAndRender(game_memory* Memory,
 	{
 		char* Filename = __FILE__;
 
+		/* 
+		// NOTE: How final API for filereading should look:
+		uint64 FileSize = GetFileSize(FileName);
+		void* BitmapMemory = ReserveMemory(Memory, FileSize);
+		ReadEntireFileMemory(FileName, BitmapMemory);
+		*/
+
 		// NOTE: Temporary solution for file reading
 		debug_read_file_result BitmapMemory = DEBUGPlatformReadEntireFile(Filename);
 		if(BitmapMemory.Contents)
@@ -82,6 +89,7 @@ GameUpdateAndRender(game_memory* Memory,
 			DEBUGPlatformWriteEntireFile("w:/handmade/data/test.out",BitmapMemory.ContentSize,BitmapMemory.Contents);
 			DEBUGFreeFileMemory(BitmapMemory.Contents);	
 		}
+		
 		
 		GameState->ToneHz = 261;
 		
