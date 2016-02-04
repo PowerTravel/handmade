@@ -138,7 +138,8 @@ struct game_memory
 internal void
 GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz);
 
-void RenderWeirdGradient(game_offscreen_buffer* Buffer, int XOffset, int YOffset);
+internal void 
+RenderWeirdGradient(game_offscreen_buffer* Buffer, int XOffset, int YOffset);
 
 
 // FourThings: timing, controller/keyboard input, bitmap buffer to use, soundbuffer to use

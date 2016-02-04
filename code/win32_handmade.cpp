@@ -167,7 +167,7 @@ DEBUGPlatformWriteEntireFile(char* Filename, uint32 MemorySize, void* Memory)
 	return Result;
 }
 internal void 
-Win32_LoadXInput(void) 
+Win32LoadXInput(void) 
 {  
 	// Note: 	There are three versions of XInput at the time of writing; 
 	// 			XInput 1.4 is bundled with Windows 8, 
@@ -390,54 +390,7 @@ MainWindowCallback(	HWND Window,
 		case WM_KEYDOWN:
 		case WM_KEYUP:
 		{
-			uint32 VKCode = WParam;
-			#define KeyMessageWasDownBit (1<<30)
-			#define KeyMessageIsDownBit (1<<31)
-			bool WasDown = ((LParam & KeyMessageWasDownBit) != 0);
-			bool IsDown = ((LParam &  KeyMessageIsDownBit) == 0);
-
-			if(WasDown != IsDown)
-			{
-				if(VKCode == 'W')
-				{
-				
-				}else if(VKCode == 'A'){
-
-				}else if(VKCode == 'S'){
-
-				}else if(VKCode == 'D'){
-
-				}else if(VKCode == 'Q'){
-
-				}else if(VKCode == 'E'){
-
-				}else if(VKCode == VK_UP){
-
-				}else if(VKCode == VK_LEFT){
-
-				}else if(VKCode == VK_DOWN){
-
-				}else if(VKCode == VK_RIGHT){
-				
-				}else if(VKCode == VK_ESCAPE){
-					OutputDebugString("ESCAPE");
-					if(IsDown){
-						OutputDebugString(" IsDown ");	
-					}
-					if(WasDown){
-						OutputDebugString(" WasDown");
-					}
-					OutputDebugString("\n");
-				}else if(VKCode == VK_SPACE){
-				
-				}
-			}
-		
-			bool AltKeyWasDown = ((LParam & (1<<29)) != 0);
-			if(VKCode==VK_F4 && AltKeyWasDown)
-			{
-				GlobalRunning=false;
-			}	
+			Assert(!"Kewyboard input came in through a non-dispatch message!");
 		}break;
 
 		case WM_PAINT:
@@ -466,7 +419,7 @@ MainWindowCallback(	HWND Window,
 
 
 internal void
-Win32_ClearSoundBuffer(win32_sound_output* SoundOutput)
+Win32ClearSoundBuffer(win32_sound_output* SoundOutput)
 {
 	VOID* Region1;
 	DWORD Region1Size;
@@ -499,7 +452,7 @@ Win32_ClearSoundBuffer(win32_sound_output* SoundOutput)
 };
 
 internal void
-Win32_FillSoundBuffer(win32_sound_output* SoundOutput, DWORD ByteToLock, DWORD BytesToWrite, game_sound_output_buffer* SourceBuffer)
+Win32FillSoundBuffer(win32_sound_output* SoundOutput, DWORD ByteToLock, DWORD BytesToWrite, game_sound_output_buffer* SourceBuffer)
 {
 	VOID* Region1;
 	DWORD Region1Size;
@@ -541,13 +494,23 @@ Win32_FillSoundBuffer(win32_sound_output* SoundOutput, DWORD ByteToLock, DWORD B
 }
 
 internal void 
-Win32_ProcessXInputDigitalButton(DWORD XInputButtonState, game_button_state* OldState, DWORD ButtonBit, game_button_state* NewState )
+Win32ProcessXInputDigitalButton(DWORD XInputButtonState, game_button_state* OldState, DWORD ButtonBit, game_button_state* NewState )
 {
 	NewState->EndedDown = ((XInputButtonState & ButtonBit) == ButtonBit);
 	NewState->HalfTransitionCount = 
 		(OldState->EndedDown != NewState->EndedDown) ? 1 : 0;
 						
 };
+
+internal void
+Win32ProcessKeyboardMessage( game_button_state* NewState, 
+							 bool32 IsDown )
+{
+	NewState->EndedDown = IsDown;
+	++NewState->HalfTransitionCount;
+						
+}
+
 
 int CALLBACK 
 WinMain(HINSTANCE Instance, 
@@ -562,7 +525,7 @@ WinMain(HINSTANCE Instance,
 	int64 PerfCounterFrequency = PerfCounterFrequencyResult.QuadPart;
 
 
-	Win32_LoadXInput();
+	Win32LoadXInput();
 
 	WNDCLASSA WindowClass = {};
 	
@@ -612,7 +575,7 @@ WinMain(HINSTANCE Instance,
 			Win32InitDSound(Window,SoundOutput.SamplesPerSecond,
 									SoundOutput.SecondaryBufferSize);
 			
-			Win32_ClearSoundBuffer(&SoundOutput);
+			Win32ClearSoundBuffer(&SoundOutput);
 			GlobalSecondaryBuffer->Play(0,0, DSBPLAY_LOOPING);
 
 
@@ -632,8 +595,7 @@ WinMain(HINSTANCE Instance,
 			GameMemory.TransientStorageSize = Gigabytes(4);
 			uint64 TotalSize = GameMemory.PermanentStorageSize +
 								GameMemory.TransientStorageSize;
-			GameMemory.PermanentStorage = VirtualAlloc(BaseAddress, 
-											TotalSize,
+			GameMemory.PermanentStorage = VirtualAlloc(BaseAddress, (size_t)TotalSize,
 											MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);	
 			GameMemory.TransientStorage = ((uint8*) GameMemory.PermanentStorage + 
 								GameMemory.PermanentStorageSize);
@@ -653,23 +615,93 @@ WinMain(HINSTANCE Instance,
 				{	
 				
 					MSG Message;
+					game_controller_input* KeyboardController = &NewInput->Controllers[0]; 
+					// TODO Zeroing Macro
+					game_controller_input ZeroController = {};
+					*KeyboardController = ZeroController;
 					
-					game_input Input = {};
-
 					while(PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
 					{
 						if(Message.message == WM_QUIT)
 						{
 							GlobalRunning =  false;
 						}
-						
-						TranslateMessage(&Message);
-						DispatchMessage(&Message);
+						switch(Message.message)
+						{
+							case WM_SYSKEYDOWN:
+							case WM_SYSKEYUP:
+							case WM_KEYDOWN:
+							case WM_KEYUP:
+							{
+							
+								uint32 VKCode = (uint32)Message.wParam;
+								#define KeyMessageWasDownBit (1<<30)
+								#define KeyMessageIsDownBit (1<<31)
+								bool WasDown = ((Message.lParam & KeyMessageWasDownBit) != 0);
+								bool IsDown = ((Message.lParam &  KeyMessageIsDownBit) == 0);
+
+								if(WasDown != IsDown)
+								{
+									if(VKCode == 'W')
+									{
+									
+									}else if(VKCode == 'A'){
+
+									}else if(VKCode == 'S'){
+
+									}else if(VKCode == 'D'){
+
+									}else if(VKCode == 'Q'){
+										Win32ProcessKeyboardMessage(
+												&KeyboardController->LeftShoulder, IsDown);
+
+									}else if(VKCode == 'E'){
+										Win32ProcessKeyboardMessage(  
+												&KeyboardController->RightShoulder, IsDown);
+
+									}else if(VKCode == VK_UP){
+										Win32ProcessKeyboardMessage(
+												&KeyboardController->Up, IsDown);
+
+									}else if(VKCode == VK_LEFT){
+										Win32ProcessKeyboardMessage(
+												&KeyboardController->Left, IsDown);
+
+									}else if(VKCode == VK_DOWN){
+										Win32ProcessKeyboardMessage(
+												&KeyboardController->Down, IsDown);
+
+									}else if(VKCode == VK_RIGHT){
+										Win32ProcessKeyboardMessage(
+												&KeyboardController->Right, IsDown);
+									
+									}else if(VKCode == VK_ESCAPE){
+									
+										GlobalRunning = false;
+
+									}else if(VKCode == VK_SPACE){
+									
+									}
+								}
+		
+								bool AltKeyWasDown = ((Message.lParam & (1<<29)) != 0);
+								if(VKCode==VK_F4 && AltKeyWasDown)
+								{
+									GlobalRunning=false;
+								}	
+							}break;
+
+							default:
+							{
+								TranslateMessage(&Message);
+								DispatchMessage(&Message);
+							}break;
+						}
 					}
 				
 					// Input
 					// TODO: Should we poll this more frequently?
-					int MaxControllerCount = XUSER_MAX_COUNT;
+					DWORD MaxControllerCount = XUSER_MAX_COUNT;
 
 					if(MaxControllerCount > ArrayCount(NewInput->Controllers))
 					{
@@ -727,32 +759,32 @@ WinMain(HINSTANCE Instance,
 							NewController->MinY = NewController->MaxY = NewController->EndY = Y;
 
 
-							Win32_ProcessXInputDigitalButton(
+							Win32ProcessXInputDigitalButton(
 									Pad ->wButtons, 
 									&OldController->Down, XINPUT_GAMEPAD_A, 
 									&NewController->Down);
 
-							Win32_ProcessXInputDigitalButton(
+							Win32ProcessXInputDigitalButton(
 									Pad ->wButtons, 
 									&OldController->Right, XINPUT_GAMEPAD_B, 
 									&NewController->Right);
 
-							Win32_ProcessXInputDigitalButton(
+							Win32ProcessXInputDigitalButton(
 									Pad ->wButtons, 
 									&OldController->Left, XINPUT_GAMEPAD_X, 
 									&NewController->Left);
 
-							Win32_ProcessXInputDigitalButton(
+							Win32ProcessXInputDigitalButton(
 									Pad ->wButtons, 
 									&OldController->Up, XINPUT_GAMEPAD_Y, 
 									&NewController->Up);
 							
-							Win32_ProcessXInputDigitalButton(
+							Win32ProcessXInputDigitalButton(
 									Pad ->wButtons, 
 									&OldController->LeftShoulder, XINPUT_GAMEPAD_LEFT_SHOULDER, 
 									&NewController->LeftShoulder);
 
-							Win32_ProcessXInputDigitalButton(
+							Win32ProcessXInputDigitalButton(
 									Pad ->wButtons, 
 									&OldController->LeftShoulder, XINPUT_GAMEPAD_RIGHT_SHOULDER, 
 									&NewController->LeftShoulder);
@@ -820,7 +852,7 @@ WinMain(HINSTANCE Instance,
 					// Sound
 					if(SoundIsValid)
 					{
-						Win32_FillSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite, &SoundBuffer);
+						Win32FillSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite, &SoundBuffer);
 					}
 
 					// Update Window

@@ -11,7 +11,7 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
 	int SamplesPerPeriod = SoundBuffer->SamplesPerSecond/ ToneHz;
 
 
-	real32 twopi = 2.0f*Pi32;
+	real32 twopi = (real32) (2.0*Pi32);
 
 	int16 *SampleOut = SoundBuffer->Samples;
 	for(int SampleIndex = 0; 
@@ -44,8 +44,8 @@ RenderWeirdGradient(game_offscreen_buffer* Buffer, int XOffset, int YOffset)
 		for(int X= 0; X < Buffer->Width; ++X)
 		{
 
-			uint8 Blue = (X+XOffset);			
-			uint8 Green = (Y+YOffset);
+			uint8 Blue = (uint8)(X+XOffset);			
+			uint8 Green = (uint8)(Y+YOffset);
 			uint8 Red = 0;
 	
 			/*
@@ -93,7 +93,7 @@ GameUpdateAndRender(game_memory* Memory,
 	if(Input0->IsAnalog){
 		//NOTE use analog movement tuning
 		GameState->BlueOffset += (int)(4.0f*Input0->EndX);
-		GameState->ToneHz = 261 + (int)(128.0f*(Input0->EndY));
+		GameState->ToneHz = 261 + (int)(128.0f*Input0->EndY);
 	}else{
 		//NOTE use keyboard movement tuning	
 	}

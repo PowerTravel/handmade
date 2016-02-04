@@ -2,6 +2,8 @@
 
 1 	009 Sound
 	Pitch of tone goes up after 16 sec. May have to do with drifting sine angle
+	solved
+
 
 2	009	Sound:
 	Induced pitch change deteriorates with time.  Goes from continious to granular with time.
