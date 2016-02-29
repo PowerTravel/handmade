@@ -95,26 +95,62 @@ struct game_button_state
 struct game_controller_input
 {	
 	bool32 IsAnalog;
-	real32 StartX;
-	real32 StartY;
-	real32 MinX;
-	real32 MinY;
-	real32 MaxX;
-	real32 MaxY;
-	real32 EndX;
-	real32 EndY;
+	bool32 IsConnected;
 
 	union
 	{
-		game_button_state Button[6];
+		real32 Averages[6];
 		struct
 		{
-			game_button_state Up;
-			game_button_state Down;
-			game_button_state Left;
-			game_button_state Right;
+			real32 LeftStickAverageX;
+			real32 LeftStickAverageY;
+			real32 RightStickAverageX;
+			real32 RightStickAverageY;
+			real32 LeftTriggerAverage;
+			real32 RightTriggerAverage;
+		};
+	};
+
+	union
+	{
+		game_button_state Button[24];
+		struct
+		{
+
+			game_button_state DPadUp;
+			game_button_state DPadDown;
+			game_button_state DPadLeft;
+			game_button_state DPadRight;
+
+			game_button_state Start;
+			game_button_state Select;
+
 			game_button_state LeftShoulder;
 			game_button_state RightShoulder;
+
+			game_button_state LeftTrigger;
+			game_button_state RightTrigger;
+
+			game_button_state LeftStick;
+			game_button_state LeftStickUp;
+			game_button_state LeftStickDown;
+			game_button_state LeftStickLeft;
+			game_button_state LeftStickRight;
+
+			game_button_state RightStick;
+			game_button_state RightStickUp;
+			game_button_state RightStickDown;
+			game_button_state RightStickLeft;
+			game_button_state RightStickRight;
+
+			game_button_state A;
+			game_button_state B;
+			game_button_state X;
+			game_button_state Y;
+
+
+			// Note: Fake Button, All new buttons must be added above this one
+			game_button_state Terminator;
 		};
 	};
 
@@ -123,8 +159,15 @@ struct game_controller_input
 struct game_input
 {
 	// TODO: insert Game Clock here
-	game_controller_input Controllers[4];
+	game_controller_input Controllers[5];
 };
+
+inline game_controller_input* GetController(game_input* Input, int ControllerIndex)
+{
+	Assert(ControllerIndex < ArrayCount(Input->Controllers));
+	game_controller_input* Result  = &Input->Controllers[ControllerIndex];
+	return Result;
+}
 
 struct game_memory
 {

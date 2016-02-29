@@ -42,7 +42,7 @@ RenderWeirdGradient(game_offscreen_buffer* Buffer, int XOffset, int YOffset)
 	{
 		uint32* Pixel = (uint32*)Row;
 		for(int X= 0; X < Buffer->Width; ++X)
-		{
+		{  
 
 			uint8 Blue = (uint8)(X+XOffset);			
 			uint8 Green = (uint8)(Y+YOffset);
@@ -68,6 +68,8 @@ GameUpdateAndRender(game_memory* Memory,
 					game_sound_output_buffer* SoundBuffer,
 					game_input* Input)
 {
+	Assert( (&Input->Controllers[0].Terminator - &Input->Controllers[0].Button[0]) == 
+			 (ArrayCount(Input->Controllers[0].Button)) );
 	Assert(sizeof(game_state) <= (Memory->PermanentStorageSize) );
 	game_state *GameState = (game_state* ) Memory->PermanentStorage;
 
@@ -88,23 +90,31 @@ GameUpdateAndRender(game_memory* Memory,
 		Memory->IsInitialized = true;
 	}
 
-	game_controller_input* Input0 = &Input->Controllers[0];
-
-	if(Input0->IsAnalog){
-		//NOTE use analog movement tuning
-		GameState->BlueOffset += (int)(4.0f*Input0->EndX);
-		GameState->ToneHz = 261 + (int)(128.0f*Input0->EndY);
-	}else{
-		//NOTE use keyboard movement tuning	
-	}
-
-	//Input.AButtonEndedDown;
-	//Input.AButteonHalfTransitionCount;
-	if(Input0->Down.EndedDown)
+	for(int ControllerIndex = 0; 
+		ControllerIndex < ArrayCount(Input->Controllers); 
+		++ControllerIndex)
 	{
-		GameState->GreenOffset +=1;
+		
+		game_controller_input* Controller = GetController(Input,ControllerIndex);
+
+		if(Controller->IsAnalog ){
+			//NOTE use analog movement tuning
+			GameState->BlueOffset += (int)(4.0f*Controller->LeftStickAverageX);
+			GameState->ToneHz = 261 + (int)(128.0f*Controller->LeftStickAverageY);
+		}else{
+
+			if(Controller->LeftStickLeft.EndedDown)
+			{
+				GameState->BlueOffset -= 4;
+			}
+
+			if(Controller->LeftStickRight.EndedDown)
+			{
+				GameState->BlueOffset += 4;
+			}
+
+		}	
 	}
-	
 
 	//TODO: Allow sample offset here for more robust platform options
 	GameOutputSound(SoundBuffer, GameState->ToneHz);
