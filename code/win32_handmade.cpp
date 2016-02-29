@@ -57,6 +57,7 @@ typedef double real64;
 global_variable bool GlobalRunning;
 global_variable win32_offscreen_buffer GlobalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER GlobalSecondaryBuffer;	
+global_variable int64 GlobalPerfCounterFrequency;
 // Note: 	We don't want to rely on the libraries needed to run the functions
 //			XInputGetState and XInputSetState defined in <xinput.h> as they have
 //			poor support on different windows versions. See handmadeHero ep 006;
@@ -517,6 +518,7 @@ internal real32
 Win32ProcessXinputStickValue(SHORT Value, SHORT DeadZoneThershold)
 {
 	real32 Result = 0;
+
 	if(Value < -DeadZoneThershold)
 	{
 		Result = (real32)(Value + DeadZoneThershold) / (32768.0f - DeadZoneThershold);
@@ -526,6 +528,30 @@ Win32ProcessXinputStickValue(SHORT Value, SHORT DeadZoneThershold)
 	return Result;
 }
 
+internal void
+Win32ProcessXinputStickValue(	real32* X, 
+								real32* Y,
+								SHORT Value_X,
+								SHORT Value_Y,
+								SHORT DeadZoneThershold)
+{
+	real32 normalizer = 1 / 32768.0f;
+	real32 normalized_deadzone= 1.f / ( (real32) DeadZoneThershold );
+	real32 normalized_deadzone_squared = normalized_deadzone*normalized_deadzone;
+
+	real32 x_norm = Value_X * normalizer;
+	real32 y_norm = Value_Y * normalizer;
+	real32 stick_offset_squared = x_norm*x_norm + y_norm*y_norm;
+
+	if(stick_offset_squared > normalized_deadzone_squared)
+	{
+		*X = (real32)(Value_X) * normalizer;
+		*Y = (real32)(Value_Y) * normalizer;
+	}else{
+		*X = 0;
+		*Y = 0;
+	}
+}
 
 internal void 
 Win32ProcessPendingMessages(game_controller_input* KeyboardController)
@@ -662,6 +688,197 @@ Win32ProcessPendingMessages(game_controller_input* KeyboardController)
 }
 
 
+internal void 
+Win32ProcessControllerInput( game_input* OldInput,
+							game_input* NewInput)
+{	
+
+	// Input
+	// TODO: Should we poll this more frequently?
+	DWORD MaxControllerCount = XUSER_MAX_COUNT;
+	if(MaxControllerCount > (ArrayCount(NewInput->Controllers)-1))
+	{
+		MaxControllerCount = (ArrayCount(NewInput->Controllers)-1);
+	}
+
+	for( DWORD ControllerIndex = 0; 
+		ControllerIndex < MaxControllerCount; 
+		++ControllerIndex )
+	{
+		DWORD OurControllerIndex = ControllerIndex+1;
+		game_controller_input* OldController = 
+								GetController(OldInput, OurControllerIndex); 
+		game_controller_input* NewController = 
+								GetController(NewInput, OurControllerIndex); 
+		// Note: Performancebug in XInputGetControllerstate.
+		//		 See HH007 at 15 min. To be ironed out in optimization
+		XINPUT_STATE ControllerState;
+		if(XInputGetState(ControllerIndex, &ControllerState) == ERROR_SUCCESS)
+		{
+			// NOTE: This controller is plugged in
+			// TODO: See if ControllerState.dwPacketNumber increment too rapidly
+			XINPUT_GAMEPAD *Pad = &ControllerState.Gamepad;
+		
+			real32 StickThreshhold = 0.0f;
+			real32 TriggerThreshhold = 0.5f;
+	
+			NewController->IsAnalog = true;
+			NewController->IsConnected = true;
+			
+			// Todo: Check if controller deadzone is round or rectangular
+			//		 Right now it is treated as rectangular inside 
+			//		 Win32ProcessXinputStickValue
+	
+			// Rectangular done deadzone
+			NewController->LeftStickAverageX =
+								Win32ProcessXinputStickValue(Pad->sThumbLX,
+								XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
+			NewController->LeftStickAverageY = 
+								Win32ProcessXinputStickValue(Pad->sThumbLY,
+								XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
+			NewController->RightStickAverageX = 
+								Win32ProcessXinputStickValue(Pad->sThumbRX,
+								XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
+			NewController->RightStickAverageY = 
+								Win32ProcessXinputStickValue(Pad->sThumbRY,
+								XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
+
+#if 0
+			// Rectangular Naivly done circular deadzone
+			// Not working correctly, wait untill casey does it 
+			// on stream
+			Win32ProcessXinputStickValue(
+						&NewController->LeftStickAverageX, 
+						&NewController->LeftStickAverageY,
+						Pad->sThumbLX,
+						Pad->sThumbLY,
+						XINPUT_GAMEPAD_LEFT_THUMB_DEADZO
+			Win32ProcessXinputStickValue( 	&(NewController->RightStickAverageX),
+											&(NewController->RightStickAverageY),
+											Pad->sThumbRX,
+											Pad->sThumbRY,
+											XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
+#endif 
+			// Left stick
+			Win32ProcessXInputDigitalButton(
+				(NewController->LeftStickAverageX<-StickThreshhold) ? 1 : 0, 
+					&OldController->LeftStickLeft, 1, 
+					&NewController->LeftStickLeft);
+			Win32ProcessXInputDigitalButton(
+				(NewController->LeftStickAverageX >StickThreshhold) ? 1 : 0, 
+					&OldController->LeftStickRight, 1, 
+					&NewController->LeftStickRight);
+			Win32ProcessXInputDigitalButton(
+				(NewController->LeftStickAverageY <-StickThreshhold) ? 1 : 0, 
+					&OldController->LeftStickDown, 1, 
+					&NewController->LeftStickDown);
+			Win32ProcessXInputDigitalButton(
+				(NewController->LeftStickAverageY > StickThreshhold) ? 1 : 0, 
+					&OldController->LeftStickUp, 1, 
+					&NewController->LeftStickUp);
+			// Right stick
+			Win32ProcessXInputDigitalButton(
+				(NewController->RightStickAverageX<-StickThreshhold) ? 1 : 0, 
+					&OldController->RightStickLeft, 1, 
+					&NewController->RightStickLeft);
+			Win32ProcessXInputDigitalButton(
+				(NewController->RightStickAverageX >StickThreshhold) ? 1 : 0, 
+					&OldController->RightStickRight, 1, 
+					&NewController->RightStickRight);
+			Win32ProcessXInputDigitalButton(
+				(NewController->RightStickAverageY<-StickThreshhold) ? 1 : 0, 
+					&OldController->RightStickDown, 1, 
+					&NewController->RightStickDown);
+			Win32ProcessXInputDigitalButton(
+				(NewController->RightStickAverageY >StickThreshhold) ? 1 : 0, 
+					&OldController->RightStickUp, 1, 
+					&NewController->RightStickUp);
+	
+			NewController->LeftTriggerAverage = (real32)Pad->bLeftTrigger/255.0f;
+			Win32ProcessXInputDigitalButton(
+					(NewController->LeftTriggerAverage > TriggerThreshhold) ? 1 : 0, 
+					&OldController->LeftTrigger, 1, 
+					&NewController->LeftTrigger);
+			
+			NewController->RightTriggerAverage =(real32)Pad->bLeftTrigger/255.0f;
+			Win32ProcessXInputDigitalButton(
+					(NewController->RightTriggerAverage > TriggerThreshhold) ? 1 : 0, 
+					&OldController->RightTrigger, 1, 
+					&NewController->RightTrigger);
+			
+			// Button handling
+			Win32ProcessXInputDigitalButton(
+					Pad ->wButtons, 
+					&OldController->DPadUp, XINPUT_GAMEPAD_DPAD_UP, 
+					&NewController->DPadUp);
+			Win32ProcessXInputDigitalButton(
+					Pad ->wButtons, 
+					&OldController->DPadDown, XINPUT_GAMEPAD_DPAD_DOWN, 
+					&NewController->DPadDown);
+			Win32ProcessXInputDigitalButton(
+					Pad ->wButtons, 
+					&OldController->DPadLeft, XINPUT_GAMEPAD_DPAD_LEFT, 
+					&NewController->DPadLeft);
+			Win32ProcessXInputDigitalButton(
+					Pad ->wButtons, 
+					&OldController->DPadRight, XINPUT_GAMEPAD_DPAD_RIGHT, 
+					&NewController->DPadRight);
+			Win32ProcessXInputDigitalButton(
+					Pad ->wButtons, 
+					&OldController->LeftShoulder, XINPUT_GAMEPAD_LEFT_SHOULDER, 
+					&NewController->LeftShoulder);
+			Win32ProcessXInputDigitalButton(
+					Pad ->wButtons, 
+					&OldController->LeftShoulder, XINPUT_GAMEPAD_RIGHT_SHOULDER, 
+					&NewController->LeftShoulder);
+			Win32ProcessXInputDigitalButton(
+					Pad ->wButtons, 
+					&OldController->Start, XINPUT_GAMEPAD_START, 
+					&NewController->Start);
+			Win32ProcessXInputDigitalButton(
+					Pad ->wButtons, 
+					&OldController->Select, XINPUT_GAMEPAD_BACK, 
+					&NewController->Select);
+			Win32ProcessXInputDigitalButton(
+					Pad ->wButtons, 
+					&OldController->A, XINPUT_GAMEPAD_A, 
+					&NewController->A);
+			Win32ProcessXInputDigitalButton(
+					Pad ->wButtons, 
+					&OldController->B, XINPUT_GAMEPAD_B, 
+					&NewController->B);
+			Win32ProcessXInputDigitalButton(
+					Pad ->wButtons, 
+					&OldController->X, XINPUT_GAMEPAD_X, 
+					&NewController->X);
+			Win32ProcessXInputDigitalButton(
+					Pad ->wButtons, 
+					&OldController->Y, XINPUT_GAMEPAD_Y, 
+					&NewController->Y);
+
+		}else{
+			// NOTE: The controller is not available
+			NewController->IsConnected = false;
+		}
+	}
+}
+
+
+inline LARGE_INTEGER
+Win32GetWallClock(void)
+{
+	LARGE_INTEGER Result;
+	QueryPerformanceCounter(&Result);
+	return Result;
+}
+
+inline real32
+Win32GetSecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End)
+{
+	real32 Result =  ((real32)(End.QuadPart - Start.QuadPart) / (real32)GlobalPerfCounterFrequency );
+	return Result;
+}
+
 
 int CALLBACK 
 WinMain(HINSTANCE Instance, 
@@ -672,15 +889,17 @@ WinMain(HINSTANCE Instance,
 
 	LARGE_INTEGER PerfCounterFrequencyResult;
 	QueryPerformanceFrequency(&PerfCounterFrequencyResult);
+	GlobalPerfCounterFrequency = PerfCounterFrequencyResult.QuadPart;
 
-	int64 PerfCounterFrequency = PerfCounterFrequencyResult.QuadPart;
-
+	// Note: 	sets the Windows scheduler granularity (The max time resolution of Sleep() 
+	//			- function) to 1 ms.
+	UINT DesiredSchedulerMS = 1;
+	bool32 SleepIsGranular = (timeBeginPeriod(DesiredSchedulerMS) == TIMERR_NOERROR);
 
 	Win32LoadXInput();
 
 	WNDCLASSA WindowClass = {};
 	
-
 	Win32ResizeDIBSection(&GlobalBackBuffer, 1280, 720);
 
 	WindowClass.style = CS_OWNDC|CS_HREDRAW|CS_VREDRAW;
@@ -688,9 +907,13 @@ WinMain(HINSTANCE Instance,
 	WindowClass.hInstance = PrevInstance; 
 // 	WindowClass.hIcon;	// window icon (for later)
 	WindowClass.lpszClassName = "HandmadeWindowClass";	// Name for the window class
-			
-	
-	if(RegisterClass(&WindowClass) != 0)
+
+	// TODO: How do we reliably query this on windows?			
+	int MonitorRefreshHz = 60;
+	int GameUpdateHz = MonitorRefreshHz/2;
+	real32 TargetSecondsPerFrame = 1.0f / (real32)GameUpdateHz;
+
+	if(RegisterClass(&WindowClass))
 	{
 		HWND Window = CreateWindowEx(
 				0,
@@ -751,16 +974,15 @@ WinMain(HINSTANCE Instance,
 			GameMemory.TransientStorage = ((uint8*) GameMemory.PermanentStorage + 
 								GameMemory.PermanentStorageSize);
 
-			if(GameMemory.PermanentStorage && Samples)
+			if( Samples && GameMemory.PermanentStorage && GameMemory.TransientStorage)
 			{
 				game_input Input[2] = {};
 				game_input* NewInput = &Input[0];
 				game_input* OldInput = &Input[1];
 
-				LARGE_INTEGER LastCounter;
-				QueryPerformanceCounter(&LastCounter);
-				int64 LastCycleCount = __rdtsc();
-			
+				LARGE_INTEGER LastCounter = Win32GetWallClock();
+				uint64 LastCycleCount = __rdtsc();
+
 				GlobalRunning = true;
 				while(GlobalRunning)
 				{	
@@ -779,172 +1001,7 @@ WinMain(HINSTANCE Instance,
 
 					Win32ProcessPendingMessages(NewKeyboardController);
 						
-					// Input
-					// TODO: Should we poll this more frequently?
-					DWORD MaxControllerCount = XUSER_MAX_COUNT;
-
-					if(MaxControllerCount > (ArrayCount(NewInput->Controllers)-1))
-					{
-						MaxControllerCount = (ArrayCount(NewInput->Controllers)-1);
-					}
-
-					for( DWORD ControllerIndex = 0; 
-						ControllerIndex< MaxControllerCount; 
-						++ControllerIndex )
-					{
-						DWORD OurControllerIndex = ControllerIndex+1;	
-						game_controller_input* OldController = GetController(OldInput, OurControllerIndex); 
-						game_controller_input* NewController = GetController(NewInput, OurControllerIndex); 
-
-						// Note: Performancebug in XInputGetControllerstate.
-						//		 See HH007 at 15 min. To be ironed out in optimization
-						XINPUT_STATE ControllerState;
-						if(XInputGetState(ControllerIndex, &ControllerState) == ERROR_SUCCESS)
-						{
-							// NOTE: This controller is plugged in
-							// TODO: See if ControllerState.dwPacketNumber increment too rapidly
-							XINPUT_GAMEPAD *Pad = &ControllerState.Gamepad;
-						
-							real32 StickThreshhold = 0.0f;
-							real32 TriggerThreshhold = 0.5f;
-
-							NewController->IsAnalog = true;
-							NewController->IsConnected = true;
-							
-							// Todo: Check if controller deadzone is round or rectangular
-							//		 Right now it is treated as rectangular inside 
-							//		Win32ProcessXinputStickValue
-							NewController->LeftStickAverageX =
-												Win32ProcessXinputStickValue(Pad->sThumbLX,
-												XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
-							Win32ProcessXInputDigitalButton(
-								(NewController->LeftStickAverageX <-StickThreshhold) ? 1 : 0, 
-									&OldController->LeftStickLeft, 1, 
-									&NewController->LeftStickLeft);
-							Win32ProcessXInputDigitalButton(
-								(NewController->LeftStickAverageX > StickThreshhold) ? 1 : 0, 
-									&OldController->LeftStickRight, 1, 
-									&NewController->LeftStickRight);
-
-							NewController->LeftStickAverageY = 
-												Win32ProcessXinputStickValue(Pad->sThumbLY,
-												XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE);
-							Win32ProcessXInputDigitalButton(
-								(NewController->LeftStickAverageY <-StickThreshhold) ? 1 : 0, 
-									&OldController->LeftStickDown, 1, 
-									&NewController->LeftStickDown);
-							Win32ProcessXInputDigitalButton(
-								(NewController->LeftStickAverageY > StickThreshhold) ? 1 : 0, 
-									&OldController->LeftStickUp, 1, 
-									&NewController->LeftStickUp);
-
-							NewController->RightStickAverageX = 
-												Win32ProcessXinputStickValue(Pad->sThumbRX,
-												XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
-							Win32ProcessXInputDigitalButton(
-								(NewController->RightStickAverageX<-StickThreshhold) ? 1 : 0, 
-									&OldController->RightStickLeft, 1, 
-									&NewController->RightStickLeft);
-							Win32ProcessXInputDigitalButton(
-								(NewController->RightStickAverageX >StickThreshhold) ? 1 : 0, 
-									&OldController->RightStickRight, 1, 
-									&NewController->RightStickRight);
-
-
-							NewController->RightStickAverageY = 
-												Win32ProcessXinputStickValue(Pad->sThumbRY,
-												XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE);
-							Win32ProcessXInputDigitalButton(
-								(NewController->RightStickAverageY<-StickThreshhold) ? 1 : 0, 
-									&OldController->RightStickDown, 1, 
-									&NewController->RightStickDown);
-							Win32ProcessXInputDigitalButton(
-								(NewController->RightStickAverageY >StickThreshhold) ? 1 : 0, 
-									&OldController->RightStickUp, 1, 
-									&NewController->RightStickUp);
-
-							NewController->LeftTriggerAverage = (real32)Pad->bLeftTrigger / 255.0f;
-							Win32ProcessXInputDigitalButton(
-							(NewController->LeftTriggerAverage > TriggerThreshhold) ? 1 : 0, 
-									&OldController->LeftTrigger, 1, 
-									&NewController->LeftTrigger);
-							
-							NewController->RightTriggerAverage = (real32)Pad->bLeftTrigger / 255.0f;
-							Win32ProcessXInputDigitalButton(
-							(NewController->RightTriggerAverage > TriggerThreshhold) ? 1 : 0, 
-									&OldController->RightTrigger, 1, 
-									&NewController->RightTrigger);
-
-
-							
-							// Button handling
-							Win32ProcessXInputDigitalButton(
-									Pad ->wButtons, 
-									&OldController->DPadUp, XINPUT_GAMEPAD_DPAD_UP, 
-									&NewController->DPadUp);
-
-							Win32ProcessXInputDigitalButton(
-									Pad ->wButtons, 
-									&OldController->DPadDown, XINPUT_GAMEPAD_DPAD_DOWN, 
-									&NewController->DPadDown);
-
-							Win32ProcessXInputDigitalButton(
-									Pad ->wButtons, 
-									&OldController->DPadLeft, XINPUT_GAMEPAD_DPAD_LEFT, 
-									&NewController->DPadLeft);
-
-							Win32ProcessXInputDigitalButton(
-									Pad ->wButtons, 
-									&OldController->DPadRight, XINPUT_GAMEPAD_DPAD_RIGHT, 
-									&NewController->DPadRight);
-
-							Win32ProcessXInputDigitalButton(
-									Pad ->wButtons, 
-									&OldController->LeftShoulder, XINPUT_GAMEPAD_LEFT_SHOULDER, 
-									&NewController->LeftShoulder);
-
-							Win32ProcessXInputDigitalButton(
-									Pad ->wButtons, 
-									&OldController->LeftShoulder, XINPUT_GAMEPAD_RIGHT_SHOULDER, 
-									&NewController->LeftShoulder);
-
-							Win32ProcessXInputDigitalButton(
-									Pad ->wButtons, 
-									&OldController->Start, XINPUT_GAMEPAD_START, 
-									&NewController->Start);
-
-							Win32ProcessXInputDigitalButton(
-									Pad ->wButtons, 
-									&OldController->Select, XINPUT_GAMEPAD_BACK, 
-									&NewController->Select);
-
-							Win32ProcessXInputDigitalButton(
-									Pad ->wButtons, 
-									&OldController->A, XINPUT_GAMEPAD_A, 
-									&NewController->A);
-
-							Win32ProcessXInputDigitalButton(
-									Pad ->wButtons, 
-									&OldController->B, XINPUT_GAMEPAD_B, 
-									&NewController->B);
-
-							Win32ProcessXInputDigitalButton(
-									Pad ->wButtons, 
-									&OldController->X, XINPUT_GAMEPAD_X, 
-									&NewController->X);
-
-							Win32ProcessXInputDigitalButton(
-									Pad ->wButtons, 
-									&OldController->Y, XINPUT_GAMEPAD_Y, 
-									&NewController->Y);
-
-
-					
-						}else{
-							// NOTE: The controller is not available
-							NewController->IsConnected = false;
-						}
-					}
+					Win32ProcessControllerInput( OldInput, NewInput);
 					
 					// Sound
 					DWORD ByteToLock = 0;
@@ -990,7 +1047,41 @@ WinMain(HINSTANCE Instance,
 					// Sound
 					if(SoundIsValid)
 					{
-						Win32FillSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite, &SoundBuffer);
+						Win32FillSoundBuffer(&SoundOutput, ByteToLock,
+												 BytesToWrite, &SoundBuffer);
+					}
+
+
+					LARGE_INTEGER WorkCounter = Win32GetWallClock();
+					real32 WorkSecondsElapsed = Win32GetSecondsElapsed(
+															LastCounter, WorkCounter);
+
+					real32 SecondsElapsedForFrame = WorkSecondsElapsed;
+					if(SecondsElapsedForFrame<TargetSecondsPerFrame){
+						if(SleepIsGranular)
+						{
+
+							DWORD SleepMS = (DWORD) ( 1000.f *
+								   (TargetSecondsPerFrame - SecondsElapsedForFrame));
+							if(SleepMS>0)
+							{
+								Sleep(SleepMS);
+							}
+						}
+
+
+						real32 TestSecondsElapsedForFrame =  Win32GetSecondsElapsed(
+												 LastCounter, Win32GetWallClock() );
+						Assert(TestSecondsElapsedForFrame < TargetSecondsPerFrame);
+
+						while(SecondsElapsedForFrame<TargetSecondsPerFrame)
+						{
+							SecondsElapsedForFrame =  Win32GetSecondsElapsed( LastCounter,
+														 Win32GetWallClock() );
+						}
+					}else{
+						// TODO: MISSED FRAME RATE
+						// TODO: Logging
 					}
 
 					// Update Window
@@ -998,29 +1089,30 @@ WinMain(HINSTANCE Instance,
 					Win32DisplayBufferInWindow(&GlobalBackBuffer, DeviceContext, 
 										Dimension.Width, Dimension.Height);
 					
-					int64 EndCycleCount = __rdtsc();
-
-					LARGE_INTEGER EndCounter;
-					QueryPerformanceCounter(&EndCounter);
-
-					uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
-					int64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
-					real64 MSPerFrame = ((1000.0f*(real64)CounterElapsed)/(real64)PerfCounterFrequency);
-					real64 FPS = (real64)PerfCounterFrequency/(real64)CounterElapsed;
-					real64 MCFP =  ((real64)CyclesElapsed /(1000.0f*1000.0f));
-#if 0
-					char txtBuffer[256];
-					snprintf(txtBuffer, sizeof(txtBuffer), "%.02f ms/f, %.02f f/s, %.02f Mc/f \n", MSPerFrame, FPS, MCFP);
-					OutputDebugString(Buffer);
-#endif			
-					LastCounter = EndCounter;
-					LastCycleCount = EndCycleCount;
 
 
 					// TODO: Should We clear hese?
 					game_input* Temp = NewInput;
 					NewInput = OldInput;
 					OldInput = Temp;
+ 
+					LARGE_INTEGER EndCounter = Win32GetWallClock();
+					real32 MSPerFrame = 1000.0f * 
+										Win32GetSecondsElapsed (LastCounter, EndCounter );
+					LastCounter = EndCounter;
+
+					uint64 EndCycleCount = __rdtsc();
+					uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
+					LastCycleCount = EndCycleCount;
+
+
+					real64 FPS = 0.0f;
+					real64 MCFP =  ((real32)CyclesElapsed /(1000.0f*1000.0f));
+
+					char txtBuffer[256];
+					snprintf(txtBuffer, sizeof(txtBuffer), "%.02f ms/f, %.02f f/s, %.02f Mc/f \n", MSPerFrame, FPS, MCFP);
+					OutputDebugString(txtBuffer);
+		
 				}
 			}else{
 
