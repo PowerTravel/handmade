@@ -29,12 +29,20 @@ struct win32_sound_output
 	uint32 RunningSampleIndex;
 	int BytesPerSample;
 	DWORD SecondaryBufferSize;
+	DWORD SafteyBytes;
 	int LatencySampleCount;
 };
 
 struct win32_debug_time_marker{
-	DWORD PlayCursor;
-	DWORD WriteCursor; 
+	
+	DWORD OutputPlayCursor;
+	DWORD OutputWriteCursor;
+
+	DWORD OutputLocation;
+	DWORD OutputByteCount;
+
+	DWORD FlipPlayCursor;
+	DWORD FlipWriteCursor; 
 };
 
 #endif

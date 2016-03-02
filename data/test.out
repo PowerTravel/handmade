@@ -65,7 +65,6 @@ RenderWeirdGradient(game_offscreen_buffer* Buffer, int XOffset, int YOffset)
 internal void 
 GameUpdateAndRender(game_memory* Memory,
 					game_offscreen_buffer* Buffer, 
-					game_sound_output_buffer* SoundBuffer,
 					game_input* Input)
 {
 	Assert( (&Input->Controllers[0].Terminator - &Input->Controllers[0].Button[0]) == 
@@ -116,11 +115,13 @@ GameUpdateAndRender(game_memory* Memory,
 		}	
 	}
 
-	//TODO: Allow sample offset here for more robust platform options
-	GameOutputSound(SoundBuffer, GameState->ToneHz);
-
 	RenderWeirdGradient(Buffer, GameState->BlueOffset, GameState->GreenOffset);
 }
 
-
+internal void
+GameGetSoundSamples( game_memory* Memory, game_sound_output_buffer* SoundBuffer)
+{
+	game_state *GameState = (game_state* ) Memory->PermanentStorage;
+	GameOutputSound(SoundBuffer, GameState->ToneHz);
+}
 
