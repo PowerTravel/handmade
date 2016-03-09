@@ -2,13 +2,11 @@
 #include "handmade.hpp"
 
 internal void
-GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
+GameOutputSound(game_state* GameState, game_sound_output_buffer* SoundBuffer)
 {
-	// TODO: tSin drifts after a while.
 
-	local_persist real32 tSine;
 	int16 ToneVolume = 2000;
-	int SamplesPerPeriod = SoundBuffer->SamplesPerSecond/ ToneHz;
+	int SamplesPerPeriod = SoundBuffer->SamplesPerSecond/ GameState->ToneHz;
 
 
 	real32 twopi = (real32) (2.0*Pi32);
@@ -18,16 +16,16 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
 		SampleIndex < SoundBuffer->SampleCount; 
 		++SampleIndex)
 	{
-		real32 SineValue = sinf(tSine);
+		real32 SineValue = sinf(GameState->tSine);
 		int16 SampleValue = (int16)(SineValue * ToneVolume);
 		*SampleOut++ = SampleValue; // Left Speker
 		*SampleOut++ = SampleValue; // Rright speaker
-		tSine += twopi/(real32)SamplesPerPeriod;
-	}
 
-	if(tSine > twopi)
-	{
-		tSine -= twopi;
+		GameState->tSine += twopi/(real32)SamplesPerPeriod;	
+		if(GameState->tSine > twopi)
+		{
+			GameState->tSine -= twopi;
+		}
 	}
 }
 
@@ -85,7 +83,7 @@ GameUpdateAndRender(game_memory* Memory,
 		}
 		
 		GameState->ToneHz = 261;
-		
+		GameState->tSine = 0.0f;
 		Memory->IsInitialized = true;
 	}
 
@@ -122,6 +120,6 @@ internal void
 GameGetSoundSamples( game_memory* Memory, game_sound_output_buffer* SoundBuffer)
 {
 	game_state *GameState = (game_state* ) Memory->PermanentStorage;
-	GameOutputSound(SoundBuffer, GameState->ToneHz);
+	GameOutputSound(GameState, SoundBuffer);
 }
 

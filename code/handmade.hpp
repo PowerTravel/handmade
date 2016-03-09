@@ -87,6 +87,13 @@ struct game_sound_output_buffer
 	int16* Samples;
 };
 
+struct game_state{
+	int ToneHz;
+	int GreenOffset;
+	int BlueOffset;
+	real32 tSine;
+};
+
 struct game_button_state
 {
 	int HalfTransitionCount;
@@ -180,7 +187,7 @@ struct game_memory
 };
 
 internal void
-GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz);
+GameOutputSound(game_state* GameState, game_sound_output_buffer* SoundBuffer);
 
 internal void 
 RenderWeirdGradient(game_offscreen_buffer* Buffer, int XOffset, int YOffset);
@@ -201,9 +208,5 @@ GameGetSoundSamples( game_memory* Memory, game_sound_output_buffer* SoundBuffer)
 ///
 ///
 ///
-struct game_state{
-	int ToneHz;
-	int GreenOffset;
-	int BlueOffset;
-};
+
 #endif

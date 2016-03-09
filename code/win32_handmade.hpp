@@ -43,6 +43,8 @@ struct win32_debug_time_marker{
 
 	DWORD FlipPlayCursor;
 	DWORD FlipWriteCursor; 
+
+	DWORD ExpectedFlipPlayCursor;
 };
 
 #endif
