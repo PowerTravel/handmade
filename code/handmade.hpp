@@ -1,7 +1,6 @@
 #ifndef HANDMADE_HPP
 #define HANDMADE_HPP
 
-
 /*
 	NOTE: 
 	 
@@ -13,6 +12,31 @@
 		0: no slow code allowed
 		1: slow code welcome
 */
+
+
+#include <stdint.h>
+#include <math.h>
+
+#define internal		 static
+#define local_persist    static
+#define global_variable  static
+
+#define Pi32 3.14159265359
+
+typedef int8_t  int8;
+typedef int16_t int16;
+typedef int32_t int32;
+typedef int64_t int64;
+
+typedef int32 bool32;
+
+typedef uint8_t uint8;
+typedef uint16_t uint16;
+typedef uint32_t uint32;
+typedef uint64_t uint64;
+
+typedef float real32;
+typedef double real64;
 
 
 #if HANDMADE_SLOW
@@ -30,7 +54,8 @@
 
 #define ArrayCount(Array) ( sizeof(Array)/sizeof((Array)[0]) )
 
-inline uint32
+
+inline uint32 
 SafeTruncateUInt64(uint64 Value)
 {
 	Assert(Value <= 0xFFFFFFFF);
@@ -59,9 +84,16 @@ struct debug_read_file_result{
 	uint32 ContentSize;
 	void* Contents;
 };
-internal debug_read_file_result DEBUGPlatformReadEntireFile(char* Filename);
-internal void DEBUGFreeFileMemory(void* Memory);	
-internal bool32 DEBUGPlatformWriteEntireFile(char* Filename, uint32 MemorySize, void* Memory);
+
+#define DEBUG_PLATFORM_FREE_FILE_MEMORY(name) void name(void* Memory)
+typedef DEBUG_PLATFORM_FREE_FILE_MEMORY(debug_platfrom_free_file_memory);
+
+#define DEBUG_PLATFORM_READ_ENTIRE_FILE(name) debug_read_file_result name(char* Filename)
+typedef DEBUG_PLATFORM_READ_ENTIRE_FILE(debug_platform_read_entire_file);
+
+#define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) bool32 name(char* Filename, uint32 MemorySize, void* Memory)
+typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE(debug_platform_write_entire_file);
+
 #endif
 
 
@@ -184,6 +216,10 @@ struct game_memory
 	void* PermanentStorage; // Note: Required to be initialized to zero at startup
 	uint64 TransientStorageSize;
 	void* TransientStorage;
+
+	debug_platform_read_entire_file* DEBUGPlatformReadEntireFile;
+	debug_platfrom_free_file_memory* DEBUGPlatformFreeFileMemory;
+	debug_platform_write_entire_file* DEBUGPlatformWriteEntireFile;
 };
 
 internal void
@@ -193,20 +229,21 @@ internal void
 RenderWeirdGradient(game_offscreen_buffer* Buffer, int XOffset, int YOffset);
 
 
-// FourThings: timing, controller/keyboard input, bitmap buffer to use, soundbuffer to use
-internal void 
-GameUpdateAndRender(	 game_memory* Memory,
-						 game_offscreen_buffer* Buffer,
-						 game_input* Input);
+// Note: XInputGetState
+#define GAME_UPDATE_AND_RENDER(name) void name( game_memory* Memory, game_offscreen_buffer* Buffer, game_input* Input )
+typedef GAME_UPDATE_AND_RENDER( game_update_and_render );
+GAME_UPDATE_AND_RENDER( GameUpdateAndRenderStub )
+{
+}
 
 // Note: At the moment this has to be a very fast function it cannot be more than a millisecond or so.
 // TODO: Reduce the pressure on this  function's preformance by measuring it  or asking about it, etc
-internal void
-GameGetSoundSamples( game_memory* Memory, game_sound_output_buffer* SoundBuffer);
 
-///
-///
-///
-///
+#define GAME_GET_SOUND_SAMPLES(name) void name( game_memory* Memory, game_sound_output_buffer* SoundBuffer)
+typedef GAME_GET_SOUND_SAMPLES(game_get_sound_samples);
+GAME_GET_SOUND_SAMPLES(GameGetSoundSamplesStub)
+{
+}
+
 
 #endif

@@ -3,8 +3,8 @@
 REM -wd4505 turns off warnings that a function is not referenced
 REM  -wd4244 turns off warning about truncation loss of data when converting from real to int
 
-set CommonCompilerFlags=-MT -nologo -Gm- -GR- -EHa- -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -wd4505 -wd4244 -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1  -DHANDMADE_WIN32=1 -FC -Zi -FAsc -Fmwin32_handmade.map
-set CommonLinkerFlags=  -opt:ref user32.lib gdi32.lib winmm.lib
+set CommonCompilerFlags=-MT -nologo -Gm- -GR- -EHa- -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -wd4505 -wd4244 -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1  -DHANDMADE_WIN32=1 -FC -Zi -FAsc 
+set CommonLinkerFlags= -incremental:no -opt:ref user32.lib gdi32.lib winmm.lib
 
 IF NOT EXIST ..\..\build mkdir ..\..\build
 pushd ..\..\build
@@ -14,5 +14,7 @@ REM cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp  /link -subsyst
 
 
 REM 64-bit build
-cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp /link %CommonLinkerFlags% 
+del *.pdb > NUL 2> NUL
+cl %CommonCompilerFlags% ..\handmade\code\handmade.cpp -Fmhandmade.map -LD /link -incremental:no -PDB:handmade_%time:~0,2%%time:~3,2%%time:~6,2%.pdb -EXPORT:GameUpdateAndRender -EXPORT:GameGetSoundSamples
+cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp -Fmwin32_handmade.map /link %CommonLinkerFlags% 
 popd

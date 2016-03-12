@@ -3,7 +3,6 @@
 #define WIN32_HANDMADE_HPP
 
 #include "handmade.hpp"
-#include "handmade.cpp"
 
 struct win32_offscreen_buffer
 {
@@ -45,6 +44,16 @@ struct win32_debug_time_marker{
 	DWORD FlipWriteCursor; 
 
 	DWORD ExpectedFlipPlayCursor;
+};
+
+struct win32_game_code
+{
+	HMODULE GameCodeDLL;
+	FILETIME LastDLLWriteTime;
+	game_update_and_render* UpdateAndRender;
+	game_get_sound_samples* GetSoundSamples;
+
+	bool32 IsValid;
 };
 
 #endif

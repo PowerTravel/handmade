@@ -44,7 +44,7 @@ RenderWeirdGradient(game_offscreen_buffer* Buffer, int XOffset, int YOffset)
 
 			uint8 Blue = (uint8)(X+XOffset);			
 			uint8 Green = (uint8)(Y+YOffset);
-			uint8 Red = 0;
+
 	
 			/*
 						  8b 8b 8b 8b = 36bit
@@ -52,7 +52,7 @@ RenderWeirdGradient(game_offscreen_buffer* Buffer, int XOffset, int YOffset)
 				Registry  xx RR GG BB
 			*/
 
-			*Pixel++ = ( (Red << 16 )  | ( Green << 8) | Blue);
+			*Pixel++ = ( ( Green << 8) | Blue);
 		}
 
 		Row += Buffer->Pitch;
@@ -60,10 +60,12 @@ RenderWeirdGradient(game_offscreen_buffer* Buffer, int XOffset, int YOffset)
 }
 
 
-internal void 
-GameUpdateAndRender(game_memory* Memory,
-					game_offscreen_buffer* Buffer, 
-					game_input* Input)
+
+/* 
+	Note: 
+	extern "C" prevents the C++ compiler from renaming the functions which it does for function-overloading reasons (among other things) by forcing it to use C conventions which does not support overloading. Also called 'name mangling' or 'name decoration'. The actual function names are visible in the outputted .map file in the build directory
+*/
+extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
 	Assert( (&Input->Controllers[0].Terminator - &Input->Controllers[0].Button[0]) == 
 			 (ArrayCount(Input->Controllers[0].Button)) );
@@ -75,11 +77,11 @@ GameUpdateAndRender(game_memory* Memory,
 		char* Filename = __FILE__;
 
 		// NOTE: Temporary solution for file reading
-		debug_read_file_result BitmapMemory = DEBUGPlatformReadEntireFile(Filename);
+		debug_read_file_result BitmapMemory = Memory->DEBUGPlatformReadEntireFile(Filename);
 		if(BitmapMemory.Contents)
 		{
-			DEBUGPlatformWriteEntireFile("w:/handmade/data/test.out",BitmapMemory.ContentSize,BitmapMemory.Contents);
-			DEBUGFreeFileMemory(BitmapMemory.Contents);	
+			Memory->DEBUGPlatformWriteEntireFile("w:/handmade/data/test.out",BitmapMemory.ContentSize,BitmapMemory.Contents);
+			Memory->DEBUGPlatformFreeFileMemory(BitmapMemory.Contents);	
 		}
 		
 		GameState->ToneHz = 261;
@@ -116,10 +118,11 @@ GameUpdateAndRender(game_memory* Memory,
 	RenderWeirdGradient(Buffer, GameState->BlueOffset, GameState->GreenOffset);
 }
 
-internal void
-GameGetSoundSamples( game_memory* Memory, game_sound_output_buffer* SoundBuffer)
+
+extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
 {
 	game_state *GameState = (game_state* ) Memory->PermanentStorage;
 	GameOutputSound(GameState, SoundBuffer);
 }
+
 
