@@ -22,17 +22,24 @@ struct win32_window_dimension{
 
 struct win32_sound_output
 {
-	// NOTE: Sound test
+
+	LPDIRECTSOUNDBUFFER SecondaryBuffer;	
+
+	// NOTE: Orthogonal Values
 	int SamplesPerSecond;
+	int ChannelCount;
 	int BytesPerSample;
-	int NrOfChannels;
+	int BufferSizeInSeconds;
+	real32 TargetSecondsOfLatency;
+
+	// Derived Values
+	int BytesPerSampleTotal; // = ChannelCount * BytesPerSample;
+	int BytesPerSecond;
+	DWORD BufferSizeInBytes; // = BufferSizeInSeconds * SamplesPerSecond * BytesPerSampleTotal;
+	
 	uint32 RunningSampleIndex;
-	DWORD SecondaryBufferSize;
-	DWORD SafteyBytes;
+	DWORD BytesOfLatency;
 
-
-	int LatencySampleCount;
-	int ToneHz;
 };
 
 struct win32_debug_time_marker{

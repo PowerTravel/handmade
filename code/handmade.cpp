@@ -131,7 +131,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			GameState->BlueOffset += (int)(4.0f*Controller->LeftStickAverageX);
 			GameState->ToneHz = 261 + (int)(128.0f*Controller->LeftStickAverageY);
 
-
+		
 		}else{
 
 			if(Controller->LeftStickLeft.EndedDown)
@@ -143,10 +143,13 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			{
 				GameState->BlueOffset += 4;
 			}
+
+
+
 		}	
 
-		GameState->PlayerX += (int)(8.0f*Controller->LeftStickAverageX);
-		GameState->PlayerY -= (int)(8.0f*Controller->LeftStickAverageY);
+		GameState->PlayerX += (int)(18.0f*Controller->LeftStickAverageX);
+		GameState->PlayerY -= (int)(18.0f*Controller->LeftStickAverageY);
 	}
 
 	RenderWeirdGradient(Buffer, GameState->BlueOffset, GameState->GreenOffset);
