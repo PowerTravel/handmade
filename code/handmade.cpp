@@ -59,7 +59,32 @@ RenderWeirdGradient(game_offscreen_buffer* Buffer, int XOffset, int YOffset)
 	}
 }
 
-
+internal void
+RenderPlayer(game_offscreen_buffer* Buffer, int PlayerX, int PlayerY)
+{
+	uint8* EndOfBuffer = (uint8 *) Buffer->Memory + Buffer->Pitch*Buffer->Height;
+	uint32 Color = 0xFFFFFFFF;	
+	int Top = PlayerY;
+	int Bottom = PlayerY+10;
+	for(int X = PlayerX; X<PlayerX+10; ++X){
+		if(( X>=0 ) && ( X<Buffer->Width ))
+		{
+			uint8* Pixel =  ((uint8*) Buffer->Memory + 
+							X*Buffer->BytesPerPixel + 
+							Top*Buffer->Pitch);
+	
+			for(int Y = Top; Y<Bottom; ++Y)
+			{
+				if( (Pixel + 4 >= Buffer->Memory) && (Pixel< EndOfBuffer))
+				{
+					*(uint32*) Pixel = Color;
+					
+				}
+				Pixel += Buffer->Pitch;
+			}
+		}
+	}
+}
 
 /* 
 	Note: 
@@ -86,7 +111,12 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		
 		GameState->ToneHz = 261;
 		GameState->tSine = 0.0f;
+		GameState->PlayerX=100;
+		GameState->PlayerY=100;
+
+
 		Memory->IsInitialized = true;
+
 	}
 
 	for(int ControllerIndex = 0; 
@@ -100,6 +130,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			//NOTE use analog movement tuning
 			GameState->BlueOffset += (int)(4.0f*Controller->LeftStickAverageX);
 			GameState->ToneHz = 261 + (int)(128.0f*Controller->LeftStickAverageY);
+
+
 		}else{
 
 			if(Controller->LeftStickLeft.EndedDown)
@@ -111,11 +143,15 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			{
 				GameState->BlueOffset += 4;
 			}
-
 		}	
+
+		GameState->PlayerX += (int)(8.0f*Controller->LeftStickAverageX);
+		GameState->PlayerY -= (int)(8.0f*Controller->LeftStickAverageY);
 	}
 
 	RenderWeirdGradient(Buffer, GameState->BlueOffset, GameState->GreenOffset);
+
+	RenderPlayer(Buffer, GameState->PlayerX, GameState->PlayerY);
 }
 
 
