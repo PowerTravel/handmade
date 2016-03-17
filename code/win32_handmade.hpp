@@ -36,10 +36,10 @@ struct win32_sound_output
 	int BytesPerSampleTotal; // = ChannelCount * BytesPerSample;
 	int BytesPerSecond;
 	DWORD BufferSizeInBytes; // = BufferSizeInSeconds * SamplesPerSecond * BytesPerSampleTotal;
-	
-	uint32 RunningSampleIndex;
 	DWORD BytesOfLatency;
 
+	// Variable
+	uint32 RunningSampleIndex;
 };
 
 struct win32_debug_time_marker{
@@ -70,17 +70,31 @@ struct win32_game_code
 
 // Note:	Never use MAX_PATH in code that is user facing because it can be wrong
 #define WIN32_STATE_FILE_NAME_COUNT MAX_PATH
+struct win32_replay_buffer
+{
+	HANDLE FileHandle;
+	HANDLE MemoryMap;
+	char FileName[WIN32_STATE_FILE_NAME_COUNT];
+	void* MemoryBlock;
+};
 struct win32_state
 {
 
 	uint64 TotalSize;
 	void* GameMemoryBlock;
+	//TODO, give support for more than 1 replaybuffer 
+	//		It works fine to add as many ass you want, however
+	// 		selecting specifik buffers to record to is not implemented.
+	// 		Also slow startup for some reason with many buffers. 
+	//		See ReplayBuffer loop initialization in win32_handmade.cpp
+	win32_replay_buffer ReplayBuffer[1];
 
-	HANDLE InputRecordingHandle;
-	int InputPlayingIndex;
 
-	HANDLE InputPlaybackHandle;
-	int InputRecordingIndex;
+	HANDLE RecordingHandle;
+	int PlayingIndex;
+
+	HANDLE PlaybackHandle;
+	int RecordingIndex;
 
 	char EXEFileName[WIN32_STATE_FILE_NAME_COUNT];
 	char* OnePastLastSlashEXEFileName;

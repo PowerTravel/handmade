@@ -78,7 +78,6 @@ RenderPlayer(game_offscreen_buffer* Buffer, int PlayerX, int PlayerY)
 				if( (Pixel + 4 >= Buffer->Memory) && (Pixel< EndOfBuffer))
 				{
 					*(uint32*) Pixel = Color;
-					
 				}
 				Pixel += Buffer->Pitch;
 			}
@@ -102,11 +101,11 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		char* Filename = __FILE__;
 
 		// NOTE: Temporary solution for file reading
-		debug_read_file_result BitmapMemory = Memory->DEBUGPlatformReadEntireFile(Filename);
+		debug_read_file_result BitmapMemory = Memory->DEBUGPlatformReadEntireFile(Thread, Filename);
 		if(BitmapMemory.Contents)
 		{
-			Memory->DEBUGPlatformWriteEntireFile("w:/handmade/data/test.out",BitmapMemory.ContentSize,BitmapMemory.Contents);
-			Memory->DEBUGPlatformFreeFileMemory(BitmapMemory.Contents);	
+			Memory->DEBUGPlatformWriteEntireFile(Thread, "w:/handmade/data/test.out",BitmapMemory.ContentSize,BitmapMemory.Contents);
+			Memory->DEBUGPlatformFreeFileMemory(Thread, BitmapMemory.Contents);	
 		}
 		
 		GameState->ToneHz = 261;
@@ -138,14 +137,10 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 			{
 				GameState->BlueOffset -= 4;
 			}
-
 			if(Controller->LeftStickRight.EndedDown)
 			{
 				GameState->BlueOffset += 4;
 			}
-
-
-
 		}	
 
 		GameState->PlayerX += (int)(18.0f*Controller->LeftStickAverageX);
@@ -155,6 +150,16 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	RenderWeirdGradient(Buffer, GameState->BlueOffset, GameState->GreenOffset);
 
 	RenderPlayer(Buffer, GameState->PlayerX, GameState->PlayerY);
+
+	RenderPlayer(Buffer, Input->MouseX, Input->MouseY);
+
+	for(int i = 0; i<5; i++)
+	{
+		if(Input->MouseButton[i].EndedDown)
+		{
+			RenderPlayer(Buffer, 20+i*20, 20);	
+		}
+	}
 }
 
 
