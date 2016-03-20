@@ -1,8 +1,8 @@
 
-#ifndef WIN32_HANDMADE_HPP
-#define WIN32_HANDMADE_HPP
+#ifndef WIN32_HANDMADE_H
+#define WIN32_HANDMADE_H
 
-#include "handmade.hpp"
+#include "handmade.h"
 
 struct win32_offscreen_buffer
 {
@@ -101,4 +101,4 @@ struct win32_state
 };
 
 
-#endif
+#endif // WIN32_HANDMADE_H

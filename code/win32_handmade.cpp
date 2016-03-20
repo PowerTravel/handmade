@@ -26,7 +26,7 @@
 
 #include <stdio.h>
 
-#include "win32_handmade.hpp"
+#include "win32_handmade.h"
 
 
 
@@ -435,6 +435,12 @@ internal void
 Win32DisplayBufferInWindow(win32_offscreen_buffer* Buffer,
 					HDC DeviceContext, int WindowWidth, int WindowHeight )
 {	
+	int OffsetX = 10;
+	int OffsetY = 10;
+	PatBlt(DeviceContext,Buffer->Width+OffsetX, 0 , WindowWidth, WindowHeight, BLACKNESS);
+	PatBlt(DeviceContext, 0, Buffer->Height+OffsetY, WindowWidth, WindowHeight, BLACKNESS);
+	PatBlt(DeviceContext, 0, 0, OffsetX, WindowHeight, BLACKNESS);
+	PatBlt(DeviceContext, 0, 0, WindowWidth, OffsetY, BLACKNESS);
 	/*
 	StretchDIBits(	DeviceContext, 
 					0,0, WindowWidth, WindowHeight,
@@ -445,7 +451,7 @@ Win32DisplayBufferInWindow(win32_offscreen_buffer* Buffer,
 	*/
 	// Note: No Stretching for prorotyping purposes. 
 	StretchDIBits(	DeviceContext, 
-					0,0, Buffer->Width, Buffer->Height,
+					OffsetX,OffsetY, Buffer->Width, Buffer->Height,
 					0,0, Buffer->Width, Buffer->Height,
 					Buffer->Memory,
 					&Buffer->Info,
@@ -696,7 +702,6 @@ Win32PlayBackInput(win32_state* State, game_input* NewInput)
 			Win32EndInputPlayback(State);
 			Win32BeginInputPlayback(State, PlayingIndex);
 			ReadFile(State->PlaybackHandle, NewInput, sizeof(*NewInput), &BytesRead, 0);
-
 		}
 	}
 }
@@ -918,6 +923,7 @@ Win32ProcessKeyboard(win32_state* State,  game_controller_input*  OldKeyboardCon
 								}
 							}else{
 								Win32EndInputPlayback(State);
+								*KeyboardController ={};
 							}
 						}
 					}
@@ -1285,7 +1291,7 @@ WinMain(HINSTANCE Instance,
 
 	WNDCLASSA WindowClass = {};
 	
-	Win32ResizeDIBSection(&GlobalBackBuffer, 1280, 720);
+	Win32ResizeDIBSection(&GlobalBackBuffer, 960, 540);
 
 	WindowClass.style = CS_HREDRAW|CS_VREDRAW;//|CS_OWNDC;
 	WindowClass.lpfnWndProc = MainWindowCallback;
@@ -1431,6 +1437,7 @@ WinMain(HINSTANCE Instance,
 				game_input Input[2] = {};
 				game_input* NewInput = &Input[0];
 				game_input* OldInput = &Input[1];
+				
 
 				LARGE_INTEGER LastCounter = Win32GetWallClock();
 				LARGE_INTEGER FlipWallClock = Win32GetWallClock();
@@ -1449,7 +1456,8 @@ WinMain(HINSTANCE Instance,
 				uint64 LastCycleCount = __rdtsc();
 				while(GlobalRunning)
 				{	
-
+					NewInput->dt = TargetSecondsPerFrame;
+					
 					FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
 					if(CompareFileTime(&NewDLLWriteTime, &Game.LastDLLWriteTime))
 					{
