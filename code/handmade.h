@@ -5,7 +5,7 @@
 	NOTE: 
 	 
 	HANDMADE_INTERNAL
-		0: build for public release
+		0: build for public release 
 		1: build for developer only
 
 	HANDMADE_SLOW
@@ -16,7 +16,7 @@
 
 #include <stdint.h>
 
-#include "handmade_platform.h"
+#include "handmade_platform.h"	
 
 
 #define internal		 static
@@ -79,8 +79,11 @@ struct tile_map{
 
 struct world
 {
-	int32 TileWidth;
-	int32 TileHeight;
+	// Fundamental Meter to Pixel scale
+	uint32 TileSideInPixels;
+	real32 TileSideInMeters;
+
+	//real32 PixelsPerMeter;
 
 	int32 TileMapWidth;
 	int32 TileMapHeight;

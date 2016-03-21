@@ -315,16 +315,16 @@ Win32InitDSound(HWND Window, win32_sound_output* SoundOutput)
 		{
 			WAVEFORMATEX WaveFormat = {};
 			WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
-			WaveFormat.nChannels = SoundOutput->ChannelCount;
-			WaveFormat.nSamplesPerSec = SoundOutput->SamplesPerSecond;
-			WaveFormat.wBitsPerSample = SoundOutput->BytesPerSample * 8; // cd-quality
+			WaveFormat.nChannels = (WORD) SoundOutput->ChannelCount;
+			WaveFormat.nSamplesPerSec =(WORD) SoundOutput->SamplesPerSecond;
+			WaveFormat.wBitsPerSample =(WORD) SoundOutput->BytesPerSample * 8; // cd-quality
 			// EXP: Audio samples for 2 channels is stored as
 			// 		LEFT RIGHT LEFT RIGHT LEFT RIGHT etc.
 			//		nBlockAlign wants the size of one [LEFT RIGHT]
 			//		block in bytes. For us this becomes
 			//		(2 channels) X (nr of bits per sample) / (bits in a byte) = 
 			//			2 * 16 /8 = 4 bytes per sample.
-			WaveFormat.nBlockAlign = SoundOutput->ChannelCount * SoundOutput->BytesPerSample;
+			WaveFormat.nBlockAlign =(WORD) (SoundOutput->ChannelCount * SoundOutput->BytesPerSample);
 			WaveFormat.nAvgBytesPerSec = 
 				WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
 			WaveFormat.cbSize = 0;
@@ -1173,8 +1173,9 @@ Win32DebugDrawSoundBufferMarker(win32_offscreen_buffer* BackBuffer,
 								int PadX, int Top, int Bottom,
 								uint32 Color, DWORD Value)
 {
-	real32 XReal32 = ( C * (real32) Value);
-	real32 X = PadX + (int)  XReal32;
+	real32 XReal32 = ( C * (real32) Value);\
+
+	int X = PadX +  (int)  XReal32;
 
 	Win32DebugDrawVertical(BackBuffer, X, Top, Bottom, Color);	
 }
