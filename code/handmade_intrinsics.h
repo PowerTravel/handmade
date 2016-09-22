@@ -58,4 +58,33 @@ ATan2(real32 Y, real32 X)
 	return Result;
 }
 
+struct bit_scan_result{
+	bool32 Found;
+	uint32 Index;
+};
+
+inline bit_scan_result
+FindLeastSignificantSetBit(uint32 Value)
+{
+	bit_scan_result Result = {};
+
+#if COMPILER_MSVC
+	Result.Found = _BitScanForward((unsigned long*)&Result.Index, Value);
+#else
+	for(uint32 Test = 0; Test < 32; Test++)
+	{
+		uint32 mask = (1 << Test);
+		if( (Value & mask ) != 0)
+		{
+			Result.Index = Test;
+			Result.Found = true;
+			break;
+		}
+	}
+
+#endif
+	return Result;
+}
+
+
 #endif // HANDMADE_INTRINSIC_H

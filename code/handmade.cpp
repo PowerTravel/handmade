@@ -202,24 +202,6 @@ DEBUGBlitBMP(game_offscreen_buffer* Buffer, real32 RealMinX, real32 RealMinY, lo
 }
 
 
-internal bool32
-BitScanForward( uint32* Index, uint32 Value)
-{
-	bool32 Found = false;
-
-	for(uint32 Test = 0; Test < 32; Test++)
-	{
-		uint32 mask = (1 << Test);
-		if( (Value & mask ) != 0)
-		{
-			*Index = Test;
-			Found = true;
-			break;
-		}
-	}
-	return Found;
-}
-
 internal loaded_bitmap
 DEBUGReadBMP( thread_context* Thread, memory_arena* Memory, debug_platform_read_entire_file* ReadEntireFile,
 			  char* FileName)
@@ -248,7 +230,16 @@ DEBUGReadBMP( thread_context* Thread, memory_arena* Memory, debug_platform_read_
 		uint32* Target = (uint32*) Result.Pixels;
 		uint32* Source = (uint32*) ( ( (uint8*) ReadResult.Contents) + Header->FileSize-4 );
 
-				
+		bit_scan_result RedBitShift = FindLeastSignificantSetBit(Header->RedMask);
+		bit_scan_result GreenBitShift = FindLeastSignificantSetBit(Header->GreenMask);
+		bit_scan_result BlueBitShift = FindLeastSignificantSetBit(Header->BlueMask);
+		bit_scan_result AlphaBitShift = FindLeastSignificantSetBit(Header->AlphaMask);
+
+		Assert(RedBitShift.Found);
+		Assert(GreenBitShift.Found);
+		Assert(BlueBitShift.Found);
+		Assert(AlphaBitShift.Found);
+
 		for (int Y = 0; Y < Result.Height; ++Y)
 		{
 			for (int X = 0; X < Result.Width; ++X)
@@ -256,23 +247,19 @@ DEBUGReadBMP( thread_context* Thread, memory_arena* Memory, debug_platform_read_
 
 				uint32 Pixel = *Source--;
 	
-				uint32 FirstBitSetIndex = 0;
+				bit_scan_result BitShift = {};
+
 				uint32 Red   = Pixel & Header->RedMask;     
-				BitScanForward(&FirstBitSetIndex, Header->RedMask);
-				uint8 R = (uint8) (Red >> FirstBitSetIndex);
+				uint8 R = (uint8) (Red >> RedBitShift.Index);
 
-				uint32 Green = Pixel & Header->GreenMask;     
-				BitScanForward(&FirstBitSetIndex, Header->GreenMask);
-				uint8 G = (uint8) (Green >> FirstBitSetIndex);
+				uint32 Green = Pixel & Header->GreenMask;
+				uint8 G = (uint8) (Green >> GreenBitShift.Index);
 			
-				uint32 Blue  = Pixel & Header->BlueMask;     
-				BitScanForward(&FirstBitSetIndex, Header->BlueMask);
-				uint8 B = (uint8) (Blue >> FirstBitSetIndex);
+				uint32 Blue  = Pixel & Header->BlueMask;
+				uint8 B = (uint8) (Blue >> BlueBitShift.Index);
 				
-				uint32 Alpha = Pixel & Header->AlphaMask;    
-				BitScanForward(&FirstBitSetIndex, Header->AlphaMask);
-				uint8 A = (uint8) (Alpha >> FirstBitSetIndex);
-
+				uint32 Alpha = Pixel & Header->AlphaMask;
+				uint8 A = (uint8) (Alpha >> AlphaBitShift.Index);
 
 				*Target++ = (A << 24) | (R << 16) | (G << 8) | (B << 0);
 
