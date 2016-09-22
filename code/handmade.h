@@ -17,7 +17,7 @@
 #include <stdint.h>
 
 #include "handmade_platform.h"	
-
+#include "handmade_tile.h"
 
 #define internal		 static
 #define local_persist    static
@@ -50,48 +50,48 @@ SafeTruncateUInt64(uint64 Value)
 	return Result;  
 }
 
-struct canonical_position{
+#include "handmade_intrinsics.h"
+//#include "handmade_tile.cpp"
 
-	// Tile pos in pixels
-	real32 RelTileX;
-	real32 RelTileY;
-
-	// Tile on a tile map
-	int32 TileX;
-	int32 TileY;
-
-	// Tile map on the world
-	int32 TileMapX;
-	int32 TileMapY;
+struct 	memory_arena
+{
+	memory_index Size;
+	uint8* Base;
+	memory_index Used;
 };
 
-struct raw_position{
 
-	real32 TileMapPosX;
-	real32 TileMapPosY;
+internal void
+InitializeArena(memory_arena* Arena, memory_index Size, uint8* Base)
+{
+	Arena->Size = Size;
+	Arena->Base = Base;
+	Arena->Used = 0;
+}
 
-	int32 TileMapX;
-	int32 TileMapY;
-};
-struct tile_map{
-	uint32* Tiles;
+#define PushStruct(Arena, type) (type*) PushSize_(Arena, sizeof(type))
+
+#define PushArray(Arena, Count, type) (type*) PushSize_(Arena, (Count)*sizeof(type))
+
+void*
+PushSize_(memory_arena* Arena, memory_index Size)
+{
+	Assert( (Arena->Used+Size) <= Arena->Size );
+	void* Result = Arena->Base + Arena->Used;
+	Arena->Used += Size;
+	return Result; 
+}
+
+struct loaded_bitmap
+{
+	int32 Width;
+	int32 Height;
+	void* Pixels;
 };
 
 struct world
-{
-	// Fundamental Meter to Pixel scale
-	uint32 TileSideInPixels;
-	real32 TileSideInMeters;
-
-	//real32 PixelsPerMeter;
-
-	int32 TileMapWidth;
-	int32 TileMapHeight;
-
-	int32 Width;
-	int32 Height;
-
-	tile_map* TileMaps;
+{	
+	tile_map* TileMap;
 };
 
 
@@ -104,8 +104,13 @@ inline game_controller_input* GetController(game_input* Input, int ControllerInd
 
 struct game_state{
 	
-	raw_position PlayerPos;
-
+	memory_arena WorldArena;
+	world* World;
+	tile_map_position PlayerPos;
+	loaded_bitmap Backdrop;
+	loaded_bitmap Head;
+	loaded_bitmap Body;
+	
 };
 
 

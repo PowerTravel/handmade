@@ -16,6 +16,8 @@ typedef uint16_t uint16;
 typedef uint32_t uint32;
 typedef uint64_t uint64;
 
+typedef size_t memory_index;
+
 typedef float real32;
 typedef double real64;
 
@@ -49,9 +51,11 @@ struct game_offscreen_buffer
 {
 	// Note: Pixels are always 32-bits wide: Memory Order BB GG RR XX
 	void* Memory;
+	// In Pixels
 	int Width;
 	int Height;
 	int Pitch;
+	
 	int BytesPerPixel;
 };
 

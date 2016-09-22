@@ -1320,7 +1320,6 @@ WinMain(HINSTANCE Instance,
 		if(Window != NULL)
 		{
 
-
 			// TODO: How do we reliably query this on windows?
 			int MonitorRefreshHz = 60;
 			HDC DC = GetDC(Window);
@@ -1380,6 +1379,7 @@ WinMain(HINSTANCE Instance,
 			GameMemory.TransientStorage = ((uint8*) GameMemory.PermanentStorage + 
 								GameMemory.PermanentStorageSize);
 
+
 			for(int ReplayIndex = 0;
 				ReplayIndex < ArrayCount(Win32State.ReplayBuffer);
 				++ReplayIndex)
@@ -1432,6 +1432,7 @@ WinMain(HINSTANCE Instance,
 				}
 
 			}
+
 
 			if( SoundSamples && GameMemory.PermanentStorage && GameMemory.TransientStorage)
 			{
@@ -1638,13 +1639,13 @@ WinMain(HINSTANCE Instance,
 						LARGE_INTEGER WorkCounter = Win32GetWallClock();
 						real32 WorkSecondsElapsed = Win32GetSecondsElapsed(
 															LastCounter, WorkCounter);
-
+						DWORD SleepMS = 0;
 						real32 SecondsElapsedForFrame = WorkSecondsElapsed;
 						if(SecondsElapsedForFrame<TargetSecondsPerFrame)
 						{
 							if(SleepIsGranular)
 							{
-								DWORD SleepMS = (DWORD) ( 1000.f *
+								SleepMS = (DWORD) ( 1000.f *
 									   (TargetSecondsPerFrame - SecondsElapsedForFrame));
 								if(SleepMS>0)
 								{
@@ -1718,7 +1719,7 @@ WinMain(HINSTANCE Instance,
 						NewInput = OldInput;
 						OldInput = Temp;
 	
-#if 0
+#if 1
 						uint64 EndCycleCount = __rdtsc();
 						uint64 CyclesElapsed = EndCycleCount - LastCycleCount;
 						LastCycleCount = EndCycleCount;
@@ -1728,7 +1729,7 @@ WinMain(HINSTANCE Instance,
 						real64 MCFP =  ((real32)CyclesElapsed /(1000.0f*1000.0f));
 	
 						char FPSBuffer[256];
-						snprintf(FPSBuffer, sizeof(FPSBuffer), "%.02f ms/f, %.02f f/s, %.02f 	Mc/f \n", MSPerFrame, FPS, MCFP);
+						snprintf(FPSBuffer, sizeof(FPSBuffer), "%.02f ms/f, %.02f tmf/s, %.02f msSlept, %.02f	Mc/f \n", MSPerFrame, TargetSecondsPerFrame*1000,(real32) SleepMS, MCFP);
 						OutputDebugString(FPSBuffer);
 #endif
 #if HANDMADE_INTERNAL

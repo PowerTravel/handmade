@@ -9,19 +9,16 @@
 inline uint32 
 RoundReal32ToUInt32(real32 Real32)
 {
-	uint32 Result = (uint32) (Real32+0.5);
+	uint32 Result = (uint32) roundf(Real32);
 	return Result; 
 }
 
 inline int32 
 RoundReal32ToInt32(real32 Real32)
 {
-
-	int32 Result = (int32) (Real32+0.5);
-	if(Real32 < 0)
-	{
-		Result = (int32) (Real32-0.5);
-	}
+	// NOTE: ROUNDF IS SLOW!! caused DrawRectangle to slow the game down!
+	// 		changed to truncate for now
+	int32 Result = (int32) roundf(Real32);
 	return Result; 
 }
 
