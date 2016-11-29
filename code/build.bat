@@ -16,6 +16,8 @@ REM cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp  /link -subsyst
 REM 64-bit build
 REM Optimization switches -O2
 del *.pdb > NUL 2> NUL
+echo WAITING FOR PDB > lock.tmp
 cl %CommonCompilerFlags% ..\handmade\code\handmade.cpp -Fmhandmade.map -LD /link -incremental:no -PDB:handmade_%random%.pdb -EXPORT:GameUpdateAndRender -EXPORT:GameGetSoundSamples
+del lock.tmp
 cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp -Fmwin32_handmade.map /link %CommonLinkerFlags% 
 popd

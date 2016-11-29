@@ -7,9 +7,7 @@ struct tile_map_position{
 
 	// Position within a tile
 	// Measured from center
-	real32 X;
-	real32 Y;
-	real32 Z;
+	v3 RelTile;
 
 	// Note: The high bits are the tile page index
 	// 		 The low bits are the tile index relative to the page
@@ -21,7 +19,7 @@ struct tile_map_position{
 // Tile Chunk Position is teh Chunk Index from tile_map_position
 // separated into its parts of high bits and low bits
 struct tile_index{
-	// High bits of ChunkIndex
+	// High bits of PageIndex
 	uint32 PageX;
 	uint32 PageY;
 	uint32 PageZ;
@@ -31,23 +29,29 @@ struct tile_index{
 	uint32 TileY;
 };
 
-struct tile_pages{
+struct tile_page{
+	uint32 PageX;
+	uint32 PageY;
+	uint32 PageZ;
+
 	uint32* Page;
+
+	tile_page* NextInHash;
 };
 
 struct tile_map{
 	// 	meters
-	real32 TileSide;
+	real32 TileSideInMeters;
 
 	uint32 PageShift;
 	uint32 PageMask;
-
 	uint32 PageDim;
 
-	uint32 PageCountX;
-	uint32 PageCountY;	
-	uint32 PageCountZ;
+//	uint32 PageCountX;
+//	uint32 PageCountY;	
+//	uint32 PageCountZ;
 
-	tile_pages* Map;
+	// NOTE(Jakob): At the moment this needs to be a power of 2
+	tile_page MapHash[4096];
 };
 #endif // HANDMADE_TILE_H

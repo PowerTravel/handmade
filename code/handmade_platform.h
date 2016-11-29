@@ -4,6 +4,18 @@
 //	NOTE: Stuff that gets refferenced in the platform layer as well as
 //			the game layer
 
+/*
+	NOTE: 
+	 
+	HANDMADE_INTERNAL
+		0: build for public release 
+		1: build for developer only
+
+	HANDMADE_SLOW
+		0: no slow code allowed
+		1: slow code welcome
+*/
+
 
 // Note(Jakob): Compilers
 
@@ -32,7 +44,32 @@
 #include <intrin.h>
 #endif
 
-//#include <stdint>
+#include <stdint.h>
+#include <stddef.h> // size_t exists in this header on some platforms
+
+#define internal		 static
+#define local_persist    static
+#define global_variable  static
+
+#define Pi32 3.14159265359
+
+#ifndef UINT32_MAX
+#define UINT32_MAX 0xffffffff
+#endif
+
+#if HANDMADE_SLOW
+#define Assert(Expression) if(!(Expression)){ *(int *)0 = 0;}
+#else
+#define Assert(Expression)
+#endif // HANDMADE_SLOW
+
+#define Kilobytes(Value) ((Value)*1024LL)
+#define Megabytes(Value) (Kilobytes(Value)*1024LL)
+#define Gigabytes(Value) (Megabytes(Value)*1024LL)
+#define Terrabytes(Value) (Gigabytes(Value)*1024LL)
+
+#define ArrayCount(Array) ( sizeof(Array)/sizeof((Array)[0]) )
+
 
 typedef int8_t  int8;
 typedef int16_t int16;
@@ -50,7 +87,6 @@ typedef size_t memory_index;
 
 typedef float real32;
 typedef double real64;
-
 
 struct thread_context
 {
@@ -73,6 +109,15 @@ typedef DEBUG_PLATFORM_READ_ENTIRE_FILE(debug_platform_read_entire_file);
 typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE(debug_platform_write_entire_file);
 
 #endif // HANDMADE_INTERNAL
+
+inline uint32 
+SafeTruncateUInt64(uint64 Value)
+{
+	Assert(Value <= 0xFFFFFFFF);
+	uint32 Result = (uint32)Value;
+	return Result;  
+}
+
 
 /*
   NOTE: Services that the game provides to the platform layer.
@@ -182,6 +227,13 @@ struct game_input
 	game_controller_input Controllers[5];
 };
 
+
+inline game_controller_input* GetController(game_input* Input, int ControllerIndex)
+{
+	Assert(ControllerIndex < ArrayCount(Input->Controllers));
+	game_controller_input* Result  = &Input->Controllers[ControllerIndex];
+	return Result;
+}
 
 struct game_memory
 {

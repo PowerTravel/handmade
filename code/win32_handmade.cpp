@@ -18,7 +18,12 @@
   Just a partial list of stuff!!
 */
 
+// Note(Jakob): If you have windows questions, look for answers given by Raymond Chen
 
+
+//#include "handmade.h"
+
+#include "handmade_platform.h"
 
 #include <windows.h>
 #include <xinput.h>
@@ -35,9 +40,20 @@ global_variable bool32 GlobalRunning;
 global_variable bool32 GlobalPause; 
 global_variable win32_offscreen_buffer GlobalBackBuffer;
 global_variable int64 GlobalPerfCounterFrequency;
+global_variable bool32 DEBUGGlobalShowCursor;
+global_variable WINDOWPLACEMENT GlobalWindowPosition = {sizeof(GlobalWindowPosition)};
+
+
+	// Note(Jakob): Caseys native screen resolution is 960 by 540 times two
+	// Note(Jakob): My native screen resolution is 840 by 525 times two
+#define MONITOR_HEIGHT 525
+#define MONITOR_WIDTH 840
+
+
 // Note: 	We don't want to rely on the libraries needed to run the functions
 //			XInputGetState and XInputSetState defined in <xinput.h> as they have
 //			poor support on different windows versions. See handmadeHero ep 006;
+
 
 // Note: XInputGetState
 #define X_INPUT_GET_STATE(name) DWORD WINAPI name( DWORD dwUserIndex, XINPUT_STATE* pState )
@@ -218,24 +234,26 @@ Win32GetLastWriteTime(char* FileName)
 }
 
 internal win32_game_code
-Win32LoadGameCode(char* SourceDLLName, char* TempDLLName)
+Win32LoadGameCode(char* SourceDLLName, char* TempDLLName, char* LockFileName)
 {
 	win32_game_code Result = {};
-	
-	Result.LastDLLWriteTime = Win32GetLastWriteTime(SourceDLLName);
-	CopyFile(SourceDLLName,TempDLLName,FALSE);
-	Result.GameCodeDLL = LoadLibraryA(TempDLLName);
-	if(Result.GameCodeDLL)
+	WIN32_FILE_ATTRIBUTE_DATA IgnoredResult;
+	if(!GetFileAttributesEx(LockFileName, GetFileExInfoStandard, &IgnoredResult))
 	{
-		Result.UpdateAndRender = (game_update_and_render* )
-			GetProcAddress(Result.GameCodeDLL, "GameUpdateAndRender");
+		Result.LastDLLWriteTime = Win32GetLastWriteTime(SourceDLLName);
+		CopyFile(SourceDLLName,TempDLLName,FALSE);
+		Result.GameCodeDLL = LoadLibraryA(TempDLLName);
+		if(Result.GameCodeDLL)
+		{
+			Result.UpdateAndRender = (game_update_and_render* )
+				GetProcAddress(Result.GameCodeDLL, "GameUpdateAndRender");
+			
+			Result.GetSoundSamples = (game_get_sound_samples* )\
+				GetProcAddress(Result.GameCodeDLL, "GameGetSoundSamples");
 		
-		Result.GetSoundSamples = (game_get_sound_samples* )\
-			GetProcAddress(Result.GameCodeDLL, "GameGetSoundSamples");
-	
-		Result.IsValid = (Result.UpdateAndRender && Result.GetSoundSamples);
+			Result.IsValid = (Result.UpdateAndRender && Result.GetSoundSamples);
+		}
 	}
-
 	if(!Result.IsValid)
 	{
 		Result.UpdateAndRender = 0;
@@ -435,28 +453,42 @@ internal void
 Win32DisplayBufferInWindow(win32_offscreen_buffer* Buffer,
 					HDC DeviceContext, int WindowWidth, int WindowHeight )
 {	
-	int OffsetX = 10;
-	int OffsetY = 10;
-	PatBlt(DeviceContext,Buffer->Width+OffsetX, 0 , WindowWidth, WindowHeight, BLACKNESS);
-	PatBlt(DeviceContext, 0, Buffer->Height+OffsetY, WindowWidth, WindowHeight, BLACKNESS);
-	PatBlt(DeviceContext, 0, 0, OffsetX, WindowHeight, BLACKNESS);
-	PatBlt(DeviceContext, 0, 0, WindowWidth, OffsetY, BLACKNESS);
-	/*
-	StretchDIBits(	DeviceContext, 
-					0,0, WindowWidth, WindowHeight,
-					0,0, Buffer->Width, Buffer->Height,
-					Buffer->Memory,
-					&Buffer->Info,
-				    DIB_RGB_COLORS, SRCCOPY);
-	*/
-	// Note: No Stretching for prorotyping purposes. 
-	StretchDIBits(	DeviceContext, 
-					OffsetX,OffsetY, Buffer->Width, Buffer->Height,
-					0,0, Buffer->Width, Buffer->Height,
-					Buffer->Memory,
-					&Buffer->Info,
-				    DIB_RGB_COLORS, SRCCOPY);
 
+	//TODO(Jakob): Fix so that aspect ration always is kept when resizing
+
+	if( (WindowWidth >= Buffer->Width*2) && 
+		(WindowHeight >= Buffer->Height*2) )
+	{
+		// Note: No Stretching for prorotyping purposes. 
+		StretchDIBits(	DeviceContext, 
+						0,0, WindowWidth,WindowHeight,
+						0,0, Buffer->Width, Buffer->Height,
+						Buffer->Memory,
+						&Buffer->Info,
+					    DIB_RGB_COLORS, SRCCOPY);
+	}else{
+		int OffsetX = 10;
+		int OffsetY = 10;
+		PatBlt(DeviceContext,Buffer->Width+OffsetX, 0 , WindowWidth, WindowHeight, BLACKNESS);
+		PatBlt(DeviceContext, 0, Buffer->Height+OffsetY, WindowWidth, WindowHeight, BLACKNESS);
+		PatBlt(DeviceContext, 0, 0, OffsetX, WindowHeight, BLACKNESS);
+		PatBlt(DeviceContext, 0, 0, WindowWidth, OffsetY, BLACKNESS);
+		/*
+		StretchDIBits(	DeviceContext, 
+						0,0, WindowWidth, WindowHeight,
+						0,0, Buffer->Width, Buffer->Height,
+						Buffer->Memory,
+						&Buffer->Info,
+					    DIB_RGB_COLORS, SRCCOPY);
+		*/
+		// Note: No Stretching for prorotyping purposes. 
+		StretchDIBits(	DeviceContext, 
+						OffsetX,OffsetY, Buffer->Width, Buffer->Height,
+						0,0, Buffer->Width, Buffer->Height,
+						Buffer->Memory,
+						&Buffer->Info,
+					    DIB_RGB_COLORS, SRCCOPY);
+	}
 
 }
 
@@ -475,6 +507,17 @@ MainWindowCallback(	HWND Window,
 		{
 			// TODO: Handle with message to user?
 			GlobalRunning = false;
+		}break;
+
+		case WM_SETCURSOR:
+		{
+			if(DEBUGGlobalShowCursor)
+			{
+				Result = DefWindowProc(Window, Message, WParam, LParam);
+			}else{
+				SetCursor(0);
+			} 
+
 		}break;
 
 		// User has clicked to make us active app
@@ -766,6 +809,34 @@ Win32ProcessXinputStickValue(	real32* X,
 	}
 }
 
+// Note(Jakob): Courtesy of Raymond Chen,
+//				See: https://blogs.msdn.microsoft.com/oldnewthing/20100412-00/?p=14353
+internal void 
+Win32ToggleFullscreen(HWND Window)
+{
+	DWORD Style = GetWindowLong(Window, GWL_STYLE);
+  	if (Style & WS_OVERLAPPEDWINDOW) {
+    	MONITORINFO MonitorInfo = { sizeof(MonitorInfo) };
+    	if(GetWindowPlacement(Window, &GlobalWindowPosition) &&
+     	   GetMonitorInfo(MonitorFromWindow(Window,MONITOR_DEFAULTTOPRIMARY), &MonitorInfo))
+    	{
+     		SetWindowLong(Window, GWL_STYLE, Style & ~WS_OVERLAPPEDWINDOW);
+      		SetWindowPos(Window, HWND_TOP,
+                   MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
+                   MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
+                   MonitorInfo.rcMonitor.bottom - MonitorInfo .rcMonitor.top,
+                   SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    	}
+  	}else{
+    	SetWindowLong(Window, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
+    	SetWindowPlacement(Window, &GlobalWindowPosition);
+    	SetWindowPos(Window, NULL, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                 SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+	}
+}
+
+
 // TODO: Handle keyboard separately from gamepad as a key-map
 // TODO: Handle Mouse input
 internal void 
@@ -928,13 +999,22 @@ Win32ProcessKeyboard(win32_state* State,  game_controller_input*  OldKeyboardCon
 						}
 					}
 #endif
+					if(IsDown)
+					{
+						bool AltKeyWasDown = ((Message.lParam & (1<<29)) != 0);
+						if( (VKCode==VK_F4) && AltKeyWasDown)
+						{
+							GlobalRunning=false;
+						}
+						if( (VKCode==VK_RETURN) && AltKeyWasDown)
+						{
+							if(Message.hwnd)
+							{
+								Win32ToggleFullscreen(Message.hwnd);
+							}
+						}
+					}
 				}
-	
-				bool AltKeyWasDown = ((Message.lParam & (1<<29)) != 0);
-				if(VKCode==VK_F4 && AltKeyWasDown)
-				{
-					GlobalRunning=false;
-				}	
 
 			}break;
 
@@ -1279,6 +1359,10 @@ WinMain(HINSTANCE Instance,
 						sizeof(TempGameCodeDLLFullPath), TempGameCodeDLLFullPath );
 	
 
+	char TempGameCodeLockFullPath[WIN32_STATE_FILE_NAME_COUNT];
+	Win32BuildEXEPathFileName(&Win32State, "lock.tmp",
+						sizeof(TempGameCodeLockFullPath), TempGameCodeLockFullPath );
+
 	LARGE_INTEGER PerfCounterFrequencyResult;
 	QueryPerformanceFrequency(&PerfCounterFrequencyResult);
 	GlobalPerfCounterFrequency = PerfCounterFrequencyResult.QuadPart;
@@ -1290,13 +1374,17 @@ WinMain(HINSTANCE Instance,
 
 	Win32LoadXInput();
 
+#if HANDMADE_INTERNAL
+	DEBUGGlobalShowCursor = true;
+#endif
 	WNDCLASSA WindowClass = {};
 	
-	Win32ResizeDIBSection(&GlobalBackBuffer, 960, 540);
+	Win32ResizeDIBSection(&GlobalBackBuffer, MONITOR_WIDTH, MONITOR_HEIGHT);
 
 	WindowClass.style = CS_HREDRAW|CS_VREDRAW;//|CS_OWNDC;
 	WindowClass.lpfnWndProc = MainWindowCallback;
 	WindowClass.hInstance = PrevInstance; 
+	WindowClass.hCursor = LoadCursor(0, IDC_ARROW);
 // 	WindowClass.hIcon;	// window icon (for later)
 	WindowClass.lpszClassName = "HandmadeWindowClass";	// Name for the window class
 
@@ -1385,7 +1473,7 @@ WinMain(HINSTANCE Instance,
 				++ReplayIndex)
 			{
 				
-				/* Note: For my own educational purposes:
+				/* Note (Jakob): For my own educational purposes:
 					CreateFileMapping wants two 32 bit values which corresponds to the higher and lower 
 					bits separately from Win32State->TotalSize which is a 64 bit. This is for compatibility
 					reasons between 32 and 64 bit systems.
@@ -1401,7 +1489,7 @@ WinMain(HINSTANCE Instance,
 					Question: Cant we just truncate lower bit?
 					[00101101 10010101] => (Cast to int8) => [10010101] ????? 		
 					Answer: Turns out it works just fine but using & is always more fancy.		
-					*/
+				*/
 				win32_replay_buffer* ReplayBuffer = &Win32State.ReplayBuffer[ReplayIndex];
 
 				// NOTE: We start indexing from 1 as 0 means no recording  / playing
@@ -1453,7 +1541,8 @@ WinMain(HINSTANCE Instance,
 				bool32 SoundIsValid = false;
 
 				win32_game_code Game = Win32LoadGameCode(SourceGameCodeDLLFullPath,
-														 TempGameCodeDLLFullPath);
+														 TempGameCodeDLLFullPath,
+														 TempGameCodeLockFullPath);
 
 				uint64 LastCycleCount = __rdtsc();
 				while(GlobalRunning)
@@ -1465,7 +1554,8 @@ WinMain(HINSTANCE Instance,
 					{
 						Win32UnloadGameCode(&Game);
 						Game = Win32LoadGameCode(SourceGameCodeDLLFullPath,
-													TempGameCodeDLLFullPath);					
+													TempGameCodeDLLFullPath,
+													TempGameCodeLockFullPath);					
 					}
 
 					game_controller_input* OldKeyboardController =GetController(OldInput,0); 
