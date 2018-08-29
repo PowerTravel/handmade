@@ -118,6 +118,14 @@ SafeTruncateUInt64(uint64 Value)
 	return Result;  
 }
 
+inline real32 
+SafeTruncateReal32(uint32 Value)
+{
+	Assert(Value <= 0xFFFFFFFF);
+	Assert(Value >= 0xFFFFFFFF);
+	real32 Result = (real32) Value;
+	return Result;
+}
 
 /*
   NOTE: Services that the game provides to the platform layer.
@@ -242,8 +250,8 @@ struct game_memory
 	uint64 TransientStorageSize;
 	void* TransientStorage;
 
-	debug_platform_read_entire_file* DEBUGPlatformReadEntireFile;
-	debug_platfrom_free_file_memory* DEBUGPlatformFreeFileMemory;
+	debug_platform_read_entire_file*  DEBUGPlatformReadEntireFile;
+	debug_platfrom_free_file_memory*  DEBUGPlatformFreeFileMemory;
 	debug_platform_write_entire_file* DEBUGPlatformWriteEntireFile;
 };
 

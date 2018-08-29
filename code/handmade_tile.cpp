@@ -237,7 +237,7 @@ IsTileMapPointEmpty(tile_map* TileMap, tile_map_position CanPos)
 
 
 internal void
-InitializeTileMap( tile_map* TileMap, real32 TileSideInMeters  )
+InitializeTileMap( tile_map* TileMap )
 {
 	TileMap->TileSideInMeters = 1.4f; 
 	TileMap->PageShift = 4;

@@ -1,7 +1,6 @@
 
 #include "handmade.h"
 #include "handmade_random.h"
-#include "handmade_tile.cpp"
 
 internal void
 GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
@@ -385,193 +384,29 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	if(!Memory->IsInitialized)
 	{
 
-		GameState->PlayerPos.RelTile.X = 0;
-		GameState->PlayerPos.RelTile.Y = 0;
-		GameState->PlayerPos.RelTile.Z = 0;
-		GameState->PlayerPos.AbsTileX = 1;
-		GameState->PlayerPos.AbsTileY = 3;
-		GameState->PlayerPos.AbsTileZ = 0;
-		GameState->dv = V3(0.f, 0.f, 0.f);
-		GameState->MovedUp = true;
-		InitializeArena(&GameState->WorldArena, Memory->PermanentStorageSize- sizeof(game_state),
+		InitializeArena(&GameState->WorldArena, Memory->PermanentStorageSize - sizeof(game_state),
 						(uint8*) Memory->PermanentStorage + sizeof(game_state) );
 
-
-		GameState->Backdrop = DEBUGReadBMP(Thread, &GameState->WorldArena, 
-											Memory->DEBUGPlatformReadEntireFile ,
-										"..\\handmade\\data\\test\\test_background.bmp");
-		GameState->Head = DEBUGReadBMP(Thread, &GameState->WorldArena, 
+		GameState->CursorBMP = DEBUGReadBMP(Thread, &GameState->WorldArena, 
 											Memory->DEBUGPlatformReadEntireFile ,
 									"..\\handmade\\data\\test\\test_hero_front_head.bmp");
-		GameState->Body = DEBUGReadBMP(Thread, &GameState->WorldArena, 
-											Memory->DEBUGPlatformReadEntireFile ,
-									"..\\handmade\\data\\test\\test_hero_front_torso.bmp");
 
-		GameState->Map = DEBUGReadBMP(Thread, &GameState->WorldArena, 
-											Memory->DEBUGPlatformReadEntireFile ,
-									"..\\handmade\\data\\map.bmp");
+	//	GameState->Map = DEBUGReadBMP(Thread, &GameState->WorldArena, 
+	//										Memory->DEBUGPlatformReadEntireFile ,
+	//								"..\\handmade\\data\\map.bmp");
 
 		GameState->World = PushStruct(&GameState->WorldArena, world);
 		world* World = GameState->World;
 		World->TileMap = PushStruct(&GameState->WorldArena,tile_map);
 
 		tile_map* TileMap = World->TileMap;
-		real32 TileSideInMeters = 1.4f;
-		InitializeTileMap(TileMap, TileSideInMeters);
+		//InitializeTileMap( TileMap );
 
 
-		uint32* SourceRow = (uint32*) GameState->Map.Pixels;
-		for(int32 RowIndex = GameState->Map.Height-1; RowIndex >= 0; --RowIndex)
-		{
-			uint32* Pixel = SourceRow; 
-			for(int32 ColIndex = GameState->Map.Width-1; ColIndex >= 0; --ColIndex)
-			{
-				int32 TileValue = 0;
-				uint32 White= 0xffffffff;
-
-				if( *Pixel == White )
-				{
-					TileValue = 1;
-				}else{
-					TileValue = 2;
-				}
-				
-				SetTileValueAbs(&GameState->WorldArena,World->TileMap, 
-								ColIndex, RowIndex, 0, TileValue );
-
-				Pixel++;
-			}
-
-			SourceRow += GameState->Map.Width;
-		}
-/*
-		uint32 RandomNumberIndex = 0;
-		uint32 TilesPerWidth = 17;
-		uint32 TilesPerHeight = 9;
-		uint32 TilesPerDepth = 1;
-
-
-		int32 ScreenX = 0;
-		int32 ScreenY = 0;
-		int32 ScreenZ = 0;
-
-		int32 TileX = 0;
-		int32 TileY = 0;
-		int32 TileZ = 0;
-
-		bool32 GoUp = true;
-
-		bool32 FirstScreen = true;
-		bool32 ZChanged = false;
-
-		int32 AbsTileX = TileX;
-		int32 AbsTileY = TileY;
-		int32 AbsTileZ = TileZ;
-		int32 AbsTileXP = TileX;
-		int32 AbsTileYP = TileY;
-		int32 AbsTileZP = TileZ;
-		for( uint32 ScreenIndex = 0; ScreenIndex < 100; ++ScreenIndex)
-		{
-			Assert(RandomNumberIndex < ArrayCount(RandomNumberTable));
-			uint32 RandomChoice = RandomNumberTable[RandomNumberIndex++] % 3;
-
-			if(!FirstScreen)
-			{
-				if(RandomChoice == 0)
-				{
-					ScreenX +=1;
-				}else if(RandomChoice == 1){
-					ScreenY +=1;
-				}else{
-					if(GoUp)
-					{
-						ScreenZ++;
-					}else{
-						ScreenZ--;
-					}
-					GoUp = !GoUp;
-					ZChanged = true;
-				}
-			}
-		
-
-			for(uint32 ScreenTileY  = 0; ScreenTileY < TilesPerHeight; ++ScreenTileY)
-			{
-				
-				for(uint32 ScreenTileX  = 0; ScreenTileX < TilesPerWidth; ++ScreenTileX)
-				{
-					AbsTileX = TileX+ScreenX*TilesPerWidth+ScreenTileX;
-					AbsTileY = TileY+ScreenY*TilesPerHeight+ScreenTileY;
-					AbsTileZ = TileZ+ScreenZ;
-
-					uint32 TileValue = 1;
-					
-					if( (ScreenTileX == 0) || (ScreenTileX == (TilesPerWidth - 1)) )
-					{
-						if( ScreenTileY == (  TilesPerHeight / 2)  )
-						{
-							TileValue = 1;
-						}else{
-							TileValue = 2;
-						}
-					}
-					
-					if( (ScreenTileY == 0) || (ScreenTileY == (TilesPerHeight - 1)) )
-					{
-						if(ScreenTileX == TilesPerWidth/2)
-						{
-							TileValue = 1;
-						}else{
-							TileValue = 2;
-						}
-					}
-
-					// If Z changed we need to add a portal on the previous floor
-					if( (ScreenTileX == TilesPerWidth/2) && (ScreenTileY == TilesPerHeight/2) )
-					{
-						if(ZChanged)
-						{
-							TileValue = 3;
-							SetTileValueAbs(&GameState->WorldArena,World->TileMap, 
-											 AbsTileXP, AbsTileYP, AbsTileZP, 3 );
-							ZChanged = false;
-						}
-						
-						AbsTileXP = AbsTileX;
-						AbsTileYP = AbsTileY;
-						AbsTileZP = AbsTileZ;
-					}
-					
-
-					SetTileValueAbs(&GameState->WorldArena,World->TileMap, 
-								AbsTileX, AbsTileY, AbsTileZ, TileValue );
-				}
-			}
-		
-			FirstScreen = false;
-		}
-	*/	
-		Memory->IsInitialized = true;	
+		Memory->IsInitialized = true;
 	}
 
-	#if 1
-	world* World = GameState->World;
-	tile_map* TileMap = World->TileMap;
-
-
-	real32 PlayerWidth = 0.75f*TileMap->TileSideInMeters;
-	real32 PlayerHeight = TileMap->TileSideInMeters;
-	real32 dt = Input->dt;
-
-	real32 dvx = 0.f;
-	real32 dvy = 0.f;
-
-	real32 dax = 0.f;
-	real32 day = 0.f;
-
-	// Meters per second
-	real32 speed;
-
+	GameState->CursorPosition = V3( (real32) Input->MouseX, (real32) Input->MouseY, (real32) Input->MouseZ);
 
 	for(int32 ControllerIndex = 0; 
 		ControllerIndex < ArrayCount(Input->Controllers); 
@@ -584,145 +419,47 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		{
 			// Controller
 		}else{
-			
+		
 			if(Controller->Start.EndedDown)
 			{
-				speed = 50;
+
 			}else{
-				speed = 9;
+
 			}
 
 			if(Controller->LeftStickLeft.EndedDown)
 			{
-				dvx -= speed;
 			}
 			if(Controller->LeftStickRight.EndedDown)
 			{
-				dvx += speed;
 			}
 			if(Controller->LeftStickUp.EndedDown)
 			{
-				dvy += speed;
 			}
 			if(Controller->LeftStickDown.EndedDown)
 			{
-				dvy -= speed;
 			}
 			if(Controller->RightShoulder.EndedDown)
 			{
-				GameState->PlayerPos.RelTile.X = 0.f;
-				GameState->PlayerPos.RelTile.Y = 0.f;	
-				GameState->PlayerPos.RelTile.Z = 0.f;	
-				GameState->PlayerPos.AbsTileX = 1;
-				GameState->PlayerPos.AbsTileY = 3;
-				GameState->PlayerPos.AbsTileZ = 0;
+
 			}
 		}	
 	}
 
-	v3 delta_pos = V3(dt * dvx, dt * dvy, 0);
-
-
-	tile_map_position NewPosition = MoveNewTileMapPosition(TileMap, GameState->PlayerPos, delta_pos);
-
-	tile_map_position NewPositionL = MoveNewTileMapPosition(TileMap, NewPosition,
-									-PlayerWidth*0.5f, 0, 0);
-
-	tile_map_position NewPositionR = MoveNewTileMapPosition(TileMap, NewPosition,
-									PlayerWidth*0.5f, 0, 0);
-
-	if( IsTileMapPointEmpty(TileMap, NewPositionR) &&
-		IsTileMapPointEmpty(TileMap, NewPositionL) &&
-		IsTileMapPointEmpty(TileMap, NewPosition))
-	{		
-		if( (GetTileValue(TileMap, NewPosition) == 3) && (!GameState->JustMoved) )
-		{
-			if(GameState->MovedUp)
-			{
-				NewPosition.AbsTileZ++;
-			}else{
-				NewPosition.AbsTileZ--;
-			}
-			GameState->MovedUp = !GameState->MovedUp;
-			GameState->JustMoved = true;
-		}
-
-		if((GetTileValue(TileMap, NewPosition) != 3)){
-			GameState->JustMoved = false;
-		}
-
-		GameState->PlayerPos  = NewPosition;
-	}
-
 	
-
-	real32 TileSideInPixels =64.f;
-	real32 PixelsPerMeter =TileSideInPixels/TileMap->TileSideInMeters;
-
-	DrawRectangle(Buffer,  0.f, 0.f,(real32) Buffer->Width, (real32) Buffer->Height , 1.f,0.f,0.f);
-
-
-	real32 CenterX = 0.5f * (real32)Buffer->Width;
-	real32 CenterY = 0.5f * (real32)Buffer->Height;
-
-	v2 PlayerOffset = {}; 
-	PlayerOffset.X = GameState->PlayerPos.RelTile.X*PixelsPerMeter;
-	PlayerOffset.Y = GameState->PlayerPos.RelTile.Y*PixelsPerMeter;
-
-//	BlitBMP(Buffer, 0.f, 0.f, GameState->Backdrop);
-
  	for(int32 RelRow = -7; RelRow<7; RelRow++)
 	{
 		for(int32 RelCol = -11; RelCol<11; RelCol++)
 		{
-			uint32 Col = GameState->PlayerPos.AbsTileX + RelCol;
-			uint32 Row = GameState->PlayerPos.AbsTileY - RelRow;
 
-			uint32 TileValue = GetTileValue(TileMap, Col, Row, GameState->PlayerPos.AbsTileZ);
-			real32 color = 0;
-
-
-			real32 MinX = CenterX + ((real32) RelCol) * TileSideInPixels - PlayerOffset.X;
-			real32 MinY = CenterY + ((real32) RelRow) * TileSideInPixels + PlayerOffset.Y;
-			
-			if(TileValue > 0)
-			{
-				if(TileValue == 1)
-				{
-					color = 0.5;
-					DrawRectangle(Buffer, MinX, MinY, TileSideInPixels, TileSideInPixels, color, color, color);
-				}else if(TileValue == 2){
-					color =  0.3f;
-					DrawRectangle(Buffer, MinX, MinY, TileSideInPixels, TileSideInPixels, color, color, color);
-				}else if(TileValue == 3){
-					color =  0.7f;
-					DrawRectangle(Buffer, MinX, MinY, TileSideInPixels, TileSideInPixels, color, color, color);
-				}
-			}
 		}
 
 	}
 
-	DrawRectangle(Buffer, CenterX - PlayerOffset.X , CenterY + PlayerOffset.Y,
+	DrawRectangle(Buffer, .X , CenterY + PlayerOffset.Y,
 				  TileSideInPixels, TileSideInPixels , 0.f,0.f,0.f);
 
-	real32 PlayerLeft = CenterX + GameState->PlayerPos.AbsTileX*TileSideInPixels;
-	real32 PlayerBottom = CenterY + GameState->PlayerPos.AbsTileY*TileSideInPixels;
-
-
-	real32 PlayerWidthInPixels = PlayerWidth*PixelsPerMeter;
-	real32 PlayerHeightInPixels = PlayerHeight*PixelsPerMeter;
-
-
-	BlitBMP(Buffer, CenterX+(TileSideInPixels - 3.f*PlayerWidthInPixels)/2.f, CenterY - 1.2f*PlayerHeightInPixels,
-							GameState->Head);
-
-//	DrawRectangle(Buffer,  CenterX+(TileSideInPixels - PlayerWidthInPixels)/2.f, CenterY - 0.5f*PlayerHeightInPixels,
-//						 PlayerWidthInPixels, PlayerHeightInPixels ,1.f,1.f,1.f);
-
-	#else 
-	draw_mandelbrot_set(Buffer);
- 	#endif
+	BlitBMP( Buffer, GameState->CursorPosition.X, GameState->CursorPosition.Y, GameState->CursorBMP);
 
 }
 
@@ -731,9 +468,6 @@ extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
 	game_state *GameState = (game_state* ) Memory->PermanentStorage;
 	GameOutputSound(SoundBuffer, 400);
 }
-
-
-
 
 
 #if 0

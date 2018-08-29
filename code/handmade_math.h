@@ -4,7 +4,7 @@
 union v2
 {
 	struct{
-		real32 X,Y;
+		real32 X, Y;
 	};
 	real32 E[2];
 };

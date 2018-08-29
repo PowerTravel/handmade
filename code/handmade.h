@@ -1,10 +1,10 @@
 #ifndef HANDMADE_H
 #define HANDMADE_H
 
-#include "handmade_platform.h"	
-#include "handmade_math.h"
+#include "handmade_platform.h"
 #include "handmade_tile.h"
 #include "handmade_intrinsics.h"
+#include "handmade_math.h"
 
 struct memory_arena
 {
@@ -48,20 +48,14 @@ struct world
 };
 
 struct game_state{
-	
-	bool32 JustMoved;
-	bool32 MovedUp;
-
-	v3 dv;
+		
+	v3 CursorPosition;
 
 	memory_arena WorldArena;
 	world* World;
-	tile_map_position PlayerPos;
-	loaded_bitmap Backdrop;
-	loaded_bitmap Head;
-	loaded_bitmap Body;
-	loaded_bitmap Map;
-	
+
+	loaded_bitmap CursorBMP;
+
 };
 
 

@@ -1,7 +1,7 @@
 #ifndef HANDMADE_TILE_H
 #define HANDMADE_TILE_H
 
-#include "handmade.h"
+#include "handmade_math.h"
 
 struct tile_map_position{
 
