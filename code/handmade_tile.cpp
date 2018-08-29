@@ -62,18 +62,19 @@ MoveNewTileMapPosition(tile_map* TileMap, tile_map_position OldCanPos,
 	return Result;
 }
 
-#define TILE_PAGE_SAFE_MARGIN 16
+#define TILE_PAGE_SAFE_MARGIN (INT32_MAX/64)
+#define TILE_PAGE_UNINITIALIZED INT32_MAX
 
 inline tile_page*
-GetTilePage(tile_map* TileMap, uint32 TilePageX, uint32 TilePageY, uint32 TilePageZ, 
+GetTilePage(tile_map* TileMap, int32 TilePageX, int32 TilePageY, int32 TilePageZ, 
 			memory_arena* Arena = 0)
 {
-	Assert( TilePageX > TILE_PAGE_SAFE_MARGIN);
-	Assert( TilePageY > TILE_PAGE_SAFE_MARGIN);
-	Assert( TilePageZ > TILE_PAGE_SAFE_MARGIN);
-	Assert( TilePageX < (UINT32_MAX-TILE_PAGE_SAFE_MARGIN)); 
-	Assert( TilePageY < (UINT32_MAX-TILE_PAGE_SAFE_MARGIN)); 
-	Assert( TilePageZ < (UINT32_MAX-TILE_PAGE_SAFE_MARGIN)); 
+	Assert( TilePageX > -TILE_PAGE_SAFE_MARGIN);
+	Assert( TilePageY > -TILE_PAGE_SAFE_MARGIN);
+	Assert( TilePageZ > -TILE_PAGE_SAFE_MARGIN);
+	Assert( TilePageX < TILE_PAGE_SAFE_MARGIN); 
+	Assert( TilePageY < TILE_PAGE_SAFE_MARGIN); 
+	Assert( TilePageZ < TILE_PAGE_SAFE_MARGIN); 
 
 	// TODO (Jakob): Make a bett er hash function
 	uint32 HashValue = 19 * TilePageX + 7*TilePageY + 3 * TilePageZ;
@@ -90,15 +91,15 @@ GetTilePage(tile_map* TileMap, uint32 TilePageX, uint32 TilePageY, uint32 TilePa
 			break;
 		}
 
-		if( Arena && (Page->PageX != 0) && (!Page->NextInHash) )
+		if( Arena && (Page->PageX != TILE_PAGE_UNINITIALIZED) && (!Page->NextInHash) )
 		{
 			Page->NextInHash = PushStruct(Arena, tile_page );
-			Page->PageX=0;
+			Page->NextInHash->PageX=TILE_PAGE_UNINITIALIZED;
 			Page = Page->NextInHash;
 			break;
 		}
 
-		if( Arena && (Page->PageX == 0) )
+		if( Arena && (Page->PageX == TILE_PAGE_UNINITIALIZED) )
 		{
 			uint32 TileCount = TileMap->PageDim * TileMap->PageDim;
 
@@ -114,7 +115,6 @@ GetTilePage(tile_map* TileMap, uint32 TilePageX, uint32 TilePageY, uint32 TilePa
 			{
 				Page->Page[TileIndex] = 1;
 			}
-			Page->NextInHash = 0;
 			break;
 		}
 
@@ -126,7 +126,7 @@ GetTilePage(tile_map* TileMap, uint32 TilePageX, uint32 TilePageY, uint32 TilePa
 }
 
 inline tile_index 
-GetTileIndex(tile_map* TileMap, uint32 AbsTileX, uint32 AbsTileY,uint32 AbsTileZ)
+GetTileIndex(tile_map* TileMap, int32 AbsTileX, int32 AbsTileY, int32 AbsTileZ)
 {
 	tile_index Result = {};
 
@@ -145,7 +145,7 @@ GetTileIndex(tile_map* TileMap, uint32 AbsTileX, uint32 AbsTileY,uint32 AbsTileZ
 
 
 inline uint32
-GetTileValueUnchecked(tile_map* TileMap, tile_page* TilePage, uint32 RelTileIndexX, uint32 RelTileIndexY)
+GetTileValueUnchecked(tile_map* TileMap, tile_page* TilePage, int32 RelTileIndexX, int32 RelTileIndexY)
 {
  	Assert(TilePage);
 	Assert(RelTileIndexX < TileMap->PageDim);
@@ -157,7 +157,7 @@ GetTileValueUnchecked(tile_map* TileMap, tile_page* TilePage, uint32 RelTileInde
 }
 
 inline void
-SetTileValueUnchecked(tile_map* TileMap, tile_page* TilePage, uint32 RelTileIndexX, uint32 RelTileIndexY, uint32 TileValue)
+SetTileValueUnchecked(tile_map* TileMap, tile_page* TilePage, int32 RelTileIndexX, int32 RelTileIndexY, uint32 TileValue)
 {
 	Assert(TilePage);
 	Assert(RelTileIndexX < TileMap->PageDim);
@@ -169,20 +169,19 @@ SetTileValueUnchecked(tile_map* TileMap, tile_page* TilePage, uint32 RelTileInde
 }
 
 inline uint32 
-GetTileValue(tile_map* TileMap, tile_page* TilePage, uint32 RelTileIndexX, uint32 RelTileIndexY)
+GetTileValue(tile_map* TileMap, tile_page* TilePage, int32 RelTileIndexX, int32 RelTileIndexY)
 {
 	uint32 Result = 0;
 	if(TilePage && TilePage->Page)
 	{
-		Result = GetTileValueUnchecked(TileMap, TilePage, RelTileIndexX,RelTileIndexY);
+		Result = GetTileValueUnchecked(TileMap, TilePage, RelTileIndexX, RelTileIndexY);
 	}
 	return Result;
 }
 
 
 inline uint32 
-GetTileValue(tile_map* TileMap, uint32 AbsTileX, uint32 
-	AbsTileY, uint32 AbsTileZ)
+GetTileValue(tile_map* TileMap, int32 AbsTileX, int32 AbsTileY, int32 AbsTileZ)
 {
 	uint32 Result = 0;
 
@@ -212,7 +211,7 @@ GetTileValue(tile_map* TileMap, tile_map_position CanPos)
 }
 
 inline void
-SetTileValueAbs(memory_arena* Arena, tile_map* TileMap, uint32 AbsTileX, uint32 AbsTileY, uint32 AbsTileZ, uint32 TileValue)
+SetTileValueAbs(memory_arena* Arena, tile_map* TileMap, int32 AbsTileX, int32 AbsTileY, int32 AbsTileZ, uint32 TileValue)
 {
 	tile_index TilePos = GetTileIndex(TileMap, AbsTileX, AbsTileY, AbsTileZ);
 	tile_page* TilePage = GetTilePage(TileMap, TilePos.PageX, TilePos.PageY, TilePos.PageZ, Arena);
@@ -249,6 +248,6 @@ InitializeTileMap( tile_map* TileMap, real32 TileSideInMeters  )
 		TilePageIndex < ArrayCount(TileMap->MapHash);
 		++TilePageIndex)
 	{
-		TileMap->MapHash[TilePageIndex].PageX = 0;
+		TileMap->MapHash[TilePageIndex].PageX = TILE_PAGE_UNINITIALIZED;
 	}
 }

@@ -20,9 +20,9 @@ struct tile_map_position{
 // separated into its parts of high bits and low bits
 struct tile_index{
 	// High bits of PageIndex
-	uint32 PageX;
-	uint32 PageY;
-	uint32 PageZ;
+	int32 PageX;
+	int32 PageY;
+	int32 PageZ;
 
 	// Low bits of page index, Each page only has x/y coords
 	uint32 TileX;
@@ -30,9 +30,9 @@ struct tile_index{
 };
 
 struct tile_page{
-	uint32 PageX;
-	uint32 PageY;
-	uint32 PageZ;
+	int32 PageX;
+	int32 PageY;
+	int32 PageZ;
 
 	uint32* Page;
 
@@ -40,16 +40,11 @@ struct tile_page{
 };
 
 struct tile_map{
-	// 	meters
 	real32 TileSideInMeters;
 
-	uint32 PageShift;
-	uint32 PageMask;
-	uint32 PageDim;
-
-//	uint32 PageCountX;
-//	uint32 PageCountY;	
-//	uint32 PageCountZ;
+	int32 PageShift;
+	int32 PageMask;
+	int32 PageDim;
 
 	// NOTE(Jakob): At the moment this needs to be a power of 2
 	tile_page MapHash[4096];

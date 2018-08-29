@@ -209,8 +209,8 @@ BlitBMP(game_offscreen_buffer* Buffer, real32 RealMinX, real32 RealMinY, loaded_
 
 
 internal loaded_bitmap
-DEBUGReadBMP( thread_context* Thread, memory_arena* Memory, debug_platform_read_entire_file* ReadEntireFile,
-			  char* FileName)
+DEBUGReadBMP( thread_context* Thread, memory_arena* Memory, 
+			   debug_platform_read_entire_file* ReadEntireFile, char* FileName)
 {
 	// Note(Jakob). BMP is stored in little Endian, 
 	// Little endian means that the least significant digit is stored first
@@ -226,19 +226,19 @@ DEBUGReadBMP( thread_context* Thread, memory_arena* Memory, debug_platform_read_
 	loaded_bitmap Result = {};
 	debug_read_file_result ReadResult = ReadEntireFile(Thread, FileName);
 
-	if(ReadResult.ContentSize != 0)
+	if (ReadResult.ContentSize != 0)
 	{
-		bmp_header* Header = (bmp_header*) ReadResult.Contents;
+		bmp_header* Header = (bmp_header*)ReadResult.Contents;
 
-		Assert(Header->BitsPerPixel==32);
-		Assert(Header->Compression==3);
+		Assert(Header->BitsPerPixel == 32);
+		Assert(Header->Compression == 3);
 
 		Result.Pixels = PushArray(Memory, Header->Width*Header->Height, uint32);
-		Result.Width  = Header->Width;
+		Result.Width = Header->Width;
 		Result.Height = Header->Height;
 
-		uint32* Target = (uint32*) Result.Pixels;
-		uint32* Source = (uint32*) ( ( (uint8*) ReadResult.Contents) + Header->FileSize-4 );
+		uint32* Target = (uint32*)Result.Pixels;
+		uint32* Source = (uint32*)(((uint8*)ReadResult.Contents) + Header->FileSize - 4);
 
 		bit_scan_result RedBitShift = FindLeastSignificantSetBit(Header->RedMask);
 		bit_scan_result GreenBitShift = FindLeastSignificantSetBit(Header->GreenMask);
@@ -248,7 +248,6 @@ DEBUGReadBMP( thread_context* Thread, memory_arena* Memory, debug_platform_read_
 		Assert(RedBitShift.Found);
 		Assert(GreenBitShift.Found);
 		Assert(BlueBitShift.Found);
-		Assert(AlphaBitShift.Found);
 
 		for (int Y = 0; Y < Result.Height; ++Y)
 		{
@@ -259,6 +258,7 @@ DEBUGReadBMP( thread_context* Thread, memory_arena* Memory, debug_platform_read_
 	
 				bit_scan_result BitShift = {};
 
+
 				uint32 Red   = Pixel & Header->RedMask;     
 				uint8 R = (uint8) (Red >> RedBitShift.Index);
 
@@ -268,9 +268,12 @@ DEBUGReadBMP( thread_context* Thread, memory_arena* Memory, debug_platform_read_
 				uint32 Blue  = Pixel & Header->BlueMask;
 				uint8 B = (uint8) (Blue >> BlueBitShift.Index);
 				
-				uint32 Alpha = Pixel & Header->AlphaMask;
-				uint8 A = (uint8) (Alpha >> AlphaBitShift.Index);
-
+				uint8 A = 0xff;
+				if (AlphaBitShift.Found)
+				{
+					uint32 Alpha = Pixel & Header->AlphaMask;
+					A = (uint8)(Alpha >> AlphaBitShift.Index);
+				}
 				*Target++ = (A << 24) | (R << 16) | (G << 8) | (B << 0);
 
 			}
@@ -385,22 +388,28 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		GameState->PlayerPos.RelTile.X = 0;
 		GameState->PlayerPos.RelTile.Y = 0;
 		GameState->PlayerPos.RelTile.Z = 0;
-		GameState->PlayerPos.AbsTileX = UINT32_MAX/2+1;
-		GameState->PlayerPos.AbsTileY = UINT32_MAX/2+3;
-		GameState->PlayerPos.AbsTileZ = UINT32_MAX/2;
+		GameState->PlayerPos.AbsTileX = 1;
+		GameState->PlayerPos.AbsTileY = 3;
+		GameState->PlayerPos.AbsTileZ = 0;
+		GameState->dv = V3(0.f, 0.f, 0.f);
 		GameState->MovedUp = true;
 		InitializeArena(&GameState->WorldArena, Memory->PermanentStorageSize- sizeof(game_state),
 						(uint8*) Memory->PermanentStorage + sizeof(game_state) );
 
 
-		GameState->Backdrop = DEBUGReadBMP(Thread, &GameState->WorldArena, Memory->DEBUGPlatformReadEntireFile ,
-			"..\\handmade\\data\\test\\test_background.bmp");
-		GameState->Head = DEBUGReadBMP(Thread, &GameState->WorldArena, Memory->DEBUGPlatformReadEntireFile ,
-			"..\\handmade\\data\\test\\test_hero_front_head.bmp");
-		GameState->Body = DEBUGReadBMP(Thread, &GameState->WorldArena, Memory->DEBUGPlatformReadEntireFile ,
-			"..\\handmade\\data\\test\\test_hero_front_torso.bmp");
+		GameState->Backdrop = DEBUGReadBMP(Thread, &GameState->WorldArena, 
+											Memory->DEBUGPlatformReadEntireFile ,
+										"..\\handmade\\data\\test\\test_background.bmp");
+		GameState->Head = DEBUGReadBMP(Thread, &GameState->WorldArena, 
+											Memory->DEBUGPlatformReadEntireFile ,
+									"..\\handmade\\data\\test\\test_hero_front_head.bmp");
+		GameState->Body = DEBUGReadBMP(Thread, &GameState->WorldArena, 
+											Memory->DEBUGPlatformReadEntireFile ,
+									"..\\handmade\\data\\test\\test_hero_front_torso.bmp");
 
-
+		GameState->Map = DEBUGReadBMP(Thread, &GameState->WorldArena, 
+											Memory->DEBUGPlatformReadEntireFile ,
+									"..\\handmade\\data\\map.bmp");
 
 		GameState->World = PushStruct(&GameState->WorldArena, world);
 		world* World = GameState->World;
@@ -410,31 +419,57 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 		real32 TileSideInMeters = 1.4f;
 		InitializeTileMap(TileMap, TileSideInMeters);
 
+
+		uint32* SourceRow = (uint32*) GameState->Map.Pixels;
+		for(int32 RowIndex = GameState->Map.Height-1; RowIndex >= 0; --RowIndex)
+		{
+			uint32* Pixel = SourceRow; 
+			for(int32 ColIndex = GameState->Map.Width-1; ColIndex >= 0; --ColIndex)
+			{
+				int32 TileValue = 0;
+				uint32 White= 0xffffffff;
+
+				if( *Pixel == White )
+				{
+					TileValue = 1;
+				}else{
+					TileValue = 2;
+				}
+				
+				SetTileValueAbs(&GameState->WorldArena,World->TileMap, 
+								ColIndex, RowIndex, 0, TileValue );
+
+				Pixel++;
+			}
+
+			SourceRow += GameState->Map.Width;
+		}
+/*
 		uint32 RandomNumberIndex = 0;
 		uint32 TilesPerWidth = 17;
 		uint32 TilesPerHeight = 9;
 		uint32 TilesPerDepth = 1;
 
 
-		uint32 ScreenX = 0;
-		uint32 ScreenY = 0;
-		uint32 ScreenZ = 0;
+		int32 ScreenX = 0;
+		int32 ScreenY = 0;
+		int32 ScreenZ = 0;
 
-		uint32 TileX = UINT32_MAX/2;
-		uint32 TileY = UINT32_MAX/2;
-		uint32 TileZ = UINT32_MAX/2;
+		int32 TileX = 0;
+		int32 TileY = 0;
+		int32 TileZ = 0;
 
 		bool32 GoUp = true;
 
 		bool32 FirstScreen = true;
 		bool32 ZChanged = false;
 
-		uint32 AbsTileX = TileX;
-		uint32 AbsTileY = TileY;
-		uint32 AbsTileZ = TileZ;
-		uint32 AbsTileXP = TileX;
-		uint32 AbsTileYP = TileY;
-		uint32 AbsTileZP = TileZ;
+		int32 AbsTileX = TileX;
+		int32 AbsTileY = TileY;
+		int32 AbsTileZ = TileZ;
+		int32 AbsTileXP = TileX;
+		int32 AbsTileYP = TileY;
+		int32 AbsTileZP = TileZ;
 		for( uint32 ScreenIndex = 0; ScreenIndex < 100; ++ScreenIndex)
 		{
 			Assert(RandomNumberIndex < ArrayCount(RandomNumberTable));
@@ -497,7 +532,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 						if(ZChanged)
 						{
 							TileValue = 3;
-							SetTileValueAbs(&GameState->WorldArena,World->TileMap, AbsTileXP, AbsTileYP, AbsTileZP, 3 );
+							SetTileValueAbs(&GameState->WorldArena,World->TileMap, 
+											 AbsTileXP, AbsTileYP, AbsTileZP, 3 );
 							ZChanged = false;
 						}
 						
@@ -507,22 +543,20 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 					}
 					
 
-					SetTileValueAbs(&GameState->WorldArena,World->TileMap, AbsTileX, AbsTileY, AbsTileZ, TileValue );
+					SetTileValueAbs(&GameState->WorldArena,World->TileMap, 
+								AbsTileX, AbsTileY, AbsTileZ, TileValue );
 				}
 			}
 		
 			FirstScreen = false;
 		}
-		
+	*/	
 		Memory->IsInitialized = true;	
 	}
 
 	#if 1
 	world* World = GameState->World;
 	tile_map* TileMap = World->TileMap;
-
-
-	GameState->JustMoved = false;
 
 
 	real32 PlayerWidth = 0.75f*TileMap->TileSideInMeters;
@@ -532,18 +566,22 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	real32 dvx = 0.f;
 	real32 dvy = 0.f;
 
+	real32 dax = 0.f;
+	real32 day = 0.f;
+
 	// Meters per second
 	real32 speed;
 
 
-	for(int ControllerIndex = 0; 
+	for(int32 ControllerIndex = 0; 
 		ControllerIndex < ArrayCount(Input->Controllers); 
 		++ControllerIndex)
 	{
 		
 		game_controller_input* Controller = GetController(Input,ControllerIndex);
 
-		if(Controller->IsAnalog ){
+		if(Controller->IsAnalog )
+		{
 			// Controller
 		}else{
 			
@@ -575,9 +613,9 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 				GameState->PlayerPos.RelTile.X = 0.f;
 				GameState->PlayerPos.RelTile.Y = 0.f;	
 				GameState->PlayerPos.RelTile.Z = 0.f;	
-				GameState->PlayerPos.AbsTileX =UINT32_MAX/2 + 1;
-				GameState->PlayerPos.AbsTileY =UINT32_MAX/2 + 3;
-				GameState->PlayerPos.AbsTileZ =UINT32_MAX/2;
+				GameState->PlayerPos.AbsTileX = 1;
+				GameState->PlayerPos.AbsTileY = 3;
+				GameState->PlayerPos.AbsTileZ = 0;
 			}
 		}	
 	}

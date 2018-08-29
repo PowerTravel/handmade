@@ -51,12 +51,16 @@ struct game_state{
 	
 	bool32 JustMoved;
 	bool32 MovedUp;
+
+	v3 dv;
+
 	memory_arena WorldArena;
 	world* World;
 	tile_map_position PlayerPos;
 	loaded_bitmap Backdrop;
 	loaded_bitmap Head;
 	loaded_bitmap Body;
+	loaded_bitmap Map;
 	
 };
 
