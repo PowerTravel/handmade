@@ -1,6 +1,3 @@
-#ifndef HANDMAD_PLATFORM_H
-#define HANDMAD_PLATFORM_H
-
 //	NOTE: Stuff that gets refferenced in the platform layer as well as
 //			the game layer
 
@@ -18,6 +15,9 @@
 
 
 // Note(Jakob): Compilers
+
+#ifndef HANDMADE_PLATFORM_HPP
+#define HANDMADE_PLATFORM_HPP
 
 #ifndef COMPILER_MSVC
 #define COMPILER_MSVC 0
@@ -44,49 +44,18 @@
 #include <intrin.h>
 #endif
 
-#include <stdint.h>
 #include <stddef.h> // size_t exists in this header on some platforms
 
-#define internal		 static
-#define local_persist    static
-#define global_variable  static
+#include "types.hpp"
 
-#define Pi32 3.14159265359
-
-#ifndef UINT32_MAX
-#define UINT32_MAX 0xffffffff
-#endif
-
-#if HANDMADE_SLOW
-#define Assert(Expression) if(!(Expression)){ *(int *)0 = 0;}
-#else
-#define Assert(Expression)
-#endif // HANDMADE_SLOW
-
-#define Kilobytes(Value) ((Value)*1024LL)
-#define Megabytes(Value) (Kilobytes(Value)*1024LL)
-#define Gigabytes(Value) (Megabytes(Value)*1024LL)
-#define Terrabytes(Value) (Gigabytes(Value)*1024LL)
-
-#define ArrayCount(Array) ( sizeof(Array)/sizeof((Array)[0]) )
-
-
-typedef int8_t  int8;
-typedef int16_t int16;
-typedef int32_t int32;
-typedef int64_t int64;
-
-typedef int32 bool32;
-
-typedef uint8_t  uint8;
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-
-typedef size_t memory_index;
-
-typedef float real32;
-typedef double real64;
+inline uint32
+SafeTruncateToU32(uint64 Value)
+{
+    // TODO(casey): Defines for maximum values
+    Assert(Value <= 0xFFFFFFFF);
+    uint32 Result = (uint32)Value;
+    return(Result);
+}
 
 struct thread_context
 {
@@ -99,6 +68,7 @@ struct debug_read_file_result{
 	uint32 ContentSize;
 	void* Contents;
 };
+
 #define DEBUG_PLATFORM_FREE_FILE_MEMORY(name) void name(thread_context* Thread, void* Memory)
 typedef DEBUG_PLATFORM_FREE_FILE_MEMORY(debug_platfrom_free_file_memory);
 
@@ -149,7 +119,6 @@ struct game_sound_output_buffer
 	int channels;
 	int16* Samples;
 };
-
 
 struct game_button_state
 {
@@ -225,6 +194,7 @@ struct game_input
 {	
 	// GameUpdateTime
 	real32 dt;
+	bool32 ExecutableReloaded;
 
 	game_button_state MouseButton[5];
 	int32 MouseX, MouseY, MouseZ;
@@ -242,17 +212,132 @@ inline game_controller_input* GetController(game_input* Input, int ControllerInd
 	return Result;
 }
 
+struct platform_file_handle
+{
+    bool32 NoErrors;
+    void *Platform;
+};
+/*
+struct platform_file_info
+{
+    platform_file_info *Next;
+    uint64 FileDate; // NOTE(casey): This is a 64-bit number that _means_ the date to the platform, but doesn't have to be understood by the app as any particular date.
+    uint64 FileSize;
+    char *BaseName; // NOTE(casey): Doesn't include a path or an extension
+    void *Platform;
+};
+struct platform_file_group
+{
+    uint32 FileCount;
+    platform_file_info *FirstFileInfo;
+    void *Platform;
+};
+enum platform_file_type
+{
+    PlatformFileType_AssetFile,
+    PlatformFileType_SavedGameFile,
+    PlatformFileType_PNG,
+    PlatformFileType_WAV,
+    
+    PlatformFileType_Count,
+};
+*/
+enum platform_memory_block_flags
+{
+    PlatformMemory_NotRestored = 0x1,
+    PlatformMemory_OverflowCheck = 0x2,
+    PlatformMemory_UnderflowCheck = 0x4,
+};
+
+/*
+ *		Platform Memory Block (PMB)
+ *			 01234567
+ *	PMB->	|xxxxxxxx|   
+ * 			...
+ *			|xxxxxxxx|
+ *	Base -> |xxxxxxxx|   0	  
+ *			|xxxxxxxx|   1
+ *			|xxxxxxxx|   2	  
+ *			...
+ *			|xxxxxxxx|   Used-1
+ *	Used->	|--------|   Used
+ *			...	  
+ *			|--------|   Size-2	  
+ *			|--------|   Size-1
+ *			|--------|   Size
+ */
+struct platform_memory_block
+{
+    uint64 Flags;
+    uint64 Size;
+    uint8* Base;						// Pointer to the beginning of the memory block
+    uintptr_t Used;						// Pointer to the end of the used data
+    platform_memory_block *ArenaPrev;
+};
+
+enum platform_open_file_mode_flags
+{
+    OpenFile_Read = 0x1,
+    OpenFile_Write = 0x2,
+};
+
+//#define PLATFORM_OPEN_FILE(name) platform_file_handle name(platform_file_group *FileGroup, platform_file_info *Info, uint32 ModeFlags)
+//typedef PLATFORM_OPEN_FILE(platform_open_file);
+//
+//#define PLATFORM_READ_DATA_FROM_FILE(name) void name(platform_file_handle *Handle, uint64 Offset, uint64 Size, void *Dest)
+//typedef PLATFORM_READ_DATA_FROM_FILE(platform_read_data_from_file);
+//
+//#define PLATFORM_WRITE_DATA_TO_FILE(name) void name(platform_file_handle *Handle, uint64 Offset, uint64 Size, void *Source)
+//typedef PLATFORM_WRITE_DATA_TO_FILE(platform_write_data_to_file);
+//
+//#define PLATFORM_FILE_ERROR(name) void name(platform_file_handle *Handle, char *Message)
+//typedef PLATFORM_FILE_ERROR(platform_file_error);
+//
+//#define PLATFORM_CLOSE_FILE(name) void name(platform_file_handle *Handle)
+//typedef PLATFORM_CLOSE_FILE(platform_close_file);
+
+#define PlatformNoFileErrors(Handle) ((Handle)->NoErrors)
+
+#define PLATFORM_ALLOCATE_MEMORY(name) platform_memory_block *name(memory_index aSize, uint64 aFlags)
+typedef PLATFORM_ALLOCATE_MEMORY(platform_allocate_memory);
+
+#define PLATFORM_DEALLOCATE_MEMORY(name) void name(platform_memory_block *aBlock)
+typedef PLATFORM_DEALLOCATE_MEMORY(platform_deallocate_memory);
+
+struct platform_api
+{
+//    platform_open_file *OpenFile;
+//    platform_read_data_from_file *ReadDataFromFile;
+//    platform_write_data_to_file *WriteDataToFile;
+//    platform_file_error *FileError;
+//    platform_close_file *CloseFile;
+
+    platform_allocate_memory* AllocateMemory;
+    platform_deallocate_memory* DeallocateMemory;
+    
+
+#if HANDMADE_INTERNAL
+//     TODO(casey): Get rid of these eventually, make them just go through
+//     the OpenFile/ReadDataFromFile/WriteDataToFile/CloseFile API.
+//     {
+     	debug_platform_read_entire_file*  DEBUGPlatformReadEntireFile;
+		debug_platfrom_free_file_memory*  DEBUGPlatformFreeFileMemory;
+		debug_platform_write_entire_file* DEBUGPlatformWriteEntireFile;
+//     }
+    
+//    debug_platform_execute_system_command *DEBUGExecuteSystemCommand;
+//    debug_platform_get_process_state *DEBUGGetProcessState;
+//    debug_platform_get_memory_stats *DEBUGGetMemoryStats;
+#endif
+
+};
+
+extern platform_api Platform;
+
 struct game_memory
 {
-	bool32 IsInitialized;
-	uint64 PermanentStorageSize;
-	void* PermanentStorage; // Note: Required to be initialized to zero at startup
-	uint64 TransientStorageSize;
-	void* TransientStorage;
-
-	debug_platform_read_entire_file*  DEBUGPlatformReadEntireFile;
-	debug_platfrom_free_file_memory*  DEBUGPlatformFreeFileMemory;
-	debug_platform_write_entire_file* DEBUGPlatformWriteEntireFile;
+	struct game_state* GameState;
+	platform_api PlatformAPI;
 };
 
 #define GAME_UPDATE_AND_RENDER(name) void name(thread_context* Thread, game_memory* Memory, game_offscreen_buffer* Buffer, game_input* Input )
@@ -265,4 +350,5 @@ typedef GAME_UPDATE_AND_RENDER( game_update_and_render );
 #define GAME_GET_SOUND_SAMPLES(name) void name(thread_context* Thread, game_memory* Memory, game_sound_output_buffer* SoundBuffer)
 typedef GAME_GET_SOUND_SAMPLES(game_get_sound_samples);
 
-#endif // HANDMADE_PLATFORM_H
+
+#endif // HANDMADE_PLATFORM_HPP

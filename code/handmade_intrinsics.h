@@ -2,7 +2,6 @@
 #ifndef HANDMADE_INTRINSIC_H
 #define HANDMADE_INTRINSIC_H
 
-
 // TODO: Replace math.h with cpu specific instructions
 #include <math.h>
 
@@ -55,6 +54,20 @@ inline real32
 ATan2(real32 Y, real32 X)
 {
 	real32 Result = atan2f(Y,X);
+	return Result;
+}
+
+inline real32
+Sqrt( real32 A )
+{
+	real32 Result = sqrtf(A);
+	return Result;
+}
+
+inline real32
+Abs( real32 A )
+{
+	real32 Result = (real32) fabs( A );
 	return Result;
 }
 

@@ -1,8 +1,4 @@
 
-#ifndef WIN32_HANDMADE_H
-#define WIN32_HANDMADE_H
-
-
 struct win32_offscreen_buffer
 {
     // NOTE(casey): Pixels are alwasy 32-bits wide, Memory Order BB GG RR XX
@@ -67,6 +63,25 @@ struct win32_game_code
 	bool32 IsValid;
 };
 
+enum win32_memory_block_flag
+{
+    Win32Mem_AllocatedDuringLooping = 0x1,
+    Win32Mem_FreedDuringLooping = 0x2,
+};
+struct win32_memory_block
+{
+    platform_memory_block Block;
+    win32_memory_block *Prev;
+    win32_memory_block *Next;
+    uint64 LoopingFlags;
+};
+
+struct win32_saved_memory_block
+{
+    uint64 BasePointer;
+    uint64 Size;
+};
+
 // Note:	Never use MAX_PATH in code that is user facing because it can be wrong
 #define WIN32_STATE_FILE_NAME_COUNT MAX_PATH
 struct win32_replay_buffer
@@ -76,8 +91,10 @@ struct win32_replay_buffer
 	char FileName[WIN32_STATE_FILE_NAME_COUNT];
 	void* MemoryBlock;
 };
+
 struct win32_state
 {
+    win32_memory_block MemorySentinel;
 
 	uint64 TotalSize;
 	void* GameMemoryBlock;
@@ -98,6 +115,3 @@ struct win32_state
 	char EXEFileName[WIN32_STATE_FILE_NAME_COUNT];
 	char* OnePastLastSlashEXEFileName;
 };
-
-
-#endif // WIN32_HANDMADE_H

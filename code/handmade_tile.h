@@ -49,4 +49,5 @@ struct tile_map{
 	// NOTE(Jakob): At the moment this needs to be a power of 2
 	tile_page MapHash[4096];
 };
+
 #endif // HANDMADE_TILE_H

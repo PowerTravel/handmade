@@ -235,8 +235,7 @@ IsTileMapPointEmpty(tile_map* TileMap, tile_map_position CanPos)
 	return Result;
 }
 
-
-internal void
+internal void 
 InitializeTileMap( tile_map* TileMap )
 {
 	TileMap->TileSideInMeters = 1.4f; 
