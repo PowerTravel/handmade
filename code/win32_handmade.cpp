@@ -401,13 +401,12 @@ Win32ResizeDIBSection( win32_offscreen_buffer* aBuffer, int aWidth, int aHeight 
 	aBuffer->Height = aHeight;
 	
 	aBuffer->BytesPerPixel = 4;
-	// Note: When biHeight is set to negative it is the cue to the
+	// Note: If biHeight is set to negative it is the cue to the
 	// compiler that we are to draw in a top down coordinate system
 	// where our screen origin is in the top left corner.
-	// TODO: Change to bottom up cordinate system?
 	aBuffer->Info.bmiHeader.biSize = sizeof(aBuffer->Info.bmiHeader);
 	aBuffer->Info.bmiHeader.biWidth = aBuffer->Width;
-	aBuffer->Info.bmiHeader.biHeight = -aBuffer->Height;	
+	aBuffer->Info.bmiHeader.biHeight = aBuffer->Height;	
 	aBuffer->Info.bmiHeader.biPlanes = 1;
 	aBuffer->Info.bmiHeader.biBitCount = 32;
 	aBuffer->Info.bmiHeader.biCompression = BI_RGB;

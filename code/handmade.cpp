@@ -338,42 +338,34 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	initiateGame( Thread,  Memory, Input );
  	handleInput( Input );
 
-	local_persist m4 Camera = M4( 1, 0, 0, 5, 
-								  0, 1, 0, 5, 
-								  0, 0, 1, 0,
-								  0, 0, 0, 1);
-
-	local_persist m4 RasterProj=M4( Buffer->Width/2.f,  0, 0, Buffer->Width/2.f, 
-							  		0, Buffer->Height/2.f, 0, Buffer->Height/2.f, 
-						      		0, 0, 0, 0,
-						      		0, 0, 0, 1);
-
-	real32 n,f,l,r,t,b;
-	n = 11;
-	f = -11;
-	l = -11;
-	r = 11;
-	t = 11;
-	b = -11;
-
-	local_persist m4 OrtoProj = M4( 2/(r-l),       0,       0, -(r+l)/(r-l), 
-						                  0, 2/(t-b),       0, -(t+b)/(t-b), 
-						                  0,       0, 2/(f-n), -(f+n)/(f-n),
-						                  0,       0,       0,           1);
-
-	v4 object = V4( (real32)  Input->MouseX * 15/ Buffer->Width, (real32) Input->MouseY * 15 / Buffer->Height, 0,1 );
+	//v4 object = V4( (real32)  Input->MouseX * 15/ Buffer->Width, (real32) Input->MouseY * 15 / Buffer->Height, 0,1 );
 
 	RootNode 	 Root = RootNode();
-	BitmapNode   BitMap   = BitmapNode(Memory->GameState->testBMP);
+	CameraNode   Camera  = CameraNode( V3(0,0,0), V3(0,0,1), 1, -1, (real32)  Buffer->Width  / (Buffer->Height), 
+																   (real32) -Buffer->Width  / (Buffer->Height), 
+																   (real32)  Buffer->Height / (Buffer->Height), 
+																   (real32) -Buffer->Height / (Buffer->Height));
+	
+	TransformNode Trans = TransformNode();
 
-	Root.Children = &BitMap;
+	real32 side = 1;
+	real32 height = side * sqrtf(3)/2;
+	GeometryNode EquilateralTriangle = GeometryNode( V3( -side/2, -height/2.f, 0), V3(0 , height/2.f ,0),    V3(side/2,-height/2,0) );
 
-	RenderVisitor rn = RenderVisitor( Buffer, object );	
+	BitmapNode   BitMap = BitmapNode(Memory->GameState->testBMP);
+
+	Root.pushChild( &Camera );
+
+	Camera.pushChild( &Trans );
+	Trans.pushChild(&EquilateralTriangle);
+//	Camera.pushChild( &Geom1 );
+//
+//	Camera.pushChild( &Geom2 );
+//	Camera.pushChild( &Geom3 );
+
+	RenderVisitor rn = RenderVisitor( Buffer );	
 
 	rn.traverse( &Root );
-
-//	game_state *GameState = Memory->GameState;
-//	RenderScene( Buffer, object, Camera, OrtoProj, RasterProj );
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)

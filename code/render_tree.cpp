@@ -19,8 +19,11 @@ class BaseCallback{
  */
 
 class BaseVisitor;
+class BaseNode;
+
 class BaseNode
 {
+
 	public:
 
 		BaseNode(){};
@@ -30,41 +33,60 @@ class BaseNode
 		virtual void acceptVisitor( BaseVisitor* ) = 0;
 		virtual void connectCallback( BaseCallback* ){};
 
-		BaseNode* Children = 0;
+		BaseNode* FirstChild = 0;
+		BaseNode* NextSibling = 0;
+
+		void pushChild( BaseNode* aNode )
+		{
+
+			if( FirstChild == 0)
+			{
+				FirstChild = aNode;
+				return;
+			}
+
+			BaseNode* Child = FirstChild;
+			while( Child->NextSibling )
+			{
+				Child = Child->NextSibling;
+			}
+
+			Child->NextSibling = aNode;
+		}
 };
 
-#define NodeApply( name ) void apply( name* aNode )
-
-//class CameraNode;
-//class GeometryNode;
 //class TransformNode;
 class RootNode;
-class BitmapNode;
+class CameraNode;
+class BitmapNode; 	// leaf
+class GeometryNode; // leaf
+class TransformNode; // leaf
 
 class BaseVisitor
 {
-
 	public:
 		BaseVisitor(){};
 		virtual ~BaseVisitor(){};
 
-		// A method for traversing the scene graph
-		virtual void traverse( BaseNode* aNode) final
+		// A method for traversing the scene graph depth first
+		virtual void traverse( BaseNode* aNode ) final
 		{
 			if(aNode == 0){return;}
 
-			// Inject itself into the node
 			aNode->acceptVisitor( this );
-			
-			if( aNode->Children != 0 )
-			{
-				traverse( aNode->Children );
-			}
+
+			traverse( aNode->FirstChild );
+
+			traverse( aNode->NextSibling );
+
 		}
 
 		// Each node has their own apply function
 		virtual void apply( RootNode* aNode ){};
+		virtual void apply( CameraNode* aNode){};
 		virtual void apply( BitmapNode* aNode){};
+		virtual void apply( GeometryNode* aNode){};
+		virtual void apply( TransformNode* aNode){};
 };
 
 /*	
@@ -75,15 +97,14 @@ class BaseVisitor
 class RenderVisitor : public BaseVisitor
 {
 	public:
-		RenderVisitor(  game_offscreen_buffer* aBuffer, v4 aObj )
+		RenderVisitor(  game_offscreen_buffer* aBuffer )
 		{
 			mBuffer = aBuffer;
 			mRasterProj=M4( 	mBuffer->Width/2.f,  0, 0, mBuffer->Width/2.f, 
 							    0, mBuffer->Height/2.f, 0, mBuffer->Height/2.f, 
 							    0, 0, 0, 0,
 							    0, 0, 0, 1);
-			mObject = aObj;
-
+			mTransformMat = M4Identity();
 
 		};
 		virtual ~RenderVisitor(){};
@@ -94,18 +115,40 @@ class RenderVisitor : public BaseVisitor
 			DrawRectangle(mBuffer, 0,0, (real32) mBuffer->Width,   (real32) mBuffer->Height, 0,0,0);
 		};
 
+		void apply( CameraNode* n) override;
+
 		void apply( BitmapNode* n) override;
 
+		void apply( GeometryNode* n) override;
+
+		void apply( TransformNode* n ) override;
+
 	private:
-		v4 mObject;
+
+
+		v4 RenderVisitor::worldToScreenCoordinates( v4 pointInWorldCoord )
+		{
+			pointInWorldCoord = mTransformMat * pointInWorldCoord;
+
+			m4 worldToCam = AffineInverse( mCameraMat );
+
+			v4 pointInCamCoord      = worldToCam * pointInWorldCoord;
+			v4 pointInCamProjection = mCameraProjMat * pointInCamCoord;
+			v4 pointInScreenCoord   = mRasterProj * pointInCamProjection;
+
+			return pointInScreenCoord;
+		}
+
 		m4 mRasterProj;
+		m4 mTransformMat;
+		m4 mCameraMat;
+		m4 mCameraProjMat;
 		game_offscreen_buffer* mBuffer;
 };
 
 /*
  * Class:	RootNode
- * Purpose:	Root of renderTree and contains the draw method
- * Misc: 	Is always Root
+ * Purpose:	Root of renderTree
  */
 class RootNode : public BaseNode
 {
@@ -123,19 +166,15 @@ class RootNode : public BaseNode
 /*
  * Class:	CameraNode
  * Purpose:	Holds camera and projection matrices
- * Misc: 	Is always Root
  */
 class CameraNode : public BaseNode
 {
 	public:
 
-		CameraNode( real32, aXPos, real32 aYPos, real32 aZPos, real32 aNear, real32 aFar, real32 aLeft, real32 aRight, real32 aTop, real32 aBottom )
+		CameraNode( ){};
+		CameraNode( v3 aFrom, v3 aTo, real32 aNear, real32 aFar, real32 aLeft, real32 aRight, real32 aTop, real32 aBottom )
 		{
-
-			mCamera = M4( 1, 0, 0, aXPos, 
-						  0, 1, 0, aYPos, 
-						  0, 0, 1, aZPos,
-						  0, 0, 0, 1);
+			lookAt( aFrom,  aTo );
 
 			setOrthoProj( aNear, aFar, aLeft, aRight, aTop, aBottom );
 		};
@@ -164,41 +203,21 @@ class CameraNode : public BaseNode
 						       0,         0,        0,             1);
 		}
 
-		Matrix44f lookAt(const Vec3f& from, const Vec3f& to, const Vec3f& tmp = Vec3f(0, 1, 0))
+		void lookAt( v3 aFrom,  v3 aTo,  v3 aTmp = V3(0,1,0) )
 		{
-			Vec3f forward = normalize(from - to);
-			Vec3f right = crossProduct(normalize(tmp), forward);
-			Vec3f up = crossProduct(forward, right);
+			v3 Forward = normalize(aFrom - aTo);
+			v3 Right = cross(normalize(aTmp), Forward);
+			v3 Up = cross(Forward, Right);
 			
-			Matrix44f camToWorld;
-			
-			camToWorld[0][0] = right.x;
-			camToWorld[0][1] = right.y;
-			camToWorld[0][2] = right.z;
-			camToWorld[1][0] = up.x;
-			camToWorld[1][1] = up.y;
-			camToWorld[1][2] = up.z;
-			camToWorld[2][0] = forward.x;
-			camToWorld[2][1] = forward.y;
-			camToWorld[2][2] = forward.z;
-			
-			camToWorld[3][0] = from.x;
-			camToWorld[3][1] = from.y;
-			camToWorld[3][2] = from.z;
+			mCamToWorld =  M4(
+							 Right.X,   Right.Y,   Right.Z,   aFrom.X,
+							 Up.X,      Up.Y,      Up.Z,      aFrom.Y,
+							 Forward.X, Forward.Y, Forward.Z, aFrom.Z,
+							 0,         0,         0,         1);
 		}
 
-		void setCamPos( v3 aCameraPosition, v3 aLookDirection )
-		{
-			mCamera = M4( 1, 0, 0, aXPos, 
-						  0, 1, 0, aYPos, 
-						  0, 0, 1, aZPos,
-						  0, 0, 0, 1);
-		}
-
-	private:
-
-		v4 mPos;
-		m4 mCamProj;
+		m4 mCamToWorld;
+		m4 mProj;
 };
 
 
@@ -227,11 +246,127 @@ class BitmapNode : public BaseNode
 };
 
 
+/*
+ * Class:	GeometryNode
+ * Purpose:	Holds all triangles
+ * Misc: 	Is always leaf
+ */
+class GeometryNode : public BaseNode
+{
+	public:
+
+		GeometryNode(){};
+		GeometryNode(v3 p0, v3 p1, v3 p2)
+		{
+			mp0 = V4(p0.X, p0.Y, p0.Z, 1);
+			mp1 = V4(p1.X, p1.Y, p1.Z, 1);
+			mp2 = V4(p2.X, p2.Y, p2.Z, 1);
+		};
+		virtual ~GeometryNode(){};
+
+		void acceptVisitor( BaseVisitor* v ) override
+		{
+			v->apply(this);
+		};
+
+		v4 mp0, mp1, mp2;
+};
+
+
+/*
+ * Class:	TransformNode
+ * Purpose:	Holds all Transformations
+ */
+class TransformNode : public BaseNode
+{
+	public:
+
+		TransformNode()
+		{
+			dR = M4Identity();
+			Pos =  M4Identity();
+			dP = M4Identity();
+		};
+
+		virtual ~TransformNode(){};
+
+		void Translate( v3 dp )
+		{
+			dP = M4(1,0,0,dp.X,
+					0,1,0,dp.Y,
+					0,0,1,dp.Z,
+					0,0,0,1);
+		}
+
+		void Rotate( real32 angle, v3 axis )
+		{
+			dR = GetRotationMatrix( angle, axis );
+		}
+
+		void acceptVisitor( BaseVisitor* v ) override
+		{
+			v->apply(this);
+		}
+
+		m4 GetTransMat()
+		{
+			Pos = dP*Pos;			
+			m4 tto = M4(1,0,0,-Pos.E[3],
+						0,1,0,-Pos.E[7],
+						0,0,1,-Pos.E[13],
+						0,0,0,1);
+
+			m4 bfo = M4(1,0,0, Pos.E[3],
+						0,1,0, Pos.E[7],
+						0,0,1, Pos.E[13],
+						0,0,0,1);
+
+			Pos = bfo * dR * tto;
+
+
+			dR = M4Identity();
+			dP = M4Identity();
+
+			return Pos;
+		}
+
+		m4 Pos;
+		m4 dP;
+		m4 dR;
+};
+
 void RenderVisitor::apply( BitmapNode* n)
 {
-	m4 cam = AffineInverse( mCamera );
-	v4 obj = cam * mObject;
-	obj = mOrtoProj*obj;
-	obj = mRasterProj*obj;
-	BlitBMP( mBuffer, (real32) obj.X, (real32) obj.Y, n->BMP);
+//	v4 obj = mCumulativeMat * mObject;
+//	obj = mRasterProj*obj;
+//	BlitBMP( mBuffer, (real32) obj.X, (real32) obj.Y, n->BMP);
+}
+
+void RenderVisitor::apply( GeometryNode* n)
+{
+	v4 p0 = worldToScreenCoordinates( n->mp0 );
+	v4 p1 = worldToScreenCoordinates( n->mp1 );
+	v4 p2 = worldToScreenCoordinates( n->mp2 );
+
+	FillTriangle(mBuffer, V2(p0.X, p0.Y), V2(p1.X, p1.Y), V2(p2.X, p2.Y) );
+}
+
+void RenderVisitor::apply( CameraNode* n)
+{
+	mCameraMat = n->mCamToWorld;
+	mCameraProjMat = n->mProj;
+}
+
+
+void RenderVisitor::apply( TransformNode* n )
+{
+	local_persist real32 t = 0;
+	n->Rotate(t, V3(0,0,1) );
+	n->Translate(V3(0,0,0));
+	t += 0.05;
+	mTransformMat = n->GetTransMat();
+
+	if(t == 2*3.14){
+		t -=2*3.14;
+	}
 }
