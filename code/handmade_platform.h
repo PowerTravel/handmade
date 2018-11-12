@@ -250,11 +250,8 @@ enum platform_memory_block_flags
 };
 
 /*
- *		Platform Memory Block (PMB)
+ *	Platform Memory Block (PMB)
  *			 01234567
- *	PMB->	|xxxxxxxx|   
- * 			...
- *			|xxxxxxxx|
  *	Base -> |xxxxxxxx|   0	  
  *			|xxxxxxxx|   1
  *			|xxxxxxxx|   2	  

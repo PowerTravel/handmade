@@ -3,6 +3,25 @@
 
 #include <math.h>
 
+
+// Supported operations:
+// v2 * v2 (dot)
+// r * v2, 
+// v2 * r
+// v2 *= r
+
+// v2 / r
+// v2 /= r
+
+// v2 + v2,
+// v2 += v2
+
+// v2 - v2,
+// v2 -= v2.
+
+// r norm
+// v2 normalize
+
 union v2
 {
 	struct{
@@ -16,32 +35,50 @@ v2 V2(real32 X, real32 Y){
 	return(Result);
 };
 
-inline v2
-operator*(real32 A, v2 B)
+inline real32 operator*(v2 A, v2 B)
+{
+	real32 Result = A.X*B.X + A.Y*B.Y;
+	return Result;
+}
+
+
+inline v2 operator*(real32 s, v2 v)
 {
 	v2 Result;
-	Result.X = A*B.X;
-	Result.Y = A*B.Y;
+	Result.X = s*v.X;
+	Result.Y = s*v.Y;
 	return Result;	
 }
 
-inline v2
-operator*(v2 B, real32 A)
+inline v2 operator*(v2 v, real32 s)
 {
 	v2 Result;
-	Result = A*B;
+	Result = s*v;
 	return Result;	
 }
 
-inline v2&
-operator*=(v2& B, real32 A)
+inline v2& operator*=(v2& v, real32 s)
 {
-	B = A*B;
-	return B;
+	v = s*v;
+	return v;
 }
 
-inline v2
-operator+(v2 A, v2 B)
+inline v2 operator/(v2 v, real32 s)
+{
+	v2 Result;
+	real32 inverse = 1/s;
+	Result = inverse*v;
+	return Result;	
+}
+
+inline v2& operator/=(v2& v, real32 s)
+{
+	v = v/s;
+	return v;
+}
+
+
+inline v2 operator+(v2 A, v2 B)
 {
 	v2 Result;
 	Result.X = A.X + B.X;
@@ -49,16 +86,14 @@ operator+(v2 A, v2 B)
 	return Result;
 }
 
-inline v2&
-operator+=(v2& A, v2 B)
+inline v2& operator+=(v2& A, v2 B)
 {
 	A = A+B;
 	return A;
 }
 
 
-inline v2
-operator-(v2 A, v2 B)
+inline v2 operator-(v2 A, v2 B)
 {
 	v2 Result;
 	Result.X = A.X - B.X;
@@ -66,19 +101,46 @@ operator-(v2 A, v2 B)
 	return Result;
 }
 
-inline v2&
-operator-=(v2& A, v2 B)
+inline v2& operator-=(v2& A, v2 B)
 {
 	A = A-B;
 	return A;
 }
 
-inline real32
-DotProduct(v2 A, v2 B)
+inline real32 norm( v2 r )
 {
-	real32 Result = A.X*B.X + A.Y*B.Y;
+	real32 Result;
+	Result =  (real32) sqrt( r*r ); 
 	return Result;
 }
+
+inline v2 normalize( v2 r )
+{
+	v2 Result;
+	Result = r / norm(r);
+	return Result;
+}
+
+
+
+// Supported operations:
+// v3 * v3 (dot)
+// r * v3, 
+// v3 * r
+// v3 *= r
+
+// v3 / r
+// v3 /= r
+
+// v3 + v3,
+// v3 += v3
+
+// v3 - v3,
+// v3 -= v3.
+
+// r norm
+// v3 normalize
+// v3 Cross
 
 union v3
 {
@@ -93,8 +155,19 @@ v3 V3(real32 X, real32 Y, real32 Z){
 	return(Result);
 };
 
-inline v3
-operator*(real32 A, v3 B)
+v3 V3(v2 R, real32 Z=0){
+	v3 Result = {R.X,R.Y,Z};
+	return(Result);
+};
+
+inline real32 operator*(v3 A, v3 B)
+{
+	real32 Result;
+	Result = A.X*B.X + A.Y*B.Y + A.Z*B.Z;
+	return Result;	
+}
+
+inline v3 operator*(real32 A, v3 B)
 {
 	v3 Result;
 	Result.X = A*B.X;
@@ -103,19 +176,30 @@ operator*(real32 A, v3 B)
 	return Result;	
 }
 
-inline v3
-operator*(v3 B, real32 A)
+inline v3 operator*(v3 B, real32 A)
 {
 	v3 Result;
 	Result = A*B;
 	return Result;	
 }
 
-inline v3&
-operator*=(v3& B, real32 A)
+inline v3& operator*=(v3& V, real32 s)
 {
-	B = A*B;
-	return B;
+	V = s*V;
+	return V;
+}
+
+inline v3 operator/(v3 V, real32 s)
+{
+	real32 sInv = 1/s;
+	v3 Result = sInv*V;
+	return Result;	
+}
+
+inline v3& operator/=(v3 V, real32 s)
+{
+	V = V / s;
+	return V;	
 }
 
 inline v3
@@ -135,7 +219,6 @@ operator+=(v3& A, v3 B)
 	return A;
 }
 
-
 inline v3
 operator-(v3 A, v3 B)
 {
@@ -153,6 +236,48 @@ operator-=(v3& A, v3 B)
 	return A;
 }
 
+inline real32 norm( v3 R )
+{
+	real32 Result;
+	Result =  (real32) sqrt( R*R ); 
+	return Result;
+}
+
+inline v3 normalize( v3 V )
+{
+	v3 Result;
+	Result = V / norm(V);
+	return Result;
+}
+
+inline v3 cross(v3 A, v3 B)
+{
+	v3 Result;
+	Result.X = A.Y * B.Z - A.Z * B.Y;
+	Result.Y = A.Z * B.X - A.X * B.Z;
+	Result.Z = A.X * B.Y - A.Y * B.X;
+	return Result;
+}
+
+// Supported operations:
+// v4 * v4 (dot)
+// r * v4, 
+// v4 * r
+// v4 *= r
+
+// v4 / r
+// v4 /= r
+
+// v4 + v4,
+// v4 += v4
+
+// v4 - v4,
+// v4 -= v4.
+
+// r norm
+// v4 normalize
+
+
 union v4
 {
 	struct{
@@ -166,6 +291,17 @@ v4 V4(real32 X, real32 Y, real32 Z, real32 W){
 	v4 Result = {X,Y,Z,W};
 	return(Result);
 };
+
+v4 V4(v3 R, real32 W = 1 ){
+	v4 Result = {R.X,R.Y,R.Z,W};
+	return(Result);
+};
+
+v4 V4(v2 R, real32 Z = 0, real32 W = 1 ){
+	v4 Result = {R.X,R.Y, Z,W};
+	return(Result);
+};
+
 
 inline real32
 operator*(v4 A, v4 B)
@@ -186,19 +322,37 @@ operator*(real32 A, v4 B)
 }
 
 inline v4
-operator*(v4 B, real32 A)
+operator*(v4 R, real32 s)
 {
 	v4 Result;
-	Result = A*B;
+	Result = s*R;
 	return Result;	
 }
 
 inline v4&
-operator*=(v4& B, real32 A)
+operator*=(v4& R, real32 s)
 {
-	B = A*B;
-	return B;
+	R = s*R;
+	return R;
 }
+
+inline v4
+operator/(v4 R, real32 s)
+{
+	v4 Result;
+	real32 inverse = 1/s;
+	Result = inverse*R;
+	return Result;	
+}
+
+inline v4&
+operator/=(v4& R, real32 s)
+{
+	R = s*R;
+	return R;
+}
+
+
 
 inline v4
 operator+(v4 A, v4 B)
@@ -207,7 +361,7 @@ operator+(v4 A, v4 B)
 	Result.X = A.X + B.X;
 	Result.Y = A.Y + B.Y;
 	Result.Z = A.Z + B.Z;
-	Result.Z = A.W + B.W;
+	Result.W = A.W + B.W;
 	return Result;
 }
 
@@ -230,16 +384,24 @@ operator-(v4 A, v4 B)
 	return Result;
 }
 
-inline v4&
-operator-=(v4& A, v4 B)
+inline v4& operator-=(v4& A, v4 B)
 {
 	A = A-B;
 	return A;
 }
 
-real32 norm( v4 A )
+inline real32 norm( v4 R )
 {
-	return (real32) Sqrt(A.X*A.X + A.Y*A.Y + A.Z * A.Z + A.W*A.W);
+	real32 Result;
+	Result = (real32) Sqrt(R.X*R.X + R.Y*R.Y + R.Z * R.Z + R.W*R.W);
+	return Result;
+}
+
+inline v4 normalize( v4 R )
+{
+	v4 Result;
+	Result = R / norm(R); 
+	return Result;
 }
 
 union m4
@@ -254,6 +416,17 @@ union m4
 	};
 	real32 E[16];
 };
+
+m4 M4Identity()
+{
+	m4 Result = {
+		1,0,0,0,
+		0,1,0,0,
+		0,0,1,0,
+		0,0,0,1};
+
+	return(Result);	
+}
 
 m4 M4(real32 a11, real32 a12, real32 a13, real32 a14,
 	  real32 a21, real32 a22, real32 a23, real32 a24,
@@ -424,5 +597,63 @@ void U_AffineInverse()
 	}
 
 }
+
+m4 QuatAsMatrix( v4 Quaternion )
+{	
+	real32 x,y,z;
+
+	x = 1-2*(Quaternion.Y*Quaternion.Y + Quaternion.Z*Quaternion.Z);
+	y = 2*(Quaternion.X*Quaternion.Y - Quaternion.Z*Quaternion.W);
+	z = 2*(Quaternion.X*Quaternion.Z + Quaternion.Y*Quaternion.W);
+	v4 r1 = V4(x,y,z,0.0f);
+
+	x = 2*(Quaternion.X*Quaternion.Y + Quaternion.Z*Quaternion.W);
+	y = 1-2*(Quaternion.X*Quaternion.X + Quaternion.Z*Quaternion.Z);
+	z = 2*(Quaternion.Y*Quaternion.Z - Quaternion.X*Quaternion.W);
+	v4 r2 = V4(x,y,z,0.0f);
+
+	x = 2*(Quaternion.X*Quaternion.Z - Quaternion.Y*Quaternion.W);
+	y = 2*(Quaternion.Y*Quaternion.Z + Quaternion.X*Quaternion.W);
+	z = 1-2*(Quaternion.X*Quaternion.X + Quaternion.Y*Quaternion.Y);
+	v4 r3 = V4(x,y,z,0.0f);
+
+	v4 r4 = V4(0.0f,0.0f,0.0f,1.0f);
+
+	return M4(r1,r2,r3,r4);
+
+}
+
+v4 RotateQuaternion( real32 angle, v3 axis )
+{
+	const real32 epsilon = 0.0000001f;
+
+	real32 length = norm( axis );
+	
+	if( length < epsilon)
+	{
+		// ~zero axis, so reset rotation to zero
+		return V4(0,0,0,1);
+	}
+
+	real32 inversenorm = 1/length;
+	real32 coshalfangle = Cos( (real32) 0.5 * angle);
+	real32 sinhalfangle = Sin( (real32) 0.5 * angle);
+
+	v4 Result = V4( axis.X * sinhalfangle * inversenorm,
+					axis.Y * sinhalfangle * inversenorm,
+					axis.Z * sinhalfangle * inversenorm,
+					coshalfangle);
+
+	return Result;
+}
+
+m4 GetRotationMatrix(real32 angle, v3 axis)
+{
+	v4 q = RotateQuaternion( angle, axis );
+	m4 R = QuatAsMatrix(q);
+
+	return R;
+}
+
 
 #endif

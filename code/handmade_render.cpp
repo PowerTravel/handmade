@@ -56,6 +56,61 @@ void PutPixel(game_offscreen_buffer* Buffer, int32 X, int32 Y, real32 R, real32 
 			   ( TruncateReal32ToInt32(B*255.f) << 0) );
 }
 
+
+void DrawCircle(game_offscreen_buffer* Buffer, real32 RealX0, real32 RealY0, real32 RealRadius, real32 R = 1, real32 G =1, real32 B = 1 )
+{
+	int32 x0     = RoundReal32ToInt32(RealX0);
+	int32 y0     = RoundReal32ToInt32(RealY0);
+	int32 radius = RoundReal32ToInt32(RealRadius);
+    
+	int32 x   = radius-1 ;
+	int32 y   = 0;
+	int32 dx  = 1;
+	int32 dy  = 1;
+	int32 err = dx - (radius << 1);
+
+
+	while (x >= y)
+	{
+	    PutPixel(Buffer, x0 + x, y0 + y, R,G,B);
+	    PutPixel(Buffer, x0 + y, y0 + x, R,G,B);
+	    PutPixel(Buffer, x0 - y, y0 + x, R,G,B);
+	    PutPixel(Buffer, x0 - x, y0 + y, R,G,B);
+	    PutPixel(Buffer, x0 - x, y0 - y, R,G,B);
+	    PutPixel(Buffer, x0 - y, y0 - x, R,G,B);
+	    PutPixel(Buffer, x0 + y, y0 - x, R,G,B);
+	    PutPixel(Buffer, x0 + x, y0 - y, R,G,B);
+
+	    //for(int xi = x-1; xi>=0; --xi)
+	    //{
+	    //	PutPixel(Buffer, x0 + xi, y0 + y,  1,1,1);
+	    //	PutPixel(Buffer, x0 + y,  y0 + xi, 1,1,1);
+	    //	PutPixel(Buffer, x0 - y,  y0 + xi, 1,1,1);
+	    //	PutPixel(Buffer, x0 - xi, y0 + y,  1,1,1);
+	    //	PutPixel(Buffer, x0 - xi, y0 - y,  1,1,1);
+	    //	PutPixel(Buffer, x0 - y,  y0 - xi, 1,1,1);
+	    //	PutPixel(Buffer, x0 + y,  y0 - xi, 1,1,1);
+	    //	PutPixel(Buffer, x0 + xi, y0 - y,  1,1,1);
+	    //}
+
+	    if (err <= 0)
+	    {
+	        y++;
+	        err += dy;
+	        dy += 2;
+	    }
+	    
+	    if (err > 0)
+	    {
+	        x--;
+	        dx += 2;
+	        err += dx - (radius << 1);
+	    }
+	}
+
+}
+
+
 // makes the packing compact
 #pragma pack(push, 1)
 struct bmp_header{
@@ -183,84 +238,249 @@ BlitBMP(game_offscreen_buffer* Buffer, real32 RealMinX, real32 RealMinY, loaded_
 	} 
 }
 
-void DrawCircle(game_offscreen_buffer* Buffer, real32 RealX0, real32 RealY0, real32 RealRadius)
+void DrawLineBresLow(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1, int32 y1, real32 R = 1, real32 G = 1, real32 B = 1 )
 {
-	int32 x0     = RoundReal32ToInt32(RealX0);
-	int32 y0     = RoundReal32ToInt32(RealY0);
-	int32 radius = RoundReal32ToInt32(RealRadius);
-    
-	int32 x   = radius-1 ;
-	int32 y   = 0;
-	int32 dx  = 1;
-	int32 dy  = 1;
-	int32 err = dx - (radius << 1);
-
-
-	while (x >= y)
+	int32 dx = x1 - x0;
+	int32 dy = y1 - y0;
+	int32 yi = 1;
+	if(dy < 0 )
 	{
-	    PutPixel(Buffer, x0 + x, y0 + y, 1,1,1);
-	    PutPixel(Buffer, x0 + y, y0 + x, 1,1,1);
-	    PutPixel(Buffer, x0 - y, y0 + x, 1,1,1);
-	    PutPixel(Buffer, x0 - x, y0 + y, 1,1,1);
-	    PutPixel(Buffer, x0 - x, y0 - y, 1,1,1);
-	    PutPixel(Buffer, x0 - y, y0 - x, 1,1,1);
-	    PutPixel(Buffer, x0 + y, y0 - x, 1,1,1);
-	    PutPixel(Buffer, x0 + x, y0 - y, 1,1,1);
+		yi = -1;
+		dy = -dy;
+	}
+	int32 D = 2*dy - dx;
+	int32 y = y0;
 
-	    //for(int xi = x-1; xi>=0; --xi)
-	    //{
-	    //	PutPixel(Buffer, x0 + xi, y0 + y,  1,1,1);
-	    //	PutPixel(Buffer, x0 + y,  y0 + xi, 1,1,1);
-	    //	PutPixel(Buffer, x0 - y,  y0 + xi, 1,1,1);
-	    //	PutPixel(Buffer, x0 - xi, y0 + y,  1,1,1);
-	    //	PutPixel(Buffer, x0 - xi, y0 - y,  1,1,1);
-	    //	PutPixel(Buffer, x0 - y,  y0 - xi, 1,1,1);
-	    //	PutPixel(Buffer, x0 + y,  y0 - xi, 1,1,1);
-	    //	PutPixel(Buffer, x0 + xi, y0 - y,  1,1,1);
-	    //}
+	for( int x = x0; x <= x1; ++x )
+	{
+		PutPixel(Buffer, x,y, R,G,B);
+		if( D > 0 ) 
+		{ 
+			y = y + yi;
+			D = D - 2*dx;
+		}
+		D = D + 2*dy;
+	}
+}
 
-	    if (err <= 0)
-	    {
-	        y++;
-	        err += dy;
-	        dy += 2;
-	    }
-	    
-	    if (err > 0)
-	    {
-	        x--;
-	        dx += 2;
-	        err += dx - (radius << 1);
-	    }
+
+void DrawLineBresHigh(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1, int32 y1, real32 R = 1, real32 G = 1, real32 B = 1 )
+{
+	int32 dx = x1 - x0;
+	int32 dy = y1 - y0;
+	int32 xi = 1;
+	if( dx < 0 )
+	{
+		xi = -1;
+		dx = -dx;
+	}
+	int32 D = 2*dx - dy;
+	int32 x = x0;
+
+	for( int y = y0; y <= y1; ++y )
+	{
+		PutPixel(Buffer, x,y, R,G,B);
+		if( D > 0 ) 
+		{ 
+			x = x + xi;
+			D = D - 2*dy;
+		}
+
+		D = D + 2*dx;
+	}
+}
+
+void DrawLineBres(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1, int32 y1, real32 R = 1, real32 G = 1, real32 B = 1 )
+{
+	if( Abs( (real32) (y1 - y0) ) < Abs( (real32) (x1 - x0) )  )
+	{
+		if( x0 > x1 ){
+			DrawLineBresLow(Buffer, x1, y1, x0, y0, R, G, B);
+		}else{
+			DrawLineBresLow(Buffer, x0, y0, x1, y1, R, G, B);
+		}
+	}else{
+		if( y0 > y1 ){
+			DrawLineBresHigh(Buffer, x1, y1, x0, y0, R, G, B);
+		}else{
+			DrawLineBresHigh(Buffer, x0, y0, x1, y1, R, G, B);	
+		}
+	}
+}
+
+
+void fillBottomFlatTriangle(game_offscreen_buffer* Buffer, v2 A, v2 B, v2 C)
+{
+	//     A
+	//    /  \
+	//   s1   s2
+	//  /      \
+	// C------- B
+
+	Assert( A.Y >= B.Y );
+	Assert( A.Y >= C.Y );
+
+	real32 ABslope = 0;
+	real32 ABdy = B.Y - A.Y;
+	if( ABdy != 0 )
+	{
+		ABslope = (B.X - A.X) / ABdy;
 	}
 
+
+	real32 ACslope = 0;
+	real32 ACdy = C.Y - A.Y;
+	if( ACdy != 0 )
+	{
+		ACslope = (C.X - A.X) / ACdy;
+	}
+
+	real32 StartX = A.X;
+	real32 StopX = A.X;
+
+	int32 startLineY = RoundReal32ToInt32( A.Y );
+	int32 stopLineY  = RoundReal32ToInt32( B.Y );
+
+	if( C.X > B.X )
+	{
+		int CCC = 1;
+	}
+
+
+	for(int32 scanlineY = startLineY; scanlineY >= stopLineY; --scanlineY)
+	{
+		DrawLineBres(Buffer, RoundReal32ToInt32(StartX) , scanlineY, RoundReal32ToInt32(StopX), scanlineY);
+		StartX -= ABslope;
+		StopX -= ACslope;
+		if (Abs(StartX - StopX) > Abs(C.X - B.X))
+		{
+			StartX = B.X;
+			StopX = C.X;
+		}
+	}
+
+	DrawCircle( Buffer, A.X, A.Y, 5, 1,0,0);
+	DrawCircle( Buffer, B.X, B.Y, 5, 0,1,0);
+	DrawCircle( Buffer, C.X, C.Y, 5, 0,0,1);
 }
 
-void RenderScene( game_offscreen_buffer* Buffer, v4 obj, m4 Camera, m4 OrtoProj, m4 RasterProj )
+void fillTopFlatTriangle(game_offscreen_buffer* Buffer, v2 A, v2 B, v2 C)
 {
-	local_persist real32 t = 0;
-	t += (real32) 0.1;
-	if( t >= (real32) (2.0*Pi32)){ t = (real32) (2.0*Pi32) - t; }
+	//B---C
+	// \ /
+	//	A
 
-	DrawRectangle(Buffer, 0,0, (real32) Buffer->Width,   (real32)	 Buffer->Height,1,1,1);
-	DrawRectangle(Buffer, 2,2, (real32) Buffer->Width-4, (real32)	 Buffer->Height-4,0,0,0);
+	Assert( A.Y <= B.Y );
+	Assert( A.Y <= C.Y );
 
-	m4 cam = AffineInverse( Camera );
-	obj = cam * obj;
-	obj = OrtoProj*obj;
-	obj = RasterProj*obj;
+	real32 ABslope = 0;
+	real32 ABdy = B.Y - A.Y;
+	if( ABdy != 0 )
+	{
+		ABslope = (B.X - A.X) / ABdy;
+	}
 
-	real32 Radius = 20+10*Sin(t);
-	DrawCircle( Buffer, obj.X, obj.Y, Radius );	
+	real32 ACslope = 0;
+	real32 ACdy = C.Y - A.Y;
+	if( ACdy != 0 )
+	{
+		ACslope = (C.X - A.X) / ACdy;
+	}
+
+	real32 StartX = A.X;
+	real32 StopX = A.X;
+
+	int32 startLineY = RoundReal32ToInt32( A.Y );
+	int32 stopLineY  = RoundReal32ToInt32( B.Y );
+
+	for(int32 scanlineY = startLineY; scanlineY <= stopLineY; ++scanlineY)
+	{
+		DrawLineBres(Buffer, RoundReal32ToInt32(StartX) , scanlineY, RoundReal32ToInt32(StopX), scanlineY);
+		StartX += ABslope;
+		StopX += ACslope;
+		if( Abs(StopX - StartX) > Abs(C.X - B.X) ) 
+		{
+			StartX = B.X;
+			StopX = C.X;
+		}
+	}
 	
+	DrawCircle( Buffer, A.X, A.Y, 5, 1,0,0);
+	DrawCircle( Buffer, B.X, B.Y, 5, 0,1,0);
+	DrawCircle( Buffer, C.X, C.Y, 5, 0,0,1);
+}
+
+
+void FillTriangle(game_offscreen_buffer* Buffer, v2 p0, v2 p1, v2 p2)
+{
+
+	v2 P[3] = {p0,p1,p2};
+
+	v2 SP[3] = {};
 	
+	int32 maxIdx = 0; 
+	int32 minIdx = 0;
 
-	//BlitBMP(Buffer, 0.0f, 0.0f, GameState->Map);
+	for(  int32 i = 0; i<3; ++i )
+	{
+		if( P[i].Y > P[maxIdx].Y )
+		{
+			maxIdx = i;
+		}
 
-	//BlitBMP( Buffer, GameState->World->PlayerPosition.X-GameState->CursorBMP.Width/2, 
-	//	             GameState->World->PlayerPosition.Y-GameState->CursorBMP.Width/2, 
-	//	             GameState->CursorBMP);
+		if( P[i].Y < P[minIdx].Y )
+		{
+			minIdx = i;
+		}
+	}
+
+	Assert( maxIdx != minIdx );
+
+	for(  int32 i = 0; i<3; ++i )
+	{
+		if( i == maxIdx )
+		{
+			SP[0] = P[i];
+		}
+
+		if( i == minIdx )
+		{
+			SP[2] = P[i];
+		}
+
+		if( (i != maxIdx) && (i != minIdx) )
+		{
+			SP[1] = P[i];
+		}
+	}
+
+	if( SP[0].Y == SP[1].Y )
+	{
+		fillTopFlatTriangle( Buffer, SP[2], SP[0], SP[1]);	
+	}else if(SP[1].Y == SP[2].Y)
+	{
+		fillBottomFlatTriangle( Buffer, SP[0], SP[1], SP[2]);
+	}else{
+		v2 p4 = V2( SP[0].X + (SP[1].Y-SP[0].Y)/(SP[2].Y-SP[0].Y) * (SP[2].X - SP[0].X) , SP[1].Y  );
+
+		fillBottomFlatTriangle( Buffer, SP[0], p4, SP[1]);
+		fillTopFlatTriangle(    Buffer, SP[2], SP[1], p4 );
+	}
+
+	DrawLineBres(Buffer,  RoundReal32ToInt32( SP[0].X ), 
+						  RoundReal32ToInt32( SP[0].Y ), 
+						  RoundReal32ToInt32( SP[1].X ), 
+						  RoundReal32ToInt32( SP[1].Y ), 0,0,0);
+	DrawLineBres(Buffer,  RoundReal32ToInt32( SP[1].X ), 
+						  RoundReal32ToInt32( SP[1].Y ), 
+						  RoundReal32ToInt32( SP[2].X ), 
+						  RoundReal32ToInt32( SP[2].Y ), 0,0,0);
+	DrawLineBres(Buffer,  RoundReal32ToInt32( SP[2].X ), 
+						  RoundReal32ToInt32( SP[2].Y ), 
+						  RoundReal32ToInt32( SP[1].X ), 
+						  RoundReal32ToInt32( SP[1].Y ), 0,0,0);
 
 }
+
 
 #endif HANDMADE_RENDER

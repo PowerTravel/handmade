@@ -401,13 +401,12 @@ Win32ResizeDIBSection( win32_offscreen_buffer* aBuffer, int aWidth, int aHeight 
 	aBuffer->Height = aHeight;
 	
 	aBuffer->BytesPerPixel = 4;
-	// Note: When biHeight is set to negative it is the cue to the
+	// Note: If biHeight is set to negative it is the cue to the
 	// compiler that we are to draw in a top down coordinate system
 	// where our screen origin is in the top left corner.
-	// TODO: Change to bottom up cordinate system?
 	aBuffer->Info.bmiHeader.biSize = sizeof(aBuffer->Info.bmiHeader);
 	aBuffer->Info.bmiHeader.biWidth = aBuffer->Width;
-	aBuffer->Info.bmiHeader.biHeight = -aBuffer->Height;	
+	aBuffer->Info.bmiHeader.biHeight = aBuffer->Height;	
 	aBuffer->Info.bmiHeader.biPlanes = 1;
 	aBuffer->Info.bmiHeader.biBitCount = 32;
 	aBuffer->Info.bmiHeader.biCompression = BI_RGB;
@@ -1431,8 +1430,8 @@ PLATFORM_ALLOCATE_MEMORY(Win32AllocateMemory)
     }
     
     win32_memory_block* Block = (win32_memory_block*)
-        VirtualAlloc(0, TotalSize,
-                     MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+        VirtualAlloc(0, TotalSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+        
     Assert(Block);
     Block->Block.Base = (uint8*) Block + BaseOffset;
     Assert(Block->Block.Used == 0);
@@ -1447,16 +1446,16 @@ PLATFORM_ALLOCATE_MEMORY(Win32AllocateMemory)
     
     win32_memory_block* Sentinel = &GlobalWin32State.MemorySentinel;
 
-    Block->Next = Sentinel;
-    Block->Block.Size = aSize;
-    Block->Block.Flags = aFlags;
+    Block->Next 		= Sentinel;
+    Block->Block.Size 	= aSize;
+    Block->Block.Flags 	= aFlags;
     Block->LoopingFlags = Win32IsInLoop(&GlobalWin32State) ? Win32Mem_AllocatedDuringLooping : 0;
     
     //TODO: add Mutex support
  //   BeginTicketMutex(&GlobalWin32State.MemoryMutex);
-    Block->Prev = Sentinel->Prev;
-    Block->Prev->Next = Block;
-    Block->Next->Prev = Block;
+    Block->Prev 		= Sentinel->Prev;
+    Block->Prev->Next 	= Block;
+    Block->Next->Prev 	= Block;
 //    EndTicketMutex(&GlobalWin32State.MemoryMutex);
     
     platform_memory_block *PlatBlock = &Block->Block;

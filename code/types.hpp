@@ -50,4 +50,4 @@ typedef double real64;
 #define local_persist    static
 #define global_variable  static
 
-#define Pi32 3.14159265359
+#define Pi32 3.14159265359f

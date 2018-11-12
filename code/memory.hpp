@@ -6,7 +6,7 @@ struct memory_arena
     uintptr_t MinimumBlockSize;
     
     uint64 AllocationFlags;
-    int32 TempCount;	
+    int32 TempCount;
 };
 
 struct temporary_memory
@@ -253,7 +253,7 @@ CheckArena(memory_arena *Arena)
     Assert(Arena->TempCount == 0);
 }
 
-#define BootstrapPushStruct(type, Member, ...) (type *)BootstrapPushSize_(sizeof(type), OffsetOf(type, Member), ## __VA_ARGS__)
+#define BootstrapPushStruct(type, Member, ...) (type *)BootstrapPushSize_(sizeof(type),8, ## __VA_ARGS__)
 inline void *
 BootstrapPushSize_(uintptr_t StructSize, uintptr_t OffsetToArena,
                    arena_bootstrap_params BootstrapParams = DefaultBootstrapParams(), 

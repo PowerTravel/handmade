@@ -14,8 +14,6 @@ struct loaded_bitmap
 	void* Pixels;
 };
 
-struct geometry;
-
 struct game_state{
 
 	memory_arena AssetArena;
@@ -25,12 +23,6 @@ struct game_state{
 	loaded_bitmap testBMP;
 
 	bool32 IsInitialized;
-};
-
-struct transient_state
-{
-    bool32 IsInitialized;
-    memory_arena TranArena;
 };
 
 #endif // HANDMADE_H

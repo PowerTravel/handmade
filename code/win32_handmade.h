@@ -71,8 +71,8 @@ enum win32_memory_block_flag
 struct win32_memory_block
 {
     platform_memory_block Block;
-    win32_memory_block *Prev;
-    win32_memory_block *Next;
+    win32_memory_block* Prev;
+    win32_memory_block* Next;
     uint64 LoopingFlags;
 };
 

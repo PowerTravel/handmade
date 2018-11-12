@@ -1,8 +1,9 @@
 
 #include <stdio.h>
 #include "handmade.h"
+#include "geometric_objects.h"
 #include "handmade_render.cpp"
-#include "render_tree.cpp"
+#include "scene_graph.cpp"
 
 internal void
 GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
@@ -299,6 +300,7 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 	if( ! Memory->GameState )
 	{
 		Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
+		//Memory->GameState = BootstrapPushStruct(game_state, TransientArena);
 
 		//geometry* geom = PushStruct( &GameState->AssetArena, geometry );
 		//GameState->Geometry = geom;
@@ -333,47 +335,56 @@ platform_api Platform;
 
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
+	local_persist real32 t = 0;
+
 	Platform = Memory->PlatformAPI;
 
 	initiateGame( Thread,  Memory, Input );
  	handleInput( Input );
 
-	local_persist m4 Camera = M4( 1, 0, 0, 5, 
-								  0, 1, 0, 5, 
-								  0, 0, 1, 0,
-								  0, 0, 0, 1);
-
-	local_persist m4 RasterProj=M4( Buffer->Width/2.f,  0, 0, Buffer->Width/2.f, 
-							  		0, Buffer->Height/2.f, 0, Buffer->Height/2.f, 
-						      		0, 0, 0, 0,
-						      		0, 0, 0, 1);
-
-	real32 n,f,l,r,t,b;
-	n = 11;
-	f = -11;
-	l = -11;
-	r = 11;
-	t = 11;
-	b = -11;
-
-	local_persist m4 OrtoProj = M4( 2/(r-l),       0,       0, -(r+l)/(r-l), 
-						                  0, 2/(t-b),       0, -(t+b)/(t-b), 
-						                  0,       0, 2/(f-n), -(f+n)/(f-n),
-						                  0,       0,       0,           1);
-
-	v4 object = V4( (real32)  Input->MouseX * 15/ Buffer->Width, (real32) Input->MouseY * 15 / Buffer->Height, 0,1 );
-
 	RootNode 	 Root = RootNode();
-	BitmapNode   BitMap   = BitmapNode(Memory->GameState->testBMP);
+	CameraNode   Camera  = CameraNode( V3(0,0,0), V3(0,0,1), 1, -1, (real32)  Buffer->Width  / (Buffer->Height), 
+																    (real32) -Buffer->Width  / (Buffer->Height), 
+																    (real32)  Buffer->Height / (Buffer->Height), 
+																    (real32) -Buffer->Height / (Buffer->Height));
+	
+	
+	TransformNode Left;
+	Left.Translate(V3(-0.5,0,0));
+	Left.Rotate(t/5,V3(-1,0,-1));
 
-	Root.Children = &BitMap;
 
-	RenderVisitor rn = RenderVisitor( Buffer, object );	
+	TransformNode Right;
+	Right.Translate( V3( 0.5f,0,0));	
+	Right.Rotate(t/5+Pi32/4, V3(0,0,1));
 
+
+	TransformNode Rotation;
+	Rotation.Rotate( t/10, V3(1, 1,1) );
+
+	real32 side = 1;
+	real32 height = side * sqrtf(3)/2;
+	//GeometryNode EquilateralTriangle = GeometryNode( V3( -side/2, -height/2.f, 0 ), V3( 0 , height/2.f ,0 ),    V3( side/2,-height/2,0 ) );
+
+	GeometryNode Square = GeometryNode( getBox() );
+
+	//BitmapNode   BitMap = BitmapNode(Memory->GameState->testBMP);
+
+
+	Root.pushChild( &Camera );
+	Camera.pushChild( &Rotation );
+	Rotation.pushChild( &Square );
+
+
+	RenderVisitor rn = RenderVisitor( Buffer  );	
 	rn.traverse( &Root );
 
-//	game_state *GameState = Memory->GameState;
-//	RenderScene( Buffer, object, Camera, OrtoProj, RasterProj );
+	t += Pi32/60;
+	if(t >= 200*Pi32)
+	{
+		t -=200*Pi32;
+	}
+	
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
