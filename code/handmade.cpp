@@ -1,7 +1,6 @@
 
 #include <stdio.h>
 #include "handmade.h"
-#include "geometric_objects.h"
 #include "handmade_render.cpp"
 #include "scene_graph.cpp"
 
@@ -141,77 +140,376 @@ group_ptr build_graph()
 
 #endif
 
-void handleInput(game_input* Input)
+
+v4 ParseNumbers(char* String)
 {
-	Assert( (&Input->Controllers[0].Terminator - &Input->Controllers[0].Button[0]) == 
-			 (ArrayCount(Input->Controllers[0].Button)) );
-		// Note: Controller 0 is keyboard. Controller 1 through 4 is Gamepads
-	for(int32 ControllerIndex = 0; 
-		ControllerIndex < ArrayCount(Input->Controllers); 
-		++ControllerIndex)
+	char* Start = str::FindFirstNotOf( " \t", String );
+	char WordBuffer[OBJ_MAX_WORD_LENGTH];
+	int32 CoordinateIdx = 0;
+	v4 Result = V4(0,0,0,1);
+	while( Start )
 	{
-		
-		game_controller_input* Controller = GetController( Input, ControllerIndex );
+		Assert(CoordinateIdx < 4);
 
-		if( Controller->IsAnalog )
-		{
-			if(Controller->Start.EndedDown)
-			{
+		char* End = str::FindFirstOf( " \t", Start);
 
-			}else{
+		size_t WordLength = ( End ) ? (End - Start) : str::StringLength(Start);
 
-			}
+		Assert(WordLength < OBJ_MAX_WORD_LENGTH);
 
-			if(Controller->LeftStickLeft.EndedDown)
-			{
-			}
-			if(Controller->LeftStickRight.EndedDown)
-			{
-			}
-			if(Controller->LeftStickUp.EndedDown)
-			{
-			}
-			if(Controller->LeftStickDown.EndedDown)
-			{
-			}
-			if(Controller->RightShoulder.EndedDown)
-			{
+		Copy( WordLength, Start, WordBuffer );
+		WordBuffer[WordLength] = '\0';
 
-			}
+		Result.E[CoordinateIdx++] =(real32) str::StringToReal64(WordBuffer);
 
-		}else{
-			
-			if(Input->MouseButton[0].EndedDown)
-			{
-
-			}
-
-			if(Controller->Start.EndedDown)
-			{
-
-			}else{
-
-			}
-
-			if(Controller->LeftStickLeft.EndedDown)
-			{
-			}
-			if(Controller->LeftStickRight.EndedDown)
-			{
-			}
-			if(Controller->LeftStickUp.EndedDown)
-			{
-			}
-			if(Controller->LeftStickDown.EndedDown)
-			{
-			}
-			if(Controller->RightShoulder.EndedDown)
-			{
-
-			}
-		}	
+		Start = (End) ? str::FindFirstNotOf(" \t", End) : End;
 	}
 
+	return Result;
+}
+
+obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState, 
+			   debug_platform_read_entire_file* ReadEntireFile,
+			   debug_platfrom_free_file_memory* FreeEntireFile,
+			   char* FileName)
+{
+	obj_geometry Result = {};
+
+	debug_read_file_result ReadResult = ReadEntireFile(Thread, FileName);
+
+	if( ReadResult.ContentSize )
+	{
+		int32 nrVertices = 0;
+		int32 nrVertexNormals = 0;
+		int32 nrTexturePoints = 0;
+		int32 nrFaces = 0;
+
+		char* ScanPtr = ( char* ) ReadResult.Contents;
+		char* FileEnd =  ( char* ) ReadResult.Contents + ReadResult.ContentSize;
+
+		while( ScanPtr < FileEnd )
+		{
+			char* ThisLine = ScanPtr;
+			ScanPtr = str::FindFirstOf('\n', ThisLine);
+			ScanPtr = (ScanPtr) ? (ScanPtr + 1) : FileEnd;
+
+			size_t Length = ScanPtr - ThisLine;
+
+			Assert(Length < OBJ_MAX_LINE_LENGTH);
+
+			if(Length < 2)
+			{
+				continue;
+			}
+
+			char LineCopy[OBJ_MAX_LINE_LENGTH];
+			Copy( Length, ThisLine, LineCopy );
+			LineCopy[Length] = '\0';
+
+
+			// Jump over Comment lines
+			if( str::BeginsWith( 1,"#",Length, LineCopy) || 
+			 	str::BeginsWith( 2,"\r\n",Length, LineCopy) ||
+			 	str::BeginsWith( 1,"\n",Length, LineCopy)  )
+			{
+				continue;
+			}
+
+			// Vertices: v x y z [w=1]
+			else if( str::BeginsWith(2,"v ", Length, LineCopy) )
+			{
+				++nrVertices;
+			}
+
+			// Vertex Normals: vn i j k
+			else if( str::BeginsWith(3,"vn ", Length, LineCopy) )
+			{
+				++nrVertexNormals;
+			}
+
+			// Vertex Textures: vt u v [w=0]
+			else if( str::BeginsWith(3,"vt ", Length, LineCopy) )
+			{
+				++nrTexturePoints;
+			}
+
+			// Faces: f v1[/vt1][/vn1] v2[/vt2][/vn2] v3[/vt3][/vn3] ...
+			else if( str::BeginsWith(2,"f ", Length, LineCopy) )
+			{
+				++nrFaces;
+			}else if(str::BeginsWith(7,"mtllib ", Length, LineCopy)  ){
+				// Unimplemented
+			}else if(str::BeginsWith(2,"g ", Length, LineCopy)  ){
+				// Unimplemented
+			}else if(str::BeginsWith(7,"usemtl ", Length, LineCopy)  ){
+				// Unimplemented
+			}else if(str::BeginsWith(2,"s ", Length, LineCopy)  ){
+				// Unimplemented
+			}
+			else if (str::BeginsWith(2, "o ", Length, LineCopy)) {
+				// Unimplemented
+			}
+			else if (str::BeginsWith(2, "l ", Length, LineCopy)) {
+				// Unimplemented
+			}
+			else{
+				Assert(0);
+			
+			}
+		}
+
+		memory_arena* Arena = &aGameState->AssetArena;
+		
+		Result.nv = nrVertices;
+		Result.v = (v4*) PushArray(Arena, nrVertices ,v4);
+		v4* vertices  = Result.v;
+
+		Result.nvn = nrVertexNormals;
+		Result.vn = (v4*) PushArray(Arena, nrVertexNormals ,v4);
+		v4* vertexNormals = Result.vn;
+
+		Result.nvt = nrTexturePoints;
+		Result.vt = (v3*) PushArray(Arena, nrTexturePoints ,v3);
+		v3* texturePoints = Result.vt;
+
+		Result.nf = nrFaces;
+		Result.f= (face*) PushArray(Arena, nrFaces, face);
+		face* faces = Result.f;
+
+		int32 verticeIdx 	  = 0;
+		int32 vertexNormalIdx = 0;
+		int32 texturePointIdx = 0;
+		int32 faceIdx = 0;
+
+		ScanPtr = ( char* ) ReadResult.Contents;
+		while( ScanPtr < FileEnd )
+		{
+			char* ThisLine = ScanPtr;
+			ScanPtr = str::FindFirstOf('\n', ThisLine);
+			ScanPtr = (ScanPtr) ? (ScanPtr + 1) : FileEnd;
+
+
+			char* TrimEnd = ScanPtr-1;
+			while( (TrimEnd > ThisLine) && ( (*TrimEnd == '\n') || (*TrimEnd == '\r') ) )
+			{
+				--TrimEnd;
+			}
+			++TrimEnd;
+
+			char* TrimStart = ThisLine;
+			while( (TrimStart < TrimEnd) && ((*TrimStart == ' ') || (*TrimStart == '\t')) )
+			{
+				++TrimStart;
+			}
+
+			ThisLine = TrimStart;
+			size_t Length = TrimEnd - ThisLine;
+
+			Assert(Length < OBJ_MAX_LINE_LENGTH);
+
+			if(Length < 2)
+			{
+				continue;
+			}
+			
+			char LineBuffer[OBJ_MAX_LINE_LENGTH];
+			
+			Copy( Length, ThisLine, LineBuffer );
+			LineBuffer[Length] = '\0';
+
+			char WordBuffer[OBJ_MAX_WORD_LENGTH];
+
+			// Jump over Comment lines
+			if( str::BeginsWith( 1,"#",Length, LineBuffer) )
+			{
+				continue;
+			}
+
+			// Vertices: v x y z [w=1]
+			else if( str::BeginsWith(2,"v ", Length, LineBuffer) )
+			{
+				Assert(verticeIdx < nrVertices);
+				vertices[verticeIdx++] = ParseNumbers(LineBuffer+2);
+			}
+			
+			// Vertex Normals: vn i j k
+			else if( str::BeginsWith(3,"vn ", Length, LineBuffer) )
+			{
+				Assert(vertexNormalIdx<=nrVertexNormals);
+
+				vertexNormals[ vertexNormalIdx++ ] = ParseNumbers(LineBuffer+3);
+				
+			}
+
+			// Vertex Textures: vt u v [w=0]
+			else if( str::BeginsWith(3,"vt ", Length, LineBuffer) )
+			{
+				Assert( texturePointIdx <=nrTexturePoints );
+				texturePoints[ texturePointIdx++ ] = V3( ParseNumbers(LineBuffer+3) );
+			}
+
+			// Faces: f v1[/vt1][/vn1] v2[/vt2][/vn2] v3[/vt3][/vn3] ...
+			else if( str::BeginsWith(2,"f ", Length, LineBuffer) )
+			{
+				char* Start = str::FindFirstNotOf( " \t", LineBuffer+2 );
+
+				
+				face* f = &faces[faceIdx++];
+				f->nv = str::GetWordCount(Start);
+				Assert( f->nv >= 3);
+				Result.nt += f->nv - 2;
+
+				int32 VertIdx = 0;
+
+				while( Start )
+				{
+					char* End = str::FindFirstOf( " \t", Start);
+
+					size_t WordLength = ( End ) ? (End - Start) : str::StringLength(Start);
+
+					Assert(WordLength < OBJ_MAX_WORD_LENGTH);
+
+					Copy( WordLength, Start, WordBuffer );
+					WordBuffer[WordLength] = '\0';
+
+
+					char* StartNr = WordBuffer;
+					char* EndNr = 0;
+					int32 i =0;
+					while( StartNr )
+					{
+						EndNr 	= str::FindFirstOf("/", StartNr);
+						if( EndNr )
+					 	{
+							*EndNr++ = '\0';
+						}
+
+						int32 nr = (int32) str::StringToReal64(StartNr)-1;
+						Assert(nr>=0);
+						Assert(VertIdx < f->nv);
+						switch(i)
+						{
+							case 0:
+							{	
+								if( !f->vi )
+								{
+									f->vi = (int32*) PushArray(Arena, f->nv, int); 
+								}
+
+								f->vi[VertIdx] = nr;
+							}break;
+
+							case 1:
+							{
+								if( !f->ni )
+								{
+									f->ni  = (int32*) PushArray(Arena, f->nv, int); 
+								}
+								f->ni[VertIdx] = nr;
+							}break;
+
+							case 2:
+							{
+								if( !f->ti )
+								{
+									f->ti = (int32*) PushArray(Arena, f->nv, int); 
+								}
+
+								f->ti[VertIdx] = nr;
+							}break;
+						}
+
+						++i;
+
+						StartNr = str::FindFirstNotOf("/", EndNr);
+						
+					}
+
+					++VertIdx;
+
+					Start = (End) ? str::FindFirstNotOf(" \t", End) : End;
+				}
+
+			}else if(str::BeginsWith(7,"mtllib ", Length, LineBuffer)  ){
+				// Unimplemented
+			}else if(str::BeginsWith(2,"g ", Length, LineBuffer)  ){
+				// Unimplemented
+			}else if(str::BeginsWith(7,"usemtl ", Length, LineBuffer)  ){
+				// Unimplemented
+			}else if(str::BeginsWith(2,"s ", Length, LineBuffer)  ){
+				// Unimplemented
+			}
+			
+	
+		}
+
+		FreeEntireFile(Thread, ReadResult.Contents);
+
+		
+		v4 cm = V4(0,0,0,0);
+		for(int32 i = 0; i<Result.nv; ++i)
+		{
+			cm += Result.v[i];
+		}
+		cm = cm/(real32)Result.nv;
+		cm.W = 0;
+
+		// Center the object around origin
+		v4 MaxAxis = V4(0,0,0,0);
+		real32 MaxDistance = 0;
+		for(int32 i = 0; i<Result.nv; ++i)
+		{
+			Result.v[i] = Result.v[i]-cm;
+			real32 distance = norm( V3(Result.v[i]) ); 
+			if( distance > MaxDistance )
+			{
+				MaxAxis = Result.v[i];
+				MaxDistance = distance;
+			}
+		}
+		if(MaxDistance > 1)
+		{
+			MaxDistance = 1/MaxDistance;
+		}
+		// Scale object to the unit cube
+		for(int32 i = 0; i<Result.nv; ++i)
+		{
+			Result.v[i] = Result.v[i]*MaxDistance; 
+			Result.v[i].W = 1;
+		}
+
+
+		Result.t = PushArray(Arena, Result.nt, triangle);
+		int32 TriangleIdx = 0;
+
+		for(int32 i = 0; i<Result.nf; ++i)
+		{
+			face* f = &Result.f[i];
+			for(int32 j = 0; j < f->nv-2; ++j)
+			{
+
+				triangle* t = &Result.t[TriangleIdx++];
+
+				t->vi[0] = f->vi[0];
+				t->vi[1] = f->vi[1+j];
+				t->vi[2] = f->vi[2+j];
+
+				v4 v0 = Result.v[f->vi[0]];
+				v4 v1 = Result.v[f->vi[1]];
+				v4 v2 = Result.v[f->vi[2]];
+
+
+				v3 r1 = V3(v1-v0);
+				v3 r2 = V3(v2-v0);
+				v4 triangleNormal = V4( cross( r1 , r2 ),0);
+				t->n = normalize( triangleNormal );
+			}
+		}
+
+
+	}
+
+	return Result;
 }
 
 internal loaded_bitmap
@@ -238,10 +536,10 @@ DEBUGReadBMP( thread_context* Thread, game_state* aGameState,
 	{
 		void* imageContentsTmp = ReadResult.Contents;
 		memory_arena* Arena = &aGameState->AssetArena;
-		ReadResult.Contents = PushCopy(Arena, ReadResult.ContentSize, imageContentsTmp);
-		FreeEntireFile(Thread, imageContentsTmp);
+		//ReadResult.Contents = PushCopy(Arena, ReadResult.ContentSize, imageContentsTmp);
 
-		bmp_header* Header = (bmp_header*)ReadResult.Contents;
+
+		bmp_header* Header = (bmp_header*)ReadResult.Contents;//ReadResult.Contents;
 
 		Assert(Header->BitsPerPixel == 32);
 		Assert(Header->Compression == 3);
@@ -290,6 +588,8 @@ DEBUGReadBMP( thread_context* Thread, game_state* aGameState,
 
 			}
 		}		
+
+		FreeEntireFile(Thread, imageContentsTmp);
 	}
 
 	return Result;
@@ -309,6 +609,13 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
 											"..\\handmade\\data\\test\\test_hero_front_head.bmp");
+		Memory->GameState->testOBJ = DEBUGReadOBJ(Thread, Memory->GameState, 
+											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+					//						"..\\handmade\\data\\geometry\\Cube_obj.obj");
+//											"..\\handmade\\data\\geometry\\cupcake.obj");
+//											"..\\handmade\\data\\geometry\\teapot.obj");					
+											"..\\handmade\\data\\geometry\\cube.obj");											
 
 		for(int32 ControllerIndex = 0; 
 			ControllerIndex < ArrayCount(Input->Controllers); 
@@ -340,43 +647,43 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	Platform = Memory->PlatformAPI;
 
 	initiateGame( Thread,  Memory, Input );
- 	handleInput( Input );
+
+	// Note: Controller 0 is keyboard. Controller 1 through 4 is Gamepads
+ 	Assert( (&Input->Controllers[0].Terminator - &Input->Controllers[0].Button[0]) == 
+			 (ArrayCount(Input->Controllers[0].Button)) );
+		
+
+	CameraMovementCallback CameraMovement = CameraMovementCallback( GetController( Input, 1 ) );
 
 	RootNode 	 Root = RootNode();
 	CameraNode   Camera  = CameraNode( V3(0,0,0), V3(0,0,1), 1, -1, (real32)  Buffer->Width  / (Buffer->Height), 
 																    (real32) -Buffer->Width  / (Buffer->Height), 
 																    (real32)  Buffer->Height / (Buffer->Height), 
 																    (real32) -Buffer->Height / (Buffer->Height));
-	
-	
-	TransformNode Left;
-	Left.Translate(V3(-0.5,0,0));
-	Left.Rotate(t/5,V3(-1,0,-1));
-
-
-	TransformNode Right;
-	Right.Translate( V3( 0.5f,0,0));	
-	Right.Rotate(t/5+Pi32/4, V3(0,0,1));
-
+	Camera.connectCallback( &CameraMovement );
 
 	TransformNode Rotation;
-	Rotation.Rotate( t/10, V3(1, 1,1) );
+	Rotation.Rotate(t/10, V3(0,1,0) );
+//	Rotation.Rotate(t/50, V3(1,0,0) );
+//	Rotation.Translate( V3( Sin(t/5), Cos(t/5),0) );
 
-	real32 side = 1;
-	real32 height = side * sqrtf(3)/2;
-	//GeometryNode EquilateralTriangle = GeometryNode( V3( -side/2, -height/2.f, 0 ), V3( 0 , height/2.f ,0 ),    V3( side/2,-height/2,0 ) );
+	TransformNode Rotation2;
+	Rotation2.Rotate( t/10+Pi32, V3(0, 1,0) );
+	Rotation2.Rotate( Pi32, V3(1, 0,0) );
 
-	GeometryNode Square = GeometryNode( getBox() );
 
-	//BitmapNode   BitMap = BitmapNode(Memory->GameState->testBMP);
-
+	GeometryNode Cube = GeometryNode( Memory->GameState->testOBJ );
 
 	Root.pushChild( &Camera );
 	Camera.pushChild( &Rotation );
-	Rotation.pushChild( &Square );
+	Rotation.pushChild( &Cube );
 
 
+	UpdateVisitor uv = UpdateVisitor();
 	RenderVisitor rn = RenderVisitor( Buffer  );	
+
+
+	uv.traverse( &Root );
 	rn.traverse( &Root );
 
 	t += Pi32/60;
@@ -384,7 +691,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	{
 		t -=200*Pi32;
 	}
-	
+
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)

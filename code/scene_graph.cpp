@@ -15,10 +15,44 @@ class BaseCallback{
 class CameraMovementCallback : public BaseCallback
 {
 	public:
-		CameraMovementCallback(){};
+
+		CameraMovementCallback(game_controller_input* aController)
+		{
+			Controller = aController;
+		};
 		virtual ~CameraMovementCallback(){};
 
-		void execute();
+		void execute()
+		{
+			if( Controller->IsAnalog )
+			{
+				if(Controller->Start.EndedDown)
+				{
+
+				}else{
+
+				}
+
+				if(Controller->LeftStickLeft.EndedDown)
+				{
+				}
+				if(Controller->LeftStickRight.EndedDown)
+				{
+				}
+				if(Controller->LeftStickUp.EndedDown)
+				{
+				}
+				if(Controller->LeftStickDown.EndedDown)
+				{
+				}
+				if(Controller->RightShoulder.EndedDown)
+				{
+
+				}
+			}	
+		};
+
+		game_controller_input* Controller=0;
 };
 
 
@@ -113,6 +147,27 @@ class BaseVisitor
 		virtual void apply( TransformNode* aNode){};
 };
 
+
+/*	
+ *	Class: 		UpdateVisitor
+ *	Purpose: 	Traverses the scenegraph and updates it.
+ */
+
+class UpdateVisitor : public BaseVisitor
+{
+	public:
+		UpdateVisitor( )
+		{
+
+		};
+		virtual ~UpdateVisitor()
+		{
+		};
+
+		void apply( CameraNode* n) override;
+};
+
+
 /*	
  *	Class: 		RenderVisitor
  *	Purpose: 	Traverses the scenegraph and renders it.
@@ -124,15 +179,14 @@ class RenderVisitor : public BaseVisitor
 		RenderVisitor(  game_offscreen_buffer* aBuffer )
 		{
 			mBuffer = aBuffer;
-			mRasterProj=M4( 	mBuffer->Width/2.f,  0, 0, mBuffer->Width/2.f, 
-							    0, mBuffer->Height/2.f, 0, mBuffer->Height/2.f, 
-							    0, 0, 0, 0,
-							    0, 0, 0, 1);
+			R =M4( 	mBuffer->Width/2.f,  0, 0, mBuffer->Width/2.f, 
+				    0, mBuffer->Height/2.f, 0, mBuffer->Height/2.f, 
+				    0, 0, 0, 0,
+				    0, 0, 0, 1);
 
 			T = M4Identity();
-			mCameraMat    = M4Identity();
-			mCameraProjMat= M4Identity();
-
+			V = M4Identity();
+			P = M4Identity();
 		};
 		virtual ~RenderVisitor()
 		{
@@ -145,8 +199,8 @@ class RenderVisitor : public BaseVisitor
 			DrawRectangle(mBuffer, 1,1, (real32) mBuffer->Width-2,   (real32) mBuffer->Height-2, 0.3,0.3,0.3);
 
 			T = M4Identity();
-			mCameraMat    = M4Identity();
-			mCameraProjMat= M4Identity();
+			V = M4Identity();
+			P = M4Identity();
 		};
 
 		void apply( CameraNode* n) override;
@@ -193,18 +247,10 @@ class RenderVisitor : public BaseVisitor
 			}
 		}
 
-		v2 RenderVisitor::Rasterize( v4 pointInCamCoord )
-		{
-			v4 pointInCamProjection = mCameraProjMat * pointInCamCoord;
-			v4 pointInScreenCoord   = mRasterProj * pointInCamProjection;
-
-			return V2(pointInScreenCoord.X, pointInScreenCoord.Y);
-		}
-
-		m4 mRasterProj;
-		m4 mCameraMat;
-		m4 mCameraProjMat;
-		m4 T;
+		m4 R; // Rasterization Matrix
+		m4 V; // View Matrix
+		m4 P; // Projection Matrix
+		m4 T; // ModelMatrix
 		game_offscreen_buffer* mBuffer;
 
 
@@ -239,7 +285,6 @@ class CameraNode : public BaseNode
 {
 	public:
 
-		CameraNode( ){};
 		CameraNode( v3 aFrom, v3 aTo, real32 aNear, real32 aFar, real32 aLeft, real32 aRight, real32 aTop, real32 aBottom )
 		{
 			lookAt( aFrom,  aTo );
@@ -265,7 +310,7 @@ class CameraNode : public BaseNode
 			real32 fnSum  = aFar+aNear;
 			real32 fnDiff = aFar-aNear;
 
-			mProj = M4( 2/rlDiff,         0,        0, -rlSum/rlDiff, 
+			P =  M4( 2/rlDiff,         0,        0, -rlSum/rlDiff, 
 						       0,   2/tbDiff,       0, -tbSum/tbDiff, 
 						       0,         0, 2/fnDiff, -fnSum/fnDiff,
 						       0,         0,        0,             1);
@@ -277,15 +322,18 @@ class CameraNode : public BaseNode
 			v3 Right = cross(normalize(aTmp), Forward);
 			v3 Up = cross(Forward, Right);
 			
-			mCamToWorld =  M4(
+			CamToWorld =  M4(
 							 Right.X,   Right.Y,   Right.Z,   aFrom.X,
 							 Up.X,      Up.Y,      Up.Z,      aFrom.Y,
 							 Forward.X, Forward.Y, Forward.Z, aFrom.Z,
 							 0,         0,         0,         1);
+
+			V = AffineInverse( CamToWorld );
 		}
 
-		m4 mCamToWorld;
-		m4 mProj;
+		m4 CamToWorld;
+		m4 V;   // View Matrix
+		m4 P;
 };
 
 
@@ -340,7 +388,7 @@ class TransformNode : public BaseNode
 			v->apply(this);
 		}
 
-		m4 T;
+		m4 T; // Model Matrix
 };
 
 
@@ -380,23 +428,8 @@ class GeometryNode : public BaseNode
 
 		GeometryNode(){};
 
-		GeometryNode(geometry Geometry)
+		GeometryNode(obj_geometry Geometry)
 		{
-			#if 0
-			v3 cm = V3(0,0,0);
-			for(int32 i = 0; i < Geometry.nrVertex; ++i)
-			{
-				cm += Geometry.vertex[i];
-			}
-
-			cm = cm/Geometry.nrVertex;
-
-			for(int32 i = 0; i < Geometry.nrVertex; ++i)
-			{
-				mp0 = V4(Geometry.vertex[i] - cm, 1);
-			}
-			#endif
-
 			Object = Geometry;
 
 		}
@@ -407,58 +440,67 @@ class GeometryNode : public BaseNode
 			v->apply(this);
 		};
 
-		geometry Object;
+
+		obj_geometry Object;
 };
 
 void RenderVisitor::apply( BitmapNode* n)
 {
 //	v4 obj = mCumulativeMat * mObject;
-//	obj = mRasterProj*obj;
+//	obj = Rasterization*obj;
 //	BlitBMP( mBuffer, (real32) obj.X, (real32) obj.Y, n->BMP);
 }
 
 void RenderVisitor::apply( GeometryNode* n)
 {
-
-	m4 worldToCam = AffineInverse( mCameraMat );
-
-	for(int32 i = 0; i < n->Object.nrTriangles; ++i)
+	local_persist real32 dt = 0;
+	if( dt > 20*Pi32 )
 	{
+		dt -= 20*Pi32;
+	}else{
+		dt = dt +Pi32*0.1f;
+	}
 
-		real32* TriangleNormal = &n->Object.triangleNormal[ 3*i ];
-		v4 FN = worldToCam * T * V4( TriangleNormal[0],TriangleNormal[1],TriangleNormal[2], 0 );
-		if( FN *V4(0,0,1,0) <= 0 )
+	obj_geometry& O = n->Object;	
+
+	m4 ModelView = V * T;
+	for(int32 i = 0; i < O.nt; ++i)
+	{
+		triangle& t = O.t[i];
+
+		v4 fn = ModelView*t.n;
+		if( fn*V4(0,0,1,0) < 0 )
 		{
 			continue;
 		}
-		
-		int32* Triangle = &n->Object.triangleIdx[3*i];
 
-		real32* Vertex1 = &n->Object.vertex[ 3*Triangle[0] ];
-		real32* Vertex2 = &n->Object.vertex[ 3*Triangle[1] ];
-		real32* Vertex3 = &n->Object.vertex[ 3*Triangle[2] ];
+		v4 AmbientProduct  = V4(0.3,0,0,1);
+		v4 DiffuseProduct  = V4(0,0.8,0,1);
+		v4 SpecularProduct = V4(0,0,0.8,1);
 
-		v4 P0 = worldToCam * T * V4( Vertex1[0],Vertex1[1],Vertex1[2], 1 );
-		v4 P1 = worldToCam * T * V4( Vertex2[0],Vertex2[1],Vertex2[2], 1 );
-		v4 P2 = worldToCam * T * V4( Vertex3[0],Vertex3[1],Vertex3[2], 1 );
+		//RenderTriangle( mBuffer, V1,V2,V3, fn, C1, C2, C3, T, V, P, R );
 
-		v2 p0 = Rasterize( P0 );
-		v2 p1 = Rasterize( P1 );
-		v2 p2 = Rasterize( P2 );
-		
-		FillTriangle(mBuffer, p0, p1, p2 );
+		v4 LightPosition = V4(0,0,-2,1);
+		RenderTriangle( mBuffer, O.v[ t.vi[0] ],O.v[ t.vi[1] ],O.v[ t.vi[2] ], t.n, LightPosition, AmbientProduct, DiffuseProduct, SpecularProduct, T, V, P, R );
+			
 	}
 	
-	v2 Origo = Rasterize( V4(0,0,0,1) );
+	v2 Origo = V2( R*P*ModelView*V4(0,0,0,1) );
 	DrawCircle( mBuffer, Origo.X, Origo.Y , 10);
 	popTrace();
 }
 
 void RenderVisitor::apply( CameraNode* n)
 {
-	mCameraMat = n->mCamToWorld;
-	mCameraProjMat = n->mProj;
+	V = n->V;
+	P = n->P;
 }
+
+
+void UpdateVisitor::apply( CameraNode* n)
+{
+	n->update();
+};
 
 
 void RenderVisitor::apply( TransformNode* n )

@@ -5,6 +5,23 @@
 // TODO: Replace math.h with cpu specific instructions
 #include <math.h>
 
+inline uint32
+SafeTruncateToU32(uint64 Value)
+{
+    // TODO(casey): Defines for maximum values
+    Assert(Value <= 0xFFFFFFFF);
+    uint32 Result = (uint32)Value;
+    return(Result);
+}
+
+inline uint32 
+RoundReal64ToUInt32(real32 Real64)
+{
+	uint64 tmp = (uint64) round( Real64 );
+	uint32 Result = SafeTruncateToU32( tmp );
+	return Result; 
+}
+
 inline uint32 
 RoundReal32ToUInt32(real32 Real32)
 {
@@ -27,7 +44,6 @@ TruncateReal32ToInt32(real32 Real32)
 	int32 Result = (int32) Real32;
 	return Result;
 }
-
 
 inline int32 
 FloorReal32ToInt32(real32 Real32)
@@ -69,6 +85,13 @@ Abs( real32 A )
 {
 	real32 Result = (real32) fabs( A );
 	return Result;
+}
+
+inline	real32
+Pow(real32 Base, real32 Exponent )
+{
+	real32 Result = (real32) powf( Base, Exponent );
+	return Result;	
 }
 
 struct bit_scan_result{

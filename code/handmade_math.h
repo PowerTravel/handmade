@@ -1,7 +1,42 @@
 #ifndef HANDMADE_MATH_H
 #define HANDMADE_MATH_H
 
-#include <math.h>
+union v2
+{
+	struct{
+		real32 X, Y;
+	};
+	real32 E[2];
+};
+
+union v3
+{
+	struct{
+		real32 X, Y, Z;
+	};
+	real32 E[3];
+};
+
+union v4
+{
+	struct{
+		real32 X, Y, Z, W;
+	};
+	real32 E[4];
+};
+
+union m4
+{
+//  Row Dominant indexing
+//   0,  1,  2,  3,
+//   4,  5,  6,  7,
+//   8,  9, 10, 11,
+//  12, 13, 14, 15
+	struct{
+		v4 r0, r1, r2, r3;
+	};
+	real32 E[16];
+};
 
 
 // Supported operations:
@@ -22,16 +57,21 @@
 // r norm
 // v2 normalize
 
-union v2
-{
-	struct{
-		real32 X, Y;
-	};
-	real32 E[2];
-};
+// bool v2 == v2
+// bool v2 !- v2
 
 v2 V2(real32 X, real32 Y){
 	v2 Result = {X,Y};
+	return(Result);
+};
+
+v2 V2(v3 R){
+	v2 Result = {R.X,R.Y};
+	return(Result);
+};
+
+v2 V2(v4 R){
+	v2 Result = {R.X,R.Y};
 	return(Result);
 };
 
@@ -40,7 +80,6 @@ inline real32 operator*(v2 A, v2 B)
 	real32 Result = A.X*B.X + A.Y*B.Y;
 	return Result;
 }
-
 
 inline v2 operator*(real32 s, v2 v)
 {
@@ -77,7 +116,6 @@ inline v2& operator/=(v2& v, real32 s)
 	return v;
 }
 
-
 inline v2 operator+(v2 A, v2 B)
 {
 	v2 Result;
@@ -101,10 +139,30 @@ inline v2 operator-(v2 A, v2 B)
 	return Result;
 }
 
+inline v2 operator-(v2 A)
+{
+	v2 Result;
+	Result.X = - A.X;
+	Result.Y = - A.Y;
+	return Result;
+}
+
+
 inline v2& operator-=(v2& A, v2 B)
 {
 	A = A-B;
 	return A;
+}
+
+
+inline bool operator==( v2 A, v2 B )
+{
+	return ( A.X == B.X ) && (A.Y == B.Y ); 
+}
+
+inline bool operator!=( v2 A, v2 B )
+{
+	return !( A == B ); 
 }
 
 inline real32 norm( v2 r )
@@ -121,34 +179,29 @@ inline v2 normalize( v2 r )
 	return Result;
 }
 
-
-
 // Supported operations:
-// v3 * v3 (dot)
-// r * v3, 
-// v3 * r
-// v3 *= r
+// real32 v3 * v3 (dot)
+// v3 = real32 * v3, 
+// v3 = v3 * real32
+// v3 *= real32
 
-// v3 / r
-// v3 /= r
+// v3 = v3 / real32
+// v3 /= real32
 
-// v3 + v3,
+// v3 = v3 + v3,
 // v3 += v3
 
-// v3 - v3,
+// v3 = v3 - v3,
+// v3 = -v3
 // v3 -= v3.
 
 // r norm
-// v3 normalize
-// v3 Cross
+// v3 = normalize
+// v3 = Cross
 
-union v3
-{
-	struct{
-		real32 X, Y, Z;
-	};
-	real32 E[3];
-};
+// bool v3 == v3
+// bool v3 !- v3
+
 
 v3 V3(real32 X, real32 Y, real32 Z){
 	v3 Result = {X,Y,Z};
@@ -157,6 +210,11 @@ v3 V3(real32 X, real32 Y, real32 Z){
 
 v3 V3(v2 R, real32 Z=0){
 	v3 Result = {R.X,R.Y,Z};
+	return(Result);
+};
+
+v3 V3( v4 R ){
+	v3 Result = {R.X, R.Y, R.Z};
 	return(Result);
 };
 
@@ -229,6 +287,17 @@ operator-(v3 A, v3 B)
 	return Result;
 }
 
+inline v3
+operator-(v3 A)
+{
+	v3 Result;
+	Result.X = - A.X;
+	Result.Y = - A.Y;
+	Result.Z = - A.Z;
+	return Result;
+}
+
+
 inline v3&
 operator-=(v3& A, v3 B)
 {
@@ -259,33 +328,37 @@ inline v3 cross(v3 A, v3 B)
 	return Result;
 }
 
+inline bool operator==( v3 A, v3 B )
+{
+	return ( A.X == B.X ) && (A.Y == B.Y ) == (A.Z ==  B.Z); 
+}
+
+inline bool operator!=( v3 A, v3 B )
+{
+	return !( A == B ); 
+}
+
 // Supported operations:
-// v4 * v4 (dot)
-// r * v4, 
-// v4 * r
+// real32 = v4 * v4 (dot)
+// v4 = r * v4, 
+// v4 = v4 * r
 // v4 *= r
 
-// v4 / r
+// v4 = v4 / r
 // v4 /= r
 
-// v4 + v4,
+// v4 = v4 + v4,
 // v4 += v4
 
-// v4 - v4,
+// v4 = v4 - v4,
 // v4 -= v4.
+// v4 = -v4
 
-// r norm
+// bool v4 == v4
+// bool v4 !- v4
+
+// real32 norm
 // v4 normalize
-
-
-union v4
-{
-	struct{
-		real32 X, Y, Z, W;
-	};
-	real32 E[4];
-};
-
 
 v4 V4(real32 X, real32 Y, real32 Z, real32 W){
 	v4 Result = {X,Y,Z,W};
@@ -297,7 +370,7 @@ v4 V4(v3 R, real32 W = 1 ){
 	return(Result);
 };
 
-v4 V4(v2 R, real32 Z = 0, real32 W = 1 ){
+v4 V4( v2 R, real32 Z = 0, real32 W = 1 ){
 	v4 Result = {R.X,R.Y, Z,W};
 	return(Result);
 };
@@ -348,11 +421,9 @@ operator/(v4 R, real32 s)
 inline v4&
 operator/=(v4& R, real32 s)
 {
-	R = s*R;
+	R = R/s;
 	return R;
 }
-
-
 
 inline v4
 operator+(v4 A, v4 B)
@@ -384,6 +455,29 @@ operator-(v4 A, v4 B)
 	return Result;
 }
 
+inline v4
+operator-(v4 A)
+{
+	v4 Result;
+	Result.X = - A.X;
+	Result.Y = - A.Y;
+	Result.Z = - A.Z;
+	Result.W = - A.W;
+	return Result;
+}
+
+
+inline bool operator==( v4 A, v4 B )
+{
+	return ( A.X == B.X ) && (A.Y == B.Y ) && (A.Z == B.Z ) && (A.W == B.W ); 
+}
+
+inline bool operator!=( v4 A, v4 B )
+{
+	return !( A == B ); 
+}
+
+
 inline v4& operator-=(v4& A, v4 B)
 {
 	A = A-B;
@@ -393,7 +487,7 @@ inline v4& operator-=(v4& A, v4 B)
 inline real32 norm( v4 R )
 {
 	real32 Result;
-	Result = (real32) Sqrt(R.X*R.X + R.Y*R.Y + R.Z * R.Z + R.W*R.W);
+	Result = (real32) Sqrt(R.X*R.X + R.Y*R.Y + R.Z*R.Z + R.W*R.W);
 	return Result;
 }
 
@@ -404,18 +498,6 @@ inline v4 normalize( v4 R )
 	return Result;
 }
 
-union m4
-{
-//  Row Dominant indexing
-//   0,  1,  2,  3,
-//   4,  5,  6,  7,
-//   8,  9, 10, 11,
-//  12, 13, 14, 15
-	struct{
-		v4 r0, r1, r2, r3;
-	};
-	real32 E[16];
-};
 
 m4 M4Identity()
 {
@@ -539,6 +621,66 @@ AffineInverse( m4 A )
 	return Inv;
 }
 
+m4 QuatAsMatrix( v4 Quaternion )
+{	
+	real32 x,y,z;
+
+	x = 1-2*(Quaternion.Y*Quaternion.Y + Quaternion.Z*Quaternion.Z);
+	y = 2*(Quaternion.X*Quaternion.Y - Quaternion.Z*Quaternion.W);
+	z = 2*(Quaternion.X*Quaternion.Z + Quaternion.Y*Quaternion.W);
+	v4 r1 = V4(x,y,z,0.0f);
+
+	x = 2*(Quaternion.X*Quaternion.Y + Quaternion.Z*Quaternion.W);
+	y = 1-2*(Quaternion.X*Quaternion.X + Quaternion.Z*Quaternion.Z);
+	z = 2*(Quaternion.Y*Quaternion.Z - Quaternion.X*Quaternion.W);
+	v4 r2 = V4(x,y,z,0.0f);
+
+	x = 2*(Quaternion.X*Quaternion.Z - Quaternion.Y*Quaternion.W);
+	y = 2*(Quaternion.Y*Quaternion.Z + Quaternion.X*Quaternion.W);
+	z = 1-2*(Quaternion.X*Quaternion.X + Quaternion.Y*Quaternion.Y);
+	v4 r3 = V4(x,y,z,0.0f);
+
+	v4 r4 = V4(0.0f,0.0f,0.0f,1.0f);
+
+	return M4(r1,r2,r3,r4);
+
+}
+
+v4 RotateQuaternion( real32 angle, v3 axis )
+{
+	const real32 epsilon = 0.0000001f;
+
+	real32 length = norm( axis );
+	
+	if( length < epsilon)
+	{
+		// ~zero axis, so reset rotation to zero
+		return V4(0,0,0,1);
+	}
+
+	real32 inversenorm = 1/length;
+	real32 coshalfangle = Cos( (real32) 0.5 * angle);
+	real32 sinhalfangle = Sin( (real32) 0.5 * angle);
+
+	v4 Result = V4( axis.X * sinhalfangle * inversenorm,
+					axis.Y * sinhalfangle * inversenorm,
+					axis.Z * sinhalfangle * inversenorm,
+					coshalfangle);
+
+	return Result;
+}
+
+m4 GetRotationMatrix(real32 angle, v3 axis)
+{
+	v4 q = RotateQuaternion( angle, axis );
+	m4 R = QuatAsMatrix(q);
+
+	return R;
+}
+
+
+#define LinearInterpolation( t, A, B) ( (A)+(t)*((B)-(A)) )
+
 
 void U_M4Mul()
 {
@@ -598,62 +740,7 @@ void U_AffineInverse()
 
 }
 
-m4 QuatAsMatrix( v4 Quaternion )
-{	
-	real32 x,y,z;
 
-	x = 1-2*(Quaternion.Y*Quaternion.Y + Quaternion.Z*Quaternion.Z);
-	y = 2*(Quaternion.X*Quaternion.Y - Quaternion.Z*Quaternion.W);
-	z = 2*(Quaternion.X*Quaternion.Z + Quaternion.Y*Quaternion.W);
-	v4 r1 = V4(x,y,z,0.0f);
-
-	x = 2*(Quaternion.X*Quaternion.Y + Quaternion.Z*Quaternion.W);
-	y = 1-2*(Quaternion.X*Quaternion.X + Quaternion.Z*Quaternion.Z);
-	z = 2*(Quaternion.Y*Quaternion.Z - Quaternion.X*Quaternion.W);
-	v4 r2 = V4(x,y,z,0.0f);
-
-	x = 2*(Quaternion.X*Quaternion.Z - Quaternion.Y*Quaternion.W);
-	y = 2*(Quaternion.Y*Quaternion.Z + Quaternion.X*Quaternion.W);
-	z = 1-2*(Quaternion.X*Quaternion.X + Quaternion.Y*Quaternion.Y);
-	v4 r3 = V4(x,y,z,0.0f);
-
-	v4 r4 = V4(0.0f,0.0f,0.0f,1.0f);
-
-	return M4(r1,r2,r3,r4);
-
-}
-
-v4 RotateQuaternion( real32 angle, v3 axis )
-{
-	const real32 epsilon = 0.0000001f;
-
-	real32 length = norm( axis );
-	
-	if( length < epsilon)
-	{
-		// ~zero axis, so reset rotation to zero
-		return V4(0,0,0,1);
-	}
-
-	real32 inversenorm = 1/length;
-	real32 coshalfangle = Cos( (real32) 0.5 * angle);
-	real32 sinhalfangle = Sin( (real32) 0.5 * angle);
-
-	v4 Result = V4( axis.X * sinhalfangle * inversenorm,
-					axis.Y * sinhalfangle * inversenorm,
-					axis.Z * sinhalfangle * inversenorm,
-					coshalfangle);
-
-	return Result;
-}
-
-m4 GetRotationMatrix(real32 angle, v3 axis)
-{
-	v4 q = RotateQuaternion( angle, axis );
-	m4 R = QuatAsMatrix(q);
-
-	return R;
-}
 
 
 #endif

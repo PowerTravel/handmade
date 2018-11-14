@@ -27,10 +27,9 @@
 
 #include "handmade_platform.h"
 #include "handmade_intrinsics.h"
-
 #include "handmade_math.h"
-#include "shared.hpp"
-#include "memory.hpp"
+#include "shared.h"
+#include "memory.h"
 #include "string.h"
 #include <windows.h>
 #include <xinput.h>

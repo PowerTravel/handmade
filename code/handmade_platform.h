@@ -16,8 +16,8 @@
 
 // Note(Jakob): Compilers
 
-#ifndef HANDMADE_PLATFORM_HPP
-#define HANDMADE_PLATFORM_HPP
+#ifndef HANDMADE_PLATFORM_H
+#define HANDMADE_PLATFORM_H
 
 #ifndef COMPILER_MSVC
 #define COMPILER_MSVC 0
@@ -46,16 +46,7 @@
 
 #include <stddef.h> // size_t exists in this header on some platforms
 
-#include "types.hpp"
-
-inline uint32
-SafeTruncateToU32(uint64 Value)
-{
-    // TODO(casey): Defines for maximum values
-    Assert(Value <= 0xFFFFFFFF);
-    uint32 Result = (uint32)Value;
-    return(Result);
-}
+#include "types.h"
 
 struct thread_context
 {
@@ -348,4 +339,4 @@ typedef GAME_UPDATE_AND_RENDER( game_update_and_render );
 typedef GAME_GET_SOUND_SAMPLES(game_get_sound_samples);
 
 
-#endif // HANDMADE_PLATFORM_HPP
+#endif // HANDMADE_PLATFORM_H
