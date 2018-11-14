@@ -348,11 +348,9 @@ operator/(v4 R, real32 s)
 inline v4&
 operator/=(v4& R, real32 s)
 {
-	R = s*R;
+	R = R/s;
 	return R;
 }
-
-
 
 inline v4
 operator+(v4 A, v4 B)

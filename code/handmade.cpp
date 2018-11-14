@@ -384,7 +384,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	{
 		t -=200*Pi32;
 	}
-	
+
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
