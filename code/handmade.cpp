@@ -655,6 +655,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 	CameraMovementCallback CameraMovement = CameraMovementCallback( GetController( Input, 1 ) );
 
+
 	RootNode 	 Root = RootNode();
 	CameraNode   Camera  = CameraNode( V3(0,0,0), V3(0,0,1), 1, -1, (real32)  Buffer->Width  / (Buffer->Height), 
 																    (real32) -Buffer->Width  / (Buffer->Height), 

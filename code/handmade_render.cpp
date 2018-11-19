@@ -318,6 +318,7 @@ BlitBMP(game_offscreen_buffer* Buffer, real32 RealMinX, real32 RealMinY, loaded_
 		}
 		DestinationRow += Buffer->Pitch;
 		SourceRow += BitmapPitch;
+
 	}
 }
 

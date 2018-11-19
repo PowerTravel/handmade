@@ -466,7 +466,6 @@ operator-(v4 A)
 	return Result;
 }
 
-
 inline bool operator==( v4 A, v4 B )
 {
 	return ( A.X == B.X ) && (A.Y == B.Y ) && (A.Z == B.Z ) && (A.W == B.W ); 
