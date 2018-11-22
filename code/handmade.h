@@ -7,7 +7,6 @@
 #include "string.h"
 #include "shared.h"
 #include "memory.h"
-#include "geometric_objects.h"
 
 
 
@@ -16,6 +15,7 @@
 
 struct triangle{
 	int32 vi[3];
+	int32 vni[3];
 	v4 n;
 };
 
@@ -53,15 +53,26 @@ struct loaded_bitmap
 	void* Pixels;
 };
 
+class RootNode;
+class CameraNode;
+class TransformNode;
+
 struct game_state{
 
 	memory_arena AssetArena;
 	memory_arena TemporaryArena;
 	real32 t;
 
+	RootNode* Root;
+	CameraNode* Camera;
+	TransformNode* XAxis;
+	TransformNode* YAxis;
+	TransformNode* ZAxis;
 
 	loaded_bitmap testBMP;
 	obj_geometry  testOBJ;
+
+
 
 	bool32 IsInitialized;
 };

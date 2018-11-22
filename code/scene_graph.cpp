@@ -33,16 +33,17 @@ class CameraMovementCallback : public BaseCallback
 
 				}
 
-				if(Controller->LeftStickLeft.EndedDown)
+				if(Controller->RightStickLeft.EndedDown)
+				{
+
+				}
+				if(Controller->RightStickRight.EndedDown)
 				{
 				}
-				if(Controller->LeftStickRight.EndedDown)
+				if(Controller->RightStickUp.EndedDown)
 				{
 				}
-				if(Controller->LeftStickUp.EndedDown)
-				{
-				}
-				if(Controller->LeftStickDown.EndedDown)
+				if(Controller->RightStickDown.EndedDown)
 				{
 				}
 				if(Controller->RightShoulder.EndedDown)
@@ -176,17 +177,23 @@ class UpdateVisitor : public BaseVisitor
 class RenderVisitor : public BaseVisitor
 {
 	public:
-		RenderVisitor(  game_offscreen_buffer* aBuffer )
+		RenderVisitor(  render_push_buffer* aBuffer )
 		{
-			mBuffer = aBuffer;
-			R =M4( 	mBuffer->Width/2.f,  0, 0, mBuffer->Width/2.f, 
-				    0, mBuffer->Height/2.f, 0, mBuffer->Height/2.f, 
-				    0, 0, 0, 0,
-				    0, 0, 0, 1);
+			Assert(aBuffer->OffscreenBuffer);
+			Assert(aBuffer->Arena);
+
+			RenderPushBuffer = aBuffer;;
+
+
+			game_offscreen_buffer* Buffer = aBuffer->OffscreenBuffer;
+			RenderPushBuffer->R = M4( Buffer->Width/2.f,  0, 0, Buffer->Width/2.f, 
+				    			     0, Buffer->Height/2.f, 0, Buffer->Height/2.f, 
+				    			     0, 0, 1, 0,
+				    			     0, 0, 0, 1);
 
 			T = M4Identity();
-			V = M4Identity();
-			P = M4Identity();
+			RenderPushBuffer->V = M4Identity();
+			RenderPushBuffer->P = M4Identity();
 		};
 		virtual ~RenderVisitor()
 		{
@@ -195,12 +202,11 @@ class RenderVisitor : public BaseVisitor
 		void apply( RootNode* n) override
 		{
 			// Clear screen to black
-			DrawRectangle(mBuffer, 0,0, (real32) mBuffer->Width,   (real32) mBuffer->Height, 1,1,1);
-			DrawRectangle(mBuffer, 1,1, (real32) mBuffer->Width-2,   (real32) mBuffer->Height-2, 0.3,0.3,0.3);
+			game_offscreen_buffer* Buffer = RenderPushBuffer->OffscreenBuffer;
+			DrawRectangle(Buffer, 0,0, (real32) Buffer->Width,   (real32) Buffer->Height, 1,1,1);
+			DrawRectangle(Buffer, 1,1, (real32) Buffer->Width-2,   (real32) Buffer->Height-2, 0.3,0.3,0.3);
 
 			T = M4Identity();
-			V = M4Identity();
-			P = M4Identity();
 		};
 
 		void apply( CameraNode* n) override;
@@ -227,7 +233,7 @@ class RenderVisitor : public BaseVisitor
 			TraceDepth++;
 		}
 
-		void popTrace()
+		void popTrace( )
 		{
 			while( TraceDepth > 0 )
 			{
@@ -247,12 +253,8 @@ class RenderVisitor : public BaseVisitor
 			}
 		}
 
-		m4 R; // Rasterization Matrix
-		m4 V; // View Matrix
-		m4 P; // Projection Matrix
 		m4 T; // ModelMatrix
-		game_offscreen_buffer* mBuffer;
-
+		render_push_buffer* RenderPushBuffer;
 
 		trace Trace[10];
 		int32 TraceDepth = 0;
@@ -287,9 +289,17 @@ class CameraNode : public BaseNode
 
 		CameraNode( v3 aFrom, v3 aTo, real32 aNear, real32 aFar, real32 aLeft, real32 aRight, real32 aTop, real32 aBottom )
 		{
+			DeltaRot = M4Identity();
+			DeltaPos = V3(0,0,0);
 			lookAt( aFrom,  aTo );
-
-			setOrthoProj( aNear, aFar, aLeft, aRight, aTop, aBottom );
+			local_persist real32 t = 0;
+			//setOrthoProj( aNear, aFar, aLeft, aRight, aTop, aBottom );
+			setPerspectiveProj( aNear, aFar, aLeft, aRight, aTop, aBottom);
+			t+=0.01;
+			if(t >= 20 * Pi32)
+			{
+				t -= 20*Pi32;
+			}
 		};
 
 		virtual ~CameraNode(){};
@@ -301,6 +311,8 @@ class CameraNode : public BaseNode
 
 		void setOrthoProj( real32 aNear, real32 aFar, real32 aLeft, real32 aRight, real32 aTop, real32 aBottom )
 		{
+			aFar = -aFar;
+			aNear = -aNear;
 			real32 rlSum  = aRight+aLeft;
 			real32 rlDiff = aRight-aLeft;
 
@@ -311,27 +323,108 @@ class CameraNode : public BaseNode
 			real32 fnDiff = aFar-aNear;
 
 			P =  M4( 2/rlDiff,         0,        0, -rlSum/rlDiff, 
-						       0,   2/tbDiff,       0, -tbSum/tbDiff, 
-						       0,         0, 2/fnDiff, -fnSum/fnDiff,
-						       0,         0,        0,             1);
+						    0,   2/tbDiff,       0, -tbSum/tbDiff, 
+						    0,         0, 2/fnDiff, -fnSum/fnDiff,
+						    0,         0,        0,             1);
 		}
 
+
+		void setPerspectiveProj( real32 aNear, real32 aFar, real32 aLeft, real32 aRight, real32 aTop, real32 aBottom )
+		{
+			real32 rlSum  = aRight+aLeft;
+			real32 rlDiff = aRight-aLeft;
+
+			real32 tbSum  = aTop+aBottom;
+			real32 tbDiff = aTop-aBottom;
+
+			real32 fnSum  = aFar+aNear;
+			real32 fnDiff = aFar-aNear;
+
+			real32 n2 = aNear*2;
+
+			real32 fn2Prod = 2*aFar*aNear;
+
+			P =  M4( n2/rlDiff,         0,  rlSum/rlDiff,               0, 
+			                 0, n2/tbDiff,  tbSum/tbDiff,               0, 
+			                 0,         0, -fnSum/fnDiff, -fn2Prod/fnDiff,
+			                 0,         0,            -1,              -0);
+		}
+
+		void setPerspectiveProj( const real32 angleOfView, const real32 imageAspectRatio,
+							 	const real32 n, const real32 f)
+		{
+			real32 scale = Tan(angleOfView * 0.5f * Pi32 / 180.f) * n;
+			real32 r = imageAspectRatio * scale;
+			real32 l = -r;
+			real32 t = scale;
+			real32 b = -t;
+
+			setPerspectiveProj( n, f, r, l, t, b );
+		} 
+
+//		void setPinholeCamera( real32 filmApertureHeight, real32 filmApertureWidth, 
+//			 					 real32 focalLength, 		real32 nearClippingPlane, 
+//			 					 real32 inchToMM = 25.4f )
+//		{	
+//			real32 top = ( nearClippingPlane* filmApertureHeight * inchToMM * 0.5 ) /  (real32) focalLength;
+//			real32 bottom = -top;
+//			real32 filmAspectRatio = filmApertureWidth / (real32) filmApertureHeight;
+//			real32 left = bottom * filmAspectRatio;
+//			real32 left = -right;
+//
+//			setPerspectiveProj( real32 aNear, real32 aFar, real32 aLeft, real32 aRight, real32 aTop, real32 aBottom );
+//
+//		}
 		void lookAt( v3 aFrom,  v3 aTo,  v3 aTmp = V3(0,1,0) )
 		{
 			v3 Forward = normalize(aFrom - aTo);
-			v3 Right = cross(normalize(aTmp), Forward);
-			v3 Up = cross(Forward, Right);
-			
-			CamToWorld =  M4(
-							 Right.X,   Right.Y,   Right.Z,   aFrom.X,
-							 Up.X,      Up.Y,      Up.Z,      aFrom.Y,
-							 Forward.X, Forward.Y, Forward.Z, aFrom.Z,
-							 0,         0,         0,         1);
+			v3 Right   = normalize( cross(aTmp, Forward) );
+			v3 Up      = normalize( cross(Forward, Right) );
 
-			V = AffineInverse( CamToWorld );
+			m4 CamToWorld; 
+			CamToWorld.r0 = V4(Right,	0);
+			CamToWorld.r1 = V4(Up,		0);
+			CamToWorld.r2 = V4(Forward,	0);
+			CamToWorld.r3 = V4(aFrom,	1);
+			CamToWorld = Transpose(CamToWorld);
+	
+			V = RigidInverse(CamToWorld);
+			AssertIdentity(V * CamToWorld, 0.001 );
+
 		}
 
-		m4 CamToWorld;
+		void Translate( v3 DeltaP  )
+		{
+			DeltaPos = DeltaP;
+		}
+
+		void Rotate( real32 DeltaAngle, v3 Axis )
+		{
+			DeltaRot = GetRotationMatrix( DeltaAngle, Axis );
+		}
+
+		void Update()
+		{
+			m4 CamToWorld = RigidInverse(V);
+			AssertIdentity(CamToWorld*V,0.001);
+
+			v4 NewUpInCamCoord    = Column(DeltaRot,1);
+			v4 NewUpInWorldCoord  = CamToWorld * NewUpInCamCoord;
+
+			v4 NewAtDirInCamCoord  = Column(DeltaRot,2);
+			v4 NewAtDirInWorldCord = CamToWorld * NewAtDirInCamCoord;
+			v4 NewPosInWorldCoord  = Column(CamToWorld,3) + CamToWorld*V4( DeltaPos, 0 );
+
+			v4 NewAtInWorldCoord   = NewPosInWorldCoord-NewAtDirInWorldCord;
+
+			lookAt( V3(NewPosInWorldCoord), V3(NewAtInWorldCoord), V3(NewUpInWorldCoord) );
+	
+			DeltaRot = M4Identity();
+			DeltaPos = V3( 0, 0, 0 );
+		}
+
+		m4 DeltaRot;
+		v3 DeltaPos;
 		m4 V;   // View Matrix
 		m4 P;
 };
@@ -463,37 +556,54 @@ void RenderVisitor::apply( GeometryNode* n)
 
 	obj_geometry& O = n->Object;	
 
-	m4 ModelView = V * T;
+	m4 ModelView = RenderPushBuffer->V * T;
 	for(int32 i = 0; i < O.nt; ++i)
 	{
 		triangle& t = O.t[i];
 
+#if 0
 		v4 fn = ModelView*t.n;
 		if( fn*V4(0,0,1,0) < 0 )
 		{
 			continue;
 		}
+#endif
 
-		v4 AmbientProduct  = V4(0.3,0,0,1);
-		v4 DiffuseProduct  = V4(0,0.8,0,1);
-		v4 SpecularProduct = V4(0,0,0.8,1);
+		render_entity Triangle = {};
 
-		//RenderTriangle( mBuffer, V1,V2,V3, fn, C1, C2, C3, T, V, P, R );
-
-		v4 LightPosition = V4(0,0,-2,1);
-		RenderTriangle( mBuffer, O.v[ t.vi[0] ],O.v[ t.vi[1] ],O.v[ t.vi[2] ], t.n, LightPosition, AmbientProduct, DiffuseProduct, SpecularProduct, T, V, P, R );
-			
-	}
+		Triangle.normal = T*t.n;
+		if(Triangle.normal * V4(0,1,0,0) > 0 )
+		{
+			Triangle.AmbientProduct  	= V4(0.0,0.7,0,0);
+			Triangle.DiffuseProduct  	= V4(0,0.0,0,1);
+			Triangle.SpecularProduct 	= V4(0,0,0.0,1);
+		}else{
+			Triangle.AmbientProduct  	= V4(0.4,0,0,1);
+			Triangle.DiffuseProduct  	= V4(0,0.0,0,1);
+			Triangle.SpecularProduct 	= V4(0,0,0.0,1);
+		}
+		Triangle.LightPosition 		= V4(1,1,1,1);
 	
-	v2 Origo = V2( R*P*ModelView*V4(0,0,0,1) );
-	DrawCircle( mBuffer, Origo.X, Origo.Y , 10);
+		Triangle.vertices[0] = T*O.v[ t.vi[0] ];
+		Triangle.vertices[1] = T*O.v[ t.vi[1] ];
+		Triangle.vertices[2] = T*O.v[ t.vi[2] ];
+
+
+		Triangle.verticeNormals[0] = T*O.vn[ t.vni[0] ];
+		Triangle.verticeNormals[1] = T*O.vn[ t.vni[1] ];
+		Triangle.verticeNormals[2] = T*O.vn[ t.vni[2] ];
+
+
+		PushBuffer( RenderPushBuffer, Triangle );
+	}
+
 	popTrace();
 }
 
 void RenderVisitor::apply( CameraNode* n)
 {
-	V = n->V;
-	P = n->P;
+	RenderPushBuffer->V = n->V;
+	RenderPushBuffer->P = n->P;
 }
 
 

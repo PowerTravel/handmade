@@ -1173,7 +1173,7 @@ Win32ProcessControllerInput( game_input* aOldInput,
 					&OldController->LeftTrigger, 1, 
 					&NewController->LeftTrigger);
 			
-			NewController->RightTriggerAverage =(real32)Pad->bLeftTrigger/255.0f;
+			NewController->RightTriggerAverage =(real32)Pad->bRightTrigger/255.0f;
 			Win32ProcessXInputDigitalButton(
 					(NewController->RightTriggerAverage > TriggerThreshhold) ? 1 : 0, 
 					&OldController->RightTrigger, 1, 
@@ -1202,8 +1202,8 @@ Win32ProcessControllerInput( game_input* aOldInput,
 					&NewController->LeftShoulder);
 			Win32ProcessXInputDigitalButton(
 					Pad ->wButtons, 
-					&OldController->LeftShoulder, XINPUT_GAMEPAD_RIGHT_SHOULDER, 
-					&NewController->LeftShoulder);
+					&OldController->RightShoulder, XINPUT_GAMEPAD_RIGHT_SHOULDER, 
+					&NewController->RightShoulder);
 			Win32ProcessXInputDigitalButton(
 					Pad ->wButtons, 
 					&OldController->Start, XINPUT_GAMEPAD_START, 

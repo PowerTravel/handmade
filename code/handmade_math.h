@@ -38,7 +38,6 @@ union m4
 	real32 E[16];
 };
 
-
 // Supported operations:
 // v2 * v2 (dot)
 // r * v2, 
@@ -509,6 +508,26 @@ m4 M4Identity()
 	return(Result);	
 }
 
+void AssertIdentity(m4 I, real32 epsilon)
+{
+	Assert( Abs( I.E[0]  -1 ) < epsilon );
+	Assert( Abs( I.E[1]     ) < epsilon );
+	Assert( Abs( I.E[2]     ) < epsilon );
+	Assert( Abs( I.E[3]     ) < epsilon );
+	Assert( Abs( I.E[4]     ) < epsilon );
+	Assert( Abs( I.E[5]  -1 ) < epsilon );
+	Assert( Abs( I.E[6]     ) < epsilon );
+	Assert( Abs( I.E[7]     ) < epsilon );
+	Assert( Abs( I.E[8]     ) < epsilon );
+	Assert( Abs( I.E[9]     ) < epsilon );
+	Assert( Abs( I.E[10] -1 ) < epsilon );
+	Assert( Abs( I.E[11]    ) < epsilon );
+	Assert( Abs( I.E[12]    ) < epsilon );
+	Assert( Abs( I.E[13]    ) < epsilon );
+	Assert( Abs( I.E[14]    ) < epsilon );
+	Assert( Abs( I.E[15] -1 ) < epsilon );
+}
+
 m4 M4(real32 a11, real32 a12, real32 a13, real32 a14,
 	  real32 a21, real32 a22, real32 a23, real32 a24,
 	  real32 a31, real32 a32, real32 a33, real32 a34,
@@ -574,10 +593,21 @@ operator*(m4 A, m4 B)
 inline v4
 operator*(m4 M, v4 b)
 {
+	bool32 isPoint = true;
+	// Note(Jakob): Should This be a tolerance instead
+	// abs(b.W)< 0.000001; Or somesuch?
+	if(b.W == 0)
+	{
+		isPoint = false;
+	}
 	v4 Result =  V4( M.r0 * b,
 				     M.r1 * b, 
 				     M.r2 * b, 
 				     M.r3 * b);
+	if(isPoint && (Result.W != 1) )
+	{
+		Result /= Result.W;
+	}
 	return Result;
 }
 
@@ -604,7 +634,7 @@ AffineInverse( m4 A )
 				 A.E[1] * (A.E[ 8] * A.E[ 6] - A.E[ 4] * A.E[10]) + 
 				 A.E[2] * (A.E[ 4] * A.E[ 9] - A.E[ 8] * A.E[ 5]);
 	
-	Assert( ( Det > 0.000001 ) || ( Det < -0.000001 ) );
+	Assert( Abs(Det) > 0.000001 );
 
 	m4 Adj = M4( A.E[ 5] * A.E[10] - A.E[ 6] * A.E[ 9], A.E[ 2] * A.E[ 9] - A.E[10] * A.E[ 1],  A.E[ 1] * A.E[ 6] - A.E[ 2] * A.E[ 5], 0,
 		         A.E[ 6] * A.E[ 8] - A.E[10] * A.E[ 4], A.E[ 0] * A.E[10] - A.E[ 2] * A.E[ 8],  A.E[ 2] * A.E[ 4] - A.E[ 6] * A.E[ 0], 0,
@@ -618,6 +648,65 @@ AffineInverse( m4 A )
 	Inv.E[15] = 1;
 
 	return Inv;
+}
+
+inline m4
+RigidInverse( m4 A )
+{
+	m4 Result = M4(	  A.E[0], A.E[4], A.E[ 8], -A.E[0] * A.E[3] - A.E[4] * A.E[7] - A.E[8]  * A.E[11], 
+					  A.E[1], A.E[5], A.E[ 9], -A.E[1] * A.E[3] - A.E[5] * A.E[7] - A.E[9]  * A.E[11], 
+					  A.E[2], A.E[6], A.E[10], -A.E[2] * A.E[3] - A.E[6] * A.E[7] - A.E[10] * A.E[11], 
+					       0,      0,       0,                           1);
+
+	return Result;
+}
+v4 Column( m4 M, uint32 Column)
+{
+	Assert(Column < 4);
+	v4 Result = V4(M.E[ Column ], M.E[4+Column], M.E[8+Column], M.E[12+Column]);
+	return Result;
+}
+
+void Column( m4 M, uint32 Column, v4 ColumnValue)
+{
+	Assert(Column < 4);
+	M.E[ Column ] = ColumnValue.E[0];
+	M.E[4+Column] = ColumnValue.E[1];
+	M.E[8+Column] = ColumnValue.E[2];
+	M.E[12+Column]= ColumnValue.E[3];
+}
+
+v4 Row( m4 M, uint32 Row )
+{
+	Assert(Row < 4);
+	uint32 Base = 4*Row;
+	v4 Result = V4(M.E[Base], M.E[Base+1], M.E[Base+2], M.E[Base+3]);
+	return Result;
+}
+
+void Row( m4 M, uint32 Row, v4 RowValue)
+{
+	Assert(Row < 4);
+	uint32 Base = 4*Row;
+	M.E[ Base  ] = RowValue.E[0];
+	M.E[ Base+1] = RowValue.E[1];
+	M.E[ Base+2] = RowValue.E[2];
+	M.E[ Base+3] = RowValue.E[3];
+}
+
+real32 Index(  m4 M, uint32 Row, uint32 Column )
+{
+	Assert(Row < 4);
+	Assert(Column < 4);
+	real32 Result = M.E[4*Row+Column];
+	return Result;
+}
+
+void Index(  m4 M, uint32 Row, uint32 Column, real32 Value )
+{
+	Assert(Row < 4);
+	Assert(Column < 4);
+	M.E[4*Row+Column] = Value;
 }
 
 m4 QuatAsMatrix( v4 Quaternion )
@@ -677,8 +766,6 @@ m4 GetRotationMatrix(real32 angle, v3 axis)
 	return R;
 }
 
-
-#define LinearInterpolation( t, A, B) ( (A)+(t)*((B)-(A)) )
 
 
 void U_M4Mul()

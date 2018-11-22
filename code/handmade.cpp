@@ -494,6 +494,13 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 				t->vi[1] = f->vi[1+j];
 				t->vi[2] = f->vi[2+j];
 
+				if(f->ni)
+				{
+					t->vni[0] = f->ni[0];
+					t->vni[1] = f->ni[1 + j];
+					t->vni[2] = f->ni[2 + j];
+				}
+				
 				v4 v0 = Result.v[f->vi[0]];
 				v4 v1 = Result.v[f->vi[1]];
 				v4 v2 = Result.v[f->vi[2]];
@@ -595,15 +602,11 @@ DEBUGReadBMP( thread_context* Thread, game_state* aGameState,
 	return Result;
 }
 
-void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input)
+void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input, game_offscreen_buffer* Buffer)
 {
 	if( ! Memory->GameState )
 	{
 		Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
-		//Memory->GameState = BootstrapPushStruct(game_state, TransientArena);
-
-		//geometry* geom = PushStruct( &GameState->AssetArena, geometry );
-		//GameState->Geometry = geom;
 
 		Memory->GameState->testBMP = DEBUGReadBMP(Thread, Memory->GameState, 
 											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
@@ -615,8 +618,54 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 					//						"..\\handmade\\data\\geometry\\Cube_obj.obj");
 //											"..\\handmade\\data\\geometry\\cupcake.obj");
 //											"..\\handmade\\data\\geometry\\teapot.obj");					
-											"..\\handmade\\data\\geometry\\cube.obj");											
+											"..\\handmade\\data\\geometry\\cube.obj");		
+//											"..\\handmade\\data\\geometry\\triangle.obj");										
 
+
+		
+		local_persist RootNode Root = RootNode();
+		Memory->GameState->Root = &Root;
+		//*Root = RootNode();
+
+		
+		v3 CamPos = V3(1,1,1);
+		v3 CamAt =  V3(0,0,0);
+		local_persist CameraNode Camera  = CameraNode( CamPos, CamAt, -0.5, -100, (real32) -2*Buffer->Width  / (Buffer->Height), 
+														  						  (real32)  2*Buffer->Width  / (Buffer->Height), 
+														  						  (real32)  2*Buffer->Height / (Buffer->Height), 
+														  						  (real32) -2*Buffer->Height / (Buffer->Height));
+		Camera.setOrthoProj( -1, 1,	  (real32) -2*Buffer->Width  / (Buffer->Height),
+										  (real32)  2*Buffer->Width  / (Buffer->Height),
+										  (real32)  2*Buffer->Height / (Buffer->Height),
+										  (real32) -2*Buffer->Height / (Buffer->Height));
+
+		Memory->GameState->Camera = &Camera;
+
+		local_persist TransformNode XAxis;
+		Memory->GameState->XAxis = &XAxis;
+		XAxis.Translate(V3(0.5,0,0));
+		XAxis.Scale(V3(1,0.2,0.2));
+
+		local_persist TransformNode YAxis;
+		Memory->GameState->YAxis = &YAxis;
+		YAxis.Translate(V3(0,0.5,0));
+		YAxis.Scale(V3(0.2,1,0.2));
+
+		local_persist TransformNode ZAxis;
+		Memory->GameState->ZAxis = &ZAxis;
+		ZAxis.Translate(V3(0,0,0.5));
+		ZAxis.Scale(V3(0.2,0.2,1));
+
+		local_persist GeometryNode Obj = GeometryNode( Memory->GameState->testOBJ );
+
+		Root.pushChild( &Camera );
+		Camera.pushChild( &XAxis );
+		Camera.pushChild( &YAxis );
+		Camera.pushChild( &ZAxis );
+
+		XAxis.pushChild( &Obj );
+		YAxis.pushChild( &Obj );
+		ZAxis.pushChild( &Obj );
 		for(int32 ControllerIndex = 0; 
 			ControllerIndex < ArrayCount(Input->Controllers); 
 			++ControllerIndex)
@@ -635,7 +684,7 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 // Signature is
 //void game_update_and_render (thread_context* Thread, 
 //							  game_memory* Memory, 
-//							 game_offscreen_buffer* Buffer, 
+//							  game_offscreen_buffer* Buffer, 
 //							  game_input* Input )
 
 platform_api Platform;
@@ -646,53 +695,118 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 	Platform = Memory->PlatformAPI;
 
-	initiateGame( Thread,  Memory, Input );
+	initiateGame( Thread,  Memory, Input, Buffer );
 
+	game_state* GameState = Memory->GameState;
 	// Note: Controller 0 is keyboard. Controller 1 through 4 is Gamepads
  	Assert( (&Input->Controllers[0].Terminator - &Input->Controllers[0].Button[0]) == 
 			 (ArrayCount(Input->Controllers[0].Button)) );
 		
+	game_controller_input* Controller =  GetController( Input, 1 );
 
-	CameraMovementCallback CameraMovement = CameraMovementCallback( GetController( Input, 1 ) );
+	CameraNode* Camera = GameState->Camera;
+	if( Controller->IsAnalog )
+	{
+		real32 dr = 0.05; 
+		real32 da = 0.05;
+		if(Controller->Start.EndedDown)
+		{
+			v3 CamPos = V3(0,0,1);
+			v3 CamAt =  V3(0,0,0);
+			Camera->lookAt(CamPos,CamAt);
+		}
+		if(Controller->LeftStickLeft.EndedDown)
+		{
+			Camera->Translate( V3(-dr,0,0) );
+		}
+		if(Controller->LeftStickRight.EndedDown)
+		{
+			Camera->Translate( V3( dr,0,0) );
+		}
+		if(Controller->LeftStickUp.EndedDown)
+		{
+			Camera->Translate( V3(0,dr,0) );
+		}
+		if(Controller->LeftStickDown.EndedDown)
+		{
+			Camera->Translate( V3(0,-dr, 0) );
+		}
+		if(Controller->RightStickUp.EndedDown)
+		{
+			Camera->Rotate( da, V3(1,0,0) );
+		}
+		if(Controller->RightStickDown.EndedDown)
+		{
+			Camera->Rotate( da, V3(-1,0,0) );
+		}		
+		if(Controller->RightStickLeft.EndedDown)
+		{
+			Camera->Rotate( da, V3(0,1,0) );
+		}
+		if(Controller->RightStickRight.EndedDown)
+		{
+			Camera->Rotate( da, V3(0,-1, 0) );
+		}
+		if(Controller->RightTrigger.EndedDown)
+		{
+			Camera->Translate( V3(0, 0, -dr) );
+		}
+		if(Controller->LeftTrigger.EndedDown)
+		{
+			Camera->Translate( V3(0, 0, dr) );
+		}
+		if(Controller->A.EndedDown)
+		{
+			// at Z, top is Y, X is Right
+			Camera->lookAt(V3(0,0,1),V3(0,0,0));
+		}
+		if(Controller->B.EndedDown)
+		{
+			// at X, top is Y, X is Left
+			Camera->lookAt(V3(1,1,1),V3(0,0,0));			
+		}
+		if(Controller->X.EndedDown)
+		{
+			// at X, top is Y, X is Left
+			Camera->lookAt(V3(1,0,0),V3(0,0,0));
+		}
+		if(Controller->Y.EndedDown)
+		{
+			// at Y, top is X is up, X is Left
+			Camera->lookAt(V3(0,1,0),V3(0,0,0), V3(1,0,0));
+		}
+		if(Controller->RightShoulder.EndedDown)
+		{
+			Camera->setOrthoProj( -1, 1,	(real32) -2*Buffer->Width  / (Buffer->Height),
+							  			(real32)  2*Buffer->Width  / (Buffer->Height),
+							  			(real32)  2*Buffer->Height / (Buffer->Height),
+							  			(real32) -2*Buffer->Height / (Buffer->Height));
+		}
+		if(Controller->LeftShoulder.EndedDown)
+		{
+			Camera->setPerspectiveProj( 90, (real32)  2*Buffer->Height / (Buffer->Width), 0.1, 1000 );
+		}
+	}
 
+	//CameraMovementCallback CameraMovement = CameraMovementCallback( GetController( Input, 1 ) );
+	Camera->Update();
 
-	RootNode 	 Root = RootNode();
-	CameraNode   Camera  = CameraNode( V3(0,0,0), V3(0,0,1), 1, -1, (real32)  Buffer->Width  / (Buffer->Height), 
-																    (real32) -Buffer->Width  / (Buffer->Height), 
-																    (real32)  Buffer->Height / (Buffer->Height), 
-																    (real32) -Buffer->Height / (Buffer->Height));
-	Camera.connectCallback( &CameraMovement );
+	render_push_buffer PushBuffer = {};
 
-	TransformNode Rotation;
-	Rotation.Rotate(t/10, V3(0,1,0) );
-//	Rotation.Rotate(t/50, V3(1,0,0) );
-//	Rotation.Translate( V3( Sin(t/5), Cos(t/5),0) );
+	InitiatePushBuffer(&PushBuffer, Buffer, &Memory->GameState->TemporaryArena);
 
-	TransformNode Rotation2;
-	Rotation2.Rotate( t/10+Pi32, V3(0, 1,0) );
-	Rotation2.Rotate( Pi32, V3(1, 0,0) );
+	RenderVisitor rn = RenderVisitor( &PushBuffer );
+	rn.traverse( GameState->Root );
+	DrawTriangles(&PushBuffer);
 
-
-	GeometryNode Cube = GeometryNode( Memory->GameState->testOBJ );
-
-	Root.pushChild( &Camera );
-	Camera.pushChild( &Rotation );
-	Rotation.pushChild( &Cube );
-
-
-	UpdateVisitor uv = UpdateVisitor();
-	RenderVisitor rn = RenderVisitor( Buffer  );	
-
-
-	uv.traverse( &Root );
-	rn.traverse( &Root );
+	ClearPushBuffer(&PushBuffer);
 
 	t += Pi32/60;
 	if(t >= 200*Pi32)
 	{
 		t -=200*Pi32;
 	}
-
+	CheckArena(&Memory->GameState->TemporaryArena);
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)

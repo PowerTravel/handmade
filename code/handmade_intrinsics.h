@@ -74,6 +74,13 @@ ATan2(real32 Y, real32 X)
 }
 
 inline real32
+Tan(real32 Angle)
+{
+	real32 Result = tanf(Angle);
+	return Result;
+}
+
+inline real32
 Sqrt( real32 A )
 {
 	real32 Result = sqrtf(A);

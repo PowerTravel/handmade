@@ -322,154 +322,7 @@ BlitBMP(game_offscreen_buffer* Buffer, real32 RealMinX, real32 RealMinY, loaded_
 	}
 }
 
-void fillBottomFlatTriangleFlat(game_offscreen_buffer* Buffer, v2 A, v2 B, v2 C, v4 Color)
-{
-	//    A
-	//   /  \
-	//  /    \
-	// B----- C
-
-	Assert(A.Y >= B.Y);
-	Assert(B.Y == C.Y);
-
-	if( C.X < B.X )
-	{
-		v2 swp = B;
-		B = C;
-		C =swp;
-	}
-
-
-	uint32 PixelValue = (TruncateReal32ToInt32(Color.X*255.f) << 16) | 
-						(TruncateReal32ToInt32(Color.Y*255.f) << 8 ) | 
-						(TruncateReal32ToInt32(Color.Z*255.f) << 0 );
-
-	real32 ABslope = 0;
-	real32 ABdy = B.Y - A.Y;
-	if (ABdy != 0)
-	{
-		ABslope = (B.X - A.X) / ABdy;
-	}
-
-	real32 ACslope = 0;
-	real32 ACdy = C.Y - A.Y;
-	if (ACdy != 0)
-	{
-		ACslope = (C.X - A.X) / ACdy;
-	}
-
-	real32 MinX = A.X;
-	real32 MaxX = A.X;
-
-	int32 MaxY = RoundReal32ToInt32(A.Y);
-	int32 MinY = RoundReal32ToInt32(B.Y);
-
-	real32 Width = C.X - B.X;
-
-	for (int32 Y = MaxY; Y >= MinY; --Y)
-	{
-		int32 StartX = RoundReal32ToInt32(MinX);
-		int32 StopX  = RoundReal32ToInt32(MaxX);
-		
-		for( int32 X = StartX; X <= StopX; ++X )
-		{
-			if((X < 0) || (Y < 0) || (X >= Buffer->Width) || (Y >= Buffer->Height))
-			{
-				continue;
-			}
-		
-			uint8* PixelLocation = ((uint8*)Buffer->Memory + X * Buffer->BytesPerPixel +
-				Y * Buffer->Pitch);
-			uint32* Pixel = (uint32*) PixelLocation;
-			*Pixel = PixelValue;
-		
-		}
-
-		MinX -= ABslope;
-		MaxX -= ACslope;
-
-		if( (MaxX - MinX) > Width )
-		{
-			MinX = B.X;
-			MaxX = C.X;
-		}
-	}
-}
-
-void fillTopFlatTriangleFlat(game_offscreen_buffer* Buffer, v2 A, v2 B, v2 C, v4 Color)
-{
-	//C---B
-	// \ /
-	//	A
-
-	Assert(A.Y <= B.Y);
-	Assert(B.Y == C.Y);
-
-	if( C.X > B.X )
-	{
-		v2 swp = B;
-		B = C;
-		C =swp;
-	}
-
-	uint32 PixelValue = (TruncateReal32ToInt32(Color.X*255.f) << 16) | 
-						(TruncateReal32ToInt32(Color.Y*255.f) << 8 ) | 
-						(TruncateReal32ToInt32(Color.Z*255.f) << 0 );
-	real32 ABslope = 0;
-	real32 ABdy = B.Y - A.Y;
-	if (ABdy != 0)
-	{
-		ABslope = (B.X - A.X) / ABdy;
-	}
-
-	real32 ACslope = 0;
-	real32 ACdy = C.Y - A.Y;
-	if (ACdy != 0)
-	{
-		ACslope = (C.X - A.X) / ACdy;
-	}
-
-	real32 MinX = A.X;
-	real32 MaxX = A.X;
-
-
-	int32 MaxY = RoundReal32ToInt32(B.Y);
-	int32 MinY = RoundReal32ToInt32(A.Y);
-
-	real32 Width = B.X - C.X;
-
-	for (int32 Y = MinY; Y <= MaxY; ++Y)
-	{
-		int32 StartX = RoundReal32ToInt32(MinX);
-		int32 StopX  = RoundReal32ToInt32(MaxX);
-		
-		for( int32 X = StartX; X <= StopX; ++X )
-		{
-			if((X < 0) || (Y < 0) || (X >= Buffer->Width) || (Y >= Buffer->Height))
-			{
-				continue;
-			}
-
-			uint8* PixelLocation = ((uint8*)Buffer->Memory + X * Buffer->BytesPerPixel +
-				Y * Buffer->Pitch);
-			uint32* Pixel = (uint32*) PixelLocation;
-			*Pixel = PixelValue;
-		
-		}
-
-		MaxX += ABslope;
-		MinX += ACslope;
-
-		if( (MaxX - MinX) > Width )
-		{
-			MinX = B.X;
-			MaxX = C.X;
-		}
-
-	}
-}
-
-void DrawLineBresLow(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1, int32 y1, v4 StartColor, v4 StopColor)
+void DrawLineBresLow( game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1, int32 y1, v4 Color )
 {
 	int32 dx = x1 - x0;
 	int32 dy = y1 - y0;
@@ -482,15 +335,8 @@ void DrawLineBresLow(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1
 	int32 D = 2 * dy - dx;
 	int32 y = y0;
 
-	real32 premul = 1 / (real32)(x1 - x0);
-	if( dx != 0 )
-	{
-		premul  = 1 / (real32)(x1 - x0);
-	}
 	for (int x = x0; x <= x1; ++x)
 	{
-		real32 t = premul * (x - x0);
-		v4 Color = LinearInterpolation(t, StartColor, StopColor);
 		PutPixel(Buffer, x, y, Color.X, Color.Y, Color.Z);
 		if (D > 0)
 		{
@@ -502,7 +348,7 @@ void DrawLineBresLow(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1
 }
 
 
-void DrawLineBresHigh(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1, int32 y1, v4 StartColor, v4 StopColor)
+void DrawLineBresHigh(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1, int32 y1, v4 Color)
 {
 	int32 dx = x1 - x0;
 	int32 dy = y1 - y0;
@@ -514,15 +360,8 @@ void DrawLineBresHigh(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x
 	}
 	int32 D = 2 * dx - dy;
 	int32 x = x0;
-	real32 premul = 0;
-	if( dy != 0 )
-	{
-		premul  = 1 / (real32)(y0 - y1);
-	}
 	for (int y = y0; y <= y1; ++y)
 	{
-		real32 t = (real32)(y0 - y)* premul;
-		v4 Color = LinearInterpolation(t, StartColor, StopColor);
 		PutPixel(Buffer, x, y, Color.X, Color.Y, Color.Z);
 		if (D > 0)
 		{
@@ -534,292 +373,42 @@ void DrawLineBresHigh(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x
 	}
 }
 
-void DrawLineBres(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1, int32 y1, v4 StartColor, v4 StopColor)
+void DrawLineBres(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1, int32 y1, v4 Color)
 {
 
 	if (Abs((real32)(y1 - y0)) < Abs((real32)(x1 - x0)))
 	{
 		if (x0 > x1) {
-			DrawLineBresLow(Buffer, x1, y1, x0, y0, StartColor, StopColor);
+			DrawLineBresLow(Buffer, x1, y1, x0, y0, Color );
 		}
 		else {
-			DrawLineBresLow(Buffer, x0, y0, x1, y1, StartColor, StopColor);
+			DrawLineBresLow(Buffer, x0, y0, x1, y1, Color );
 		}
 	}
 	else {
 		if (y0 > y1) {
-			DrawLineBresHigh(Buffer, x1, y1, x0, y0, StartColor, StopColor);
+			DrawLineBresHigh(Buffer, x1, y1, x0, y0, Color );
 		}
 		else {
-			DrawLineBresHigh(Buffer, x0, y0, x1, y1, StartColor, StopColor);
+			DrawLineBresHigh(Buffer, x0, y0, x1, y1, Color );
 		}
 	}
 }
 
 
-void fillBottomFlatTriangle(game_offscreen_buffer* Buffer, v2 A, v2 B, v2 C, v4 Ac, v4 Bc, v4 Cc)
-{
-	//     A
-	//    /  \
-	//   s1   s2
-	//  /      \
-	// B------- C
-
-	Assert(A.Y >= B.Y);
-	Assert(A.Y >= C.Y);
-
-	real32 ABslope = 0;
-	real32 ABdy = B.Y - A.Y;
-	if (ABdy != 0)
-	{
-		ABslope = (B.X - A.X) / ABdy;
-	}
-
-	real32 ACslope = 0;
-	real32 ACdy = C.Y - A.Y;
-	if (ACdy != 0)
-	{
-		ACslope = (C.X - A.X) / ACdy;
-	}
-
-	real32 StartX = A.X;
-	real32 StopX = A.X;
-
-	real32 startT = 0;
-
-	int32 startLineY = RoundReal32ToInt32(A.Y);
-	int32 stopLineY = RoundReal32ToInt32(B.Y);
-
-	real32 premulc = 1 / ((real32)(startLineY - stopLineY));
-	for (int32 scanlineY = startLineY; scanlineY >= stopLineY; --scanlineY)
-	{
-		real32 yt = (real32)(startLineY - scanlineY) * premulc;
-
-		v4 StartColor = LinearInterpolation(yt, Ac, Bc);
-		v4 StopColor = LinearInterpolation(yt, Ac, Cc);
-
-		DrawLineBres(Buffer, RoundReal32ToInt32(StartX), scanlineY, RoundReal32ToInt32(StopX), scanlineY, StartColor, StopColor);
-		StartX -= ABslope;
-		StopX -= ACslope;
-		if (Abs(StartX - StopX) > Abs(C.X - B.X))
-		{
-			StartX = B.X;
-			StopX = C.X;
-		}
-	}
-}
-
-void fillTopFlatTriangle(game_offscreen_buffer* Buffer, v2 A, v2 B, v2 C, v4 Ac, v4 Bc, v4 Cc)
-{
-	//C---B
-	// \ /
-	//	A
-
-	Assert(A.Y <= B.Y);
-	Assert(A.Y <= C.Y);
-
-	real32 ABslope = 0;
-	real32 ABdy = B.Y - A.Y;
-	if (ABdy != 0)
-	{
-		ABslope = (B.X - A.X) / ABdy;
-	}
-
-	real32 ACslope = 0;
-	real32 ACdy = C.Y - A.Y;
-	if (ACdy != 0)
-	{
-		ACslope = (C.X - A.X) / ACdy;
-	}
-
-	real32 StartX = A.X;
-	real32 StopX = A.X;
-
-	int32 startLineY = RoundReal32ToInt32(A.Y);
-	int32 stopLineY = RoundReal32ToInt32(B.Y);
-
-	real32 premulc = 1 / ((real32)(stopLineY - startLineY));
-	for (int32 scanlineY = startLineY; scanlineY <= stopLineY; ++scanlineY)
-	{
-		real32 yt = (real32)(scanlineY - startLineY) * premulc;
-
-		v4 StartColor = LinearInterpolation(yt, Ac, Cc);
-		v4 StopColor = LinearInterpolation(yt, Ac, Bc);
-
-		DrawLineBres(Buffer, RoundReal32ToInt32(StartX), scanlineY, RoundReal32ToInt32(StopX), scanlineY, StartColor, StopColor);
-
-		StartX += ABslope;
-		StopX += ACslope;
-		if (Abs(StopX - StartX) > Abs(C.X - B.X))
-		{
-			StartX = B.X;
-			StopX = C.X;
-		}
-	}
-}
-
-
-bool SortTriangleVerticesAlongYAxis( v2* PointsIn, v2* PointsOut, v4* ColorIn, v4* ColorOut )
-{
-	int32 maxIdx = 0;
-	int32 minIdx = 0;
-
-	for (int32 i = 0; i < 3; ++i)
-	{
-		if (PointsIn[i].Y > PointsIn[maxIdx].Y)
-		{
-			maxIdx = i;
-		}
-
-		if (PointsIn[i].Y < PointsIn[minIdx].Y)
-		{
-			minIdx = i;
-		}
-	}
-
-	// Points on a line along x axis
-	if (maxIdx == minIdx) { return false; }
-
-	for (int32 i = 0; i < 3; ++i)
-	{
-		if (i == maxIdx)
-		{
-			PointsOut[0] = PointsIn[i];
-			ColorOut[0] = ColorIn[i];
-		}else if (i == minIdx)
-		{
-			PointsOut[2] = PointsIn[i];
-			ColorOut[2] = ColorIn[i];
-		}else
-		{
-			PointsOut[1] = PointsIn[i];
-			ColorOut[1] = ColorIn[i];
-		}
-	}
-
-	return true;
-}
-
-void FillTriangle(game_offscreen_buffer* Buffer, v2 p0, v2 p1, v2 p2, v4 p1c = V4(1, 0, 0, 0), v4 p2c = V4(0, 1, 0, 0), v4 p3c = V4(0, 0, 1, 0))
-{
-	v2 P[3] = { p0,p1,p2 };
-	v4 C[3] = { p1c, p2c, p3c };
-
-	v2 SP[3] = {};
-	v4 SC[3] = {};
-
-	if( ! SortTriangleVerticesAlongYAxis(P,SP, C, SC) )
-	{
-		return;
-	}
-
-	if (SP[0].Y == SP[1].Y)
-	{
-		fillTopFlatTriangle(Buffer, SP[2], SP[0], SP[1], SC[2], SC[0], SC[1]);
-	}
-	else if (SP[1].Y == SP[2].Y)
-	{
-		fillBottomFlatTriangle(Buffer, SP[0], SP[1], SP[2], SC[0], SC[1], SC[2]);
-	}
-	else {
-
-		v2 p4 = V2(SP[0].X + (SP[1].Y - SP[0].Y) / (SP[2].Y - SP[0].Y) * (SP[2].X - SP[0].X), SP[1].Y);
-
-		real32 len = norm(SP[0] - p4) / norm(SP[0]-SP[2]);
-		v4 c4 = LinearInterpolation(len, SC[0], SC[2] );
-
-		if( SP[1].X < p4.X )
-		{
-			fillBottomFlatTriangle( Buffer, SP[0], SP[1], p4, SC[0], SC[1], c4 );
-			fillTopFlatTriangle(    Buffer, SP[2], p4, SP[1],  SC[2], c4, SC[1] );
-		}else{
-			fillBottomFlatTriangle( Buffer, SP[0], p4, SP[1], SC[0], c4, SC[1] );
-			fillTopFlatTriangle(    Buffer, SP[2], SP[1], p4, SC[2], SC[1], c4 );
-		}
-
-	}
-
-}
-
-void FillTriangleFlat(game_offscreen_buffer* Buffer, v2 p0, v2 p1, v2 p2, v4 Color)
-{
-
-	v2 P[3] = { p0,p1,p2 };
-	v4 C[3] = { };
-
-	v2 SP[3] = {};
-	v4 SC[3] = {};
-
-
-	if( ! SortTriangleVerticesAlongYAxis(P, SP, C, SC) )
-	{
-		return;
-	}
-
-	if (SP[0].Y == SP[1].Y)
-	{
-		fillTopFlatTriangleFlat(Buffer, SP[2], SP[0], SP[1], Color);
-	}
-	else if (SP[1].Y == SP[2].Y)
-	{
-		fillBottomFlatTriangleFlat(Buffer, SP[0], SP[1], SP[2], Color);
-	}
-	else {
-
-		v2 p4 = V2(SP[0].X + (SP[1].Y - SP[0].Y) / (SP[2].Y - SP[0].Y) * (SP[2].X - SP[0].X), SP[1].Y);
-		fillBottomFlatTriangleFlat( Buffer, SP[0], SP[1], p4, Color );
-		fillTopFlatTriangleFlat(    Buffer, SP[2], p4, SP[1], Color );
-	}
-}
-
-#if 0
-void RenderScene(game_offscreen_buffer* Buffer, memory_arena* MemoryArena, real32 nrVert, v4* vert, v4* vertNorm, int32 nrTriangles, v3* triangleIdx, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct,
-	m4 T, m4 V, m4 P, m4 R)
-{
-	temporary_memory tmpMem = BeginTemporaryMemory(MemoryArena);
-	vertex_data* vd = PushArray(MemoryArena, nrVert, vertex_data);
-
-	m4 ModelView = V*T;
-	for (int32 i = 0; i < nrVert; ++i)
-	{
-		vd[i] = VertexShader(vert[i], vertNorm[i], AmbientProduct, DiffuseProduct, SpecularProduct, T, V, P);
-	}
-
-	for (int32 i = 0; i < nrTriangles; ++i)
-	{
-		int32 vertIndex1 = triangleIdx[i].E[0];
-		int32 vertIndex2 = triangleIdx[i].E[1];
-		int32 vertIndex3 = triangleIdx[i].E[2];
-
-		Rasterizer(Buffer, R, vd[vertIndex1], vd[vertIndex2], vd[vertIndex3]);
-	}
-
-
-	EndTemporaryMemory(tmpMem);
-}
-#endif
-
-struct vertex_data
-{
-	v4 v;
-	v4 n;
-	v4 c;
-};
-
-v4 Flatshading(v4 fCenter, v4 fNormal, v4 LightPosition, m4 T, m4 V, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct)
+v4 Flatshading(v4 fCenter, v4 fNormal, v4 LightPosition, m4 V, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct)
 {
 	// T = Model Matrix;
 	// V = View Matrix;
 	real32 Shininess = 10;
 	real32 flippNormals = 0;
 
-	m4 ModelView = V*T;
-	v3 vpos = V3(ModelView*fCenter);
+	v3 vpos = V3(V*fCenter);
 	v3 lpos = V3(V*LightPosition);
 	v3 L = normalize(lpos - vpos);
 	v3 E = normalize(-vpos);
 	v3 H = normalize(L + E);
-	v3 N = normalize(V3(ModelView*fNormal));
+	v3 N = normalize(V3(V*fNormal));
 
 	v4 ambient = AmbientProduct;
 
@@ -848,6 +437,14 @@ v4 Flatshading(v4 fCenter, v4 fNormal, v4 LightPosition, m4 T, m4 V, v4 AmbientP
 
 	return Result;
 }
+
+
+struct vertex_data
+{
+	v4 v;
+	v4 n;
+	v4 c;
+};
 
 vertex_data BlinnPhong(v4 vPosition, v4 vNormal, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct, m4 T, m4 V, m4 P)
 {
@@ -911,24 +508,156 @@ vertex_data BlinnPhong(v4 vPosition, v4 vNormal, v4 AmbientProduct, v4 DiffusePr
 	return Result;
 }
 
-
-void RenderTriangle(game_offscreen_buffer* Buffer, v4 Vertex1, v4 Vertex2, v4 Vertex3, v4 fNormal, v4 LightPosition, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct,
-	m4 T, m4 V, m4 P, m4 R)
+struct aabb2d
 {
-	#if 1
-	local_persist real32 t = 0;
-	v4 triangleCenter = (Vertex1 + Vertex2 +  Vertex3)/3.f;
-	m4 ProjectionModelView = R * P * V * T;
+	v2 min;
+	v2 max;
+};
 
-	v4 Color = Flatshading(triangleCenter, fNormal, LightPosition, T, V, AmbientProduct, DiffuseProduct, SpecularProduct);
-	FillTriangleFlat(Buffer, V2(ProjectionModelView*Vertex1), V2(ProjectionModelView*Vertex2), V2(ProjectionModelView*Vertex3), Color);
-	#else
-	vertex_data vd1 = BlinnPhong(Vertex1, fNormal, AmbientProduct, DiffuseProduct, SpecularProduct, T, V, P);
-	vertex_data vd2 = BlinnPhong(Vertex2, fNormal, AmbientProduct, DiffuseProduct, SpecularProduct, T, V, P);
-	vertex_data vd3 = BlinnPhong(Vertex3, fNormal, AmbientProduct, DiffuseProduct, SpecularProduct, T, V, P);
+struct render_entity
+{
+	v4 vertices[3];
+	v4 verticeNormals[3];
+	v4 normal;
+	v4 AmbientProduct;
+	v4 DiffuseProduct;
+	v4 SpecularProduct;
+	v4 LightPosition;
+	render_entity* Next;
+};
 
-	FillTriangle(Buffer, V2(R*vd1.v), V2(R*vd2.v), V2(R*vd3.v), vd1.c, vd2.c, vd3.c);
-	#endif
+struct render_push_buffer
+{
+	memory_arena* Arena;
+	temporary_memory TemporaryMemory;
+
+	m4 R; // Rasterization Matrix
+	m4 V; // View Matrix
+	m4 P; // Projection Matrix
+	game_offscreen_buffer* OffscreenBuffer;
+	//game_z_buffer* zBuffer;
+	render_entity* First;
+	render_entity* Last;
+};
+
+void InitiatePushBuffer(render_push_buffer* PushBuffer, game_offscreen_buffer* aOffscreenBuffer, memory_arena* aArena)
+{	
+	*PushBuffer = {};
+	PushBuffer->Arena = aArena;
+	PushBuffer->TemporaryMemory = BeginTemporaryMemory(PushBuffer->Arena);
+	PushBuffer->OffscreenBuffer = aOffscreenBuffer;
+}
+
+void ClearPushBuffer(render_push_buffer* Buffer)
+{
+	Assert(Buffer->Arena);
+	Assert(Buffer->OffscreenBuffer);
+	EndTemporaryMemory(Buffer->TemporaryMemory);
+	*Buffer = {};
+}
+
+void PushBuffer(render_push_buffer* Buffer, render_entity Entity )
+{
+	render_entity* EntityCopy = (render_entity*) PushStruct(Buffer->Arena, render_entity);
+	*EntityCopy = Entity;
+	if( ! Buffer->First )
+	{
+		Assert( EntityCopy->Next == 0);
+		Buffer->First = EntityCopy;
+		Buffer->Last  = EntityCopy;
+		return;
+	}
+
+	Assert( Buffer->Last->Next == 0 );
+	Buffer->Last->Next = EntityCopy;
+	Buffer->Last = EntityCopy;
+}
+
+aabb2d getBoundingBox(v2 a, v2 b, v2 c)
+{
+	v2 p[3] = {a,b,c};
+	aabb2d Result = {};
+	Result.min.X = Minimum(a.X, Minimum(b.X,c.X));
+	Result.min.Y = Minimum(a.Y, Minimum(b.Y,c.Y));
+	Result.max.X = Maximum(a.X, Maximum(b.X,c.X));
+	Result.max.Y = Maximum(a.Y, Maximum(b.Y,c.Y));
+	return Result;
+}
+
+real32 EdgeFunction( v2 a, v2 b, v2 p )
+{
+	real32 Result = (a.X - p.X) * ( b.Y-a.Y ) - (b.X-a.X)*( a.Y-p.Y );
+	return(Result);
+}
+
+void DrawTriangles( render_push_buffer* PushBuffer )
+{
+	local_persist  real32 dt = 0;
+	dt =  (dt<10*Pi32) ? (dt-10*Pi32) : (dt+ 0.01f);
+
+	m4 RasterizerProjectionViewMatrix = PushBuffer->R * PushBuffer->P * PushBuffer->V;
+	game_offscreen_buffer* OffscreenBuffer =  PushBuffer->OffscreenBuffer;
+	for(render_entity* Triangle = PushBuffer->First; 
+					   Triangle != 0; 
+					   Triangle = Triangle->Next)
+	{
+		v4* v = Triangle->vertices;
+		v2 p2[3] = {};
+
+		for( int i = 0; i<3; ++i)
+		{
+			v[i] = RasterizerProjectionViewMatrix * v[i];
+			p2[i] = V2(v[i]);
+		}
+
+		aabb2d Box = getBoundingBox( p2[0], p2[1], p2[2] );
+		if( (Box.max.X < 0)  || 
+			(Box.max.Y < 0 ) ||
+			(Box.min.X >= OffscreenBuffer->Width) || 
+			(Box.min.Y >= OffscreenBuffer->Height))
+		{
+			continue;
+		}
+
+		v4 Color = V4(0.7,0.2,0.4,0); // 
+		v4 triangleCenter = (v[0] + v[1] + v[2])/3;
+		Color = Flatshading(triangleCenter, Triangle->normal, Triangle->LightPosition,  PushBuffer->V, Triangle->AmbientProduct, 
+				Triangle->DiffuseProduct, Triangle->SpecularProduct );
+
+		Box.min.X = Maximum(0, Box.min.X);
+		Box.max.X = Minimum((real32) OffscreenBuffer->Width, Box.max.X);
+		Box.min.Y = Maximum(0, Box.min.Y);
+		Box.max.Y = Minimum((real32) OffscreenBuffer->Height, Box.max.Y);
+
+
+		real32 Area2 = EdgeFunction( p2[0], p2[1], p2[2] );
+		if( Area2 < 0 )
+		{
+			continue;
+		}
+		for(int32 i = RoundReal32ToInt32( Box.min.X ); i < Box.max.X; ++i)
+		{
+			for(int32 j = RoundReal32ToInt32( Box.min.Y ); j < Box.max.Y; ++j)
+			{
+				v2 p = V2( (real32) i, (real32) j);
+				real32 PixelInRange1 = EdgeFunction( p2[0], p2[1], p);
+				real32 PixelInRange2 = EdgeFunction( p2[1], p2[2], p);
+				real32 PixelInRange3 = EdgeFunction( p2[2], p2[0], p);
+
+				if( ( PixelInRange1 >= 0 ) && 
+					( PixelInRange2 >= 0 ) &&
+					( PixelInRange3 >= 0 ) )
+				{
+					uint8* PixelLocation = ((uint8*)OffscreenBuffer->Memory + i * OffscreenBuffer->BytesPerPixel +
+													j * OffscreenBuffer->Pitch);
+					uint32* Pixel = (uint32*)PixelLocation;
+					*Pixel = ((TruncateReal32ToInt32(Color.X*255.f) << 16) |
+							  (TruncateReal32ToInt32(Color.Y*255.f) << 8) |
+							  (TruncateReal32ToInt32(Color.Z*255.f) << 0));
+				}
+			}
+		}
+	}
 }
 
 
