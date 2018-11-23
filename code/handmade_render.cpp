@@ -660,5 +660,4 @@ void DrawTriangles( render_push_buffer* PushBuffer )
 	}
 }
 
-
 #endif HANDMADE_RENDER

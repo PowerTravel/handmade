@@ -29,6 +29,7 @@ cl %CommonCompilerFlags% -MTd %BuildFiles% -Fmhandmade.map -LD /link -incrementa
 set LastError=%ERRORLEVEL%
 del lock.tmp
 cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp -Fmwin32_handmade.map /link %CommonLinkerFlags% 
+cl %CommonCompilerFlags% ..\handmade\tests\memory.cpp /link %CommonLinkerFlags% 
 popd
 
 ..\ctime\ctime -end handmade_hero.ctm %LastError%

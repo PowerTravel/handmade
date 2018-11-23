@@ -16,44 +16,17 @@ class CameraMovementCallback : public BaseCallback
 {
 	public:
 
-		CameraMovementCallback(game_controller_input* aController)
+		CameraMovementCallback(game_controller_input* aController, CameraNode* aCamera)
 		{
 			Controller = aController;
+			Camera = aCamera;
 		};
 		virtual ~CameraMovementCallback(){};
 
-		void execute()
-		{
-			if( Controller->IsAnalog )
-			{
-				if(Controller->Start.EndedDown)
-				{
-
-				}else{
-
-				}
-
-				if(Controller->RightStickLeft.EndedDown)
-				{
-
-				}
-				if(Controller->RightStickRight.EndedDown)
-				{
-				}
-				if(Controller->RightStickUp.EndedDown)
-				{
-				}
-				if(Controller->RightStickDown.EndedDown)
-				{
-				}
-				if(Controller->RightShoulder.EndedDown)
-				{
-
-				}
-			}	
-		};
+		void execute() override;
 
 		game_controller_input* Controller=0;
+		CameraNode* Camera;
 };
 
 
@@ -157,13 +130,8 @@ class BaseVisitor
 class UpdateVisitor : public BaseVisitor
 {
 	public:
-		UpdateVisitor( )
-		{
-
-		};
-		virtual ~UpdateVisitor()
-		{
-		};
+		UpdateVisitor(){};
+		virtual ~UpdateVisitor(){};
 
 		void apply( CameraNode* n) override;
 };
@@ -287,21 +255,12 @@ class CameraNode : public BaseNode
 {
 	public:
 
-		CameraNode( v3 aFrom, v3 aTo, real32 aNear, real32 aFar, real32 aLeft, real32 aRight, real32 aTop, real32 aBottom )
+		CameraNode(	real32 aAngleOfView, real32 aAspectRatio )
 		{
-			DeltaRot = M4Identity();
-			DeltaPos = V3(0,0,0);
-			lookAt( aFrom,  aTo );
-			local_persist real32 t = 0;
-			//setOrthoProj( aNear, aFar, aLeft, aRight, aTop, aBottom );
-			setPerspectiveProj( aNear, aFar, aLeft, aRight, aTop, aBottom);
-			t+=0.01;
-			if(t >= 20 * Pi32)
-			{
-				t -= 20*Pi32;
-			}
-		};
-
+			AngleOfView = aAngleOfView;
+			AspectRatio = aAspectRatio;
+			SetPerspectiveProj( -0.1, 100 );
+		}
 		virtual ~CameraNode(){};
 
 		void acceptVisitor( BaseVisitor* v ) override
@@ -309,18 +268,16 @@ class CameraNode : public BaseNode
 			v->apply(this);
 		};
 
-		void setOrthoProj( real32 aNear, real32 aFar, real32 aLeft, real32 aRight, real32 aTop, real32 aBottom )
+		void SetOrthoProj( real32 n, real32 f, real32 r, real32 l,  real32 t, real32 b )
 		{
-			aFar = -aFar;
-			aNear = -aNear;
-			real32 rlSum  = aRight+aLeft;
-			real32 rlDiff = aRight-aLeft;
+			real32 rlSum  = r+l;
+			real32 rlDiff = r-l;
 
-			real32 tbSum  = aTop+aBottom;
-			real32 tbDiff = aTop-aBottom;
+			real32 tbSum  = t+b;
+			real32 tbDiff = t-b;
 
-			real32 fnSum  = aFar+aNear;
-			real32 fnDiff = aFar-aNear;
+			real32 fnSum  = f+n;
+			real32 fnDiff = f-n;
 
 			P =  M4( 2/rlDiff,         0,        0, -rlSum/rlDiff, 
 						    0,   2/tbDiff,       0, -tbSum/tbDiff, 
@@ -328,21 +285,31 @@ class CameraNode : public BaseNode
 						    0,         0,        0,             1);
 		}
 
-
-		void setPerspectiveProj( real32 aNear, real32 aFar, real32 aLeft, real32 aRight, real32 aTop, real32 aBottom )
+		void SetOrthoProj( real32 n, real32 f )
 		{
-			real32 rlSum  = aRight+aLeft;
-			real32 rlDiff = aRight-aLeft;
+			real32 scale = - Tan(AngleOfView * 0.5f * Pi32 / 180.f) * n;
+			real32 r = AspectRatio * scale;
+			real32 l = -r;
+			real32 t = scale;
+			real32 b = -t;
+			SetOrthoProj( n, f, r, l,  t, b );
+		}
 
-			real32 tbSum  = aTop+aBottom;
-			real32 tbDiff = aTop-aBottom;
 
-			real32 fnSum  = aFar+aNear;
-			real32 fnDiff = aFar-aNear;
+		void SetPerspectiveProj( real32 n, real32 f, real32 r, real32 l, real32 t, real32 b )
+		{
+			real32 rlSum  = r+l;
+			real32 rlDiff = r-l;
 
-			real32 n2 = aNear*2;
+			real32 tbSum  = t+b;
+			real32 tbDiff = t-b;
 
-			real32 fn2Prod = 2*aFar*aNear;
+			real32 fnSum  = f+n;
+			real32 fnDiff = f-n;
+
+			real32 n2 = n*2;
+
+			real32 fn2Prod = 2*f*n;
 
 			P =  M4( n2/rlDiff,         0,  rlSum/rlDiff,               0, 
 			                 0, n2/tbDiff,  tbSum/tbDiff,               0, 
@@ -350,16 +317,15 @@ class CameraNode : public BaseNode
 			                 0,         0,            -1,              -0);
 		}
 
-		void setPerspectiveProj( const real32 angleOfView, const real32 imageAspectRatio,
-							 	const real32 n, const real32 f)
+		void SetPerspectiveProj( real32 n, real32 f )
 		{
-			real32 scale = Tan(angleOfView * 0.5f * Pi32 / 180.f) * n;
-			real32 r = imageAspectRatio * scale;
+			real32 scale = Tan(AngleOfView * 0.5f * Pi32 / 180.f) * n;
+			real32 r = AspectRatio * scale;
 			real32 l = -r;
 			real32 t = scale;
 			real32 b = -t;
 
-			setPerspectiveProj( n, f, r, l, t, b );
+			SetPerspectiveProj( n, f, r, l, t, b );
 		} 
 
 //		void setPinholeCamera( real32 filmApertureHeight, real32 filmApertureWidth, 
@@ -375,7 +341,7 @@ class CameraNode : public BaseNode
 //			setPerspectiveProj( real32 aNear, real32 aFar, real32 aLeft, real32 aRight, real32 aTop, real32 aBottom );
 //
 //		}
-		void lookAt( v3 aFrom,  v3 aTo,  v3 aTmp = V3(0,1,0) )
+		void LookAt( v3 aFrom,  v3 aTo,  v3 aTmp = V3(0,1,0) )
 		{
 			v3 Forward = normalize(aFrom - aTo);
 			v3 Right   = normalize( cross(aTmp, Forward) );
@@ -403,7 +369,7 @@ class CameraNode : public BaseNode
 			DeltaRot = GetRotationMatrix( DeltaAngle, Axis );
 		}
 
-		void Update()
+		void ApplyMovement()
 		{
 			m4 CamToWorld = RigidInverse(V);
 			AssertIdentity(CamToWorld*V,0.001);
@@ -417,12 +383,14 @@ class CameraNode : public BaseNode
 
 			v4 NewAtInWorldCoord   = NewPosInWorldCoord-NewAtDirInWorldCord;
 
-			lookAt( V3(NewPosInWorldCoord), V3(NewAtInWorldCoord), V3(NewUpInWorldCoord) );
+			LookAt( V3(NewPosInWorldCoord), V3(NewAtInWorldCoord), V3(NewUpInWorldCoord) );
 	
 			DeltaRot = M4Identity();
 			DeltaPos = V3( 0, 0, 0 );
 		}
 
+		real32 AngleOfView;
+		real32 AspectRatio;
 		m4 DeltaRot;
 		v3 DeltaPos;
 		m4 V;   // View Matrix
@@ -617,3 +585,90 @@ void RenderVisitor::apply( TransformNode* n )
 {
 	pushTrace( n->T, n->nrChildren );
 }
+
+
+void CameraMovementCallback::execute()
+{
+	if( Controller->IsAnalog )
+	{
+		real32 dr = 0.05; 
+		real32 da = 0.05;
+		if(Controller->Start.EndedDown)
+		{
+			v3 CamPos = V3(0,0,1);
+			v3 CamAt =  V3(0,0,0);
+			Camera->LookAt(CamPos,CamAt);
+		}
+		if(Controller->LeftStickLeft.EndedDown)
+		{
+			Camera->Translate( V3(-dr,0,0) );
+		}
+		if(Controller->LeftStickRight.EndedDown)
+		{
+			Camera->Translate( V3( dr,0,0) );
+		}
+		if(Controller->LeftStickUp.EndedDown)
+		{
+			Camera->Translate( V3(0,dr,0) );
+		}
+		if(Controller->LeftStickDown.EndedDown)
+		{
+			Camera->Translate( V3(0,-dr, 0) );
+		}
+		if(Controller->RightStickUp.EndedDown)
+		{
+			Camera->Rotate( da, V3(1,0,0) );
+		}
+		if(Controller->RightStickDown.EndedDown)
+		{
+			Camera->Rotate( da, V3(-1,0,0) );
+		}		
+		if(Controller->RightStickLeft.EndedDown)
+		{
+			Camera->Rotate( da, V3(0,1,0) );
+		}
+		if(Controller->RightStickRight.EndedDown)
+		{
+			Camera->Rotate( da, V3(0,-1, 0) );
+		}
+		if(Controller->RightTrigger.EndedDown)
+		{
+			Camera->Translate( V3(0, 0, -dr) );
+		}
+		if(Controller->LeftTrigger.EndedDown)
+		{
+			Camera->Translate( V3(0, 0, dr) );
+		}
+		if(Controller->A.EndedDown)
+		{
+			// at Z, top is Y, X is Right
+			Camera->LookAt(V3(0,0,1),V3(0,0,0));
+		}
+		if(Controller->B.EndedDown)
+		{
+			// at X, top is Y, X is Left
+			Camera->LookAt(V3(1,1,1),V3(0,0,0));			
+		}
+		if(Controller->X.EndedDown)
+		{
+			// at X, top is Y, X is Left
+			Camera->LookAt(V3(1,0,0),V3(0,0,0));
+		}
+		if(Controller->Y.EndedDown)
+		{
+			// at Y, top is X is up, X is Left
+			Camera->LookAt(V3(0,1,0),V3(0,0,0), V3(1,0,0));
+		}
+		if(Controller->RightShoulder.EndedDown)
+		{
+			Camera->SetOrthoProj( -1, 1 );
+		}
+		if(Controller->LeftShoulder.EndedDown)
+		{
+			Camera->SetPerspectiveProj( 0.1, 1000 );
+		}
+
+		Camera->ApplyMovement();
+	}
+
+};

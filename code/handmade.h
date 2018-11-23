@@ -45,7 +45,40 @@ struct obj_geometry
 	triangle* t;
 };
 
+#if 0
+struct component_list
+{
+	uint32 Type;
+	void* Data;
+	component_list* Next;
+};
 
+struct entity
+{
+	uint32 Index;
+	component_list* Component;
+};
+
+struct world_entities
+{
+	entity Entities[32];
+	uint32 NrEntities;
+};
+
+enum component_type
+{
+	CAMERA  		= 0x1,
+	COLLISION 		= 0x2,
+	GEOMETRY  		= 0x4
+};
+
+struct geometry_component
+{
+	obj_geometry O;
+	m4 M;
+};
+
+#endif
 struct loaded_bitmap
 {
 	int32 Width;
@@ -65,9 +98,6 @@ struct game_state{
 
 	RootNode* Root;
 	CameraNode* Camera;
-	TransformNode* XAxis;
-	TransformNode* YAxis;
-	TransformNode* ZAxis;
 
 	loaded_bitmap testBMP;
 	obj_geometry  testOBJ;

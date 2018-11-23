@@ -38,108 +38,6 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
 	}
 }
 
-#if 0
-bool32 closeEnough(real32 a, real32 b) 
-{
-
-	real32 diff = a - b;
-
-	if(diff < 0)
-	{
-		diff = -diff;
-	}
-
-	return (diff < .001);
-
-}
-
-real32 betterGuess(real32 x, real32 g) 
-{
-   return ( (g + x/g) / 2.f );
-}
-
-real32 test(real32 x, real32 g) 
-{
-	if( closeEnough(x/g, g) )
-	{
-		return g;
-	}else{
-		return test(x, betterGuess(x, g) );
-	}
-}
-#endif
-
-#if 0
-int main( void )
-{
-	//MainWindow mainWindow = MainWindow();
-	MainWindow::getInstance().init(1024,768);
-	//mainWindow.init(1024,768);
-
-	group_ptr grp = build_graph();
-	RenderVisitor r = RenderVisitor();	
-	UpdateVisitor u = UpdateVisitor();	
-
-	//while(mainWindow.isRunning()){
-	while(MainWindow::getInstance().isRunning()){
-		MainWindow::getInstance().clear();
-		MainWindow::getInstance().getInput();
-		MainWindow::getInstance().update();	
-
-	//	std::cout << "NEW FRAME" << std::endl;
-		u.traverse(grp.get());
-		r.traverse(grp.get());
-
-		// Swap buffers
-		MainWindow::getInstance().swap();
-	} 
-
-//	p.printToFile("bajsloek.m");
-
-	MainWindow::getInstance().destroy();
-
-	return 0;
-}
-
-group_ptr build_graph()
-{
-	// Create Nodes
-	// Root
-	group_ptr grp = group_ptr(new Group());
-
-	// Camera
-	camera_ptr cam = camera_ptr(new Camera());
-	cam->connectCallback(callback_ptr(new CameraMovementCallback(cam)));
-
-	// Transform 1 and 2
-	transform_ptr trns1 = transform_ptr(new Transform());
-	trns1->translate(vec3(0.5,0,0));
-	trns1->scale(vec3(0.5,0.5,0.5));
-	trns1->rotate(90,vec3(0,0,1));
-
-	transform_ptr trns2 = transform_ptr(new Transform());
-	trns2->translate(vec3(-0.5,0,0));
-	trns2->scale(vec3(0.5,0.5,0.5));
-
-	// Geometry
-	geometry_vec gvec = Geometry::loadFile("../models/sphere.obj");
-
-	// Link the tree
-
-	grp->addChild(cam);
-	cam->addChild(trns1);
-	cam->addChild(trns2);
-
-	for(int i = 0; i<gvec.size(); i++){
-		trns1->addChild(gvec[i]);
-		trns2->addChild(gvec[i]);
-	}
-
-	return grp;
-}
-
-#endif
-
 
 v4 ParseNumbers(char* String)
 {
@@ -512,8 +410,6 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 				t->n = normalize( triangleNormal );
 			}
 		}
-
-
 	}
 
 	return Result;
@@ -606,66 +502,75 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 {
 	if( ! Memory->GameState )
 	{
+
 		Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
 
-		Memory->GameState->testBMP = DEBUGReadBMP(Thread, Memory->GameState, 
+		game_state* GameState = Memory->GameState;
+
+		GameState->testBMP = DEBUGReadBMP(Thread, GameState, 
 											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
 											"..\\handmade\\data\\test\\test_hero_front_head.bmp");
-		Memory->GameState->testOBJ = DEBUGReadOBJ(Thread, Memory->GameState, 
+		GameState->testOBJ = DEBUGReadOBJ(Thread, GameState, 
 											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-					//						"..\\handmade\\data\\geometry\\Cube_obj.obj");
+											"..\\handmade\\data\\geometry\\Cube_obj.obj");
 //											"..\\handmade\\data\\geometry\\cupcake.obj");
 //											"..\\handmade\\data\\geometry\\teapot.obj");					
-											"..\\handmade\\data\\geometry\\cube.obj");		
-//											"..\\handmade\\data\\geometry\\triangle.obj");										
+//											"..\\handmade\\data\\geometry\\cube.obj");		
+//											"..\\handmade\\data\\geometry\\triangle.obj");
+
+		memory_arena* AssetArena = &GameState->AssetArena;
 
 
-		
-		local_persist RootNode Root = RootNode();
-		Memory->GameState->Root = &Root;
-		//*Root = RootNode();
+		RootNode RootInstance = RootNode();
+		GameState->Root = (RootNode*) PushCopy(AssetArena, sizeof(RootNode), &RootInstance);
 
-		
+
 		v3 CamPos = V3(1,1,1);
 		v3 CamAt =  V3(0,0,0);
-		local_persist CameraNode Camera  = CameraNode( CamPos, CamAt, -0.5, -100, (real32) -2*Buffer->Width  / (Buffer->Height), 
-														  						  (real32)  2*Buffer->Width  / (Buffer->Height), 
-														  						  (real32)  2*Buffer->Height / (Buffer->Height), 
-														  						  (real32) -2*Buffer->Height / (Buffer->Height));
-		Camera.setOrthoProj( -1, 1,	  (real32) -2*Buffer->Width  / (Buffer->Height),
-										  (real32)  2*Buffer->Width  / (Buffer->Height),
-										  (real32)  2*Buffer->Height / (Buffer->Height),
-										  (real32) -2*Buffer->Height / (Buffer->Height));
+		CameraNode CameraInstance = CameraNode( 90, (real32) Buffer->Width/ (real32) Buffer->Height );
+		CameraInstance.LookAt(CamPos, CamAt);
+		CameraInstance.SetPerspectiveProj( 0.1, 1000 );
+		GameState->Camera = (CameraNode*) PushCopy(AssetArena, sizeof(CameraNode), &CameraInstance);
 
-		Memory->GameState->Camera = &Camera;
 
-		local_persist TransformNode XAxis;
-		Memory->GameState->XAxis = &XAxis;
-		XAxis.Translate(V3(0.5,0,0));
-		XAxis.Scale(V3(1,0.2,0.2));
+ 		Assert( (&Input->Controllers[0].Terminator - &Input->Controllers[0].Button[0]) == 
+			 (ArrayCount(Input->Controllers[0].Button)) );
+		CameraMovementCallback CameraMovementInstance = CameraMovementCallback( GetController( Input, 1 ), GameState->Camera );
+		CameraMovementCallback* CameraMovement = (CameraMovementCallback*) PushCopy(AssetArena, sizeof(CameraMovementCallback), &CameraMovementInstance);
+		GameState->Camera->connectCallback(CameraMovement);
 
-		local_persist TransformNode YAxis;
-		Memory->GameState->YAxis = &YAxis;
-		YAxis.Translate(V3(0,0.5,0));
-		YAxis.Scale(V3(0.2,1,0.2));
 
-		local_persist TransformNode ZAxis;
-		Memory->GameState->ZAxis = &ZAxis;
-		ZAxis.Translate(V3(0,0,0.5));
-		ZAxis.Scale(V3(0.2,0.2,1));
+		TransformNode XAxisInstance;
+		XAxisInstance.Translate(V3(0.5,0,0));
+		XAxisInstance.Scale(V3(1 ,0.2,0.2));
+		TransformNode* XAxis  = (TransformNode*) PushCopy(AssetArena, sizeof(TransformNode), &XAxisInstance);
 
-		local_persist GeometryNode Obj = GeometryNode( Memory->GameState->testOBJ );
+		TransformNode YAxisInstance;
+		YAxisInstance.Translate(V3(0,0.5,0));
+		YAxisInstance.Scale(V3(0.2,1,0.2));
+		TransformNode* YAxis  = (TransformNode*) PushCopy(AssetArena, sizeof(TransformNode), &YAxisInstance);
 
-		Root.pushChild( &Camera );
-		Camera.pushChild( &XAxis );
-		Camera.pushChild( &YAxis );
-		Camera.pushChild( &ZAxis );
+		TransformNode ZAxisInstance;
+		ZAxisInstance.Translate(V3(0,0,0.5));
+		ZAxisInstance.Scale(V3(0.2,0.2,1));
+		TransformNode* ZAxis  = (TransformNode*) PushCopy(AssetArena, sizeof(TransformNode), &ZAxisInstance);
 
-		XAxis.pushChild( &Obj );
-		YAxis.pushChild( &Obj );
-		ZAxis.pushChild( &Obj );
+
+		GeometryNode ObjInstance = GeometryNode( Memory->GameState->testOBJ );
+		GeometryNode* Obj = (GeometryNode*) PushCopy(AssetArena, sizeof(GeometryNode), &ObjInstance);
+
+
+		GameState->Root->pushChild( GameState->Camera );
+		GameState->Camera->pushChild( XAxis );
+		GameState->Camera->pushChild( YAxis );
+		GameState->Camera->pushChild( ZAxis );
+
+		XAxis->pushChild( Obj );
+		YAxis->pushChild( Obj );
+		ZAxis->pushChild( Obj );
+
 		for(int32 ControllerIndex = 0; 
 			ControllerIndex < ArrayCount(Input->Controllers); 
 			++ControllerIndex)
@@ -698,104 +603,14 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	initiateGame( Thread,  Memory, Input, Buffer );
 
 	game_state* GameState = Memory->GameState;
-	// Note: Controller 0 is keyboard. Controller 1 through 4 is Gamepads
- 	Assert( (&Input->Controllers[0].Terminator - &Input->Controllers[0].Button[0]) == 
-			 (ArrayCount(Input->Controllers[0].Button)) );
-		
-	game_controller_input* Controller =  GetController( Input, 1 );
-
-	CameraNode* Camera = GameState->Camera;
-	if( Controller->IsAnalog )
-	{
-		real32 dr = 0.05; 
-		real32 da = 0.05;
-		if(Controller->Start.EndedDown)
-		{
-			v3 CamPos = V3(0,0,1);
-			v3 CamAt =  V3(0,0,0);
-			Camera->lookAt(CamPos,CamAt);
-		}
-		if(Controller->LeftStickLeft.EndedDown)
-		{
-			Camera->Translate( V3(-dr,0,0) );
-		}
-		if(Controller->LeftStickRight.EndedDown)
-		{
-			Camera->Translate( V3( dr,0,0) );
-		}
-		if(Controller->LeftStickUp.EndedDown)
-		{
-			Camera->Translate( V3(0,dr,0) );
-		}
-		if(Controller->LeftStickDown.EndedDown)
-		{
-			Camera->Translate( V3(0,-dr, 0) );
-		}
-		if(Controller->RightStickUp.EndedDown)
-		{
-			Camera->Rotate( da, V3(1,0,0) );
-		}
-		if(Controller->RightStickDown.EndedDown)
-		{
-			Camera->Rotate( da, V3(-1,0,0) );
-		}		
-		if(Controller->RightStickLeft.EndedDown)
-		{
-			Camera->Rotate( da, V3(0,1,0) );
-		}
-		if(Controller->RightStickRight.EndedDown)
-		{
-			Camera->Rotate( da, V3(0,-1, 0) );
-		}
-		if(Controller->RightTrigger.EndedDown)
-		{
-			Camera->Translate( V3(0, 0, -dr) );
-		}
-		if(Controller->LeftTrigger.EndedDown)
-		{
-			Camera->Translate( V3(0, 0, dr) );
-		}
-		if(Controller->A.EndedDown)
-		{
-			// at Z, top is Y, X is Right
-			Camera->lookAt(V3(0,0,1),V3(0,0,0));
-		}
-		if(Controller->B.EndedDown)
-		{
-			// at X, top is Y, X is Left
-			Camera->lookAt(V3(1,1,1),V3(0,0,0));			
-		}
-		if(Controller->X.EndedDown)
-		{
-			// at X, top is Y, X is Left
-			Camera->lookAt(V3(1,0,0),V3(0,0,0));
-		}
-		if(Controller->Y.EndedDown)
-		{
-			// at Y, top is X is up, X is Left
-			Camera->lookAt(V3(0,1,0),V3(0,0,0), V3(1,0,0));
-		}
-		if(Controller->RightShoulder.EndedDown)
-		{
-			Camera->setOrthoProj( -1, 1,	(real32) -2*Buffer->Width  / (Buffer->Height),
-							  			(real32)  2*Buffer->Width  / (Buffer->Height),
-							  			(real32)  2*Buffer->Height / (Buffer->Height),
-							  			(real32) -2*Buffer->Height / (Buffer->Height));
-		}
-		if(Controller->LeftShoulder.EndedDown)
-		{
-			Camera->setPerspectiveProj( 90, (real32)  2*Buffer->Height / (Buffer->Width), 0.1, 1000 );
-		}
-	}
-
-	//CameraMovementCallback CameraMovement = CameraMovementCallback( GetController( Input, 1 ) );
-	Camera->Update();
 
 	render_push_buffer PushBuffer = {};
+	InitiatePushBuffer(&PushBuffer, Buffer, &GameState->TemporaryArena);
 
-	InitiatePushBuffer(&PushBuffer, Buffer, &Memory->GameState->TemporaryArena);
-
+	UpdateVisitor ud = UpdateVisitor( );
 	RenderVisitor rn = RenderVisitor( &PushBuffer );
+
+	ud.traverse( GameState->Root );
 	rn.traverse( GameState->Root );
 	DrawTriangles(&PushBuffer);
 
