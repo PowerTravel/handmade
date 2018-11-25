@@ -1,37 +1,38 @@
-
 #include <stdio.h>
 #include "handmade.h"
-#include "handmade_render.cpp"
-#include "scene_graph.cpp"
+#include "render.cpp"
+//#include "scene_graph.cpp"
+#include "camera_system.cpp"
+#include "render_system.cpp"
 
 internal void
 GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
 {
 
-	local_persist real32 tSine = 0.f;
+	local_persist r32 tSine = 0.f;
 
-	int16 ToneVolume = 2000;
+	s16 ToneVolume = 2000;
 	int SamplesPerPeriod = SoundBuffer->SamplesPerSecond/ToneHz;
 
-	real32 twopi = (real32) (2.0*Pi32);
+	r32 twopi = (r32) (2.0*Pi32);
 
-	int16 *SampleOut = SoundBuffer->Samples;
+	s16 *SampleOut = SoundBuffer->Samples;
 	for(int SampleIndex = 0; 
 		SampleIndex < SoundBuffer->SampleCount; 
 		++SampleIndex)
 	{
 
 #if 0
-		real32 SineValue = Sin(tSine);
-		int16 SampleValue = (int16)(SineValue * ToneVolume);
+		r32 SineValue = Sin(tSine);
+		s16 SampleValue = (s16)(SineValue * ToneVolume);
 
-		tSine += twopi/(real32)SamplesPerPeriod;	
+		tSine += twopi/(r32)SamplesPerPeriod;	
 		if(tSine > twopi)
 		{
 			tSine -= twopi;
 		}
 #else	
-		int16 SampleValue = 0;
+		s16 SampleValue = 0;
 #endif	
 		*SampleOut++ = SampleValue; // Left Speker
 		*SampleOut++ = SampleValue; // Rright speaker
@@ -43,7 +44,7 @@ v4 ParseNumbers(char* String)
 {
 	char* Start = str::FindFirstNotOf( " \t", String );
 	char WordBuffer[OBJ_MAX_WORD_LENGTH];
-	int32 CoordinateIdx = 0;
+	s32 CoordinateIdx = 0;
 	v4 Result = V4(0,0,0,1);
 	while( Start )
 	{
@@ -58,7 +59,7 @@ v4 ParseNumbers(char* String)
 		Copy( WordLength, Start, WordBuffer );
 		WordBuffer[WordLength] = '\0';
 
-		Result.E[CoordinateIdx++] =(real32) str::StringToReal64(WordBuffer);
+		Result.E[CoordinateIdx++] =(r32) str::StringToReal64(WordBuffer);
 
 		Start = (End) ? str::FindFirstNotOf(" \t", End) : End;
 	}
@@ -77,10 +78,10 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 
 	if( ReadResult.ContentSize )
 	{
-		int32 nrVertices = 0;
-		int32 nrVertexNormals = 0;
-		int32 nrTexturePoints = 0;
-		int32 nrFaces = 0;
+		s32 nrVertices = 0;
+		s32 nrVertexNormals = 0;
+		s32 nrTexturePoints = 0;
+		s32 nrFaces = 0;
 
 		char* ScanPtr = ( char* ) ReadResult.Contents;
 		char* FileEnd =  ( char* ) ReadResult.Contents + ReadResult.ContentSize;
@@ -174,10 +175,10 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 		Result.f= (face*) PushArray(Arena, nrFaces, face);
 		face* faces = Result.f;
 
-		int32 verticeIdx 	  = 0;
-		int32 vertexNormalIdx = 0;
-		int32 texturePointIdx = 0;
-		int32 faceIdx = 0;
+		s32 verticeIdx 	  = 0;
+		s32 vertexNormalIdx = 0;
+		s32 texturePointIdx = 0;
+		s32 faceIdx = 0;
 
 		ScanPtr = ( char* ) ReadResult.Contents;
 		while( ScanPtr < FileEnd )
@@ -257,7 +258,7 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 				Assert( f->nv >= 3);
 				Result.nt += f->nv - 2;
 
-				int32 VertIdx = 0;
+				s32 VertIdx = 0;
 
 				while( Start )
 				{
@@ -273,7 +274,7 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 
 					char* StartNr = WordBuffer;
 					char* EndNr = 0;
-					int32 i =0;
+					s32 i =0;
 					while( StartNr )
 					{
 						EndNr 	= str::FindFirstOf("/", StartNr);
@@ -282,7 +283,7 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 							*EndNr++ = '\0';
 						}
 
-						int32 nr = (int32) str::StringToReal64(StartNr)-1;
+						s32 nr = (s32) str::StringToReal64(StartNr)-1;
 						Assert(nr>=0);
 						Assert(VertIdx < f->nv);
 						switch(i)
@@ -291,7 +292,7 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 							{	
 								if( !f->vi )
 								{
-									f->vi = (int32*) PushArray(Arena, f->nv, int); 
+									f->vi = (s32*) PushArray(Arena, f->nv, int); 
 								}
 
 								f->vi[VertIdx] = nr;
@@ -301,7 +302,7 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 							{
 								if( !f->ni )
 								{
-									f->ni  = (int32*) PushArray(Arena, f->nv, int); 
+									f->ni  = (s32*) PushArray(Arena, f->nv, int); 
 								}
 								f->ni[VertIdx] = nr;
 							}break;
@@ -310,7 +311,7 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 							{
 								if( !f->ti )
 								{
-									f->ti = (int32*) PushArray(Arena, f->nv, int); 
+									f->ti = (s32*) PushArray(Arena, f->nv, int); 
 								}
 
 								f->ti[VertIdx] = nr;
@@ -345,20 +346,20 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 
 		
 		v4 cm = V4(0,0,0,0);
-		for(int32 i = 0; i<Result.nv; ++i)
+		for(s32 i = 0; i<Result.nv; ++i)
 		{
 			cm += Result.v[i];
 		}
-		cm = cm/(real32)Result.nv;
+		cm = cm/(r32)Result.nv;
 		cm.W = 0;
 
 		// Center the object around origin
 		v4 MaxAxis = V4(0,0,0,0);
-		real32 MaxDistance = 0;
-		for(int32 i = 0; i<Result.nv; ++i)
+		r32 MaxDistance = 0;
+		for(s32 i = 0; i<Result.nv; ++i)
 		{
 			Result.v[i] = Result.v[i]-cm;
-			real32 distance = norm( V3(Result.v[i]) ); 
+			r32 distance = Norm( V3(Result.v[i]) ); 
 			if( distance > MaxDistance )
 			{
 				MaxAxis = Result.v[i];
@@ -370,7 +371,7 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 			MaxDistance = 1/MaxDistance;
 		}
 		// Scale object to the unit cube
-		for(int32 i = 0; i<Result.nv; ++i)
+		for(s32 i = 0; i<Result.nv; ++i)
 		{
 			Result.v[i] = Result.v[i]*MaxDistance; 
 			Result.v[i].W = 1;
@@ -378,12 +379,12 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 
 
 		Result.t = PushArray(Arena, Result.nt, triangle);
-		int32 TriangleIdx = 0;
+		s32 TriangleIdx = 0;
 
-		for(int32 i = 0; i<Result.nf; ++i)
+		for(s32 i = 0; i<Result.nf; ++i)
 		{
 			face* f = &Result.f[i];
-			for(int32 j = 0; j < f->nv-2; ++j)
+			for(s32 j = 0; j < f->nv-2; ++j)
 			{
 
 				triangle* t = &Result.t[TriangleIdx++];
@@ -406,8 +407,8 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 
 				v3 r1 = V3(v1-v0);
 				v3 r2 = V3(v2-v0);
-				v4 triangleNormal = V4( cross( r1 , r2 ),0);
-				t->n = normalize( triangleNormal );
+				v4 triangleNormal = V4( CrossProduct( r1 , r2 ),0);
+				t->n = Normalize( triangleNormal );
 			}
 		}
 	}
@@ -447,12 +448,12 @@ DEBUGReadBMP( thread_context* Thread, game_state* aGameState,
 		Assert(Header->BitsPerPixel == 32);
 		Assert(Header->Compression == 3);
 
-		Result.Pixels = PushArray(Arena, Header->Width*Header->Height, uint32);
+		Result.Pixels = PushArray(Arena, Header->Width*Header->Height, u32);
 		Result.Width = Header->Width;
 		Result.Height = Header->Height;
 
-		uint32* Target = (uint32*)Result.Pixels;
-		uint32* Source = (uint32*)(((uint8*)ReadResult.Contents) + Header->FileSize - 4);
+		u32* Target = (u32*)Result.Pixels;
+		u32* Source = (u32*)(((u8*)ReadResult.Contents) + Header->FileSize - 4);
 
 		bit_scan_result RedBitShift =   FindLeastSignificantSetBit(Header->RedMask);
 		bit_scan_result GreenBitShift = FindLeastSignificantSetBit(Header->GreenMask);
@@ -467,25 +468,25 @@ DEBUGReadBMP( thread_context* Thread, game_state* aGameState,
 		{
 			for (int X = 0; X < Result.Width; ++X)
 			{
-				uint32 Pixel = *Source--;
+				u32 Pixel = *Source--;
 	
 				bit_scan_result BitShift = {};
 
 
-				uint32 Red   = Pixel & Header->RedMask;     
-				uint8 R = (uint8) (Red >> RedBitShift.Index);
+				u32 Red   = Pixel & Header->RedMask;     
+				u8 R = (u8) (Red >> RedBitShift.Index);
 
-				uint32 Green = Pixel & Header->GreenMask;
-				uint8 G = (uint8) (Green >> GreenBitShift.Index);
+				u32 Green = Pixel & Header->GreenMask;
+				u8 G = (u8) (Green >> GreenBitShift.Index);
 			
-				uint32 Blue  = Pixel & Header->BlueMask;
-				uint8 B = (uint8) (Blue >> BlueBitShift.Index);
+				u32 Blue  = Pixel & Header->BlueMask;
+				u8 B = (u8) (Blue >> BlueBitShift.Index);
 				
-				uint8 A = 0xff;
+				u8 A = 0xff;
 				if (AlphaBitShift.Found)
 				{
-					uint32 Alpha = Pixel & Header->AlphaMask;
-					A = (uint8)(Alpha >> AlphaBitShift.Index);
+					u32 Alpha = Pixel & Header->AlphaMask;
+					A = (u8)(Alpha >> AlphaBitShift.Index);
 				}
 				*Target++ = (A << 24) | (R << 16) | (G << 8) | (B << 0);
 
@@ -520,58 +521,56 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 //											"..\\handmade\\data\\geometry\\cube.obj");		
 //											"..\\handmade\\data\\geometry\\triangle.obj");
 
+		
 		memory_arena* AssetArena = &GameState->AssetArena;
 
 
-		RootNode RootInstance = RootNode();
-		GameState->Root = (RootNode*) PushCopy(AssetArena, sizeof(RootNode), &RootInstance);
+		entity Camera = CreateBlankEntity();
+		camera_component& C = Camera.CameraComponent;
+		C.AngleOfView  = 90;
+		C.ScreenWidth  = (r32) Buffer->Width;
+		C.ScreenHeight = (r32) Buffer->Height;
+		C.DeltaRot = M4Identity();
+		v3 DeltaPos = V3(0,0,0);
+		LookAt(&Camera.CameraComponent, V3(3,3,3), V3(0,0,0));
+		SetPerspectiveProj( &Camera.CameraComponent, -0.001, -1000);
+		Camera.Types = Camera.Types | COMPONENT_TYPE_CAMERA;
+
+		Camera.ControllerComponent.Controller = GetController( Input, 1 );
+		Camera.Types = Camera.Types | COMPONENT_TYPE_CONTROLLER;
 
 
-		v3 CamPos = V3(1,1,1);
-		v3 CamAt =  V3(0,0,0);
-		CameraNode CameraInstance = CameraNode( 90, (real32) Buffer->Width/ (real32) Buffer->Height );
-		CameraInstance.LookAt(CamPos, CamAt);
-		CameraInstance.SetPerspectiveProj( 0.1, 1000 );
-		GameState->Camera = (CameraNode*) PushCopy(AssetArena, sizeof(CameraNode), &CameraInstance);
+		entity XAxis = CreateBlankEntity();
+		geometry_component& X = XAxis.GeometryComponent;
+		X.Object = &GameState->testOBJ;
+		X.T = M4Identity();
+		Translate( V4(1,0,0,0), X.T);
+		XAxis.Types = XAxis.Types | COMPONENT_TYPE_MESH;
+
+		entity YAxis = CreateBlankEntity();
+		geometry_component& Y = YAxis.GeometryComponent;
+		Y.Object = &GameState->testOBJ;
+		Y.T = M4Identity();
+		Translate( V4(0,1,0,0), Y.T);
+		YAxis.Types = YAxis.Types | COMPONENT_TYPE_MESH;
+
+		entity ZAxis = CreateBlankEntity();
+		geometry_component& Z = ZAxis.GeometryComponent;
+		Z.Object = &GameState->testOBJ;
+		Z.T = M4Identity();
+		Translate( V4(0,0,1,0), Z.T);
+		ZAxis.Types = ZAxis.Types | COMPONENT_TYPE_MESH;
 
 
- 		Assert( (&Input->Controllers[0].Terminator - &Input->Controllers[0].Button[0]) == 
-			 (ArrayCount(Input->Controllers[0].Button)) );
-		CameraMovementCallback CameraMovementInstance = CameraMovementCallback( GetController( Input, 1 ), GameState->Camera );
-		CameraMovementCallback* CameraMovement = (CameraMovementCallback*) PushCopy(AssetArena, sizeof(CameraMovementCallback), &CameraMovementInstance);
-		GameState->Camera->connectCallback(CameraMovement);
 
+		world& W = GameState->World = {};
 
-		TransformNode XAxisInstance;
-		XAxisInstance.Translate(V3(0.5,0,0));
-		XAxisInstance.Scale(V3(1 ,0.2,0.2));
-		TransformNode* XAxis  = (TransformNode*) PushCopy(AssetArena, sizeof(TransformNode), &XAxisInstance);
+		GameState->World.WorldEntities[0] = Camera;
+		GameState->World.WorldEntities[1] = XAxis;
+		GameState->World.WorldEntities[2] = YAxis;
+		GameState->World.WorldEntities[3] = ZAxis;
 
-		TransformNode YAxisInstance;
-		YAxisInstance.Translate(V3(0,0.5,0));
-		YAxisInstance.Scale(V3(0.2,1,0.2));
-		TransformNode* YAxis  = (TransformNode*) PushCopy(AssetArena, sizeof(TransformNode), &YAxisInstance);
-
-		TransformNode ZAxisInstance;
-		ZAxisInstance.Translate(V3(0,0,0.5));
-		ZAxisInstance.Scale(V3(0.2,0.2,1));
-		TransformNode* ZAxis  = (TransformNode*) PushCopy(AssetArena, sizeof(TransformNode), &ZAxisInstance);
-
-
-		GeometryNode ObjInstance = GeometryNode( Memory->GameState->testOBJ );
-		GeometryNode* Obj = (GeometryNode*) PushCopy(AssetArena, sizeof(GeometryNode), &ObjInstance);
-
-
-		GameState->Root->pushChild( GameState->Camera );
-		GameState->Camera->pushChild( XAxis );
-		GameState->Camera->pushChild( YAxis );
-		GameState->Camera->pushChild( ZAxis );
-
-		XAxis->pushChild( Obj );
-		YAxis->pushChild( Obj );
-		ZAxis->pushChild( Obj );
-
-		for(int32 ControllerIndex = 0; 
+		for(s32 ControllerIndex = 0; 
 			ControllerIndex < ArrayCount(Input->Controllers); 
 			++ControllerIndex)
 		{
@@ -593,26 +592,38 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 //							  game_input* Input )
 
 platform_api Platform;
+#include "entity_components.h"
 
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
-	local_persist real32 t = 0;
+
+	local_persist r32 t = 0;
 
 	Platform = Memory->PlatformAPI;
-
 	initiateGame( Thread,  Memory, Input, Buffer );
+
+
 
 	game_state* GameState = Memory->GameState;
 
 	render_push_buffer PushBuffer = {};
 	InitiatePushBuffer(&PushBuffer, Buffer, &GameState->TemporaryArena);
 
-	UpdateVisitor ud = UpdateVisitor( );
-	RenderVisitor rn = RenderVisitor( &PushBuffer );
+	//UpdateVisitor ud = UpdateVisitor( );
+	//RenderVisitor rn = RenderVisitor( &PushBuffer );
 
-	ud.traverse( GameState->Root );
-	rn.traverse( GameState->Root );
+//	ud.traverse( GameState->Root );
+//	rn.traverse( GameState->Root );
+
+	// Clear Screen
+	DrawRectangle(Buffer, 0,0, (r32) Buffer->Width,   (r32) Buffer->Height, 1,1,1);
+	DrawRectangle(Buffer, 1,1, (r32) Buffer->Width-2,   (r32) Buffer->Height-2, 0.3,0.3,0.3);
+
+	CameraSystemUpdate(&GameState->World);
+	RenderSystemUpdate(&GameState->World, &PushBuffer);
+
 	DrawTriangles(&PushBuffer);
+
 
 	ClearPushBuffer(&PushBuffer);
 

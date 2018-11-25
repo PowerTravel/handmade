@@ -1,12 +1,13 @@
-
+#ifndef MEMORY_H
+#define MEMORY_H
 
 struct memory_arena
 {
     platform_memory_block *CurrentBlock;
     uintptr_t MinimumBlockSize;
     
-    uint64 AllocationFlags;
-    int32 TempCount;
+    u64 AllocationFlags;
+    s32 TempCount;
 };
 
 struct temporary_memory
@@ -16,15 +17,14 @@ struct temporary_memory
     uintptr_t Used;
 };
 
-
 inline void
-SetMinimumBlockSize(memory_arena *Arena, memory_index MinimumBlockSize)
+SetMinimumBlockSize( memory_arena *Arena, memory_index MinimumBlockSize )
 {
     Arena->MinimumBlockSize = MinimumBlockSize;
 }
 
 inline memory_index
-GetAlignmentOffset(memory_arena *Arena, memory_index Alignment)
+GetAlignmentOffset( memory_arena *Arena, memory_index Alignment )
 {
     memory_index AlignmentOffset = 0;
     
@@ -42,14 +42,15 @@ enum arena_push_flag
 {
     ArenaFlag_ClearToZero = 0x1,
 };
+
 struct arena_push_params
 {
-    uint32 Flags;
-    uint32 Alignment;
+    u32 Flags;
+    u32 Alignment;
 };
 
 inline arena_push_params
-DefaultArenaParams(void)
+DefaultArenaParams( void )
 {
     arena_push_params Params;
     Params.Flags = ArenaFlag_ClearToZero;
@@ -58,7 +59,7 @@ DefaultArenaParams(void)
 }
 
 inline arena_push_params
-AlignNoClear(uint32 Alignment)
+AlignNoClear( u32 Alignment )
 {
     arena_push_params Params = DefaultArenaParams();
     Params.Flags &= ~ArenaFlag_ClearToZero;
@@ -67,7 +68,7 @@ AlignNoClear(uint32 Alignment)
 }
 
 inline arena_push_params
-Align(uint32 Alignment, bool32 Clear)
+Align( u32 Alignment, b32 Clear )
 {
     arena_push_params Params = DefaultArenaParams();
     if(Clear)
@@ -83,7 +84,7 @@ Align(uint32 Alignment, bool32 Clear)
 }
 
 inline arena_push_params
-NoClear(void)
+NoClear( void )
 {
     arena_push_params Params = DefaultArenaParams();
     Params.Flags &= ~ArenaFlag_ClearToZero;
@@ -92,19 +93,19 @@ NoClear(void)
 
 struct arena_bootstrap_params
 {
-    uint64 AllocationFlags;
+    u64 AllocationFlags;
     uintptr_t MinimumBlockSize;
 };
 
 inline arena_bootstrap_params
-DefaultBootstrapParams(void)
+DefaultBootstrapParams( void )
 {
     arena_bootstrap_params Params = {};
     return(Params);
 }
 
 inline arena_bootstrap_params
-NonRestoredArena(void)
+NonRestoredArena( void )
 {
     arena_bootstrap_params Params = DefaultBootstrapParams();
     Params.AllocationFlags = PlatformMemory_NotRestored;
@@ -112,28 +113,28 @@ NonRestoredArena(void)
 }
 
 // TODO(casey): Optional "clear" parameter!!!!
-#define PushStruct(Arena, type, ...) 				   (type *)PushSize_(Arena, 		sizeof(type), ## __VA_ARGS__)
-#define PushArray(Arena, Count, type, ...)  		   (type *)PushSize_(Arena, (Count)*sizeof(type), ## __VA_ARGS__)
-#define PushSize(Arena, Size, ...) 					           PushSize_(Arena, Size, 				  ## __VA_ARGS__)
-#define PushCopy(Arena, Size, Source, ...) 	Copy(Size, Source, PushSize_(Arena, Size, 				  ## __VA_ARGS__))
+#define PushStruct(Arena, type, ...) 				   (type *)PushSize_( Arena, 		 sizeof(type), ## __VA_ARGS__ )
+#define PushArray(Arena, Count, type, ...)  		   (type *)PushSize_( Arena, (Count)*sizeof(type), ## __VA_ARGS__ )
+#define PushSize(Arena, Size, ...) 					           PushSize_( Arena, Size, 				   ## __VA_ARGS__ )
+#define PushCopy(Arena, Size, Source, ...) 	Copy(Size, Source, PushSize_( Arena, Size, 				   ## __VA_ARGS__ ))
 
 inline memory_index
-GetEffectiveSizeFor(memory_arena *Arena, memory_index SizeInit, arena_push_params Params = DefaultArenaParams() )
+GetEffectiveSizeFor( memory_arena *Arena, memory_index SizeInit, arena_push_params Params = DefaultArenaParams() )
 {
     memory_index Size = SizeInit;
 
-    memory_index AlignmentOffset = GetAlignmentOffset(Arena, Params.Alignment);
+    memory_index AlignmentOffset = GetAlignmentOffset( Arena, Params.Alignment );
     Size += AlignmentOffset;
 
-    return(Size);
+    return( Size );
 }
 
-#define ZeroStruct(Instance) ZeroSize(sizeof(Instance), &(Instance))
-#define ZeroArray(Count, Pointer) ZeroSize(Count*sizeof((Pointer)[0]), Pointer)
+#define ZeroStruct( Instance ) ZeroSize( sizeof( Instance ), &( Instance ) )
+#define ZeroArray( Count, Pointer ) ZeroSize( Count*sizeof( ( Pointer )[0] ), Pointer )
 inline void
-ZeroSize(memory_index Size, void *Ptr)
+ZeroSize( memory_index Size, void *Ptr )
 {
-    uint8 *Byte = (uint8 *)Ptr;
+    u8 *Byte = (u8*) Ptr;
     while(Size--)
     {
         *Byte++ = 0;
@@ -141,25 +142,25 @@ ZeroSize(memory_index Size, void *Ptr)
 }
 
 inline void *
-PushSize_(memory_arena *Arena, memory_index SizeInit, arena_push_params Params = DefaultArenaParams())
+PushSize_( memory_arena *Arena, memory_index SizeInit, arena_push_params Params = DefaultArenaParams() )
 {
     void *Result = 0;
     
     memory_index Size = 0;
-    if(Arena->CurrentBlock)
+    if( Arena->CurrentBlock )
     {
-        Size = GetEffectiveSizeFor(Arena, SizeInit, Params);
+        Size = GetEffectiveSizeFor( Arena, SizeInit, Params );
     }
     
-    if(!Arena->CurrentBlock ||
-       (Arena->CurrentBlock->Used + Size) > Arena->CurrentBlock->Size)
+    if( !Arena->CurrentBlock ||
+       ( Arena->CurrentBlock->Used + Size) > Arena->CurrentBlock->Size )
     {
         Size = SizeInit; // NOTE(casey): The base will automatically be aligned now!
-        if(Arena->AllocationFlags & (PlatformMemory_OverflowCheck |
-                                     PlatformMemory_UnderflowCheck ))
+        if(Arena->AllocationFlags & ( PlatformMemory_OverflowCheck |
+                                      PlatformMemory_UnderflowCheck ) )
         {
             Arena->MinimumBlockSize = 0;
-            Size = AlignPow2(Size, Params.Alignment);
+            Size = AlignPow2( Size, Params.Alignment );
         }
         else if(!Arena->MinimumBlockSize)
         {
@@ -167,32 +168,32 @@ PushSize_(memory_arena *Arena, memory_index SizeInit, arena_push_params Params =
             Arena->MinimumBlockSize = 1024*1024;
         }
         
-        memory_index BlockSize = Maximum(Size, Arena->MinimumBlockSize);
+        memory_index BlockSize = Maximum( Size, Arena->MinimumBlockSize );
         
         platform_memory_block *NewBlock = 
-            Platform.AllocateMemory(BlockSize, Arena->AllocationFlags);
+            Platform.AllocateMemory( BlockSize, Arena->AllocationFlags );
         NewBlock->ArenaPrev = Arena->CurrentBlock;
         Arena->CurrentBlock = NewBlock;
     }    
     
-    Assert((Arena->CurrentBlock->Used + Size) <= Arena->CurrentBlock->Size);
+    Assert( ( Arena->CurrentBlock->Used + Size ) <= Arena->CurrentBlock->Size );
     
-    memory_index AlignmentOffset = GetAlignmentOffset(Arena, Params.Alignment);
+    memory_index AlignmentOffset = GetAlignmentOffset( Arena, Params.Alignment );
     Result = Arena->CurrentBlock->Base + Arena->CurrentBlock->Used + AlignmentOffset;
     Arena->CurrentBlock->Used += Size;
     
-    Assert(Size >= SizeInit);
+    Assert( Size >= SizeInit );
 
-    if(Params.Flags & ArenaFlag_ClearToZero)
+    if( Params.Flags & ArenaFlag_ClearToZero )
     {
-        ZeroSize(SizeInit, Result);
+        ZeroSize( SizeInit, Result );
     }
     
-    return(Result);
+    return( Result );
 }
 
 inline temporary_memory
-BeginTemporaryMemory(memory_arena *Arena)
+BeginTemporaryMemory( memory_arena *Arena )
 {
     temporary_memory Result;
 
@@ -202,45 +203,45 @@ BeginTemporaryMemory(memory_arena *Arena)
 
     ++Arena->TempCount;
 
-    return(Result);
+    return( Result );
 }
 
 inline void
-FreeLastBlock(memory_arena *Arena)
+FreeLastBlock( memory_arena *Arena )
 {
     platform_memory_block *Free = Arena->CurrentBlock;
     Arena->CurrentBlock = Free->ArenaPrev;
-    Platform.DeallocateMemory(Free);
+    Platform.DeallocateMemory( Free );
 }
 
 inline void
-EndTemporaryMemory(temporary_memory TempMem)
+EndTemporaryMemory( temporary_memory TempMem )
 {
     memory_arena *Arena = TempMem.Arena;
-    while(Arena->CurrentBlock != TempMem.Block)
+    while( Arena->CurrentBlock != TempMem.Block )
     {
-        FreeLastBlock(Arena);
+        FreeLastBlock( Arena );
     }
     
-    if(Arena->CurrentBlock)
+    if( Arena->CurrentBlock )
     {
-        Assert(Arena->CurrentBlock->Used >= TempMem.Used);
+        Assert( Arena->CurrentBlock->Used >= TempMem.Used );
         Arena->CurrentBlock->Used = TempMem.Used;
-        Assert(Arena->TempCount > 0);
+        Assert( Arena->TempCount > 0 );
     }
     --Arena->TempCount;
 }
 
 inline void
-Clear(memory_arena *Arena)
+Clear( memory_arena *Arena )
 {
-    while(Arena->CurrentBlock)
+    while( Arena->CurrentBlock )
     {
         // NOTE(casey): Because the arena itself may be stored in the last block,
         // we must ensure that we don't look at it after freeing.
-        bool32 ThisIsLastBlock = (Arena->CurrentBlock->ArenaPrev == 0);
-        FreeLastBlock(Arena);
-        if(ThisIsLastBlock)
+        b32 ThisIsLastBlock = ( Arena->CurrentBlock->ArenaPrev == 0 );
+        FreeLastBlock( Arena );
+        if( ThisIsLastBlock )
         {
             break;
         }
@@ -248,22 +249,25 @@ Clear(memory_arena *Arena)
 }
 
 inline void
-CheckArena(memory_arena *Arena)
+CheckArena( memory_arena *Arena )
 {
-    Assert(Arena->TempCount == 0);
+    Assert( Arena->TempCount == 0 );
 }
 
-#define BootstrapPushStruct(type, Member, ...) (type *)BootstrapPushSize_(sizeof(type),8, ## __VA_ARGS__)
+#define BootstrapPushStruct( type, Member, ... ) (type*) BootstrapPushSize_( sizeof( type ), 8, ## __VA_ARGS__ )
 inline void *
-BootstrapPushSize_(uintptr_t StructSize, uintptr_t OffsetToArena,
-                   arena_bootstrap_params BootstrapParams = DefaultBootstrapParams(), 
-                   arena_push_params Params = DefaultArenaParams())
+BootstrapPushSize_( uintptr_t StructSize, uintptr_t OffsetToArena,
+                    arena_bootstrap_params BootstrapParams = DefaultBootstrapParams(), 
+                    arena_push_params Params = DefaultArenaParams() )
 {
     memory_arena Bootstrap = {};
     Bootstrap.AllocationFlags = BootstrapParams.AllocationFlags;
     Bootstrap.MinimumBlockSize = BootstrapParams.MinimumBlockSize;
-    void* Struct = PushSize(&Bootstrap, StructSize, Params);
-    *(memory_arena* )( (uint8* )Struct + OffsetToArena) = Bootstrap;
+    void* Struct = PushSize( &Bootstrap, StructSize, Params );
+    *(memory_arena*) ( (u8*) Struct + OffsetToArena ) = Bootstrap;
     
     return(Struct);
 }
+
+
+#endif

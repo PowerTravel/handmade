@@ -1,18 +1,19 @@
 #ifndef STRING_H
 #define STRING_H
 
+#include "types.h"
 #include "shared.h"
+
 
 namespace str
 {
 
-
-internal int
-StringLength(char* String)
+internal s32
+StringLength( char* String )
 {
 	// foo++ -> increment after
 	// ++foo -> increment before
-	int Count = 0;
+	s32 Count = 0;
 	while(*String++)
 	{
 		++Count;
@@ -105,11 +106,11 @@ FindFirstNotOf( char Token, char* String )
 	return FindFirstNotOf( tokens, String );
 }
 
-internal int32
+internal s32
 GetWordCount( char* String )
 {
 	char* wcp = str::FindFirstNotOf(" \t\n", String);
-	int32 wc = wcp ? 1 : 0;
+	s32 wc = wcp ? 1 : 0;
 	while(wcp)
 	{
 		wcp = str::FindFirstOf(" \t", wcp);
@@ -121,12 +122,12 @@ GetWordCount( char* String )
 }
 
 
-double StringToReal64(char* String)
+s64 StringToReal64( char* String )
 {
 	char* wcp = String;
-	double Value = 0;
-	double Fact = 1;
-	bool PointSeen = false;
+	s64 Value = 0;
+	s64 Fact = 1;
+	b32 PointSeen = false;
 	while(*wcp)
 	{
 		if( *wcp == '-' )
@@ -136,7 +137,7 @@ double StringToReal64(char* String)
 		{
 			PointSeen = true;
 		}else{
-		 	int32 Digit = *wcp - '0';
+		 	s32 Digit = *wcp - '0';
 		 	if( (Digit >= 0) || (Digit <=9) )
 		 	{	
 		 		if( PointSeen ){
@@ -161,16 +162,16 @@ double StringToReal64(char* String)
 internal void
 CatStrings(	size_t SourceACount, char* SourceA,
 			size_t SourceBCount, char* SourceB,
-			size_t DestCount,	 char* Dest)
+			size_t DestCount,	 char* Dest )
 {
 
-	for(int Index = 0; Index < SourceACount; ++Index)
+	for( s32 Index = 0; Index < SourceACount; ++Index)
 	{
 		*Dest++ = *SourceA++;
 	}
 
 
-	for(int Index = 0; Index < SourceBCount; ++Index)
+	for( s32 Index = 0; Index < SourceBCount; ++Index)
 	{
 		*Dest++ = *SourceB++;
 	}

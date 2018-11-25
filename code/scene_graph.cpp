@@ -1,4 +1,299 @@
 
+#if 0
+
+struct CameraNode_;
+struct GeometryNode_;
+
+//struct scene_graph_visitor_interface
+//{
+//	void (*Apply)( CameraNode_*);
+//	void (*Apply)( GeometryNode_*);
+//};
+//
+//struct scene_graph_visitor
+//{
+//	void* instance;
+//	const scene_graph_visitor_interface* interface;
+//};
+//
+struct RenderVisitor_
+{
+	void Apply(GeometryNode_*)
+	{
+		int A = 10;
+	};
+	void Apply(CameraNode_*)
+	{
+		int B = 20;
+	};
+};
+//void visitor_Apply(scene_graph_visitor* v, CameraNode_* n)
+//{
+//	(v->interface->Apply)(n);
+//}
+//
+//void
+//RenderVisitor_Apply(RenderVisitor_* v, GeometryNode_* n)
+//{
+//    v->Apply(n);
+//}
+//
+//void
+//RenderVisitor_Apply(RenderVisitor_* v, CameraNode_* n)
+//{
+//    v->Apply(n);
+//}
+
+
+struct scene_graph_node_interface 
+{
+    void (*AcceptVisitor)( RenderVisitor_* v);
+};
+
+struct scene_graph_node
+{
+    void *instance;
+    const scene_graph_node_interface* interface;
+};
+
+void AcceptVisitor(scene_graph_node* n, RenderVisitor_* v)
+{
+	(n->interface->AcceptVisitor)( v);
+}
+
+
+struct CameraNode_
+{
+    m4 V;
+    m4 T;
+};
+
+struct GeometryNode_
+{
+    obj_geometry* O;
+};
+
+
+void
+GeometryNode_AcceptVisitor(GeometryNode_* n, RenderVisitor_* v)
+{
+    v->Apply(n);
+}
+
+void
+CameraNode_AcceptVisitor(CameraNode_* n, RenderVisitor_* v)
+{
+    v->Apply(n);
+}
+
+enum class InterfaceEnum
+{
+	SCENEGRAPH_VISITOR_RENDER,
+
+	SCENEGRAPH_NODE_CAMERA,
+	SCENEGRAPH_NODE_GEOMETRY
+};
+
+struct interface_table
+{
+//	scene_graph_visitor_interface VisitorBase;
+//	scene_graph_visitor_interface VisitorRender;
+
+	scene_graph_node_interface NodeGeometry;
+	scene_graph_node_interface NodeCamera;
+};
+
+scene_graph_node*
+Create_(memory_arena* Arena, InterfaceEnum i)
+{
+	local_persist interface_table iTable
+	{
+//		.VisitorRender 	= (void (*)( scene_graph_node* )) Apply_Render
+
+		(void (*)(RenderVisitor_* v)) GeometryNode_AcceptVisitor,
+		(void (*)(RenderVisitor_* v)) CameraNode_AcceptVisitor
+	};
+
+	scene_graph_node* Result = PushStruct(Arena, scene_graph_node);
+
+	switch(i)
+	{
+//		case SCENEGRAPH_VISITOR_RENDER:
+//		{
+//			Result = PushStruct(Arena, scene_graph_visitor);
+//			Result->instance = PushStruct(Arena, RenderVisitor_);
+//			Result->interface = &iTable.VisitorRender;
+//		}break;
+		case InterfaceEnum::SCENEGRAPH_NODE_CAMERA:	
+		{	
+			Result->instance = PushStruct(Arena, CameraNode_);
+			Result->interface = &iTable.NodeGeometry;
+		}break;
+		case InterfaceEnum::SCENEGRAPH_NODE_GEOMETRY:	
+		{
+			Result->instance = PushStruct(Arena, GeometryNode_);
+			Result->interface = &iTable.NodeCamera;
+		}break;
+	}
+
+    return Result;
+};
+
+
+void setup(memory_arena* Arena )
+{
+	scene_graph_node* Camera = Create_(Arena, InterfaceEnum::SCENEGRAPH_NODE_CAMERA);
+	scene_graph_node* Geometry = Create_(Arena, InterfaceEnum::SCENEGRAPH_NODE_GEOMETRY);
+	RenderVisitor_ R = {};
+
+	AcceptVisitor(Camera, &R);
+	AcceptVisitor(Geometry, &R);
+
+}
+
+
+
+typedef struct shape_interface {
+    double (*Area)(void *instance);
+    double (*Volume)(void *instance);
+} ShapeInterface;
+
+typedef struct {
+    void *instance;
+    const ShapeInterface *interface;
+} Shape;
+
+Shape *
+shape_Create(void *instance, ShapeInterface *interface)
+{
+    Shape *shape = (Shape *) malloc(sizeof(Shape));
+    shape->instance = instance;
+    shape->interface = interface;
+    return shape;
+}
+
+double
+shape_Area(Shape *shape)
+{
+    return (shape->interface->Area)(shape->instance);
+}
+
+double
+shape_Volume(Shape *shape)
+{
+    return (shape->interface->Volume)(shape->instance);
+}
+
+
+typedef struct {
+    double x;
+} Square;
+
+double
+square_Area(Square *square)
+{
+    return square->x * square->x;
+}
+double
+square_Volume(Square *square)
+{
+    return square->x * square->x * square->x;
+}
+
+static ShapeInterface SquareAsShape = 
+{
+	(double (*)(void *)) square_Area,
+	(double (*)(void *)) square_Volume,
+};
+
+
+Square *
+square_Create(double sideLength)
+{
+    Square *square = (Square *) malloc(sizeof(Square));
+    square->x = sideLength;
+    return square;
+}
+
+typedef struct {
+    double radius;
+} Circle;
+
+double
+circle_Area(Circle *circle)
+{
+    return Pi32 * (circle->radius * circle->radius);
+}
+
+double
+circle_Volume(Circle *circle)
+{
+    return (2/3.f)*Pi32 * (circle->radius * circle->radius* circle->radius);
+}
+
+static ShapeInterface CircleAsShape = 
+{ 
+	(double (*)(void *)) circle_Area,
+	(double (*)(void *)) circle_Volume,
+};
+
+Circle *
+circle_Create(double radius)
+{
+	Circle *circle = (Circle *) malloc(sizeof(Circle));
+	circle->radius = radius;
+    return circle;
+}
+
+void setup( memory_arena* Arena )
+{
+    // Create concrete types.
+    Circle *circle = circle_Create(5.0);
+    Square *square = square_Create(10.0);
+
+    // Wire up the tables.
+    Shape *circleShape = shape_Create(circle, &CircleAsShape);
+    Shape *squareShape = shape_Create(square, &SquareAsShape);
+
+    // Sanity check.
+    if( circle_Area(circle) == shape_Area(circleShape))
+    {
+    	int yeeey = 1;
+    }else{
+    	int boo = 0;
+    }
+
+    if(square_Area(square) == shape_Area(squareShape))
+    {
+    	int yeeey = 1;
+    }else{
+    	int boo = 0;
+    }
+
+    // Sanity check.
+    if( circle_Volume(circle) == shape_Volume(circleShape))
+    {
+    	int yeeey = 1;
+    }else{
+    	int boo = 0;
+    }
+
+    if(square_Volume(square) == shape_Volume(squareShape))
+    {
+    	int yeeey = 1;
+    }else{
+    	int boo = 0;
+    }
+
+
+    free(circle);
+    free(circleShape);
+    free(square);
+    free(squareShape);
+}
+
+#endif
+
 
 /*	
  *	Class: 		BaseCallback
@@ -145,7 +440,7 @@ class UpdateVisitor : public BaseVisitor
 class RenderVisitor : public BaseVisitor
 {
 	public:
-		RenderVisitor(  render_push_buffer* aBuffer )
+		RenderVisitor( render_push_buffer* aBuffer )
 		{
 			Assert(aBuffer->OffscreenBuffer);
 			Assert(aBuffer->Arena);
@@ -259,7 +554,10 @@ class CameraNode : public BaseNode
 		{
 			AngleOfView = aAngleOfView;
 			AspectRatio = aAspectRatio;
-			SetPerspectiveProj( -0.1, 100 );
+			V = M4Identity();
+			DeltaRot = M4Identity();
+			DeltaPos = V3(0, 0, 0);
+			SetPerspectiveProj( -0.1, -100 );
 		}
 		virtual ~CameraNode(){};
 
@@ -366,7 +664,7 @@ class CameraNode : public BaseNode
 
 		void Rotate( real32 DeltaAngle, v3 Axis )
 		{
-			DeltaRot = GetRotationMatrix( DeltaAngle, Axis );
+			DeltaRot = GetRotationMatrix( DeltaAngle, &Axis );
 		}
 
 		void ApplyMovement()
@@ -422,7 +720,7 @@ class TransformNode : public BaseNode
 
 		void Rotate( real32 Angle, v3 Axis )
 		{
-			m4 dR = GetRotationMatrix( Angle, Axis );
+			m4 dR = GetRotationMatrix( Angle, &Axis );
 
 			m4 tto = M4(1,0,0,-T.E[3],
 						0,1,0,-T.E[7],

@@ -1,6 +1,8 @@
 #ifndef HANDMADE_RENDER
 #define HANDMADE_RENDER
 
+
+#if 0
 // Extremely Fast Line Algorithm Var E (Addition Fixed Point PreCalc)
 // Copyright 2001-2, By Po-Han Lin
 
@@ -17,7 +19,7 @@
 struct SURFACE;
 
 // used by myLine
-void myPixel(SURFACE* surface, int x,int y) {
+void myPixel( SURFACE* surface, int x,int y ) {
 	// PLOT x,y point on surface
 
 }
@@ -85,85 +87,85 @@ void myRect(SURFACE* surface, int x, int y, int x2, int y2) {
 	myLine(surface,x,y2,x,y);
 }
 
+#endif
 
 internal void
-DrawRectangle(game_offscreen_buffer* Buffer, real32 RealMinX, real32 RealMinY, real32 Width, real32 Height, real32 R, real32 G, real32 B)
+DrawRectangle( game_offscreen_buffer* Buffer, r32 RealMinX, r32 RealMinY, r32 Width, r32 Height, r32 R, r32 G, r32 B )
 {
-	int32 MinX = RoundReal32ToInt32(RealMinX);
-	int32 MinY = RoundReal32ToInt32(RealMinY);
-	int32 MaxX = RoundReal32ToInt32(RealMinX + Width);
-	int32 MaxY = RoundReal32ToInt32(RealMinY + Height);
+	s32 MinX = RoundReal32ToInt32( RealMinX );
+	s32 MinY = RoundReal32ToInt32( RealMinY );
+	s32 MaxX = RoundReal32ToInt32( RealMinX + Width);
+	s32 MaxY = RoundReal32ToInt32( RealMinY + Height);
 
-	if (MinX < 0)
+	if( MinX < 0 )
 	{
 		MinX = 0;
 	}
-	if (MinY < 0)
+	if( MinY < 0 )
 	{
 		MinY = 0;
 	}
-	if (MaxX > Buffer->Width)
+	if( MaxX > Buffer->Width )
 	{
 		MaxX = Buffer->Width;
 	}
-	if (MaxY > Buffer->Height)
+	if( MaxY > Buffer->Height )
 	{
 		MaxY = Buffer->Height;
 	}
 
-	uint8* Row = ((uint8*)Buffer->Memory + MinX * Buffer->BytesPerPixel +
-		MinY * Buffer->Pitch);
-	for (int Y = MinY; Y < MaxY; ++Y)
+	u8* Row = ( (u8*) Buffer->Memory + MinX*Buffer->BytesPerPixel + MinY*Buffer->Pitch );
+	for( s32 Y = MinY; Y < MaxY; ++Y )
 	{
-		uint32* Pixel = (uint32*)Row;
-		for (int X = MinX; X < MaxX; ++X)
+		u32* Pixel = (u32*) Row;
+		for( s32 X = MinX; X < MaxX; ++X )
 		{
-			*Pixel++ = ((TruncateReal32ToInt32(R*255.f) << 16) |
-				(TruncateReal32ToInt32(G*255.f) << 8) |
-				(TruncateReal32ToInt32(B*255.f) << 0));
+			*Pixel++ = ( (TruncateReal32ToInt32( R*255.f ) << 16 ) |
+						 (TruncateReal32ToInt32( G*255.f ) << 8  ) |
+						 (TruncateReal32ToInt32( B*255.f ) << 0  ) );
 		}
 		Row += Buffer->Pitch;
 	}
 }
 
-void PutPixel(game_offscreen_buffer* Buffer, int32 X, int32 Y, real32 R, real32 G, real32 B)
+void PutPixel( game_offscreen_buffer* Buffer, s32 X, s32 Y, r32 R, r32 G, r32 B )
 {
-	if((X < 0) || (Y < 0) || (X >= Buffer->Width) || (Y >= Buffer->Height))
+	if( ( X < 0 ) || ( Y < 0 ) || ( X >= Buffer->Width ) || ( Y >= Buffer->Height ) )
 	{
 		return;
 	} 
-	uint8* PixelLocation = ((uint8*)Buffer->Memory + X * Buffer->BytesPerPixel +
-		Y * Buffer->Pitch);
-	uint32* Pixel = (uint32*)PixelLocation;
-	*Pixel = ((TruncateReal32ToInt32(R*255.f) << 16) |
-		(TruncateReal32ToInt32(G*255.f) << 8) |
-		(TruncateReal32ToInt32(B*255.f) << 0));
+
+	u8*  PixelLocation = ( (u8*) Buffer->Memory + X*Buffer->BytesPerPixel + Y*Buffer->Pitch );
+	u32* Pixel = (u32*) PixelLocation;
+	*Pixel = ( (TruncateReal32ToInt32( R*255.f ) << 16 ) |
+			   (TruncateReal32ToInt32( G*255.f ) << 8  ) |
+			   (TruncateReal32ToInt32( B*255.f ) << 0));
 }
 
 
-void DrawCircle(game_offscreen_buffer* Buffer, real32 RealX0, real32 RealY0, real32 RealRadius, real32 R = 1, real32 G = 1, real32 B = 1)
+void DrawCircle( game_offscreen_buffer* Buffer, r32 RealX0, r32 RealY0, r32 RealRadius, r32 R = 1, r32 G = 1, r32 B = 1 )
 {
-	int32 x0 = RoundReal32ToInt32(RealX0);
-	int32 y0 = RoundReal32ToInt32(RealY0);
-	int32 radius = RoundReal32ToInt32(RealRadius);
+	s32 x0 = RoundReal32ToInt32( RealX0 );
+	s32 y0 = RoundReal32ToInt32( RealY0 );
+	s32 r  = RoundReal32ToInt32( RealRadius );
 
-	int32 x = radius - 1;
-	int32 y = 0;
-	int32 dx = 1;
-	int32 dy = 1;
-	int32 err = dx - (radius << 1);
+	s32 x   = r - 1;
+	s32 y   = 0;
+	s32 dx  = 1;
+	s32 dy  = 1;
+	s32 err = dx - ( r << 1 );
 
 
-	while (x >= y)
+	while( x >= y )
 	{
-		PutPixel(Buffer, x0 + x, y0 + y, R, G, B);
-		PutPixel(Buffer, x0 + y, y0 + x, R, G, B);
-		PutPixel(Buffer, x0 - y, y0 + x, R, G, B);
-		PutPixel(Buffer, x0 - x, y0 + y, R, G, B);
-		PutPixel(Buffer, x0 - x, y0 - y, R, G, B);
-		PutPixel(Buffer, x0 - y, y0 - x, R, G, B);
-		PutPixel(Buffer, x0 + y, y0 - x, R, G, B);
-		PutPixel(Buffer, x0 + x, y0 - y, R, G, B);
+		PutPixel( Buffer, x0 + x, y0 + y, R, G, B );
+		PutPixel( Buffer, x0 + y, y0 + x, R, G, B );
+		PutPixel( Buffer, x0 - y, y0 + x, R, G, B );
+		PutPixel( Buffer, x0 - x, y0 + y, R, G, B );
+		PutPixel( Buffer, x0 - x, y0 - y, R, G, B );
+		PutPixel( Buffer, x0 - y, y0 - x, R, G, B );
+		PutPixel( Buffer, x0 + y, y0 - x, R, G, B );
+		PutPixel( Buffer, x0 + x, y0 - y, R, G, B );
 
 		//for(int xi = x-1; xi>=0; --xi)
 		//{
@@ -177,18 +179,18 @@ void DrawCircle(game_offscreen_buffer* Buffer, real32 RealX0, real32 RealY0, rea
 		//	PutPixel(Buffer, x0 + xi, y0 - y,  1,1,1);
 		//}
 
-		if (err <= 0)
+		if( err <= 0 )
 		{
 			y++;
 			err += dy;
 			dy += 2;
 		}
 
-		if (err > 0)
+		if( err > 0 )
 		{
 			x--;
 			dx += 2;
-			err += dx - (radius << 1);
+			err += dx - ( r << 1 );
 		}
 	}
 
@@ -197,147 +199,147 @@ void DrawCircle(game_offscreen_buffer* Buffer, real32 RealX0, real32 RealY0, rea
 
 // makes the packing compact
 #pragma pack(push, 1)
-struct bmp_header {
+struct bmp_header
+{
+	u16 FileType;     /* File type, always 4D42h ("BM") */
+	u32 FileSize;     /* Size of the file in bytes */
+	u16 Reserved1;    /* Always 0 */
+	u16 Reserved2;    /* Always 0 */
+	u32 BitmapOffset; /* Starting position of image data in bytes */
 
-	uint16   FileType;     /* File type, always 4D42h ("BM") */
-	uint32  FileSize;     /* Size of the file in bytes */
-	uint16   Reserved1;    /* Always 0 */
-	uint16   Reserved2;    /* Always 0 */
-	uint32  BitmapOffset; /* Starting position of image data in bytes */
-
-	uint32 HeaderSize;       /* Size of this header in bytes */
-	int32  Width;           /* Image width in pixels */
-	int32  Height;          /* Image height in pixels */
-	uint16  Planes;          /* Number of color planes */
-	uint16  BitsPerPixel;    /* Number of bits per pixel */
-	uint32 Compression;     /* Compression methods used */
-	uint32 SizeOfBitmap;    /* Size of bitmap in bytes */
-	int32  HorzResolution;  /* Horizontal resolution in pixels per meter */
-	int32  VertResolution;  /* Vertical resolution in pixels per meter */
-	uint32 ColorsUsed;      /* Number of colors in the image */
-	uint32 ColorsImportant; /* Minimum number of important colors */
+	u32 HeaderSize;       /* Size of this header in bytes */
+	s32 Width;           /* Image width in pixels */
+	s32 Height;          /* Image height in pixels */
+	u16 Planes;          /* Number of color planes */
+	u16 BitsPerPixel;    /* Number of bits per pixel */
+	u32 Compression;     /* Compression methods used */
+	u32 SizeOfBitmap;    /* Size of bitmap in bytes */
+	s32 HorzResolution;  /* Horizontal resolution in pixels per meter */
+	s32 VertResolution;  /* Vertical resolution in pixels per meter */
+	u32 ColorsUsed;      /* Number of colors in the image */
+	u32 ColorsImportant; /* Minimum number of important colors */
 	/* Fields added for Windows 4.x follow this line */
 
-	uint32 RedMask;       /* Mask identifying bits of red component */
-	uint32 GreenMask;     /* Mask identifying bits of green component */
-	uint32 BlueMask;      /* Mask identifying bits of blue component */
-	uint32 AlphaMask;     /* Mask identifying bits of alpha component */
-	uint32 CSType;        /* Color space type */
-	int32  RedX;          /* X coordinate of red endpoint */
-	int32  RedY;          /* Y coordinate of red endpoint */
-	int32  RedZ;          /* Z coordinate of red endpoint */
-	int32  GreenX;        /* X coordinate of green endpoint */
-	int32  GreenY;        /* Y coordinate of green endpoint */
-	int32  GreenZ;        /* Z coordinate of green endpoint */
-	int32  BlueX;         /* X coordinate of blue endpoint */
-	int32  BlueY;         /* Y coordinate of blue endpoint */
-	int32  BlueZ;         /* Z coordinate of blue endpoint */
-	uint32 GammaRed;      /* Gamma red coordinate scale value */
-	uint32 GammaGreen;    /* Gamma green coordinate scale value */
-	uint32 GammaBlue;     /* Gamma blue coordinate scale value */
+	u32 RedMask;       /* Mask identifying bits of red component */
+	u32 GreenMask;     /* Mask identifying bits of green component */
+	u32 BlueMask;      /* Mask identifying bits of blue component */
+	u32 AlphaMask;     /* Mask identifying bits of alpha component */
+	u32 CSType;        /* Color space type */
+	s32 RedX;          /* X coordinate of red endpoint */
+	s32 RedY;          /* Y coordinate of red endpoint */
+	s32 RedZ;          /* Z coordinate of red endpoint */
+	s32 GreenX;        /* X coordinate of green endpoint */
+	s32 GreenY;        /* Y coordinate of green endpoint */
+	s32 GreenZ;        /* Z coordinate of green endpoint */
+	s32 BlueX;         /* X coordinate of blue endpoint */
+	s32 BlueY;         /* Y coordinate of blue endpoint */
+	s32 BlueZ;         /* Z coordinate of blue endpoint */
+	u32 GammaRed;      /* Gamma red coordinate scale value */
+	u32 GammaGreen;    /* Gamma green coordinate scale value */
+	u32 GammaBlue;     /* Gamma blue coordinate scale value */
 };
 #pragma pack(pop)
 
 internal void
-BlitBMP(game_offscreen_buffer* Buffer, real32 RealMinX, real32 RealMinY, loaded_bitmap BitMap)
+BlitBMP( game_offscreen_buffer* Buffer, r32 RealMinX, r32 RealMinY, loaded_bitmap BitMap )
 {
-	int32 MinX = RoundReal32ToInt32(RealMinX);
-	int32 MinY = RoundReal32ToInt32(RealMinY);
-	int32 MaxX = RoundReal32ToInt32(RealMinX + (real32)BitMap.Width);
-	int32 MaxY = RoundReal32ToInt32(RealMinY + (real32)BitMap.Height);
+	s32 MinX = RoundReal32ToInt32( RealMinX );
+	s32 MinY = RoundReal32ToInt32( RealMinY );
+	s32 MaxX = RoundReal32ToInt32( RealMinX + (r32) BitMap.Width  );
+	s32 MaxY = RoundReal32ToInt32( RealMinY + (r32) BitMap.Height );
 
 
-	uint32 ClippingOffsetX = 0;
-	uint32 ClippingOffsetY = 0;
-	if (MinX < 0)
+	u32 ClippingOffsetX = 0;
+	u32 ClippingOffsetY = 0;
+	if( MinX < 0 )
 	{
 		ClippingOffsetX = -MinX;
 		MinX = 0;
 	}
-	if (MinY < 0)
+	if( MinY < 0 )
 	{
 		ClippingOffsetY = -MinY;
 		MinY = 0;
 	}
-	if (MaxX > Buffer->Width)
+	if( MaxX > Buffer->Width )
 	{
 		MaxX = Buffer->Width;
 	}
-	if (MaxY > Buffer->Height)
+	if( MaxY > Buffer->Height )
 	{
 		MaxY = Buffer->Height;
 	}
 
 
-	uint32 BytesPerPixel = 4;
+	u32 BytesPerPixel = 4;
 
-	uint8* SourceRow = (uint8*)BitMap.Pixels + (BitMap.Width*ClippingOffsetY + ClippingOffsetX)*BytesPerPixel;
-	uint8* DestinationRow = (uint8*)((uint8*)Buffer->Memory + MinY* Buffer->Pitch +
-		MinX * Buffer->BytesPerPixel);
+	u8* SourceRow = (u8*) BitMap.Pixels + ( BitMap.Width*ClippingOffsetY + ClippingOffsetX )*BytesPerPixel;
+	u8* DestinationRow = (u8*) ( (u8*) Buffer->Memory + MinY*Buffer->Pitch + MinX*Buffer->BytesPerPixel );
 
 
-	uint32 BitmapPitch = BitMap.Width * BytesPerPixel;
+	u32 BitmapPitch = BitMap.Width*BytesPerPixel;
 
-	for (int Y = MinY; Y < MaxY; ++Y)
+	for( s32 Y = MinY; Y < MaxY; ++Y )
 	{
-		uint32* SourcePixel = (uint32*)SourceRow;
-		uint32* DesinationPixel = (uint32*)DestinationRow;
-		for (int X = MinX; X < MaxX; ++X)
+		u32* SourcePixel = (u32*)SourceRow;
+		u32* DesinationPixel = (u32*)DestinationRow;
+		for( s32 X = MinX; X < MaxX; ++X )
 		{
 
 			/// Note(Jakob): This loop is SLOW!! Tanking the fps
 
-			uint32 Source = *SourcePixel;
+			u32 Source  = *SourcePixel;
 
-			real32 Alpha = (real32)((Source & 0xFF000000) >> 24) / 255.f;
+			r32 Alpha   = (r32)  ( (Source & 0xFF000000)  >> 24 )  / 255.f;
 
-			real32 Red = (real32)(((Source & 0x00FF0000) >> 16)) / 255.f;
-			real32 Green = (real32)(((Source & 0x0000FF00) >> 8)) / 255.f;
-			real32 Blue = (real32)(((Source & 0x000000FF) >> 0)) / 255.f;
+			r32 Red     = (r32) (( (Source & 0x00FF0000)  >> 16 )) / 255.f;
+			r32 Green   = (r32) (( (Source & 0x0000FF00)  >> 8  )) / 255.f;
+			r32 Blue    = (r32) (( (Source & 0x000000FF)  >> 0  )) / 255.f;
 
-			uint32 DestPix = *DesinationPixel;
-			real32 DRed = (real32)(((DestPix & 0x00FF0000) >> 16)) / 255.f;
-			real32 DGreen = (real32)(((DestPix & 0x0000FF00) >> 8)) / 255.f;
-			real32 DBlue = (real32)(((DestPix & 0x000000FF) >> 0)) / 255.f;
+			u32 DestPix = *DesinationPixel;
+			r32 DRed    = (r32) (( (DestPix & 0x00FF0000) >> 16 )) / 255.f;
+			r32 DGreen  = (r32) (( (DestPix & 0x0000FF00) >> 8  )) / 255.f;
+			r32 DBlue   = (r32) (( (DestPix & 0x000000FF) >> 0  )) / 255.f;
 
-			Red = (1 - Alpha) *DRed + Alpha*Red;
-			Green = (1 - Alpha)* DGreen + Alpha*Green;
-			Blue = (1 - Alpha) *DBlue + Alpha*Blue;
+			Red   = (1 - Alpha)*DRed   + Alpha*Red;
+			Green = (1 - Alpha)*DGreen + Alpha*Green;
+			Blue  = (1 - Alpha)*DBlue  + Alpha*Blue;
 
-			int32 R = (int)(Red * 255 + 0.5);
-			int32 G = (int)(Green * 255 + 0.5);
-			int32 B = (int)(Blue * 255 + 0.5);
+			s32 R = (s32)(Red   * 255 + 0.5);
+			s32 G = (s32)(Green * 255 + 0.5);
+			s32 B = (s32)(Blue  * 255 + 0.5);
 
 			Source = (R << 16) | (G << 8) | (B << 0);
 
 			*DesinationPixel = Source;
 
-			DesinationPixel++;
-			SourcePixel++;
+			++DesinationPixel;
+			++SourcePixel;
 
 		}
+
 		DestinationRow += Buffer->Pitch;
 		SourceRow += BitmapPitch;
 
 	}
 }
 
-void DrawLineBresLow( game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1, int32 y1, v4 Color )
+void DrawLineBresLow( game_offscreen_buffer* Buffer, s32 x0, s32 y0, s32 x1, s32 y1, v4 Color )
 {
-	int32 dx = x1 - x0;
-	int32 dy = y1 - y0;
-	int32 yi = 1;
+	s32 dx = x1 - x0;
+	s32 dy = y1 - y0;
+	s32 yi = 1;
 	if (dy < 0)
 	{
 		yi = -1;
 		dy = -dy;
 	}
-	int32 D = 2 * dy - dx;
-	int32 y = y0;
+	s32 D = 2 * dy - dx;
+	s32 y = y0;
 
-	for (int x = x0; x <= x1; ++x)
+	for (s32 x = x0; x <= x1; ++x)
 	{
-		PutPixel(Buffer, x, y, Color.X, Color.Y, Color.Z);
+		PutPixel( Buffer, x, y, Color.X, Color.Y, Color.Z );
 		if (D > 0)
 		{
 			y = y + yi;
@@ -348,21 +350,21 @@ void DrawLineBresLow( game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x
 }
 
 
-void DrawLineBresHigh(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1, int32 y1, v4 Color)
+void DrawLineBresHigh( game_offscreen_buffer* Buffer, s32 x0, s32 y0, s32 x1, s32 y1, v4 Color )
 {
-	int32 dx = x1 - x0;
-	int32 dy = y1 - y0;
-	int32 xi = 1;
+	s32 dx = x1 - x0;
+	s32 dy = y1 - y0;
+	s32 xi = 1;
 	if (dx < 0)
 	{
 		xi = -1;
 		dx = -dx;
 	}
-	int32 D = 2 * dx - dy;
-	int32 x = x0;
-	for (int y = y0; y <= y1; ++y)
+	s32 D = 2 * dx - dy;
+	s32 x = x0;
+	for (s32 y = y0; y <= y1; ++y)
 	{
-		PutPixel(Buffer, x, y, Color.X, Color.Y, Color.Z);
+		PutPixel( Buffer, x, y, Color.X, Color.Y, Color.Z );
 		if (D > 0)
 		{
 			x = x + xi;
@@ -373,46 +375,45 @@ void DrawLineBresHigh(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x
 	}
 }
 
-void DrawLineBres(game_offscreen_buffer* Buffer, int32 x0, int32 y0, int32 x1, int32 y1, v4 Color)
+void DrawLineBres( game_offscreen_buffer* Buffer, s32 x0, s32 y0, s32 x1, s32 y1, v4 Color )
 {
 
-	if (Abs((real32)(y1 - y0)) < Abs((real32)(x1 - x0)))
+	if( Abs((r32) (y1 - y0)) < Abs((r32) (x1 - x0)) )
 	{
-		if (x0 > x1) {
+		if(x0 > x1) 
+		{
 			DrawLineBresLow(Buffer, x1, y1, x0, y0, Color );
-		}
-		else {
+		}else{
 			DrawLineBresLow(Buffer, x0, y0, x1, y1, Color );
 		}
-	}
-	else {
-		if (y0 > y1) {
+	}else{
+		if(y0 > y1) 
+		{
 			DrawLineBresHigh(Buffer, x1, y1, x0, y0, Color );
-		}
-		else {
+		}else{
 			DrawLineBresHigh(Buffer, x0, y0, x1, y1, Color );
 		}
 	}
 }
 
 
-v4 Flatshading(v4 fCenter, v4 fNormal, v4 LightPosition, m4 V, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct)
+v4 Flatshading( v4 fCenter, v4 fNormal, v4 LightPosition, m4 V, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct )
 {
 	// T = Model Matrix;
 	// V = View Matrix;
-	real32 Shininess = 10;
-	real32 flippNormals = 0;
+	r32 Shininess    = 10;
+	r32 flippNormals = 0;
 
 	v3 vpos = V3(V*fCenter);
 	v3 lpos = V3(V*LightPosition);
-	v3 L = normalize(lpos - vpos);
-	v3 E = normalize(-vpos);
-	v3 H = normalize(L + E);
-	v3 N = normalize(V3(V*fNormal));
+	v3 L    = Normalize(lpos - vpos);
+	v3 E    = Normalize(-vpos);
+	v3 H    = Normalize(L + E);
+	v3 N    = Normalize(V3(V*fNormal));
 
 	v4 ambient = AmbientProduct;
 
-	real32 Kd = Maximum(L*N, 0.0f);
+	r32 Kd = Maximum(L*N, 0.0f);
 	v4 diffuse = Kd*DiffuseProduct;
 
 	if (L*N < 0.0)
@@ -420,7 +421,7 @@ v4 Flatshading(v4 fCenter, v4 fNormal, v4 LightPosition, m4 V, v4 AmbientProduct
 		diffuse = V4(0.0, 0.0, 0.0, 0.0);
 	}
 
-	real32 Ks = Pow(Maximum(N*H, 0.0f), Shininess);
+	r32 Ks = Pow(Maximum(N*H, 0.0f), Shininess);
 	v4 specular = Ks * SpecularProduct;
 
 	if (L*N < 0.0)
@@ -446,16 +447,16 @@ struct vertex_data
 	v4 c;
 };
 
-vertex_data BlinnPhong(v4 vPosition, v4 vNormal, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct, m4 T, m4 V, m4 P)
+vertex_data BlinnPhong( v4 vPosition, v4 vNormal, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct, m4 T, m4 V, m4 P )
 {
 	// T = Model Matrix;
 	// V = View Matrix;
 	// P = Projection Matrix;
-	local_persist real32 dt = 0;
+	local_persist r32 dt = 0;
 	v4 LightPosition = V4(0, 0, 0, 1);
 	dt += Pi32 / 600.f;
-	real32 Shininess = 0.1;
-	real32 flippNormals = 0;
+	r32 Shininess = 0.1;
+	r32 flippNormals = 0;
 	/////////////////////////////
 
 	v4 norm = -vNormal;
@@ -467,14 +468,14 @@ vertex_data BlinnPhong(v4 vPosition, v4 vNormal, v4 AmbientProduct, v4 DiffusePr
 	m4 ModelView = V*T;
 	v3 pos = V3(ModelView*vPosition);
 
-	v3 L = normalize(V3(V*LightPosition) - pos);
-	v3 E = normalize(-pos);
-	v3 H = normalize(L + E);
-	v3 N = normalize(V3(ModelView*norm));
+	v3 L = Normalize(V3(V*LightPosition) - pos);
+	v3 E = Normalize(-pos);
+	v3 H = Normalize(L + E);
+	v3 N = Normalize(V3(ModelView*norm));
 
 	v4 ambient = AmbientProduct;
 
-	real32 Kd = Maximum(L*N, 0.0f);
+	r32 Kd = Maximum(L*N, 0.0f);
 	v4 diffuse = Kd*DiffuseProduct;
 
 	if (L*N < 0.0)
@@ -482,7 +483,7 @@ vertex_data BlinnPhong(v4 vPosition, v4 vNormal, v4 AmbientProduct, v4 DiffusePr
 		diffuse = V4(0.0, 0.0, 0.0, 1.0);
 	}
 
-	real32 Ks = Pow(Maximum(N*H, 0.0f), Shininess);
+	r32 Ks = Pow(Maximum(N*H, 0.0f), Shininess);
 	v4 specular = Ks * SpecularProduct;
 
 	if (L*N < 0.0)
@@ -584,15 +585,15 @@ aabb2d getBoundingBox(v2 a, v2 b, v2 c)
 	return Result;
 }
 
-real32 EdgeFunction( v2 a, v2 b, v2 p )
+r32 EdgeFunction( v2 a, v2 b, v2 p )
 {
-	real32 Result = (a.X - p.X) * ( b.Y-a.Y ) - (b.X-a.X)*( a.Y-p.Y );
+	r32 Result = (a.X - p.X) * ( b.Y-a.Y ) - (b.X-a.X)*( a.Y-p.Y );
 	return(Result);
 }
 
 void DrawTriangles( render_push_buffer* PushBuffer )
 {
-	local_persist  real32 dt = 0;
+	local_persist  r32 dt = 0;
 	dt =  (dt<10*Pi32) ? (dt-10*Pi32) : (dt+ 0.01f);
 
 	m4 RasterizerProjectionViewMatrix = PushBuffer->R * PushBuffer->P * PushBuffer->V;
@@ -604,9 +605,9 @@ void DrawTriangles( render_push_buffer* PushBuffer )
 		v4* v = Triangle->vertices;
 		v2 p2[3] = {};
 
-		for( int i = 0; i<3; ++i)
+		for( s32 i = 0; i<3; ++i)
 		{
-			v[i] = RasterizerProjectionViewMatrix * v[i];
+			v[i] =  PointMultiply( RasterizerProjectionViewMatrix, v[i]);
 			p2[i] = V2(v[i]);
 		}
 
@@ -625,32 +626,32 @@ void DrawTriangles( render_push_buffer* PushBuffer )
 				Triangle->DiffuseProduct, Triangle->SpecularProduct );
 
 		Box.min.X = Maximum(0, Box.min.X);
-		Box.max.X = Minimum((real32) OffscreenBuffer->Width, Box.max.X);
+		Box.max.X = Minimum((r32) OffscreenBuffer->Width, Box.max.X);
 		Box.min.Y = Maximum(0, Box.min.Y);
-		Box.max.Y = Minimum((real32) OffscreenBuffer->Height, Box.max.Y);
+		Box.max.Y = Minimum((r32) OffscreenBuffer->Height, Box.max.Y);
 
 
-		real32 Area2 = EdgeFunction( p2[0], p2[1], p2[2] );
+		r32 Area2 = EdgeFunction( p2[0], p2[1], p2[2] );
 		if( Area2 < 0 )
 		{
 			continue;
 		}
-		for(int32 i = RoundReal32ToInt32( Box.min.X ); i < Box.max.X; ++i)
+		for(s32 i = RoundReal32ToInt32( Box.min.X ); i < Box.max.X; ++i)
 		{
-			for(int32 j = RoundReal32ToInt32( Box.min.Y ); j < Box.max.Y; ++j)
+			for(s32 j = RoundReal32ToInt32( Box.min.Y ); j < Box.max.Y; ++j)
 			{
-				v2 p = V2( (real32) i, (real32) j);
-				real32 PixelInRange1 = EdgeFunction( p2[0], p2[1], p);
-				real32 PixelInRange2 = EdgeFunction( p2[1], p2[2], p);
-				real32 PixelInRange3 = EdgeFunction( p2[2], p2[0], p);
+				v2 p = V2( (r32) i, (r32) j);
+				r32 PixelInRange1 = EdgeFunction( p2[0], p2[1], p);
+				r32 PixelInRange2 = EdgeFunction( p2[1], p2[2], p);
+				r32 PixelInRange3 = EdgeFunction( p2[2], p2[0], p);
 
 				if( ( PixelInRange1 >= 0 ) && 
 					( PixelInRange2 >= 0 ) &&
 					( PixelInRange3 >= 0 ) )
 				{
-					uint8* PixelLocation = ((uint8*)OffscreenBuffer->Memory + i * OffscreenBuffer->BytesPerPixel +
+					u8* PixelLocation = ((u8*)OffscreenBuffer->Memory + i * OffscreenBuffer->BytesPerPixel +
 													j * OffscreenBuffer->Pitch);
-					uint32* Pixel = (uint32*)PixelLocation;
+					u32* Pixel = (u32*)PixelLocation;
 					*Pixel = ((TruncateReal32ToInt32(Color.X*255.f) << 16) |
 							  (TruncateReal32ToInt32(Color.Y*255.f) << 8) |
 							  (TruncateReal32ToInt32(Color.Z*255.f) << 0));

@@ -50,41 +50,41 @@
 
 struct thread_context
 {
-	int placeholder;
+	s32 placeholder;
 };
 
 #if HANDMADE_INTERNAL
 
 struct debug_read_file_result{
-	uint32 ContentSize;
+	u32 ContentSize;
 	void* Contents;
 };
 
-#define DEBUG_PLATFORM_FREE_FILE_MEMORY(name) void name(thread_context* Thread, void* Memory)
-typedef DEBUG_PLATFORM_FREE_FILE_MEMORY(debug_platfrom_free_file_memory);
+#define DEBUG_PLATFORM_FREE_FILE_MEMORY(name) void name( thread_context* Thread, void* Memory )
+typedef DEBUG_PLATFORM_FREE_FILE_MEMORY( debug_platfrom_free_file_memory );
 
-#define DEBUG_PLATFORM_READ_ENTIRE_FILE(name) debug_read_file_result name(thread_context* Thread, char* Filename)
-typedef DEBUG_PLATFORM_READ_ENTIRE_FILE(debug_platform_read_entire_file);
+#define DEBUG_PLATFORM_READ_ENTIRE_FILE(name) debug_read_file_result name( thread_context* Thread, char* Filename )
+typedef DEBUG_PLATFORM_READ_ENTIRE_FILE( debug_platform_read_entire_file );
 
-#define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) bool32 name(thread_context* Thread, char* Filename, uint32 MemorySize, void* Memory)
-typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE(debug_platform_write_entire_file);
+#define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) b32 name( thread_context* Thread, char* Filename, u32 MemorySize, void* Memory )
+typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE( debug_platform_write_entire_file );
 
 #endif // HANDMADE_INTERNAL
 
-inline uint32 
-SafeTruncateUInt64(uint64 Value)
+inline u32 
+SafeTruncateUInt64( u64 Value )
 {
 	Assert(Value <= 0xFFFFFFFF);
-	uint32 Result = (uint32)Value;
+	u32 Result = (u32)Value;
 	return Result;  
 }
 
-inline real32 
-SafeTruncateReal32(uint32 Value)
+inline r32 
+SafeTruncateReal32( u32 Value )
 {
 	Assert(Value <= 0xFFFFFFFF);
 	Assert(Value >= 0xFFFFFFFF);
-	real32 Result = (real32) Value;
+	r32 Result = (r32) Value;
 	return Result;
 }
 
@@ -96,43 +96,43 @@ struct game_offscreen_buffer
 	// Note: Pixels are always 32-bits wide: Memory Order BB GG RR XX
 	void* Memory;
 	// In Pixels
-	int Width;
-	int Height;
-	int Pitch;
+	s32 Width;
+	s32 Height;
+	s32 Pitch;
 	
-	int BytesPerPixel;
+	s32 BytesPerPixel;
 };
 
 struct game_sound_output_buffer
 {
-	int SamplesPerSecond;
-	int SampleCount;
-	int channels;
-	int16* Samples;
+	s32 SamplesPerSecond;
+	s32 SampleCount;
+	s32 channels;
+	s16* Samples;
 };
 
 struct game_button_state
 {
-	int HalfTransitionCount;
-	bool32 EndedDown;
+	s32 HalfTransitionCount;
+	b32 EndedDown;
 };
 
 struct game_controller_input
 {	
-	bool32 IsAnalog;
-	bool32 IsConnected;
+	b32 IsAnalog;
+	b32 IsConnected;
 
 	union
 	{
-		real32 Averages[6];
+		r32 Averages[6];
 		struct
 		{
-			real32 LeftStickAverageX;
-			real32 LeftStickAverageY;
-			real32 RightStickAverageX;
-			real32 RightStickAverageY;
-			real32 LeftTriggerAverage;
-			real32 RightTriggerAverage;
+			r32 LeftStickAverageX;
+			r32 LeftStickAverageY;
+			r32 RightStickAverageX;
+			r32 RightStickAverageY;
+			r32 LeftTriggerAverage;
+			r32 RightTriggerAverage;
 		};
 	};
 
@@ -184,11 +184,11 @@ struct game_controller_input
 struct game_input
 {	
 	// GameUpdateTime
-	real32 dt;
-	bool32 ExecutableReloaded;
+	r32 dt;
+	b32 ExecutableReloaded;
 
 	game_button_state MouseButton[5];
-	int32 MouseX, MouseY, MouseZ;
+	s32 MouseX, MouseY, MouseZ;
 
 	// Todo: handle keyboard like this? Use raw input?
 	//game_button_state KeyboardButton[104];
@@ -196,7 +196,7 @@ struct game_input
 	game_controller_input Controllers[5];
 };
 
-inline game_controller_input* GetController(game_input* Input, int ControllerIndex)
+inline game_controller_input* GetController(game_input* Input, s32 ControllerIndex)
 {
 	Assert( ControllerIndex < ArrayCount( Input->Controllers ) );
 	game_controller_input* Result  = &Input->Controllers[ControllerIndex];
@@ -205,21 +205,21 @@ inline game_controller_input* GetController(game_input* Input, int ControllerInd
 
 struct platform_file_handle
 {
-    bool32 NoErrors;
+    b32 NoErrors;
     void *Platform;
 };
 /*
 struct platform_file_info
 {
     platform_file_info *Next;
-    uint64 FileDate; // NOTE(casey): This is a 64-bit number that _means_ the date to the platform, but doesn't have to be understood by the app as any particular date.
-    uint64 FileSize;
+    u64 FileDate; // NOTE(casey): This is a 64-bit number that _means_ the date to the platform, but doesn't have to be understood by the app as any particular date.
+    u64 FileSize;
     char *BaseName; // NOTE(casey): Doesn't include a path or an extension
     void *Platform;
 };
 struct platform_file_group
 {
-    uint32 FileCount;
+    u32 FileCount;
     platform_file_info *FirstFileInfo;
     void *Platform;
 };
@@ -256,9 +256,9 @@ enum platform_memory_block_flags
  */
 struct platform_memory_block
 {
-    uint64 Flags;
-    uint64 Size;
-    uint8* Base;						// Pointer to the beginning of the memory block
+    u64 Flags;
+    u64 Size;
+    u8* Base;						// Pointer to the beginning of the memory block
     uintptr_t Used;						// Pointer to the end of the used data
     platform_memory_block *ArenaPrev;
 };
@@ -269,13 +269,13 @@ enum platform_open_file_mode_flags
     OpenFile_Write = 0x2,
 };
 
-//#define PLATFORM_OPEN_FILE(name) platform_file_handle name(platform_file_group *FileGroup, platform_file_info *Info, uint32 ModeFlags)
+//#define PLATFORM_OPEN_FILE(name) platform_file_handle name(platform_file_group *FileGroup, platform_file_info *Info, u32 ModeFlags)
 //typedef PLATFORM_OPEN_FILE(platform_open_file);
 //
-//#define PLATFORM_READ_DATA_FROM_FILE(name) void name(platform_file_handle *Handle, uint64 Offset, uint64 Size, void *Dest)
+//#define PLATFORM_READ_DATA_FROM_FILE(name) void name(platform_file_handle *Handle, u64 Offset, u64 Size, void *Dest)
 //typedef PLATFORM_READ_DATA_FROM_FILE(platform_read_data_from_file);
 //
-//#define PLATFORM_WRITE_DATA_TO_FILE(name) void name(platform_file_handle *Handle, uint64 Offset, uint64 Size, void *Source)
+//#define PLATFORM_WRITE_DATA_TO_FILE(name) void name(platform_file_handle *Handle, u64 Offset, u64 Size, void *Source)
 //typedef PLATFORM_WRITE_DATA_TO_FILE(platform_write_data_to_file);
 //
 //#define PLATFORM_FILE_ERROR(name) void name(platform_file_handle *Handle, char *Message)
@@ -286,7 +286,7 @@ enum platform_open_file_mode_flags
 
 #define PlatformNoFileErrors(Handle) ((Handle)->NoErrors)
 
-#define PLATFORM_ALLOCATE_MEMORY(name) platform_memory_block *name(memory_index aSize, uint64 aFlags)
+#define PLATFORM_ALLOCATE_MEMORY(name) platform_memory_block *name(memory_index aSize, u64 aFlags)
 typedef PLATFORM_ALLOCATE_MEMORY(platform_allocate_memory);
 
 #define PLATFORM_DEALLOCATE_MEMORY(name) void name(platform_memory_block *aBlock)

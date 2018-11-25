@@ -7,9 +7,9 @@
 
 #define OffsetOf(type, Member) (uintptr_t) &( ( (type* )0 )->Member )
 
-#define Kilobytes(Value) ((Value)*1024LL)
-#define Megabytes(Value) (Kilobytes(Value)*1024LL)
-#define Gigabytes(Value) (Megabytes(Value)*1024LL)
+#define Kilobytes(Value)  ((Value)*1024LL)
+#define Megabytes(Value)  (Kilobytes(Value)*1024LL)
+#define Gigabytes(Value)  (Megabytes(Value)*1024LL)
 #define Terrabytes(Value) (Gigabytes(Value)*1024LL)
 #define ArrayCount(Array) ( sizeof(Array)/sizeof((Array)[0]) )
 
@@ -19,28 +19,28 @@
 #define Assert(Expression)
 #endif // HANDMADE_SLOW
 
-typedef int8_t  int8;
-typedef int16_t int16;
-typedef int32_t int32;
-typedef int64_t int64;
+typedef int8_t  s8;
+typedef int16_t s16;
+typedef int32_t s32;
+typedef int64_t s64;
 
-typedef int32 bool32;
+typedef s32 b32;
 
-typedef uint8_t  uint8;
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
+typedef uint8_t  u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
 
 typedef size_t memory_index;
 
-typedef float real32;
-typedef double real64;
+typedef float  r32;
+typedef double r64;
 
 #define Maximum(A, B) ((A > B) ? (A) : (B))
 #define Minimum(A, B) ((A < B) ? (A) : (B))
 
 
-#define U32Max ( (uint32)-1 )
+#define U32Max ( (u32)-1 )
 
 // NOTE(casey): Added (Value-Value) here to force integral promotion to the size of Value
 #define AlignPow2(Value, Alignment) ((Value + ((Alignment) - 1)) & ~((Value - Value) + (Alignment) - 1))

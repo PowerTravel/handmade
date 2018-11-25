@@ -1,18 +1,20 @@
 
+#include "types.h"
+
 struct win32_offscreen_buffer
 {
     // NOTE(casey): Pixels are alwasy 32-bits wide, Memory Order BB GG RR XX
     BITMAPINFO Info;
     void *Memory;
-    int Width;
-    int Height;
-    int Pitch;
-    int BytesPerPixel;
+    s32 Width;
+    s32 Height;
+    s32 Pitch;
+    s32 BytesPerPixel;
 };
 
 struct win32_window_dimension{
-	int Width;
-	int Height;
+	s32 Width;
+	s32 Height;
 };
 
 struct win32_sound_output
@@ -21,20 +23,20 @@ struct win32_sound_output
 	LPDIRECTSOUNDBUFFER SecondaryBuffer;	
 
 	// NOTE: Orthogonal Values
-	int SamplesPerSecond;
-	int ChannelCount;
-	int BytesPerSample;
-	int BufferSizeInSeconds;
-	real32 TargetSecondsOfLatency;
+	s32 SamplesPerSecond;
+	s32 ChannelCount;
+	s32 BytesPerSample;
+	s32 BufferSizeInSeconds;
+	s32 TargetSecondsOfLatency;
 
 	// Derived Values
-	int BytesPerSampleTotal; // = ChannelCount * BytesPerSample;
-	int BytesPerSecond;
+	s32 BytesPerSampleTotal; // = ChannelCount * BytesPerSample;
+	s32 BytesPerSecond;
 	DWORD BufferSizeInBytes; // = BufferSizeInSeconds * SamplesPerSecond * BytesPerSampleTotal;
 	DWORD BytesOfLatency;
 
 	// Variable
-	uint32 RunningSampleIndex;
+	u32 RunningSampleIndex;
 };
 
 struct win32_debug_time_marker{
@@ -60,7 +62,7 @@ struct win32_game_code
 	game_update_and_render* UpdateAndRender;
 	game_get_sound_samples* GetSoundSamples;
 
-	bool32 IsValid;
+	b32 IsValid;
 };
 
 enum win32_memory_block_flag
@@ -73,13 +75,13 @@ struct win32_memory_block
     platform_memory_block Block;
     win32_memory_block* Prev;
     win32_memory_block* Next;
-    uint64 LoopingFlags;
+    u64 LoopingFlags;
 };
 
 struct win32_saved_memory_block
 {
-    uint64 BasePointer;
-    uint64 Size;
+    u64 BasePointer;
+    u64 Size;
 };
 
 // Note:	Never use MAX_PATH in code that is user facing because it can be wrong
@@ -96,7 +98,7 @@ struct win32_state
 {
     win32_memory_block MemorySentinel;
 
-	uint64 TotalSize;
+	u64 TotalSize;
 	void* GameMemoryBlock;
 	//TODO, give support for more than 1 replaybuffer 
 	//		It works fine to add as many ass you want, however
@@ -107,10 +109,10 @@ struct win32_state
 
 
 	HANDLE RecordingHandle;
-	int PlayingIndex;
+	s32 PlayingIndex;
 
 	HANDLE PlaybackHandle;
-	int RecordingIndex;
+	s32 RecordingIndex;
 
 	char EXEFileName[WIN32_STATE_FILE_NAME_COUNT];
 	char* OnePastLastSlashEXEFileName;
