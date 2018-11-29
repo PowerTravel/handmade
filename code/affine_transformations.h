@@ -151,7 +151,7 @@ PointMultiply( const m4& M, const v4& b )
 {
 	v4 Result = M*b;
 
-	Assert(( Abs( Result.W ) > 0.0001 ));
+	Assert(( Abs( Result.W ) > 10e-10 ));
 
 	if( Result.W != 1 )
 	{

@@ -122,11 +122,11 @@ GetWordCount( char* String )
 }
 
 
-s64 StringToReal64( char* String )
+r64 StringToReal64( char* String )
 {
 	char* wcp = String;
-	s64 Value = 0;
-	s64 Fact = 1;
+	r64 Value = 0;
+	r64 Fact = 1;
 	b32 PointSeen = false;
 	while(*wcp)
 	{

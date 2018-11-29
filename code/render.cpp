@@ -1,93 +1,4 @@
-#ifndef HANDMADE_RENDER
-#define HANDMADE_RENDER
-
-
-#if 0
-// Extremely Fast Line Algorithm Var E (Addition Fixed Point PreCalc)
-// Copyright 2001-2, By Po-Han Lin
-
-
-// Freely useable in non-commercial applications as long as credits 
-// to Po-Han Lin and link to http://www.edepot.com is provided in 
-// source code and can been seen in compiled executable.  
-// Commercial applications please inquire about licensing the algorithms.
-//
-// Lastest version at http://www.edepot.com/phl.html
-// This version is for standard displays (up to 65536x65536)
-// For small display version (256x256) visit http://www.edepot.com/lineex.html
-
-struct SURFACE;
-
-// used by myLine
-void myPixel( SURFACE* surface, int x,int y ) {
-	// PLOT x,y point on surface
-
-}
-
-// THE EXTREMELY FAST LINE ALGORITHM Variation E (Addition Fixed Point PreCalc)
-void myLine(SURFACE* surface, int x, int y, int x2, int y2) {
-   	bool yLonger=false;
-	int shortLen=y2-y;
-	int longLen=x2-x;
-	if (abs(shortLen)>abs(longLen)) {
-		int swap=shortLen;
-		shortLen=longLen;
-		longLen=swap;				
-		yLonger=true;
-	}
-	int decInc;
-	if (longLen==0) decInc=0;
-	else decInc = (shortLen << 16) / longLen;
-
-	if (yLonger) {
-		if (longLen>0) {
-			longLen+=y;
-			for (int j=0x8000+(x<<16);y<=longLen;++y) {
-				myPixel(surface,j >> 16,y);	
-				j+=decInc;
-			}
-			return;
-		}
-		longLen+=y;
-		for (int j=0x8000+(x<<16);y>=longLen;--y) {
-			myPixel(surface,j >> 16,y);	
-			j-=decInc;
-		}
-		return;	
-	}
-
-	if (longLen>0) {
-		longLen+=x;
-		for (int j=0x8000+(y<<16);x<=longLen;++x) {
-			myPixel(surface,x,j >> 16);
-			j+=decInc;
-		}
-		return;
-	}
-	longLen+=x;
-	for (int j=0x8000+(y<<16);x>=longLen;--x) {
-		myPixel(surface,x,j >> 16);
-		j-=decInc;
-	}
-
-}
-
-void mySquare(SURFACE* surface,int x, int y, int x2, int y2) {
-	myLine(surface,x,y,x2,y2);
-	myLine(surface,x2,y2,x2+(y-y2),y2+(x2-x));
-	myLine(surface,x,y,x+(y-y2),y+(x2-x));
-	myLine(surface,x+(y-y2),y+(x2-x),x2+(y-y2),y2+(x2-x));
-}
-
-
-void myRect(SURFACE* surface, int x, int y, int x2, int y2) {
-	myLine(surface,x,y,x2,y);
-	myLine(surface,x2,y,x2,y2);
-	myLine(surface,x2,y2,x,y2);
-	myLine(surface,x,y2,x,y);
-}
-
-#endif
+#include "render.h"
 
 internal void
 DrawRectangle( game_offscreen_buffer* Buffer, r32 RealMinX, r32 RealMinY, r32 Width, r32 Height, r32 R, r32 G, r32 B )
@@ -396,38 +307,30 @@ void DrawLineBres( game_offscreen_buffer* Buffer, s32 x0, s32 y0, s32 x1, s32 y1
 	}
 }
 
-
-v4 Flatshading( v4 fCenter, v4 fNormal, v4 LightPosition, m4 V, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct )
+// Inputs are in world coordinate space
+v4 Flatshading( v4 Vertice, v4 VerticeNormal, v4 CameraPosition, v4 LightPosition, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct, r32 Shininess )
 {
-	// T = Model Matrix;
-	// V = View Matrix;
-	r32 Shininess    = 10;
-	r32 flippNormals = 0;
+	local_persist r32 t = 0;
+	t += 0.000006;
+	if(t>=10*Pi32)
+	{
+		t-= 10*Pi32;
+	}
 
-	v3 vpos = V3(V*fCenter);
-	v3 lpos = V3(V*LightPosition);
-	v3 L    = Normalize(lpos - vpos);
-	v3 E    = Normalize(-vpos);
-	v3 H    = Normalize(L + E);
-	v3 N    = Normalize(V3(V*fNormal));
+	v4 N = Normalize(VerticeNormal);
+	v4 L = Normalize(LightPosition  - Vertice);
+	v4 V = Normalize(CameraPosition - Vertice);
+	v4 H = Normalize(L+V);
+
+	Shininess = 10;
 
 	v4 ambient = AmbientProduct;
 
 	r32 Kd = Maximum(L*N, 0.0f);
 	v4 diffuse = Kd*DiffuseProduct;
 
-	if (L*N < 0.0)
-	{
-		diffuse = V4(0.0, 0.0, 0.0, 0.0);
-	}
-
-	r32 Ks = Pow(Maximum(N*H, 0.0f), Shininess);
+	r32 Ks = Pow(Maximum(H*N, 0.0f), Shininess);
 	v4 specular = Ks * SpecularProduct;
-
-	if (L*N < 0.0)
-	{
-		specular = V4(0.0, 0.0, 0.0, 0.0);
-	}
 
 	v4 Result;
 	Result = ambient + diffuse + specular;
@@ -439,114 +342,35 @@ v4 Flatshading( v4 fCenter, v4 fNormal, v4 LightPosition, m4 V, v4 AmbientProduc
 	return Result;
 }
 
-
-struct vertex_data
-{
-	v4 v;
-	v4 n;
-	v4 c;
-};
-
-vertex_data BlinnPhong( v4 vPosition, v4 vNormal, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct, m4 T, m4 V, m4 P )
-{
-	// T = Model Matrix;
-	// V = View Matrix;
-	// P = Projection Matrix;
-	local_persist r32 dt = 0;
-	v4 LightPosition = V4(0, 0, 0, 1);
-	dt += Pi32 / 600.f;
-	r32 Shininess = 0.1;
-	r32 flippNormals = 0;
-	/////////////////////////////
-
-	v4 norm = -vNormal;
-	if (flippNormals == 1)
-	{
-		norm = -norm;
-	}
-
-	m4 ModelView = V*T;
-	v3 pos = V3(ModelView*vPosition);
-
-	v3 L = Normalize(V3(V*LightPosition) - pos);
-	v3 E = Normalize(-pos);
-	v3 H = Normalize(L + E);
-	v3 N = Normalize(V3(ModelView*norm));
-
-	v4 ambient = AmbientProduct;
-
-	r32 Kd = Maximum(L*N, 0.0f);
-	v4 diffuse = Kd*DiffuseProduct;
-
-	if (L*N < 0.0)
-	{
-		diffuse = V4(0.0, 0.0, 0.0, 1.0);
-	}
-
-	r32 Ks = Pow(Maximum(N*H, 0.0f), Shininess);
-	v4 specular = Ks * SpecularProduct;
-
-	if (L*N < 0.0)
-	{
-	//	specular = V4(0.0, 0.0, 0.0, 1.0);
-	}
-
-	vertex_data Result;
-	Result.v = P*ModelView*vPosition;
-	Result.n = ModelView*norm;
-	Result.c = ambient + diffuse + specular;
-	//Result.c = diffuse;// + specular;
-	Result.c.W = 0;
-
-	Result.c.X = (Result.c.X > 1) ? 1 : Result.c.X;
-	Result.c.Y = (Result.c.Y > 1) ? 1 : Result.c.Y;
-	Result.c.Z = (Result.c.Z > 1) ? 1 : Result.c.Z;
-	Result.c.W = 1;
-	if (Result.c.X > 1)
-	{
-		Assert(false)
-	}
-	return Result;
-}
-
 struct aabb2d
 {
 	v2 min;
 	v2 max;
 };
 
-struct render_entity
+
+void PushLight( render_push_buffer* PushBuffer, component_light* Light )
 {
-	v4 vertices[3];
-	v4 verticeNormals[3];
-	v4 normal;
-	v4 AmbientProduct;
-	v4 DiffuseProduct;
-	v4 SpecularProduct;
-	v4 LightPosition;
-	render_entity* Next;
-};
+	Push<component_light>( PushBuffer->Lights, Light );
+}
 
-struct render_push_buffer
+void PushRenderGroup( render_push_buffer* PushBuffer, component_mesh* Mesh, component_material* Material )
 {
-	memory_arena* Arena;
-	temporary_memory TemporaryMemory;
+	render_group* NewRenderGroup = (render_group*) PushStruct( PushBuffer->Arena, render_group );
+	NewRenderGroup->Mesh = Mesh;
+	NewRenderGroup->Material = Material;
+	Push<render_group>( PushBuffer->RenderGroups, NewRenderGroup );
+}
 
-	m4 R; // Rasterization Matrix
-	m4 V; // View Matrix
-	m4 P; // Projection Matrix
-	game_offscreen_buffer* OffscreenBuffer;
-	//game_z_buffer* zBuffer;
-	render_entity* First;
-	render_entity* Last;
-};
-
-void InitiatePushBuffer(render_push_buffer* PushBuffer, game_offscreen_buffer* aOffscreenBuffer, memory_arena* aArena)
+void InitiatePushBuffer(render_push_buffer* PushBuffer, game_offscreen_buffer* aOffscreenBuffer, depth_buffer* DepthBuffer, memory_arena* aArena)
 {	
 	*PushBuffer = {};
 	PushBuffer->Arena = aArena;
+	PushBuffer->DepthBuffer = DepthBuffer;
 	PushBuffer->TemporaryMemory = BeginTemporaryMemory(PushBuffer->Arena);
 	PushBuffer->OffscreenBuffer = aOffscreenBuffer;
+	PushBuffer->RenderGroups = CreateFiloBuffer( PushBuffer->Arena );
+	PushBuffer->Lights = CreateFiloBuffer( PushBuffer->Arena );
 }
 
 void ClearPushBuffer(render_push_buffer* Buffer)
@@ -555,23 +379,6 @@ void ClearPushBuffer(render_push_buffer* Buffer)
 	Assert(Buffer->OffscreenBuffer);
 	EndTemporaryMemory(Buffer->TemporaryMemory);
 	*Buffer = {};
-}
-
-void PushBuffer(render_push_buffer* Buffer, render_entity Entity )
-{
-	render_entity* EntityCopy = (render_entity*) PushStruct(Buffer->Arena, render_entity);
-	*EntityCopy = Entity;
-	if( ! Buffer->First )
-	{
-		Assert( EntityCopy->Next == 0);
-		Buffer->First = EntityCopy;
-		Buffer->Last  = EntityCopy;
-		return;
-	}
-
-	Assert( Buffer->Last->Next == 0 );
-	Buffer->Last->Next = EntityCopy;
-	Buffer->Last = EntityCopy;
 }
 
 aabb2d getBoundingBox(v2 a, v2 b, v2 c)
@@ -587,78 +394,145 @@ aabb2d getBoundingBox(v2 a, v2 b, v2 c)
 
 r32 EdgeFunction( v2 a, v2 b, v2 p )
 {
-	r32 Result = (a.X - p.X) * ( b.Y-a.Y ) - (b.X-a.X)*( a.Y-p.Y );
+	r32 Result = (a.X-p.X) * (b.Y-a.Y) - (b.X-a.X) * (a.Y-p.Y);
 	return(Result);
 }
 
 void DrawTriangles( render_push_buffer* PushBuffer )
 {
-	local_persist  r32 dt = 0;
-	dt =  (dt<10*Pi32) ? (dt-10*Pi32) : (dt+ 0.01f);
+	// TODO: Move to Camera?
+	r32 near_clipping_plane = -1;
 
-	m4 RasterizerProjectionViewMatrix = PushBuffer->R * PushBuffer->P * PushBuffer->V;
+	// Get camera matrices
+	m4& V =  PushBuffer->Camera->V; 	// ViewMatrix
+	m4& P = PushBuffer->Camera->P;		// ProjectionMatrix
+	m4& R = PushBuffer->Camera->R;				// RasterizationMatrix
+	m4 	RPV= R*P*V;						// All in one
+
+	v4 CameraPosition = Transpose( RigidInverse( V ) ).r3;
+	component_light* Light = Pop<component_light>(PushBuffer->Lights);
+	Assert(Light)
+	v4 LightPosition  = Light->Position;
+	v4 LightColor  = Light->Color;
+
+	// 'Reset' DepthBuffer
 	game_offscreen_buffer* OffscreenBuffer =  PushBuffer->OffscreenBuffer;
-	for(render_entity* Triangle = PushBuffer->First; 
-					   Triangle != 0; 
-					   Triangle = Triangle->Next)
+	depth_buffer* DepthBuffer = PushBuffer->DepthBuffer;
+	for( u32 i = 0; i<DepthBuffer->Width*DepthBuffer->Height; ++i)
 	{
-		v4* v = Triangle->vertices;
-		v2 p2[3] = {};
+		DepthBuffer->Buffer[i] = -10E10;
+	}
 
-		for( s32 i = 0; i<3; ++i)
+	// For each render group
+	render_group* RenderGroup = 0;
+	while( ( RenderGroup = Pop<render_group>(PushBuffer->RenderGroups) ) )
+	{
+		// Transform Matrix for points
+		m4& T = RenderGroup->Mesh->T;
+		// Transform Matrix for normals
+		m4 NT = Transpose( RigidInverse(T) );
+
+		obj_geometry* Object = RenderGroup->Mesh->Object;
+		u32 NrTrianglesInMesh = Object->nt;
+		for( u32 TriangleIndex = 0; TriangleIndex < NrTrianglesInMesh; ++TriangleIndex) 
 		{
-			v[i] =  PointMultiply( RasterizerProjectionViewMatrix, v[i]);
-			p2[i] = V2(v[i]);
-		}
+			triangle Triangle = Object->t[TriangleIndex];
+			
+			v4 v[3]  = {};
+			v4 vn[3] = {};
 
-		aabb2d Box = getBoundingBox( p2[0], p2[1], p2[2] );
-		if( (Box.max.X < 0)  || 
-			(Box.max.Y < 0 ) ||
-			(Box.min.X >= OffscreenBuffer->Width) || 
-			(Box.min.Y >= OffscreenBuffer->Height))
-		{
-			continue;
-		}
+			v[0] = T*Object->v[ Triangle.vi[0] ];
+			v[1] = T*Object->v[ Triangle.vi[1] ];
+			v[2] = T*Object->v[ Triangle.vi[2] ];
 
-		v4 Color = V4(0.7,0.2,0.4,0); // 
-		v4 triangleCenter = (v[0] + v[1] + v[2])/3;
-		Color = Flatshading(triangleCenter, Triangle->normal, Triangle->LightPosition,  PushBuffer->V, Triangle->AmbientProduct, 
-				Triangle->DiffuseProduct, Triangle->SpecularProduct );
-
-		Box.min.X = Maximum(0, Box.min.X);
-		Box.max.X = Minimum((r32) OffscreenBuffer->Width, Box.max.X);
-		Box.min.Y = Maximum(0, Box.min.Y);
-		Box.max.Y = Minimum((r32) OffscreenBuffer->Height, Box.max.Y);
-
-
-		r32 Area2 = EdgeFunction( p2[0], p2[1], p2[2] );
-		if( Area2 < 0 )
-		{
-			continue;
-		}
-		for(s32 i = RoundReal32ToInt32( Box.min.X ); i < Box.max.X; ++i)
-		{
-			for(s32 j = RoundReal32ToInt32( Box.min.Y ); j < Box.max.Y; ++j)
+			if(Triangle.HasVerticeNormals)
 			{
-				v2 p = V2( (r32) i, (r32) j);
-				r32 PixelInRange1 = EdgeFunction( p2[0], p2[1], p);
-				r32 PixelInRange2 = EdgeFunction( p2[1], p2[2], p);
-				r32 PixelInRange3 = EdgeFunction( p2[2], p2[0], p);
+				vn[0] = NT*Object->vn[ Triangle.vni[0] ];
+				vn[1] = NT*Object->vn[ Triangle.vni[1] ];
+				vn[2] = NT*Object->vn[ Triangle.vni[2] ];
+			}else{
+				vn[0] = vn[1] = vn[2] = NT*Triangle.n;
+			}
 
-				if( ( PixelInRange1 >= 0 ) && 
-					( PixelInRange2 >= 0 ) &&
-					( PixelInRange3 >= 0 ) )
+			// Get Bounding Box in raster space
+			v2 RasterPoint[3] = { V2( PointMultiply(RPV, v[0]) ), V2( PointMultiply(RPV, v[1]) ), V2( PointMultiply(RPV, v[2]) ) };
+			aabb2d RasterBB = getBoundingBox( RasterPoint[0], RasterPoint[1], RasterPoint[2] );
+
+			// OffScreenCulling
+			if( (RasterBB.max.X < 0)  || 
+				(RasterBB.max.Y < 0 ) ||
+				(RasterBB.min.X >= OffscreenBuffer->Width) || 
+				(RasterBB.min.Y >= OffscreenBuffer->Height))
+			{
+				continue;
+			}
+
+			RasterBB.min.X = Maximum(0, RasterBB.min.X);
+			RasterBB.max.X = Minimum((r32) OffscreenBuffer->Width, RasterBB.max.X);
+			RasterBB.min.Y = Maximum(0, RasterBB.min.Y);
+			RasterBB.max.Y = Minimum((r32) OffscreenBuffer->Height, RasterBB.max.Y);
+
+			// Behind Camera Culling?
+			r32 Area2 = EdgeFunction( RasterPoint[0], RasterPoint[1], RasterPoint[2] );
+			if( Area2 <= 0 )
+			{
+				continue;
+			}
+			r32 PremulArea2 = 1/Area2;
+
+			v4 ViewPoint[3] ={ V*v[0] ,V*v[1] , V*v[2] };				
+
+			for(s32 i = RoundReal32ToInt32( RasterBB.min.X ); i < RasterBB.max.X; ++i)
+			{
+				for(s32 j = RoundReal32ToInt32( RasterBB.min.Y ); j < RasterBB.max.Y; ++j)
 				{
-					u8* PixelLocation = ((u8*)OffscreenBuffer->Memory + i * OffscreenBuffer->BytesPerPixel +
-													j * OffscreenBuffer->Pitch);
-					u32* Pixel = (u32*)PixelLocation;
-					*Pixel = ((TruncateReal32ToInt32(Color.X*255.f) << 16) |
-							  (TruncateReal32ToInt32(Color.Y*255.f) << 8) |
-							  (TruncateReal32ToInt32(Color.Z*255.f) << 0));
+					v2 p = V2( (r32) i, (r32) j);
+					r32 PixelInRange0 = EdgeFunction( RasterPoint[0], RasterPoint[1], p);
+					r32 PixelInRange1 = EdgeFunction( RasterPoint[1], RasterPoint[2], p);
+					r32 PixelInRange2 = EdgeFunction( RasterPoint[2], RasterPoint[0], p);
+
+					if( ( PixelInRange0 >= 0 ) && 
+						( PixelInRange1 >= 0) &&
+						( PixelInRange2 >= 0) )
+					{
+
+						// Barycentric Coordinates
+						r32 Lambda0 = PixelInRange1 * PremulArea2;
+						r32 Lambda1 = PixelInRange2 * PremulArea2;
+						r32 Lambda2 = PixelInRange0 * PremulArea2;
+
+						r32 PixelDepthValue = Lambda0 * ViewPoint[0].Z + Lambda1 * ViewPoint[1].Z + Lambda2 * ViewPoint[2].Z;
+
+						r32& BufferDepthValue = DepthBuffer->Buffer[ j * DepthBuffer->Width  + i];
+
+						if(( PixelDepthValue > BufferDepthValue)  && ( PixelDepthValue < near_clipping_plane ))
+						{
+							BufferDepthValue = PixelDepthValue;
+							u8* PixelLocation = ((u8*)OffscreenBuffer->Memory + i * OffscreenBuffer->BytesPerPixel +
+															j * OffscreenBuffer->Pitch);
+
+							v4 No = Lambda0 * vn[0] + Lambda1 * vn[1] + Lambda2 * vn[2];
+							v4 Ve = Lambda0 *  v[0] + Lambda1 *  v[1] + Lambda2 *  v[2];
+
+							v4 Color = Flatshading( Ve, No, CameraPosition, 
+															LightPosition, 
+													     	LightColor, 
+													     	LightColor, 
+													     	LightColor, 
+													     	12 );
+
+							r32 Red   = Color.X;
+							r32 Green = Color.Y;
+							r32 Blue  = Color.Z;
+		
+							u32* Pixel = (u32*)PixelLocation;
+							*Pixel = ((TruncateReal32ToInt32(Red*255.f) << 16) |
+									  (TruncateReal32ToInt32(Green*255.f) << 8)  |
+									  (TruncateReal32ToInt32(Blue*255.f) << 0));
+						}
+					}
 				}
 			}
 		}
 	}
 }
-
-#endif HANDMADE_RENDER

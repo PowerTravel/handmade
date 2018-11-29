@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include "handmade.h"
 #include "render.cpp"
-//#include "scene_graph.cpp"
 #include "camera_system.cpp"
 #include "render_system.cpp"
 
@@ -59,7 +58,9 @@ v4 ParseNumbers(char* String)
 		Copy( WordLength, Start, WordBuffer );
 		WordBuffer[WordLength] = '\0';
 
-		Result.E[CoordinateIdx++] =(r32) str::StringToReal64(WordBuffer);
+		
+		r64 value = str::StringToReal64(WordBuffer);
+		Result.E[CoordinateIdx++] = (r32) value;
 
 		Start = (End) ? str::FindFirstNotOf(" \t", End) : End;
 	}
@@ -180,6 +181,8 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 		s32 texturePointIdx = 0;
 		s32 faceIdx = 0;
 
+		char mtlLib[OBJ_MAX_LINE_LENGTH] = {};
+
 		ScanPtr = ( char* ) ReadResult.Contents;
 		while( ScanPtr < FileEnd )
 		{
@@ -236,7 +239,9 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 			{
 				Assert(vertexNormalIdx<=nrVertexNormals);
 
-				vertexNormals[ vertexNormalIdx++ ] = ParseNumbers(LineBuffer+3);
+				vertexNormals[ vertexNormalIdx ] = ParseNumbers(LineBuffer+3);
+				vertexNormals[ vertexNormalIdx ].W = 0;
+				vertexNormalIdx++;
 				
 			}
 
@@ -300,15 +305,6 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 
 							case 1:
 							{
-								if( !f->ni )
-								{
-									f->ni  = (s32*) PushArray(Arena, f->nv, int); 
-								}
-								f->ni[VertIdx] = nr;
-							}break;
-
-							case 2:
-							{
 								if( !f->ti )
 								{
 									f->ti = (s32*) PushArray(Arena, f->nv, int); 
@@ -316,6 +312,16 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 
 								f->ti[VertIdx] = nr;
 							}break;
+
+							case 2:
+							{
+								if( !f->ni )
+								{
+									f->ni  = (s32*) PushArray(Arena, f->nv, int); 
+								}
+								f->ni[VertIdx] = nr;
+							}break;
+
 						}
 
 						++i;
@@ -330,7 +336,7 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 				}
 
 			}else if(str::BeginsWith(7,"mtllib ", Length, LineBuffer)  ){
-				// Unimplemented
+				
 			}else if(str::BeginsWith(2,"g ", Length, LineBuffer)  ){
 				// Unimplemented
 			}else if(str::BeginsWith(7,"usemtl ", Length, LineBuffer)  ){
@@ -398,6 +404,9 @@ obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState,
 					t->vni[0] = f->ni[0];
 					t->vni[1] = f->ni[1 + j];
 					t->vni[2] = f->ni[2 + j];
+					t->HasVerticeNormals = true;
+				}else{
+					t->HasVerticeNormals = false;
 				}
 				
 				v4 v0 = Result.v[f->vi[0]];
@@ -512,63 +521,73 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
 											"..\\handmade\\data\\test\\test_hero_front_head.bmp");
-		GameState->testOBJ = DEBUGReadOBJ(Thread, GameState, 
+
+		GameState->testOBJ0 = DEBUGReadOBJ(Thread, GameState, 
 											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-											"..\\handmade\\data\\geometry\\Cube_obj.obj");
-//											"..\\handmade\\data\\geometry\\cupcake.obj");
-//											"..\\handmade\\data\\geometry\\teapot.obj");					
-//											"..\\handmade\\data\\geometry\\cube.obj");		
-//											"..\\handmade\\data\\geometry\\triangle.obj");
+											"..\\handmade\\data\\geometry\\teapot.obj");		
 
+		GameState->testOBJ1 = DEBUGReadOBJ(Thread, GameState, 
+											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,	
+											"..\\handmade\\data\\geometry\\cube.obj");		
+
+		GameState->testOBJ2 = DEBUGReadOBJ(Thread, GameState, 
+											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+											"..\\handmade\\data\\geometry\\sphere.obj");
 		
+		GameState->testOBJ3 = DEBUGReadOBJ(Thread, GameState, 
+											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+											"..\\handmade\\data\\geometry\\Cube\\Cube_obj.obj");
 		memory_arena* AssetArena = &GameState->AssetArena;
 
+		GameState->DepthBuffer = {};
+		GameState->DepthBuffer.Width = Buffer->Width;
+		GameState->DepthBuffer.Height = Buffer->Height;
+		GameState->DepthBuffer.Buffer = PushArray(AssetArena, Buffer->Width*Buffer->Height, r32 );
 
-		entity Camera = CreateBlankEntity();
-		camera_component& C = Camera.CameraComponent;
-		C.AngleOfView  = 90;
-		C.ScreenWidth  = (r32) Buffer->Width;
-		C.ScreenHeight = (r32) Buffer->Height;
-		C.DeltaRot = M4Identity();
-		v3 DeltaPos = V3(0,0,0);
-		LookAt(&Camera.CameraComponent, V3(3,3,3), V3(0,0,0));
-		SetPerspectiveProj( &Camera.CameraComponent, -0.001, -1000);
-		Camera.Types = Camera.Types | COMPONENT_TYPE_CAMERA;
+		u32 NrMaxWorldEntities = 16;
+		GameState->World = AllocateWorld( NrMaxWorldEntities );
 
-		Camera.ControllerComponent.Controller = GetController( Input, 1 );
-		Camera.Types = Camera.Types | COMPONENT_TYPE_CONTROLLER;
+		entity* Camera = AllocateNewEntity( GameState->World, COMPONENT_TYPE_CAMERA |  COMPONENT_TYPE_CONTROLLER );
+		CreateCameraComponent(Camera->CameraComponent, 60, -0.1, -100, (r32) Buffer->Width, (r32) Buffer->Height );
+		LookAt( Camera->CameraComponent, 3* Normalize( V3(1,1,1) ), V3(0,0,0));
+		Camera->ControllerComponent->Controller = GetController( Input, 1 );
 
+		entity* Light = AllocateNewEntity( GameState->World, COMPONENT_TYPE_LIGHT );
+		component_light* L = Light->LightComponent;
+		L->Position = V4(3,2,3,1);
+		L->Color 	= V4(0.5,0.5,0.5,1);
 
-		entity XAxis = CreateBlankEntity();
-		geometry_component& X = XAxis.GeometryComponent;
-		X.Object = &GameState->testOBJ;
-		X.T = M4Identity();
-		Translate( V4(1,0,0,0), X.T);
-		XAxis.Types = XAxis.Types | COMPONENT_TYPE_MESH;
+	//	entity* XAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
+	//	component_mesh* X = XAxis->MeshComponent;
+	//	X->Object = &GameState->testOBJ0;
+	//	X->T = M4Identity();
+	//	Translate( V4(2,0,0,0), X->T);
+	//	XAxis->MaterialComponent = GetMaterial(MATERIAL_RED_RUBBER);
+//
+		entity* YAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
+		component_mesh* Y = YAxis->MeshComponent;
+		Y->Object = &GameState->testOBJ1;
+		Y->T = M4Identity();
+		Translate( V4(0,0,0,0), Y->T);
+		YAxis->MaterialComponent = GetMaterial(MATERIAL_RED_PLASTIC);
+//
+	//	entity* ZAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
+	//	component_mesh* Z = ZAxis->MeshComponent;
+	//	Z->Object = &GameState->testOBJ2;
+	//	Z->T = M4Identity();
+	//	Translate( V4(0,0,2,0), Z->T);
+	//	ZAxis->MaterialComponent = GetMaterial(MATERIAL_SILVER);
 
-		entity YAxis = CreateBlankEntity();
-		geometry_component& Y = YAxis.GeometryComponent;
-		Y.Object = &GameState->testOBJ;
-		Y.T = M4Identity();
-		Translate( V4(0,1,0,0), Y.T);
-		YAxis.Types = YAxis.Types | COMPONENT_TYPE_MESH;
-
-		entity ZAxis = CreateBlankEntity();
-		geometry_component& Z = ZAxis.GeometryComponent;
-		Z.Object = &GameState->testOBJ;
-		Z.T = M4Identity();
-		Translate( V4(0,0,1,0), Z.T);
-		ZAxis.Types = ZAxis.Types | COMPONENT_TYPE_MESH;
-
-
-
-		world& W = GameState->World = {};
-
-		GameState->World.WorldEntities[0] = Camera;
-		GameState->World.WorldEntities[1] = XAxis;
-		GameState->World.WorldEntities[2] = YAxis;
-		GameState->World.WorldEntities[3] = ZAxis;
+	//	entity* WAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
+	//	component_mesh* W = WAxis->MeshComponent;
+	//	W->Object = &GameState->testOBJ3;
+	//	W->T = M4Identity();
+	//	Translate( V4(0,0,0,0), W->T);
+	//	WAxis->MaterialComponent = GetMaterial(MATERIAL_GOLD);
 
 		for(s32 ControllerIndex = 0; 
 			ControllerIndex < ArrayCount(Input->Controllers); 
@@ -602,28 +621,19 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	Platform = Memory->PlatformAPI;
 	initiateGame( Thread,  Memory, Input, Buffer );
 
-
-
 	game_state* GameState = Memory->GameState;
 
 	render_push_buffer PushBuffer = {};
-	InitiatePushBuffer(&PushBuffer, Buffer, &GameState->TemporaryArena);
-
-	//UpdateVisitor ud = UpdateVisitor( );
-	//RenderVisitor rn = RenderVisitor( &PushBuffer );
-
-//	ud.traverse( GameState->Root );
-//	rn.traverse( GameState->Root );
+	InitiatePushBuffer(&PushBuffer, Buffer, &GameState->DepthBuffer, &GameState->TemporaryArena);
 
 	// Clear Screen
 	DrawRectangle(Buffer, 0,0, (r32) Buffer->Width,   (r32) Buffer->Height, 1,1,1);
-	DrawRectangle(Buffer, 1,1, (r32) Buffer->Width-2,   (r32) Buffer->Height-2, 0.3,0.3,0.3);
+	DrawRectangle(Buffer, 1,1, (r32) Buffer->Width-2, (r32) Buffer->Height-2, 0.3,0.3,0.3);
 
-	CameraSystemUpdate(&GameState->World);
-	RenderSystemUpdate(&GameState->World, &PushBuffer);
+	CameraSystemUpdate(GameState->World);
+	RenderSystemUpdate(GameState->World, &PushBuffer);
 
 	DrawTriangles(&PushBuffer);
-
 
 	ClearPushBuffer(&PushBuffer);
 

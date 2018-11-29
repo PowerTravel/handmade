@@ -1,6 +1,30 @@
 #include "entity_components.h"
 
-void SetOrthoProj( camera_component* Camera, r32 aNear, r32 aFar, r32 aRight, r32 aLeft, r32 aTop, r32 aBottom )
+/*
+struct component_camera
+{
+	r32 AngleOfView;
+	r32 ScreenHeight;
+	r32 ScreenWidth;
+	r32 NearClippingPlane;
+	r32 FarClippingPlane;
+	m4  DeltaRot;
+	v3  DeltaPos;
+	m4  V;
+	m4  P;
+	m4  R;
+};
+*/
+
+void SetRasterMatrix( component_camera* Camera, r32 ScreenWidth, r32 ScreenHeight )
+{
+	Camera->R = M4( ScreenWidth/2.f,                0, 0,  ScreenWidth/2.f, 
+				    			  0, ScreenHeight/2.f, 0, ScreenHeight/2.f, 
+				    			  0,                0, 1,                0,
+				    			  0,                0, 0,                1);
+}
+
+void SetOrthoProj( component_camera* Camera, r32 aNear, r32 aFar, r32 aRight, r32 aLeft, r32 aTop, r32 aBottom )
 {
 	aFar 	   = -aFar;
 	aNear 	   = -aNear;
@@ -19,9 +43,9 @@ void SetOrthoProj( camera_component* Camera, r32 aNear, r32 aFar, r32 aRight, r3
 				            0,         0,        0,             1);
 }
 
-void SetOrthoProj( camera_component* Camera, r32 n, r32 f )
+void SetOrthoProj( component_camera* Camera, r32 n, r32 f )
 {
-	r32 AspectRatio = Camera->ScreenWidth/Camera->ScreenHeight;
+	r32 AspectRatio = Camera->R.E[0]/Camera->R.E[5];
 	r32 scale = - Tan( Camera->AngleOfView * 0.5f * Pi32 / 180.f ) * n;
 	r32 r = AspectRatio * scale;
 	r32 l = -r;
@@ -30,7 +54,7 @@ void SetOrthoProj( camera_component* Camera, r32 n, r32 f )
 	SetOrthoProj( Camera, n, f, r, l, t, b );
 }
 
-void SetPerspectiveProj( camera_component* Camera, r32 aNear, r32 aFar, r32 aRight, r32 aLeft, r32 aTop, r32 aBottom )
+void SetPerspectiveProj( component_camera* Camera, r32 aNear, r32 aFar, r32 aRight, r32 aLeft, r32 aTop, r32 aBottom )
 {
 	r32 rlSum  = aRight+aLeft;
 	r32 rlDiff = aRight-aLeft;
@@ -55,9 +79,9 @@ void SetPerspectiveProj( camera_component* Camera, r32 aNear, r32 aFar, r32 aRig
 	                          0,         0,            -1,              -0);
 }
 
-void SetPerspectiveProj( camera_component* Camera, const r32 n, const r32 f)
+void SetPerspectiveProj( component_camera* Camera, const r32 n, const r32 f)
 {
-	r32 AspectRatio = Camera->ScreenWidth/Camera->ScreenHeight;
+	r32 AspectRatio = Camera->R.E[0]/Camera->R.E[5];
 	r32 scale = Tan( Camera->AngleOfView * 0.5f * Pi32 / 180.f ) * n;
 	r32 r     = AspectRatio * scale;
 	r32 l     = -r;
@@ -66,6 +90,22 @@ void SetPerspectiveProj( camera_component* Camera, const r32 n, const r32 f)
 
 	SetPerspectiveProj( Camera, n, f, r, l, t, b );
 } 
+
+
+void CreateCameraComponent(component_camera* Camera, r32 AngleOfView, r32 NearClippingPlane, r32 FarClippingPlane, r32 ScreenWidth, r32 ScreenHeight )
+{
+	Assert(Camera);
+	Assert(FarClippingPlane < NearClippingPlane);
+	Assert(NearClippingPlane < 0);
+	
+	Camera->AngleOfView  = AngleOfView;
+	Camera->DeltaRot = M4Identity();
+	Camera->DeltaPos = V3(0,0,0);
+
+	Camera->V = M4Identity();
+	SetRasterMatrix( Camera, ScreenWidth, ScreenHeight );
+	SetPerspectiveProj( Camera, NearClippingPlane, FarClippingPlane);
+}
 
 //		void setPinholeCamera( r32 filmApertureHeight, r32 filmApertureWidth, 
 //			 					 r32 focalLength, 		r32 nearClippingPlane, 
@@ -80,7 +120,7 @@ void SetPerspectiveProj( camera_component* Camera, const r32 n, const r32 f)
 //			setPerspectiveProj( r32 aNear, r32 aFar, r32 aLeft, r32 aRight, r32 aTop, r32 aBottom );
 //
 //		}
-void LookAt( camera_component* Camera, v3 aFrom,  v3 aTo,  v3 aTmp = V3(0,1,0) )
+void LookAt( component_camera* Camera, v3 aFrom,  v3 aTo,  v3 aTmp = V3(0,1,0) )
 {
 	v3 Forward = Normalize(aFrom - aTo);
 	v3 Right   = Normalize( CrossProduct(aTmp, Forward) );
@@ -97,17 +137,17 @@ void LookAt( camera_component* Camera, v3 aFrom,  v3 aTo,  v3 aTmp = V3(0,1,0) )
 	AssertIdentity(Camera->V * CamToWorld, 0.001 );
 }
 
-void Translate( camera_component* Camera, const v3& DeltaP  )
+void TranslateCamera( component_camera* Camera, const v3& DeltaP  )
 {
 	Camera->DeltaPos += DeltaP;
 }
 
-void Rotate( camera_component* Camera, const r32 DeltaAngle, const v3& Axis )
+void RotateCamera( component_camera* Camera, const r32 DeltaAngle, const v3& Axis )
 {
 	Camera->DeltaRot = GetRotationMatrix( DeltaAngle, V4(Axis, 0) ) * Camera->DeltaRot;
 }
 
-void UpdateViewMatrix(  camera_component* Camera )
+void UpdateViewMatrix(  component_camera* Camera )
 {
 	m4 CamToWorld = RigidInverse( Camera->V );
 	AssertIdentity( CamToWorld*Camera->V,0.001 );
@@ -127,7 +167,22 @@ void UpdateViewMatrix(  camera_component* Camera )
 	Camera->DeltaPos = V3( 0, 0, 0 );
 }
 
-void UpdateCameraMovement(camera_component* Camera, controller_component* ControllerComponent)
+void UpdateViewMatrixAngularMovement(  component_camera* Camera )
+{
+	m4 CamToWorld = RigidInverse( Camera->V );
+	AssertIdentity( CamToWorld*Camera->V,0.001 );
+
+	v4 NewUpInWorldCoord  = Camera->V * V4(0,1,0,0);
+
+	v4 NewPosInWorldCoord  = Column( CamToWorld, 3 ) + CamToWorld*V4( Camera->DeltaPos, 0 );
+
+	LookAt(Camera, V3(NewPosInWorldCoord), V3(0,0,0), V3(NewUpInWorldCoord) );
+
+	Camera->DeltaRot = M4Identity();
+	Camera->DeltaPos = V3( 0, 0, 0 );
+}
+
+void UpdateCameraMovement(component_camera* Camera, component_controller* ControllerComponent)
 {
 	game_controller_input* Controller = ControllerComponent->Controller;
 	if( Controller->IsAnalog )
@@ -135,87 +190,105 @@ void UpdateCameraMovement(camera_component* Camera, controller_component* Contro
 		b32 hasMoved = false;
 		r32 dr = 0.05;
 		r32 da = 0.05;
-		m4& DeltaRot = Camera->DeltaRot;
-		v3& DeltaPos = Camera->DeltaPos;
+		r32 Length = 3;
+		local_persist b32 AngularMovement = false;
+		local_persist r32 algular_distance = 0;
+		local_persist s32 BufferFrameCount = 0;
+
 		if(Controller->Start.EndedDown)
 		{
-			v3 CamPos = V3(0,0,1);
-			v3 CamAt =  V3(0,0,0);
-			LookAt( Camera, CamPos, CamAt );
+			if(BufferFrameCount == 0)
+			{
+				if(!AngularMovement )
+				{
+					m4 CtoW = RigidInverse(Camera->V);
+					v3 P = V3( Transpose(CtoW).r3 ); 
+					algular_distance = Norm(P);
+					AngularMovement = true;
+				}else{
+					AngularMovement = false;
+				}
+				BufferFrameCount = 1;
+			}else{
+				++BufferFrameCount;
+			}
+
+			if(BufferFrameCount > 20)
+			{
+				BufferFrameCount = 0;
+			}
 		}
 		if(Controller->LeftStickLeft.EndedDown)
 		{
-			DeltaPos += V3(-dr,0,0);
+			TranslateCamera( Camera, V3(-dr,0,0));
 			hasMoved = true;
 		}
 		if(Controller->LeftStickRight.EndedDown)
 		{
-			DeltaPos = V3(dr,0,0);
+			TranslateCamera( Camera, V3(dr,0,0));
 			hasMoved = true;
 		}
 		if(Controller->LeftStickUp.EndedDown)
 		{
-			DeltaPos = V3( 0, dr, 0 );
+			TranslateCamera( Camera, V3(0,dr,0));
 			hasMoved = true;
 		}
 		if(Controller->LeftStickDown.EndedDown)
 		{
-			DeltaPos = V3( 0, -dr, 0 );
+			TranslateCamera( Camera, V3(0,-dr,0));
 			hasMoved = true;
 		}
 		if(Controller->RightStickUp.EndedDown)
 		{
-			const v4 RotAxis = V4( 1, 0, 0, 0 );
-			Rotate( da, RotAxis, DeltaRot );
+			RotateCamera( Camera, da, V3(1,0,0) );
 			hasMoved = true;
 		}
 		if(Controller->RightStickDown.EndedDown)
 		{
-			const v4 RotAxis = V4( -1, 0, 0, 0 );
-			Rotate( da, RotAxis, DeltaRot );
+			RotateCamera( Camera, da, V3(-1,0,0) );
 			hasMoved = true;
 		}		
 		if(Controller->RightStickLeft.EndedDown)
 		{
-			const v4 RotAxis = V4( 0, 1, 0, 0);
-			Rotate( da, RotAxis, DeltaRot );
+			v4 WorldUpCamCoord = Camera->V * V4(0,1,0,0);
+			RotateCamera( Camera, da, V3( WorldUpCamCoord) );
 			hasMoved = true;
 		}
 		if(Controller->RightStickRight.EndedDown)
 		{
-			const v4 RotAxis = V4(0,-1,0,0);
-			Rotate( da, RotAxis, DeltaRot );
+			v4 WorldDownCamCoord = Camera->V * V4(0,-1,0,0);
+			RotateCamera( Camera, da, V3( WorldDownCamCoord ) );
 			hasMoved = true;
 		}
 		if(Controller->RightTrigger.EndedDown)
 		{
-			DeltaPos += V3(0,0,-dr);
+			TranslateCamera(Camera, V3(0,0,-dr));
 			hasMoved = true;
 		}
 		if(Controller->LeftTrigger.EndedDown)
 		{
-			DeltaPos += V3( 0, 0, dr);
+			TranslateCamera(Camera, V3( 0, 0, dr));
 			hasMoved = true;
 		}
 		if(Controller->A.EndedDown)
 		{
 			// at Z, top is Y, X is Right
-			LookAt( Camera, V3(0,0,3),V3(0,0,0));
+			LookAt( Camera, V3(0,0,Length),V3(0,0,0));
 		}
 		if(Controller->B.EndedDown)
 		{
 			// at X, top is Y, X is Left
-			LookAt( Camera, V3(1,1,1),V3(0,0,0));			
+			LookAt( Camera, Length * Normalize( V3(1,1,1) ),V3(0,0,0));			
 		}
 		if(Controller->X.EndedDown)
 		{
 			// at X, top is Y, X is Left
-			LookAt( Camera, V3(3,0,0), V3(0,0,0));
+			LookAt( Camera, V3(Length,0,0), V3(0,0,0));
 		}
 		if(Controller->Y.EndedDown)
 		{
 			// at Y, top is X is up, X is Left
-			LookAt( Camera, V3(0,3,0),V3(0,0,0), V3(1,0,0));
+			LookAt( Camera, V3(0,Length,0),V3(0,0,0), V3(1,0,0));
 		}
 		if(Controller->RightShoulder.EndedDown)
 		{
@@ -228,20 +301,25 @@ void UpdateCameraMovement(camera_component* Camera, controller_component* Contro
 
 		if(hasMoved)
 		{
-			UpdateViewMatrix(  Camera );
+			if(AngularMovement)
+			{
+				UpdateViewMatrixAngularMovement(Camera);
+			}else{
+				UpdateViewMatrix(  Camera );
+			}
 		}
 	}
 }
 
 void CameraSystemUpdate( world* World )
 {
-	for(s32 Index = 0;  Index < ArrayCount( World->WorldEntities); ++Index )
+	for(u32 Index = 0;  Index < World->NrMaxEntities; ++Index )
 	{
-		entity* Entity = &World->WorldEntities[Index];
+		entity* Entity = &World->Entities[Index];
 
 		if( ( Entity->Types & ( COMPONENT_TYPE_CAMERA | COMPONENT_TYPE_CONTROLLER )  ) )
 		{
-			UpdateCameraMovement( &Entity->CameraComponent, &Entity->ControllerComponent );
+			UpdateCameraMovement( Entity->CameraComponent, Entity->ControllerComponent );
 		}
 	}
 }
