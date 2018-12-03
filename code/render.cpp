@@ -308,7 +308,7 @@ void DrawLineBres( game_offscreen_buffer* Buffer, s32 x0, s32 y0, s32 x1, s32 y1
 }
 
 // Inputs are in world coordinate space
-v4 Flatshading( v4 Vertice, v4 VerticeNormal, v4 CameraPosition, v4 LightPosition, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct, r32 Shininess )
+v4 CalculateColor( v4 Vertice, v4 VerticeNormal, v4 CameraPosition, v4 LightPosition, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct, r32 Shininess )
 {
 	local_persist r32 t = 0;
 	t += 0.000006;
@@ -334,11 +334,6 @@ v4 Flatshading( v4 Vertice, v4 VerticeNormal, v4 CameraPosition, v4 LightPositio
 
 	v4 Result;
 	Result = ambient + diffuse + specular;
-	Result.X = (Result.X > 1) ? 1 : Result.X;
-	Result.Y = (Result.Y > 1) ? 1 : Result.Y;
-	Result.Z = (Result.Z > 1) ? 1 : Result.Z;
-	Result.W = 1;
-
 	return Result;
 }
 
@@ -398,22 +393,186 @@ r32 EdgeFunction( v2 a, v2 b, v2 p )
 	return(Result);
 }
 
+
+struct fragment_color
+{
+	v4 LightPosition;
+	v4 AmbientColor;
+	v4 DiffuseColor;
+	v4 SpecularColor;
+	r32 Shininess;
+};
+
+
+void GouradShading(game_offscreen_buffer* OffscreenBuffer, depth_buffer* DepthBuffer, 
+					v4* CameraPosition, aabb2d* RasterBB, v2* RasterPoints, 
+					v4* Vertices, v4* VertexNormals, v4* ViewPoints, 
+					u32 NrFragmentColors, fragment_color* PerLightColors )
+{
+	r32 Area2 = EdgeFunction( RasterPoints[0], RasterPoints[1], RasterPoints[2] );
+	if( Area2 <= 0 )
+	{
+		return;
+	}
+	
+	r32 near_clipping_plane = -1;
+	r32 PremulArea2 = 1/Area2;
+
+	v4 Color[3] = {};
+	for( u32 LightIndex = 0; LightIndex < NrFragmentColors; ++LightIndex )
+	{
+		for( u32 TriangleIndex = 0; TriangleIndex < 3; ++TriangleIndex )
+		{
+			fragment_color& Fragment = PerLightColors[LightIndex];
+			v4& VerticeColor = Color[TriangleIndex];
+			VerticeColor += CalculateColor( Vertices[TriangleIndex], 
+												 VertexNormals[TriangleIndex], 
+												 *CameraPosition, 
+												 Fragment.LightPosition, 
+									     		 Fragment.AmbientColor, 
+									     		 Fragment.DiffuseColor, 
+									     		 Fragment.SpecularColor, 
+									     		 Fragment.Shininess );
+
+			VerticeColor.X = (VerticeColor.X > 1) ? 1 : VerticeColor.X;
+			VerticeColor.Y = (VerticeColor.Y > 1) ? 1 : VerticeColor.Y;
+			VerticeColor.Z = (VerticeColor.Z > 1) ? 1 : VerticeColor.Z;
+			VerticeColor.W = 1;
+		}
+	}
+
+	for(s32 i = RoundReal32ToInt32( RasterBB->min.X ); i < RasterBB->max.X; ++i)
+	{
+		for(s32 j = RoundReal32ToInt32( RasterBB->min.Y ); j < RasterBB->max.Y; ++j)
+		{
+			v2 p = V2( (r32) i, (r32) j);
+			r32 PixelInRange0 = EdgeFunction( RasterPoints[0], RasterPoints[1], p);
+			r32 PixelInRange1 = EdgeFunction( RasterPoints[1], RasterPoints[2], p);
+			r32 PixelInRange2 = EdgeFunction( RasterPoints[2], RasterPoints[0], p);
+
+			if( ( PixelInRange0 >= 0 ) && 
+				( PixelInRange1 >= 0) &&
+				( PixelInRange2 >= 0) )
+			{
+
+				// Barycentric Coordinates
+				r32 Lambda0 = PixelInRange1 * PremulArea2;
+				r32 Lambda1 = PixelInRange2 * PremulArea2;
+				r32 Lambda2 = PixelInRange0 * PremulArea2;
+
+				r32 PixelDepthValue = Lambda0 * ViewPoints[0].Z + Lambda1 * ViewPoints[1].Z + Lambda2 * ViewPoints[2].Z;
+
+				r32& BufferDepthValue = DepthBuffer->Buffer[ j * DepthBuffer->Width  + i];
+
+				if(( PixelDepthValue > BufferDepthValue)  && ( PixelDepthValue < near_clipping_plane ))
+				{
+					BufferDepthValue = PixelDepthValue;
+					u8* PixelLocation = ((u8*)OffscreenBuffer->Memory + i * OffscreenBuffer->BytesPerPixel +
+										j * OffscreenBuffer->Pitch);
+
+					v4 InterpolatedColor = Lambda0 * Color[0] + Lambda1 * Color[1] + Lambda2 * Color[2];
+
+					r32 Red   = InterpolatedColor.X;
+					r32 Green = InterpolatedColor.Y;
+					r32 Blue  = InterpolatedColor.Z;
+
+					u32* Pixel = (u32*)PixelLocation;
+					*Pixel = ((TruncateReal32ToInt32(Red*255.f) << 16) |
+							  (TruncateReal32ToInt32(Green*255.f) << 8)  |
+							  (TruncateReal32ToInt32(Blue*255.f) << 0));
+				}
+			}
+		}
+	}
+
+}
+
+void PhongShading(game_offscreen_buffer* OffscreenBuffer, depth_buffer* DepthBuffer, 
+						v4* CameraPosition, aabb2d* RasterBB, v2* RasterPoints, 
+						v4* Vertices, v4* VertexNormals, v4* ViewPoints, 
+						u32 NrFragmentColors, fragment_color* PerLightColors )
+{
+	r32 Area2 = EdgeFunction( RasterPoints[0], RasterPoints[1], RasterPoints[2] );
+	if( Area2 <= 0 )
+	{
+		return;
+	}
+	
+	r32 near_clipping_plane = -1;
+	r32 PremulArea2 = 1/Area2;
+
+	for(s32 i = RoundReal32ToInt32( RasterBB->min.X ); i < RasterBB->max.X; ++i)
+	{
+		for(s32 j = RoundReal32ToInt32( RasterBB->min.Y ); j < RasterBB->max.Y; ++j)
+		{
+			v2 p = V2( (r32) i, (r32) j);
+			r32 PixelInRange0 = EdgeFunction( RasterPoints[0], RasterPoints[1], p);
+			r32 PixelInRange1 = EdgeFunction( RasterPoints[1], RasterPoints[2], p);
+			r32 PixelInRange2 = EdgeFunction( RasterPoints[2], RasterPoints[0], p);
+
+			if( ( PixelInRange0 >= 0 ) && 
+				( PixelInRange1 >= 0) &&
+				( PixelInRange2 >= 0) )
+			{
+
+				// Barycentric Coordinates
+				r32 Lambda0 = PixelInRange1 * PremulArea2;
+				r32 Lambda1 = PixelInRange2 * PremulArea2;
+				r32 Lambda2 = PixelInRange0 * PremulArea2;
+
+				r32 PixelDepthValue = Lambda0 * ViewPoints[0].Z + Lambda1 * ViewPoints[1].Z + Lambda2 * ViewPoints[2].Z;
+
+				r32& BufferDepthValue = DepthBuffer->Buffer[ j * DepthBuffer->Width  + i];
+
+				if(( PixelDepthValue > BufferDepthValue)  && ( PixelDepthValue < near_clipping_plane ))
+				{
+					BufferDepthValue = PixelDepthValue;
+					u8* PixelLocation = ((u8*)OffscreenBuffer->Memory + i * OffscreenBuffer->BytesPerPixel +
+										j * OffscreenBuffer->Pitch);
+
+					v4 No = Lambda0 * VertexNormals[0] + Lambda1 * VertexNormals[1] + Lambda2 * VertexNormals[2];
+					v4 Ve = Lambda0 *  Vertices[0] + Lambda1 *  Vertices[1] + Lambda2 *  Vertices[2];
+
+
+					v4 Color = V4(0,0,0,0);
+					for( u32 LightIndex = 0; LightIndex < NrFragmentColors; ++LightIndex )
+					{
+						fragment_color& Fragment = PerLightColors[LightIndex];
+						Color += CalculateColor( Ve, No, 	*CameraPosition, 
+														Fragment.LightPosition, 
+												     	Fragment.AmbientColor, 
+												     	Fragment.DiffuseColor, 
+												     	Fragment.SpecularColor, 
+												     	Fragment.Shininess );
+						
+						Color.X = (Color.X > 1) ? 1 : Color.X;
+						Color.Y = (Color.Y > 1) ? 1 : Color.Y;
+						Color.Z = (Color.Z > 1) ? 1 : Color.Z;
+						Color.W = 1;
+					}
+					r32 Red   = Color.X;
+					r32 Green = Color.Y;
+					r32 Blue  = Color.Z;
+
+					u32* Pixel = (u32*)PixelLocation;
+					*Pixel = ((TruncateReal32ToInt32(Red*255.f) << 16) |
+							  (TruncateReal32ToInt32(Green*255.f) << 8)  |
+							  (TruncateReal32ToInt32(Blue*255.f) << 0));
+				}
+			}
+		}
+	}
+}
+
 void DrawTriangles( render_push_buffer* PushBuffer )
 {
-	// TODO: Move to Camera?
-	r32 near_clipping_plane = -1;
-
 	// Get camera matrices
 	m4& V =  PushBuffer->Camera->V; 	// ViewMatrix
 	m4& P = PushBuffer->Camera->P;		// ProjectionMatrix
-	m4& R = PushBuffer->Camera->R;				// RasterizationMatrix
+	m4& R = PushBuffer->Camera->R;		// RasterizationMatrix
 	m4 	RPV= R*P*V;						// All in one
 
 	v4 CameraPosition = Transpose( RigidInverse( V ) ).r3;
-	component_light* Light = Pop<component_light>(PushBuffer->Lights);
-	Assert(Light)
-	v4 LightPosition  = Light->Position;
-	v4 LightColor  = Light->Color;
 
 	// 'Reset' DepthBuffer
 	game_offscreen_buffer* OffscreenBuffer =  PushBuffer->OffscreenBuffer;
@@ -423,6 +582,9 @@ void DrawTriangles( render_push_buffer* PushBuffer )
 		DepthBuffer->Buffer[i] = -10E10;
 	}
 
+	r32 DiffsePremul = 1/Pi32;
+	r32 SpecularPremul = 1/(8*Pi32);
+
 	// For each render group
 	render_group* RenderGroup = 0;
 	while( ( RenderGroup = Pop<render_group>(PushBuffer->RenderGroups) ) )
@@ -431,6 +593,43 @@ void DrawTriangles( render_push_buffer* PushBuffer )
 		m4& T = RenderGroup->Mesh->T;
 		// Transform Matrix for normals
 		m4 NT = Transpose( RigidInverse(T) );
+
+		temporary_memory LightMemory = BeginTemporaryMemory( PushBuffer->Arena );
+		fragment_color* PerLightColors = (fragment_color*) PushArray( PushBuffer->Arena, PushBuffer->Lights->Size, fragment_color );
+		component_material* Material = RenderGroup->Material;
+		
+		filo_buffer_entry* LightEntry = PushBuffer->Lights->First;
+		u32 LightIndex = 0;
+		do
+		{
+			component_light* Light = (component_light*) LightEntry->Data;
+
+			fragment_color& Fragment = PerLightColors[LightIndex];
+			Fragment.LightPosition  = Light->Position;
+
+			v4 LightColor  = Light->Color;
+			Fragment.AmbientColor  = V4(	LightColor.X * Material->AmbientColor.X,  
+											LightColor.Y * Material->AmbientColor.Y,  
+											LightColor.Z * Material->AmbientColor.Z,  
+											LightColor.W * Material->AmbientColor.W );
+			Fragment.DiffuseColor  = V4(	LightColor.X * Material->DiffuseColor.X,  
+											LightColor.Y * Material->DiffuseColor.Y,  
+											LightColor.Z * Material->DiffuseColor.Z,  
+											LightColor.W * Material->DiffuseColor.W );
+			Fragment.AmbientColor = DiffsePremul*Fragment.AmbientColor;
+
+			Fragment.SpecularColor = V4(	LightColor.X * Material->SpecularColor.X, 
+											LightColor.Y * Material->SpecularColor.Y,
+								 			LightColor.Z * Material->SpecularColor.Z, 
+			 								LightColor.W * Material->SpecularColor.W );
+
+			Fragment.Shininess = Material->Shininess;
+
+			Fragment.SpecularColor = (SpecularPremul * (Fragment.Shininess + 8) ) * Fragment.SpecularColor;
+			LightIndex++;
+		}while( (LightEntry = LightEntry->Next) );
+
+		
 
 		obj_geometry* Object = RenderGroup->Mesh->Object;
 		u32 NrTrianglesInMesh = Object->nt;
@@ -455,8 +654,8 @@ void DrawTriangles( render_push_buffer* PushBuffer )
 			}
 
 			// Get Bounding Box in raster space
-			v2 RasterPoint[3] = { V2( PointMultiply(RPV, v[0]) ), V2( PointMultiply(RPV, v[1]) ), V2( PointMultiply(RPV, v[2]) ) };
-			aabb2d RasterBB = getBoundingBox( RasterPoint[0], RasterPoint[1], RasterPoint[2] );
+			v2 RasterPoints[3] = { V2( PointMultiply(RPV, v[0]) ), V2( PointMultiply(RPV, v[1]) ), V2( PointMultiply(RPV, v[2]) ) };
+			aabb2d RasterBB = getBoundingBox( RasterPoints[0], RasterPoints[1], RasterPoints[2] );
 
 			// OffScreenCulling
 			if( (RasterBB.max.X < 0)  || 
@@ -472,67 +671,14 @@ void DrawTriangles( render_push_buffer* PushBuffer )
 			RasterBB.min.Y = Maximum(0, RasterBB.min.Y);
 			RasterBB.max.Y = Minimum((r32) OffscreenBuffer->Height, RasterBB.max.Y);
 
-			// Behind Camera Culling?
-			r32 Area2 = EdgeFunction( RasterPoint[0], RasterPoint[1], RasterPoint[2] );
-			if( Area2 <= 0 )
-			{
-				continue;
-			}
-			r32 PremulArea2 = 1/Area2;
+			v4 ViewPoints[3] ={ V*v[0] ,V*v[1] , V*v[2] };
+			#if 1
+			GouradShading(OffscreenBuffer, DepthBuffer, &CameraPosition, &RasterBB, RasterPoints, v, vn, ViewPoints,  PushBuffer->Lights->Size, PerLightColors);
+			#else
+			PhongShading(OffscreenBuffer, DepthBuffer, &CameraPosition, &RasterBB, RasterPoints, v, vn, ViewPoints,  PushBuffer->Lights->Size, PerLightColors);
+			#endif
 
-			v4 ViewPoint[3] ={ V*v[0] ,V*v[1] , V*v[2] };				
-
-			for(s32 i = RoundReal32ToInt32( RasterBB.min.X ); i < RasterBB.max.X; ++i)
-			{
-				for(s32 j = RoundReal32ToInt32( RasterBB.min.Y ); j < RasterBB.max.Y; ++j)
-				{
-					v2 p = V2( (r32) i, (r32) j);
-					r32 PixelInRange0 = EdgeFunction( RasterPoint[0], RasterPoint[1], p);
-					r32 PixelInRange1 = EdgeFunction( RasterPoint[1], RasterPoint[2], p);
-					r32 PixelInRange2 = EdgeFunction( RasterPoint[2], RasterPoint[0], p);
-
-					if( ( PixelInRange0 >= 0 ) && 
-						( PixelInRange1 >= 0) &&
-						( PixelInRange2 >= 0) )
-					{
-
-						// Barycentric Coordinates
-						r32 Lambda0 = PixelInRange1 * PremulArea2;
-						r32 Lambda1 = PixelInRange2 * PremulArea2;
-						r32 Lambda2 = PixelInRange0 * PremulArea2;
-
-						r32 PixelDepthValue = Lambda0 * ViewPoint[0].Z + Lambda1 * ViewPoint[1].Z + Lambda2 * ViewPoint[2].Z;
-
-						r32& BufferDepthValue = DepthBuffer->Buffer[ j * DepthBuffer->Width  + i];
-
-						if(( PixelDepthValue > BufferDepthValue)  && ( PixelDepthValue < near_clipping_plane ))
-						{
-							BufferDepthValue = PixelDepthValue;
-							u8* PixelLocation = ((u8*)OffscreenBuffer->Memory + i * OffscreenBuffer->BytesPerPixel +
-															j * OffscreenBuffer->Pitch);
-
-							v4 No = Lambda0 * vn[0] + Lambda1 * vn[1] + Lambda2 * vn[2];
-							v4 Ve = Lambda0 *  v[0] + Lambda1 *  v[1] + Lambda2 *  v[2];
-
-							v4 Color = Flatshading( Ve, No, CameraPosition, 
-															LightPosition, 
-													     	LightColor, 
-													     	LightColor, 
-													     	LightColor, 
-													     	12 );
-
-							r32 Red   = Color.X;
-							r32 Green = Color.Y;
-							r32 Blue  = Color.Z;
-		
-							u32* Pixel = (u32*)PixelLocation;
-							*Pixel = ((TruncateReal32ToInt32(Red*255.f) << 16) |
-									  (TruncateReal32ToInt32(Green*255.f) << 8)  |
-									  (TruncateReal32ToInt32(Blue*255.f) << 0));
-						}
-					}
-				}
-			}
 		}
+		EndTemporaryMemory( LightMemory );
 	}
 }

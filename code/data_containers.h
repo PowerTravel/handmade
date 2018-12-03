@@ -12,6 +12,7 @@ struct filo_buffer_entry
 struct filo_buffer
 {
 	memory_arena* Arena;
+	u32 Size;
 	filo_buffer_entry* First;
 };
 
@@ -22,6 +23,7 @@ void Push( filo_buffer* FiloBuffer, T* FiloEntry )
 	NewEntry->Data = (void*) FiloEntry;
 	NewEntry->Next = FiloBuffer->First;
 	FiloBuffer->First = NewEntry;
+	++FiloBuffer->Size;
 };
 
 template <typename T>
@@ -34,8 +36,10 @@ T* Pop( filo_buffer* FiloBuffer )
 
 	T* Result = (T*) FiloBuffer->First->Data;
 	FiloBuffer->First = FiloBuffer->First->Next;
+	--FiloBuffer->Size;
 	return Result;
 };
+
 
 filo_buffer* CreateFiloBuffer( memory_arena* Arena )
 {

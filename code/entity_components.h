@@ -71,6 +71,7 @@ struct component_material
 	r32 Shininess;
 };
 
+
 struct component_mesh
 {
 	m4 T;

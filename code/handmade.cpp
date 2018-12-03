@@ -559,35 +559,45 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 		entity* Light = AllocateNewEntity( GameState->World, COMPONENT_TYPE_LIGHT );
 		component_light* L = Light->LightComponent;
 		L->Position = V4(3,2,3,1);
-		L->Color 	= V4(0.5,0.5,0.5,1);
+		L->Color 	= V4(0.7,0.2,0.2,1);
 
-	//	entity* XAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
-	//	component_mesh* X = XAxis->MeshComponent;
-	//	X->Object = &GameState->testOBJ0;
-	//	X->T = M4Identity();
-	//	Translate( V4(2,0,0,0), X->T);
-	//	XAxis->MaterialComponent = GetMaterial(MATERIAL_RED_RUBBER);
-//
+		Light = AllocateNewEntity( GameState->World, COMPONENT_TYPE_LIGHT );
+		L = Light->LightComponent;
+		L->Position = V4(4,-2,-3,1);
+		L->Color 	= V4(0.1,0.8,0.3,1);
+
+		Light = AllocateNewEntity( GameState->World, COMPONENT_TYPE_LIGHT );
+		L = Light->LightComponent;
+		L->Position = V4(-4,-2,-3,1);
+		L->Color 	= V4(0.2,0.2,0.7,1);
+
+		entity* XAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
+		component_mesh* X = XAxis->MeshComponent;
+		X->Object = &GameState->testOBJ0;
+		X->T = M4Identity();
+		Translate( V4(2,0,0,0), X->T);
+		SetMaterial(XAxis->MaterialComponent, MATERIAL_RED_RUBBER);
+
 		entity* YAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
 		component_mesh* Y = YAxis->MeshComponent;
 		Y->Object = &GameState->testOBJ1;
 		Y->T = M4Identity();
 		Translate( V4(0,0,0,0), Y->T);
-		YAxis->MaterialComponent = GetMaterial(MATERIAL_RED_PLASTIC);
-//
-	//	entity* ZAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
-	//	component_mesh* Z = ZAxis->MeshComponent;
-	//	Z->Object = &GameState->testOBJ2;
-	//	Z->T = M4Identity();
-	//	Translate( V4(0,0,2,0), Z->T);
-	//	ZAxis->MaterialComponent = GetMaterial(MATERIAL_SILVER);
+		SetMaterial(YAxis->MaterialComponent, MATERIAL_RED_PLASTIC);
 
-	//	entity* WAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
-	//	component_mesh* W = WAxis->MeshComponent;
-	//	W->Object = &GameState->testOBJ3;
-	//	W->T = M4Identity();
-	//	Translate( V4(0,0,0,0), W->T);
-	//	WAxis->MaterialComponent = GetMaterial(MATERIAL_GOLD);
+		entity* ZAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
+		component_mesh* Z = ZAxis->MeshComponent;
+		Z->Object = &GameState->testOBJ2;
+		Z->T = M4Identity();
+		Translate( V4(0,0,2,0), Z->T);
+		SetMaterial(ZAxis->MaterialComponent, MATERIAL_SILVER);
+
+		entity* WAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
+		component_mesh* W = WAxis->MeshComponent;
+		W->Object = &GameState->testOBJ3;
+		W->T = M4Identity();
+		Translate( V4(0,0,0,0), W->T);
+		SetMaterial(WAxis->MaterialComponent, MATERIAL_GOLD);
 
 		for(s32 ControllerIndex = 0; 
 			ControllerIndex < ArrayCount(Input->Controllers); 
