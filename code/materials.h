@@ -29,7 +29,7 @@ enum material
 	MATERIAL_YELLOW_RUBBER
 };
 
-component_material* GetMaterial(u32 MaterialType)
+void SetMaterial(component_material* Material, u32 MaterialType)
 {
 	local_persist component_material mtl[24] = 
 	{ 
@@ -61,34 +61,32 @@ component_material* GetMaterial(u32 MaterialType)
 
 	switch(MaterialType)
 	{
-		case MATERIAL_EMERALD:        return &mtl[0 ]; break; 
-		case MATERIAL_JADE:           return &mtl[1 ]; break; 
-		case MATERIAL_OBSIDIAN:       return &mtl[2 ]; break; 
-		case MATERIAL_PEARL:          return &mtl[3 ]; break; 
-		case MATERIAL_RUBY:           return &mtl[4 ]; break; 
-		case MATERIAL_TURQUOISE:      return &mtl[5 ]; break; 
-		case MATERIAL_BRASS:          return &mtl[6 ]; break; 
-		case MATERIAL_BRONZE:         return &mtl[7 ]; break; 
-		case MATERIAL_CHROME:         return &mtl[8 ]; break; 
-		case MATERIAL_COMPPER:        return &mtl[9 ]; break; 
-		case MATERIAL_GOLD:           return &mtl[10]; break; 
-		case MATERIAL_SILVER:         return &mtl[11]; break; 
-		case MATERIAL_BLACK_PLASTIC:  return &mtl[12]; break; 
-		case MATERIAL_CYAN_PLASTIC:   return &mtl[13]; break; 
-		case MATERIAL_GREEN_PLASTIC:  return &mtl[14]; break; 
-		case MATERIAL_RED_PLASTIC:    return &mtl[15]; break; 
-		case MATERIAL_WHITE_PLASTIC:  return &mtl[16]; break; 
-		case MATERIAL_YELLOW_PLASTIC: return &mtl[17]; break; 
-		case MATERIAL_BLACK_RUBBER:   return &mtl[18]; break; 
-		case MATERIAL_CYAN_RUBBER:    return &mtl[19]; break; 
-		case MATERIAL_GREEN_RUBBER:   return &mtl[20]; break; 
-		case MATERIAL_RED_RUBBER:     return &mtl[21]; break; 
-		case MATERIAL_WHITE_RUBBER:   return &mtl[22]; break; 
-		case MATERIAL_YELLOW_RUBBER:  return &mtl[23]; break; 
+		case MATERIAL_EMERALD:        *Material = mtl[0 ]; break; 
+		case MATERIAL_JADE:           *Material = mtl[1 ]; break; 
+		case MATERIAL_OBSIDIAN:       *Material = mtl[2 ]; break; 
+		case MATERIAL_PEARL:          *Material = mtl[3 ]; break; 
+		case MATERIAL_RUBY:           *Material = mtl[4 ]; break; 
+		case MATERIAL_TURQUOISE:      *Material = mtl[5 ]; break; 
+		case MATERIAL_BRASS:          *Material = mtl[6 ]; break; 
+		case MATERIAL_BRONZE:         *Material = mtl[7 ]; break; 
+		case MATERIAL_CHROME:         *Material = mtl[8 ]; break; 
+		case MATERIAL_COMPPER:        *Material = mtl[9 ]; break; 
+		case MATERIAL_GOLD:           *Material = mtl[10]; break; 
+		case MATERIAL_SILVER:         *Material = mtl[11]; break; 
+		case MATERIAL_BLACK_PLASTIC:  *Material = mtl[12]; break; 
+		case MATERIAL_CYAN_PLASTIC:   *Material = mtl[13]; break; 
+		case MATERIAL_GREEN_PLASTIC:  *Material = mtl[14]; break; 
+		case MATERIAL_RED_PLASTIC:    *Material = mtl[15]; break; 
+		case MATERIAL_WHITE_PLASTIC:  *Material = mtl[16]; break; 
+		case MATERIAL_YELLOW_PLASTIC: *Material = mtl[17]; break; 
+		case MATERIAL_BLACK_RUBBER:   *Material = mtl[18]; break; 
+		case MATERIAL_CYAN_RUBBER:    *Material = mtl[19]; break; 
+		case MATERIAL_GREEN_RUBBER:   *Material = mtl[20]; break; 
+		case MATERIAL_RED_RUBBER:     *Material = mtl[21]; break; 
+		case MATERIAL_WHITE_RUBBER:   *Material = mtl[22]; break; 
+		case MATERIAL_YELLOW_RUBBER:  *Material = mtl[23]; break; 
 		default: Assert(0) break;
 	}
-
-	return 0;
 }
 
 #endif
