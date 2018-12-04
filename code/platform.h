@@ -46,8 +46,6 @@
 
 #include <stddef.h> // size_t exists in this header on some platforms
 
-#include "types.h"
-
 struct thread_context
 {
 	s32 placeholder;

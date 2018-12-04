@@ -2,7 +2,7 @@
 
 void RenderSystemUpdate( world* World, render_push_buffer* RenderPushBuffer )
 {
-	for( u32 Index = 0;  Index < World->NrMaxEntities; ++Index )
+	for( u32 Index = 0;  Index < World->NrEntities; ++Index )
 	{
 		entity* Entity = &World->Entities[Index];
 
@@ -16,9 +16,9 @@ void RenderSystemUpdate( world* World, render_push_buffer* RenderPushBuffer )
 			PushLight( RenderPushBuffer, Entity->LightComponent );
 		}
 
-		if( ( Entity->Types & COMPONENT_TYPE_MESH ) )
+		if( ( Entity->Types & ( COMPONENT_TYPE_RENDER_MESH  ) )  )
 		{
-			PushRenderGroup( RenderPushBuffer, Entity->MeshComponent, Entity->MaterialComponent );
+			PushRenderGroup( RenderPushBuffer, Entity->RenderMeshComponent );
 		}
 
 	}

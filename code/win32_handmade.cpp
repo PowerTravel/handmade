@@ -24,13 +24,6 @@
 //#include "handmade.h"
 
 #include <stdio.h>
-
-#include "platform.h"
-#include "intrinsics.h"
-#include "vector_math.h"
-#include "shared.h"
-#include "memory.h"
-#include "string.h"
 #include <windows.h>
 #include <xinput.h>
 #include <dsound.h>

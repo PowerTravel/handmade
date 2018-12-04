@@ -1,19 +1,15 @@
 #ifndef STRING_H
 #define STRING_H
 
-#include "types.h"
-#include "shared.h"
-
-
 namespace str
 {
 
-internal s32
-StringLength( char* String )
+internal u32
+StringLength( const char* String )
 {
 	// foo++ -> increment after
 	// ++foo -> increment before
-	s32 Count = 0;
+	u32 Count = 0;
 	while(*String++)
 	{
 		++Count;
@@ -22,7 +18,7 @@ StringLength( char* String )
 }
 
 internal bool
-BeginsWith( size_t LookForLength,  char* LookForString, size_t SearchInLength,  char* SearchInString )
+BeginsWith( size_t LookForLength, const char* LookForString, size_t SearchInLength, const char* SearchInString )
 {
 	if( LookForLength > SearchInLength )
 	{
@@ -41,6 +37,48 @@ BeginsWith( size_t LookForLength,  char* LookForString, size_t SearchInLength,  
 
 	return true;
 }
+
+
+char*
+Contains( size_t LookForLength, char* LookForString, size_t SearchInLength, char* SearchInString )
+{
+	if(SearchInLength<LookForLength  )
+	{
+		return 0;
+	}
+
+	size_t SearchMargin = SearchInLength - LookForLength;
+	size_t ScanIdx = 0;
+	while(ScanIdx <= SearchMargin)
+	{
+		size_t LeftOverLength = SearchInLength - SearchMargin;
+		char* LeftOverString =  &SearchInString[ScanIdx];
+		if( ( *LeftOverString == *LookForString ) &&
+			BeginsWith( LookForLength, LookForString, LeftOverLength, LeftOverString) )
+		{
+			return LeftOverString;
+		}
+
+		++ScanIdx;
+	}	
+
+	return 0;
+}
+
+b32
+Equals( char* StringA, char* StringB )
+{
+	while( *StringA && *StringB )
+	{
+		if( *StringA++ != *StringB++ )
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+
 
 internal char*
 FindFirstOf( char* Tokens, char* String )
@@ -106,6 +144,74 @@ FindFirstNotOf( char Token, char* String )
 	return FindFirstNotOf( tokens, String );
 }
 
+internal char*
+FindLastOf( char* Tokens, char* String )
+{
+	if( !String ){ return 0; }
+
+
+	u32 Length = StringLength( String );
+	if(Length < 1){ return 0; }
+
+	char* ScanPos = String + Length;
+	while( ScanPos > String  )
+	{
+		--ScanPos;
+
+		char* t = Tokens;
+		bool found = false;
+		while( *t )
+		{
+			if(*t == *ScanPos)
+			{
+				found = true;
+				break;
+			}
+			++t;
+		}
+		if(found)
+		{
+			return ScanPos;
+		}
+	}
+
+	return 0;	
+}
+
+internal char*
+FindLastNotOf( char* Tokens, char* String )
+{
+	if( !String ){ return 0; }
+
+
+	u32 Length = StringLength( String );
+	if(Length < 1){ return 0; }
+
+	char* ScanPos = String + Length;
+	while( ScanPos > String  )
+	{
+		--ScanPos;
+
+		char* t = Tokens;
+		bool found = false;
+		while( *t )
+		{
+			if(*t == *ScanPos)
+			{
+				found = true;
+				break;
+			}
+			++t;
+		}
+		if(!found)
+		{
+			return ScanPos;
+		}
+	}
+
+	return 0;	
+}
+
 internal s32
 GetWordCount( char* String )
 {
@@ -160,11 +266,23 @@ r64 StringToReal64( char* String )
 }
 
 internal void
-CatStrings(	size_t SourceACount, char* SourceA,
-			size_t SourceBCount, char* SourceB,
+CopyStrings(	size_t SourceCount, char* Source,
+				size_t DestCount,	 char* Dest )
+{
+	Assert(SourceCount <= DestCount);
+	for( s32 Index = 0; Index < SourceCount; ++Index)
+	{
+		*Dest++ = *Source++;
+	}
+
+	*Dest ='\0';
+}
+
+internal void
+CatStrings(	const size_t SourceACount, const char* SourceA,
+			const size_t SourceBCount, const char* SourceB,
 			size_t DestCount,	 char* Dest )
 {
-
 	for( s32 Index = 0; Index < SourceACount; ++Index)
 	{
 		*Dest++ = *SourceA++;
@@ -176,7 +294,7 @@ CatStrings(	size_t SourceACount, char* SourceA,
 		*Dest++ = *SourceB++;
 	}
 
-	*Dest++ ='\0';
+	*Dest ='\0';
 }
 
 }

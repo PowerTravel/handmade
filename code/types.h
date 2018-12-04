@@ -1,3 +1,5 @@
+#ifndef TYPES_H
+#define TYPES_H
 
 #include <stdint.h>
 
@@ -53,3 +55,5 @@ typedef double r64;
 #define global_variable  static
 
 #define Pi32 3.14159265359f
+
+#endif

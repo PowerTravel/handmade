@@ -1,21 +1,5 @@
 #include "entity_components.h"
 
-/*
-struct component_camera
-{
-	r32 AngleOfView;
-	r32 ScreenHeight;
-	r32 ScreenWidth;
-	r32 NearClippingPlane;
-	r32 FarClippingPlane;
-	m4  DeltaRot;
-	v3  DeltaPos;
-	m4  V;
-	m4  P;
-	m4  R;
-};
-*/
-
 void SetRasterMatrix( component_camera* Camera, r32 ScreenWidth, r32 ScreenHeight )
 {
 	Camera->R = M4( ScreenWidth/2.f,                0, 0,  ScreenWidth/2.f, 
@@ -278,7 +262,7 @@ void UpdateCameraMovement(component_camera* Camera, component_controller* Contro
 		if(Controller->B.EndedDown)
 		{
 			// at X, top is Y, X is Left
-			LookAt( Camera, Length * Normalize( V3(1,1,1) ),V3(0,0,0));			
+			LookAt( Camera, 100*Length * Normalize( V3(0,0,1) ),V3(0,0,0));			
 		}
 		if(Controller->X.EndedDown)
 		{
@@ -313,7 +297,7 @@ void UpdateCameraMovement(component_camera* Camera, component_controller* Contro
 
 void CameraSystemUpdate( world* World )
 {
-	for(u32 Index = 0;  Index < World->NrMaxEntities; ++Index )
+	for(u32 Index = 0;  Index < World->NrEntities; ++Index )
 	{
 		entity* Entity = &World->Entities[Index];
 

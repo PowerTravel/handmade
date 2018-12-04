@@ -152,7 +152,7 @@ struct bmp_header
 #pragma pack(pop)
 
 internal void
-BlitBMP( game_offscreen_buffer* Buffer, r32 RealMinX, r32 RealMinY, loaded_bitmap BitMap )
+BlitBMP( game_offscreen_buffer* Buffer, r32 RealMinX, r32 RealMinY, bitmap BitMap )
 {
 	s32 MinX = RoundReal32ToInt32( RealMinX );
 	s32 MinY = RoundReal32ToInt32( RealMinY );
@@ -307,8 +307,15 @@ void DrawLineBres( game_offscreen_buffer* Buffer, s32 x0, s32 y0, s32 x1, s32 y1
 	}
 }
 
+
+struct calculated_color
+{
+	v4 ambient;
+	v4 diffuse;
+	v4 specular;
+};
 // Inputs are in world coordinate space
-v4 CalculateColor( v4 Vertice, v4 VerticeNormal, v4 CameraPosition, v4 LightPosition, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct, r32 Shininess )
+calculated_color CalculateColor( v4 Vertice, v4 VerticeNormal, v4 CameraPosition, v4 LightPosition, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct, r32 Shininess )
 {
 	local_persist r32 t = 0;
 	t += 0.000006;
@@ -324,16 +331,15 @@ v4 CalculateColor( v4 Vertice, v4 VerticeNormal, v4 CameraPosition, v4 LightPosi
 
 	Shininess = 10;
 
-	v4 ambient = AmbientProduct;
+	calculated_color Result = {};
+	Result.ambient = AmbientProduct;
 
 	r32 Kd = Maximum(L*N, 0.0f);
-	v4 diffuse = Kd*DiffuseProduct;
+	Result.diffuse = Kd*DiffuseProduct;
 
 	r32 Ks = Pow(Maximum(H*N, 0.0f), Shininess);
-	v4 specular = Ks * SpecularProduct;
+	Result.specular = Ks * SpecularProduct;
 
-	v4 Result;
-	Result = ambient + diffuse + specular;
 	return Result;
 }
 
@@ -346,15 +352,15 @@ struct aabb2d
 
 void PushLight( render_push_buffer* PushBuffer, component_light* Light )
 {
-	Push<component_light>( PushBuffer->Lights, Light );
+	PushBuffer->Lights.Last();
+	PushBuffer->Lights.InsertAfter(Light);
 }
 
-void PushRenderGroup( render_push_buffer* PushBuffer, component_mesh* Mesh, component_material* Material )
+void PushRenderGroup( render_push_buffer* PushBuffer, component_render_mesh* Mesh )
 {
 	render_group* NewRenderGroup = (render_group*) PushStruct( PushBuffer->Arena, render_group );
 	NewRenderGroup->Mesh = Mesh;
-	NewRenderGroup->Material = Material;
-	Push<render_group>( PushBuffer->RenderGroups, NewRenderGroup );
+	PushBuffer->RenderGroups.Push(NewRenderGroup);
 }
 
 void InitiatePushBuffer(render_push_buffer* PushBuffer, game_offscreen_buffer* aOffscreenBuffer, depth_buffer* DepthBuffer, memory_arena* aArena)
@@ -364,8 +370,8 @@ void InitiatePushBuffer(render_push_buffer* PushBuffer, game_offscreen_buffer* a
 	PushBuffer->DepthBuffer = DepthBuffer;
 	PushBuffer->TemporaryMemory = BeginTemporaryMemory(PushBuffer->Arena);
 	PushBuffer->OffscreenBuffer = aOffscreenBuffer;
-	PushBuffer->RenderGroups = CreateFiloBuffer( PushBuffer->Arena );
-	PushBuffer->Lights = CreateFiloBuffer( PushBuffer->Arena );
+	PushBuffer->RenderGroups = filo_queue<render_group*>( PushBuffer->Arena );
+	PushBuffer->Lights = list<component_light*>(PushBuffer->Arena);
 }
 
 void ClearPushBuffer(render_push_buffer* Buffer)
@@ -387,9 +393,9 @@ aabb2d getBoundingBox(v2 a, v2 b, v2 c)
 	return Result;
 }
 
-r32 EdgeFunction( v2 a, v2 b, v2 p )
+r32 EdgeFunction( v2* a, v2* b, v2* p )
 {
-	r32 Result = (a.X-p.X) * (b.Y-a.Y) - (b.X-a.X) * (a.Y-p.Y);
+	r32 Result = (a->X-p->X) * (b->Y-a->Y) - (b->X-a->X) * (a->Y-p->Y);
 	return(Result);
 }
 
@@ -404,172 +410,157 @@ struct fragment_color
 };
 
 
-void GouradShading(game_offscreen_buffer* OffscreenBuffer, depth_buffer* DepthBuffer, 
-					v4* CameraPosition, aabb2d* RasterBB, v2* RasterPoints, 
-					v4* Vertices, v4* VertexNormals, v4* ViewPoints, 
-					u32 NrFragmentColors, fragment_color* PerLightColors )
+void DrawTriangle(game_offscreen_buffer* OffscreenBuffer, depth_buffer* DepthBuffer, 
+					aabb2d* RasterBB, v2* PointsInScreenSpace, 
+					v4* PointInCameraSpace, v2* TextureCoordinates, bitmap* TextureMap, r32 PremulArea2, calculated_color* Color)
 {
-	r32 Area2 = EdgeFunction( RasterPoints[0], RasterPoints[1], RasterPoints[2] );
+	r32 near_clipping_plane = -1;
+	for(s32 Y = RoundReal32ToInt32( RasterBB->min.Y ); Y < RasterBB->max.Y; ++Y)
+	{
+		for(s32 X = RoundReal32ToInt32( RasterBB->min.X ); X < RasterBB->max.X; ++X)
+		{
+		
+			v2 p = V2( (r32) X, (r32) Y);
+			r32 PixelInRange0 = EdgeFunction( &PointsInScreenSpace[0], &PointsInScreenSpace[1], &p);
+			r32 PixelInRange1 = EdgeFunction( &PointsInScreenSpace[1], &PointsInScreenSpace[2], &p);
+			r32 PixelInRange2 = EdgeFunction( &PointsInScreenSpace[2], &PointsInScreenSpace[0], &p);
+
+			b32 ShouldFillPixel = ( ( PixelInRange0 >= 0 ) && 
+								    ( PixelInRange1 >= 0 ) &&
+								    ( PixelInRange2 >= 0 ) );
+
+			if( ShouldFillPixel )
+			{
+				// Barycentric Coordinates
+				r32 Lambda0 = PixelInRange1 * PremulArea2;
+				r32 Lambda1 = PixelInRange2 * PremulArea2;
+				r32 Lambda2 = PixelInRange0 * PremulArea2;
+
+				r32 PixelDepthValue = Lambda0 * PointInCameraSpace[0].Z + Lambda1 * PointInCameraSpace[1].Z + Lambda2 * PointInCameraSpace[2].Z;
+
+				r32* BufferDepthValue = &DepthBuffer->Buffer[ Y * DepthBuffer->Width  + X];
+
+				if( ( PixelDepthValue > *BufferDepthValue) && ( PixelDepthValue < near_clipping_plane ) )
+				{
+					*BufferDepthValue = PixelDepthValue;
+					u8* PixelLocation = ((u8*)OffscreenBuffer->Memory + X * OffscreenBuffer->BytesPerPixel +
+										Y * OffscreenBuffer->Pitch);
+
+					v4 InterpolatedAmbientColor  = Lambda0 * Color[0].ambient  + Lambda1 * Color[1].ambient  + Lambda2 * Color[2].ambient;
+					v4 InterpolatedDiffuseColor  = Lambda0 * Color[0].diffuse  + Lambda1 * Color[1].diffuse  + Lambda2 * Color[2].diffuse;
+					v4 InterpolatedSpecularColor = Lambda0 * Color[0].specular + Lambda1 * Color[1].specular + Lambda2 * Color[2].specular;
+
+					v2 InterpolatedTextureCoord = Lambda0 * TextureCoordinates[0] + Lambda1 * TextureCoordinates[1] + Lambda2 * TextureCoordinates[2];
+
+					r32 TextureRed   = 1;
+					r32 TextureGreen = 1;
+					r32 TextureBlue  = 1;
+					if( TextureMap  )
+					{
+						u32* TextureValue = ( (u32*) TextureMap->Pixels + TextureMap->Width *  TruncateReal32ToInt32( InterpolatedTextureCoord.Y ) +
+																							   TruncateReal32ToInt32( InterpolatedTextureCoord.X ));
+
+						TextureRed   = ( ((*TextureValue) & 0x00FF0000) >> 16)/255.f;
+						TextureGreen = ( ((*TextureValue) & 0x0000FF00) >> 8)/255.f;
+						TextureBlue  = ( ((*TextureValue) & 0x000000FF) >> 0)/255.f;
+
+					}
+#if 1
+					r32 TextureBlendedRed   = InterpolatedAmbientColor.X * TextureRed + 
+											  InterpolatedDiffuseColor.X * TextureRed + 
+											  InterpolatedSpecularColor.X;
+					TextureBlendedRed = (TextureBlendedRed > 1) ? 1 : TextureBlendedRed;	 
+
+					r32 TextureBlendedGreen = InterpolatedAmbientColor.Y * TextureGreen + 
+											  InterpolatedDiffuseColor.Y * TextureGreen + 
+											  InterpolatedSpecularColor.Y;
+					TextureBlendedGreen = (TextureBlendedGreen > 1) ? 1 : TextureBlendedGreen;
+
+					r32 TextureBlendedBlue  = InterpolatedAmbientColor.Z * TextureBlue + 
+											  InterpolatedDiffuseColor.Z * TextureBlue + 
+											  InterpolatedSpecularColor.Z;
+					TextureBlendedBlue = (TextureBlendedBlue > 1) ? 1 : TextureBlendedBlue;	 
+
+#else
+					r32 TextureBlendedRed   =  TextureRed;
+					r32 TextureBlendedGreen =  TextureGreen;
+					r32 TextureBlendedBlue  =  TextureBlue;
+#endif
+					u32* Pixel = (u32*)PixelLocation;
+
+					*Pixel = ((TruncateReal32ToInt32(TextureBlendedRed  * 255.f) << 16) |
+							  (TruncateReal32ToInt32(TextureBlendedGreen* 255.f) << 8)  |
+							  (TruncateReal32ToInt32(TextureBlendedBlue * 255.f) << 0));
+				}
+			}
+		}
+	}
+}
+
+void GouradShading(game_offscreen_buffer* OffscreenBuffer, depth_buffer* DepthBuffer, 
+					v4* CameraPosition, aabb2d* RasterBB, v2* PointsInScreenSpace, 
+					v4* Vertices, v4* VertexNormals, v4* PointInCameraSpace, 
+					u32 NrFragmentColors, fragment_color* PerLightColors, v2* TextureCoordinates, bitmap* TextureMap )
+{
+	r32 Area2 = EdgeFunction( &PointsInScreenSpace[0], &PointsInScreenSpace[1], &PointsInScreenSpace[2] );
 	if( Area2 <= 0 )
 	{
 		return;
 	}
 	
-	r32 near_clipping_plane = -1;
+	
 	r32 PremulArea2 = 1/Area2;
-
-	v4 Color[3] = {};
+	calculated_color Color[3] = {};
 	for( u32 LightIndex = 0; LightIndex < NrFragmentColors; ++LightIndex )
 	{
 		for( u32 TriangleIndex = 0; TriangleIndex < 3; ++TriangleIndex )
 		{
 			fragment_color& Fragment = PerLightColors[LightIndex];
-			v4& VerticeColor = Color[TriangleIndex];
-			VerticeColor += CalculateColor( Vertices[TriangleIndex], 
-												 VertexNormals[TriangleIndex], 
-												 *CameraPosition, 
-												 Fragment.LightPosition, 
-									     		 Fragment.AmbientColor, 
-									     		 Fragment.DiffuseColor, 
-									     		 Fragment.SpecularColor, 
-									     		 Fragment.Shininess );
+			
+			calculated_color VC = CalculateColor( Vertices[TriangleIndex], 
+												  VertexNormals[TriangleIndex], 
+												  *CameraPosition, 
+												  Fragment.LightPosition, 
+									     		  Fragment.AmbientColor, 
+									     		  Fragment.DiffuseColor, 
+									     		  Fragment.SpecularColor, 
+									     		  Fragment.Shininess );
 
-			VerticeColor.X = (VerticeColor.X > 1) ? 1 : VerticeColor.X;
-			VerticeColor.Y = (VerticeColor.Y > 1) ? 1 : VerticeColor.Y;
-			VerticeColor.Z = (VerticeColor.Z > 1) ? 1 : VerticeColor.Z;
-			VerticeColor.W = 1;
+			calculated_color& VerticeColor = Color[TriangleIndex];
+			VerticeColor.ambient += VC.ambient;
+			VerticeColor.diffuse += VC.diffuse;
+			VerticeColor.specular += VC.specular;
 		}
 	}
-
-	for(s32 i = RoundReal32ToInt32( RasterBB->min.X ); i < RasterBB->max.X; ++i)
-	{
-		for(s32 j = RoundReal32ToInt32( RasterBB->min.Y ); j < RasterBB->max.Y; ++j)
-		{
-			v2 p = V2( (r32) i, (r32) j);
-			r32 PixelInRange0 = EdgeFunction( RasterPoints[0], RasterPoints[1], p);
-			r32 PixelInRange1 = EdgeFunction( RasterPoints[1], RasterPoints[2], p);
-			r32 PixelInRange2 = EdgeFunction( RasterPoints[2], RasterPoints[0], p);
-
-			if( ( PixelInRange0 >= 0 ) && 
-				( PixelInRange1 >= 0) &&
-				( PixelInRange2 >= 0) )
-			{
-
-				// Barycentric Coordinates
-				r32 Lambda0 = PixelInRange1 * PremulArea2;
-				r32 Lambda1 = PixelInRange2 * PremulArea2;
-				r32 Lambda2 = PixelInRange0 * PremulArea2;
-
-				r32 PixelDepthValue = Lambda0 * ViewPoints[0].Z + Lambda1 * ViewPoints[1].Z + Lambda2 * ViewPoints[2].Z;
-
-				r32& BufferDepthValue = DepthBuffer->Buffer[ j * DepthBuffer->Width  + i];
-
-				if(( PixelDepthValue > BufferDepthValue)  && ( PixelDepthValue < near_clipping_plane ))
-				{
-					BufferDepthValue = PixelDepthValue;
-					u8* PixelLocation = ((u8*)OffscreenBuffer->Memory + i * OffscreenBuffer->BytesPerPixel +
-										j * OffscreenBuffer->Pitch);
-
-					v4 InterpolatedColor = Lambda0 * Color[0] + Lambda1 * Color[1] + Lambda2 * Color[2];
-
-					r32 Red   = InterpolatedColor.X;
-					r32 Green = InterpolatedColor.Y;
-					r32 Blue  = InterpolatedColor.Z;
-
-					u32* Pixel = (u32*)PixelLocation;
-					*Pixel = ((TruncateReal32ToInt32(Red*255.f) << 16) |
-							  (TruncateReal32ToInt32(Green*255.f) << 8)  |
-							  (TruncateReal32ToInt32(Blue*255.f) << 0));
-				}
-			}
-		}
-	}
+	
+	DrawTriangle( OffscreenBuffer, DepthBuffer, RasterBB, PointsInScreenSpace, 
+				  PointInCameraSpace, TextureCoordinates, TextureMap, PremulArea2, Color);
 
 }
 
-void PhongShading(game_offscreen_buffer* OffscreenBuffer, depth_buffer* DepthBuffer, 
-						v4* CameraPosition, aabb2d* RasterBB, v2* RasterPoints, 
-						v4* Vertices, v4* VertexNormals, v4* ViewPoints, 
-						u32 NrFragmentColors, fragment_color* PerLightColors )
+v4 Blend(v4* A, v4* B)
 {
-	r32 Area2 = EdgeFunction( RasterPoints[0], RasterPoints[1], RasterPoints[2] );
-	if( Area2 <= 0 )
-	{
-		return;
-	}
-	
-	r32 near_clipping_plane = -1;
-	r32 PremulArea2 = 1/Area2;
+	v4 Result =  V4( A->X *B->X,  
+				     A->Y *B->Y,  
+				     A->Z *B->Z,  
+				     A->W *B->W );
+	return Result;
+}
 
-	for(s32 i = RoundReal32ToInt32( RasterBB->min.X ); i < RasterBB->max.X; ++i)
-	{
-		for(s32 j = RoundReal32ToInt32( RasterBB->min.Y ); j < RasterBB->max.Y; ++j)
-		{
-			v2 p = V2( (r32) i, (r32) j);
-			r32 PixelInRange0 = EdgeFunction( RasterPoints[0], RasterPoints[1], p);
-			r32 PixelInRange1 = EdgeFunction( RasterPoints[1], RasterPoints[2], p);
-			r32 PixelInRange2 = EdgeFunction( RasterPoints[2], RasterPoints[0], p);
-
-			if( ( PixelInRange0 >= 0 ) && 
-				( PixelInRange1 >= 0) &&
-				( PixelInRange2 >= 0) )
-			{
-
-				// Barycentric Coordinates
-				r32 Lambda0 = PixelInRange1 * PremulArea2;
-				r32 Lambda1 = PixelInRange2 * PremulArea2;
-				r32 Lambda2 = PixelInRange0 * PremulArea2;
-
-				r32 PixelDepthValue = Lambda0 * ViewPoints[0].Z + Lambda1 * ViewPoints[1].Z + Lambda2 * ViewPoints[2].Z;
-
-				r32& BufferDepthValue = DepthBuffer->Buffer[ j * DepthBuffer->Width  + i];
-
-				if(( PixelDepthValue > BufferDepthValue)  && ( PixelDepthValue < near_clipping_plane ))
-				{
-					BufferDepthValue = PixelDepthValue;
-					u8* PixelLocation = ((u8*)OffscreenBuffer->Memory + i * OffscreenBuffer->BytesPerPixel +
-										j * OffscreenBuffer->Pitch);
-
-					v4 No = Lambda0 * VertexNormals[0] + Lambda1 * VertexNormals[1] + Lambda2 * VertexNormals[2];
-					v4 Ve = Lambda0 *  Vertices[0] + Lambda1 *  Vertices[1] + Lambda2 *  Vertices[2];
-
-
-					v4 Color = V4(0,0,0,0);
-					for( u32 LightIndex = 0; LightIndex < NrFragmentColors; ++LightIndex )
-					{
-						fragment_color& Fragment = PerLightColors[LightIndex];
-						Color += CalculateColor( Ve, No, 	*CameraPosition, 
-														Fragment.LightPosition, 
-												     	Fragment.AmbientColor, 
-												     	Fragment.DiffuseColor, 
-												     	Fragment.SpecularColor, 
-												     	Fragment.Shininess );
-						
-						Color.X = (Color.X > 1) ? 1 : Color.X;
-						Color.Y = (Color.Y > 1) ? 1 : Color.Y;
-						Color.Z = (Color.Z > 1) ? 1 : Color.Z;
-						Color.W = 1;
-					}
-					r32 Red   = Color.X;
-					r32 Green = Color.Y;
-					r32 Blue  = Color.Z;
-
-					u32* Pixel = (u32*)PixelLocation;
-					*Pixel = ((TruncateReal32ToInt32(Red*255.f) << 16) |
-							  (TruncateReal32ToInt32(Green*255.f) << 8)  |
-							  (TruncateReal32ToInt32(Blue*255.f) << 0));
-				}
-			}
-		}
-	}
+void ClampToOne( v4* A )
+{
+	A->X = (A->X > 1) ? 1 : A->X; 
+	A->Y = (A->Y > 1) ? 1 : A->Y; 
+	A->Z = (A->Z > 1) ? 1 : A->Z; 
+	A->W = (A->W > 1) ? 1 : A->W; 
 }
 
 void DrawTriangles( render_push_buffer* PushBuffer )
 {
 	// Get camera matrices
 	m4& V =  PushBuffer->Camera->V; 	// ViewMatrix
-	m4& P = PushBuffer->Camera->P;		// ProjectionMatrix
-	m4& R = PushBuffer->Camera->R;		// RasterizationMatrix
+	m4& P =  PushBuffer->Camera->P;		// ProjectionMatrix
+	m4& R =  PushBuffer->Camera->R;		// RasterizationMatrix
 	m4 	RPV= R*P*V;						// All in one
 
 	v4 CameraPosition = Transpose( RigidInverse( V ) ).r3;
@@ -586,97 +577,118 @@ void DrawTriangles( render_push_buffer* PushBuffer )
 	r32 SpecularPremul = 1/(8*Pi32);
 
 	// For each render group
-	render_group* RenderGroup = 0;
-	while( ( RenderGroup = Pop<render_group>(PushBuffer->RenderGroups) ) )
+	filo_queue<render_group*>& RenderGroups = PushBuffer->RenderGroups;
+	while( !PushBuffer->RenderGroups.IsEmpty()  )
 	{
-		// Transform Matrix for points
-		m4& T = RenderGroup->Mesh->T;
-		// Transform Matrix for normals
-		m4 NT = Transpose( RigidInverse(T) );
+		render_group* RenderGroup = RenderGroups.Pop();
 
 		temporary_memory LightMemory = BeginTemporaryMemory( PushBuffer->Arena );
-		fragment_color* PerLightColors = (fragment_color*) PushArray( PushBuffer->Arena, PushBuffer->Lights->Size, fragment_color );
-		component_material* Material = RenderGroup->Material;
+		fragment_color* PerLightColors = (fragment_color*) PushArray( PushBuffer->Arena, PushBuffer->Lights.GetSize(), fragment_color );
+	
+		surface_property SurfaceProperty = RenderGroup->Mesh->SurfaceProperty;
+		material* Material = SurfaceProperty.Material;
+		bitmap* DiffuseMap = SurfaceProperty.DiffuseMap;
 		
-		filo_buffer_entry* LightEntry = PushBuffer->Lights->First;
+		list<component_light*>& LightQueue = PushBuffer->Lights;
+		LightQueue.First();
 		u32 LightIndex = 0;
-		do
+		while( ! LightQueue.IsEnd() )
 		{
-			component_light* Light = (component_light*) LightEntry->Data;
+			component_light* Light = LightQueue.Get();
 
 			fragment_color& Fragment = PerLightColors[LightIndex];
 			Fragment.LightPosition  = Light->Position;
 
 			v4 LightColor  = Light->Color;
-			Fragment.AmbientColor  = V4(	LightColor.X * Material->AmbientColor.X,  
-											LightColor.Y * Material->AmbientColor.Y,  
-											LightColor.Z * Material->AmbientColor.Z,  
-											LightColor.W * Material->AmbientColor.W );
-			Fragment.DiffuseColor  = V4(	LightColor.X * Material->DiffuseColor.X,  
-											LightColor.Y * Material->DiffuseColor.Y,  
-											LightColor.Z * Material->DiffuseColor.Z,  
-											LightColor.W * Material->DiffuseColor.W );
-			Fragment.AmbientColor = DiffsePremul*Fragment.AmbientColor;
+			
+			if(Material)
+			{
+				Fragment.AmbientColor   = Blend(&Light->Color, &Material->AmbientColor);
+				Fragment.DiffuseColor   = Blend(&Light->Color, &Material->DiffuseColor);
+				Fragment.SpecularColor  = Blend(&Light->Color, &Material->SpecularColor);
+				Fragment.Shininess 		= Material->Shininess;
+			}else{
 
-			Fragment.SpecularColor = V4(	LightColor.X * Material->SpecularColor.X, 
-											LightColor.Y * Material->SpecularColor.Y,
-								 			LightColor.Z * Material->SpecularColor.Z, 
-			 								LightColor.W * Material->SpecularColor.W );
+				Fragment.AmbientColor  = V4(3,3,3,3);
+				Fragment.DiffuseColor  = V4(0,0,0,0);
+				Fragment.SpecularColor = V4(0,0,0,0);
 
-			Fragment.Shininess = Material->Shininess;
+				Fragment.Shininess = 1;
+			}
 
+			Fragment.AmbientColor  = DiffsePremul*Fragment.AmbientColor;
 			Fragment.SpecularColor = (SpecularPremul * (Fragment.Shininess + 8) ) * Fragment.SpecularColor;
+
+			LightQueue.Next();
 			LightIndex++;
-		}while( (LightEntry = LightEntry->Next) );
+		};
+			
+		// Transform Matrix for points
+		m4& T = RenderGroup->Mesh->T;
+		// Transform Matrix for normals
+		m4 NT = Transpose( RigidInverse(T) );
 
-		
+		component_render_mesh* Mesh = RenderGroup->Mesh;
+		u32 NrTrianglesInMesh = Mesh->TriangleCount;
+		mesh_data* MeshData = Mesh->Data;
 
-		obj_geometry* Object = RenderGroup->Mesh->Object;
-		u32 NrTrianglesInMesh = Object->nt;
 		for( u32 TriangleIndex = 0; TriangleIndex < NrTrianglesInMesh; ++TriangleIndex) 
 		{
-			triangle Triangle = Object->t[TriangleIndex];
-			
+			face* Triangle = &Mesh->Triangles[TriangleIndex];
+			Assert(Triangle->nv == 3);
+
 			v4 v[3]  = {};
 			v4 vn[3] = {};
+			v2 tc[3] = {}; // TextureCoordinate
 
-			v[0] = T*Object->v[ Triangle.vi[0] ];
-			v[1] = T*Object->v[ Triangle.vi[1] ];
-			v[2] = T*Object->v[ Triangle.vi[2] ];
+			v[0] = T*MeshData->v[ Triangle->vi[0] ];
+			v[1] = T*MeshData->v[ Triangle->vi[1] ];
+			v[2] = T*MeshData->v[ Triangle->vi[2] ];
 
-			if(Triangle.HasVerticeNormals)
+			if(Triangle->ni)
 			{
-				vn[0] = NT*Object->vn[ Triangle.vni[0] ];
-				vn[1] = NT*Object->vn[ Triangle.vni[1] ];
-				vn[2] = NT*Object->vn[ Triangle.vni[2] ];
+				vn[0] = NT*MeshData->vn[ Triangle->ni[0] ];
+				vn[1] = NT*MeshData->vn[ Triangle->ni[1] ];
+				vn[2] = NT*MeshData->vn[ Triangle->ni[2] ];
 			}else{
-				vn[0] = vn[1] = vn[2] = NT*Triangle.n;
+				v3 A = V3(v[0]-v[1]);
+				v3 B = V3(v[0]-v[2]);
+				v4 FaceNormal =  V4( Normalize( CrossProduct(A,B) ),0);
+
+				vn[0] = vn[1] = vn[2] = NT*FaceNormal;
+			}
+
+			if( Triangle->ti && DiffuseMap )
+			{
+				tc[0].X = DiffuseMap->Width  * MeshData->vt[ Triangle->ti[0] ].X;
+				tc[0].Y = DiffuseMap->Height * MeshData->vt[ Triangle->ti[0] ].Y;
+				tc[1].X = DiffuseMap->Width  * MeshData->vt[ Triangle->ti[1] ].X;
+				tc[1].Y = DiffuseMap->Height * MeshData->vt[ Triangle->ti[1] ].Y;
+				tc[2].X = DiffuseMap->Width  * MeshData->vt[ Triangle->ti[2] ].X;
+				tc[2].Y = DiffuseMap->Height * MeshData->vt[ Triangle->ti[2] ].Y;
 			}
 
 			// Get Bounding Box in raster space
-			v2 RasterPoints[3] = { V2( PointMultiply(RPV, v[0]) ), V2( PointMultiply(RPV, v[1]) ), V2( PointMultiply(RPV, v[2]) ) };
-			aabb2d RasterBB = getBoundingBox( RasterPoints[0], RasterPoints[1], RasterPoints[2] );
+			v2 PointsInScreenSpace[3] = { V2( PointMultiply(RPV, v[0]) ), V2( PointMultiply(RPV, v[1]) ), V2( PointMultiply(RPV, v[2]) ) };
+			aabb2d ScreenBoundingBox = getBoundingBox( PointsInScreenSpace[0], PointsInScreenSpace[1], PointsInScreenSpace[2] );
 
 			// OffScreenCulling
-			if( (RasterBB.max.X < 0)  || 
-				(RasterBB.max.Y < 0 ) ||
-				(RasterBB.min.X >= OffscreenBuffer->Width) || 
-				(RasterBB.min.Y >= OffscreenBuffer->Height))
+			if( (ScreenBoundingBox.max.X < 0)  || 
+				(ScreenBoundingBox.max.Y < 0 ) ||
+				(ScreenBoundingBox.min.X >= OffscreenBuffer->Width) || 
+				(ScreenBoundingBox.min.Y >= OffscreenBuffer->Height))
 			{
 				continue;
 			}
 
-			RasterBB.min.X = Maximum(0, RasterBB.min.X);
-			RasterBB.max.X = Minimum((r32) OffscreenBuffer->Width, RasterBB.max.X);
-			RasterBB.min.Y = Maximum(0, RasterBB.min.Y);
-			RasterBB.max.Y = Minimum((r32) OffscreenBuffer->Height, RasterBB.max.Y);
+			ScreenBoundingBox.min.X = Maximum(0, ScreenBoundingBox.min.X);
+			ScreenBoundingBox.max.X = Minimum((r32) OffscreenBuffer->Width, ScreenBoundingBox.max.X);
+			ScreenBoundingBox.min.Y = Maximum(0, ScreenBoundingBox.min.Y);
+			ScreenBoundingBox.max.Y = Minimum((r32) OffscreenBuffer->Height, ScreenBoundingBox.max.Y);
 
-			v4 ViewPoints[3] ={ V*v[0] ,V*v[1] , V*v[2] };
-			#if 1
-			GouradShading(OffscreenBuffer, DepthBuffer, &CameraPosition, &RasterBB, RasterPoints, v, vn, ViewPoints,  PushBuffer->Lights->Size, PerLightColors);
-			#else
-			PhongShading(OffscreenBuffer, DepthBuffer, &CameraPosition, &RasterBB, RasterPoints, v, vn, ViewPoints,  PushBuffer->Lights->Size, PerLightColors);
-			#endif
+			v4 PointInCameraSpace[3] ={ V*v[0] ,V*v[1] , V*v[2] };
+
+			GouradShading(OffscreenBuffer, DepthBuffer, &CameraPosition, &ScreenBoundingBox, PointsInScreenSpace, v, vn, PointInCameraSpace,  PushBuffer->Lights.GetSize(), PerLightColors, tc, DiffuseMap);
 
 		}
 		EndTemporaryMemory( LightMemory );

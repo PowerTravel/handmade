@@ -1,8 +1,10 @@
 #include <stdio.h>
+
 #include "handmade.h"
 #include "render.cpp"
 #include "camera_system.cpp"
 #include "render_system.cpp"
+#include "obj_loader.cpp"
 
 internal void
 GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
@@ -38,394 +40,8 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
 	}
 }
 
-
-v4 ParseNumbers(char* String)
-{
-	char* Start = str::FindFirstNotOf( " \t", String );
-	char WordBuffer[OBJ_MAX_WORD_LENGTH];
-	s32 CoordinateIdx = 0;
-	v4 Result = V4(0,0,0,1);
-	while( Start )
-	{
-		Assert(CoordinateIdx < 4);
-
-		char* End = str::FindFirstOf( " \t", Start);
-
-		size_t WordLength = ( End ) ? (End - Start) : str::StringLength(Start);
-
-		Assert(WordLength < OBJ_MAX_WORD_LENGTH);
-
-		Copy( WordLength, Start, WordBuffer );
-		WordBuffer[WordLength] = '\0';
-
-		
-		r64 value = str::StringToReal64(WordBuffer);
-		Result.E[CoordinateIdx++] = (r32) value;
-
-		Start = (End) ? str::FindFirstNotOf(" \t", End) : End;
-	}
-
-	return Result;
-}
-
-obj_geometry DEBUGReadOBJ(thread_context* Thread, game_state* aGameState, 
-			   debug_platform_read_entire_file* ReadEntireFile,
-			   debug_platfrom_free_file_memory* FreeEntireFile,
-			   char* FileName)
-{
-	obj_geometry Result = {};
-
-	debug_read_file_result ReadResult = ReadEntireFile(Thread, FileName);
-
-	if( ReadResult.ContentSize )
-	{
-		s32 nrVertices = 0;
-		s32 nrVertexNormals = 0;
-		s32 nrTexturePoints = 0;
-		s32 nrFaces = 0;
-
-		char* ScanPtr = ( char* ) ReadResult.Contents;
-		char* FileEnd =  ( char* ) ReadResult.Contents + ReadResult.ContentSize;
-
-		while( ScanPtr < FileEnd )
-		{
-			char* ThisLine = ScanPtr;
-			ScanPtr = str::FindFirstOf('\n', ThisLine);
-			ScanPtr = (ScanPtr) ? (ScanPtr + 1) : FileEnd;
-
-			size_t Length = ScanPtr - ThisLine;
-
-			Assert(Length < OBJ_MAX_LINE_LENGTH);
-
-			if(Length < 2)
-			{
-				continue;
-			}
-
-			char LineCopy[OBJ_MAX_LINE_LENGTH];
-			Copy( Length, ThisLine, LineCopy );
-			LineCopy[Length] = '\0';
-
-
-			// Jump over Comment lines
-			if( str::BeginsWith( 1,"#",Length, LineCopy) || 
-			 	str::BeginsWith( 2,"\r\n",Length, LineCopy) ||
-			 	str::BeginsWith( 1,"\n",Length, LineCopy)  )
-			{
-				continue;
-			}
-
-			// Vertices: v x y z [w=1]
-			else if( str::BeginsWith(2,"v ", Length, LineCopy) )
-			{
-				++nrVertices;
-			}
-
-			// Vertex Normals: vn i j k
-			else if( str::BeginsWith(3,"vn ", Length, LineCopy) )
-			{
-				++nrVertexNormals;
-			}
-
-			// Vertex Textures: vt u v [w=0]
-			else if( str::BeginsWith(3,"vt ", Length, LineCopy) )
-			{
-				++nrTexturePoints;
-			}
-
-			// Faces: f v1[/vt1][/vn1] v2[/vt2][/vn2] v3[/vt3][/vn3] ...
-			else if( str::BeginsWith(2,"f ", Length, LineCopy) )
-			{
-				++nrFaces;
-			}else if(str::BeginsWith(7,"mtllib ", Length, LineCopy)  ){
-				// Unimplemented
-			}else if(str::BeginsWith(2,"g ", Length, LineCopy)  ){
-				// Unimplemented
-			}else if(str::BeginsWith(7,"usemtl ", Length, LineCopy)  ){
-				// Unimplemented
-			}else if(str::BeginsWith(2,"s ", Length, LineCopy)  ){
-				// Unimplemented
-			}
-			else if (str::BeginsWith(2, "o ", Length, LineCopy)) {
-				// Unimplemented
-			}
-			else if (str::BeginsWith(2, "l ", Length, LineCopy)) {
-				// Unimplemented
-			}
-			else{
-				Assert(0);
-			
-			}
-		}
-
-		memory_arena* Arena = &aGameState->AssetArena;
-		
-		Result.nv = nrVertices;
-		Result.v = (v4*) PushArray(Arena, nrVertices ,v4);
-		v4* vertices  = Result.v;
-
-		Result.nvn = nrVertexNormals;
-		Result.vn = (v4*) PushArray(Arena, nrVertexNormals ,v4);
-		v4* vertexNormals = Result.vn;
-
-		Result.nvt = nrTexturePoints;
-		Result.vt = (v3*) PushArray(Arena, nrTexturePoints ,v3);
-		v3* texturePoints = Result.vt;
-
-		Result.nf = nrFaces;
-		Result.f= (face*) PushArray(Arena, nrFaces, face);
-		face* faces = Result.f;
-
-		s32 verticeIdx 	  = 0;
-		s32 vertexNormalIdx = 0;
-		s32 texturePointIdx = 0;
-		s32 faceIdx = 0;
-
-		char mtlLib[OBJ_MAX_LINE_LENGTH] = {};
-
-		ScanPtr = ( char* ) ReadResult.Contents;
-		while( ScanPtr < FileEnd )
-		{
-			char* ThisLine = ScanPtr;
-			ScanPtr = str::FindFirstOf('\n', ThisLine);
-			ScanPtr = (ScanPtr) ? (ScanPtr + 1) : FileEnd;
-
-
-			char* TrimEnd = ScanPtr-1;
-			while( (TrimEnd > ThisLine) && ( (*TrimEnd == '\n') || (*TrimEnd == '\r') ) )
-			{
-				--TrimEnd;
-			}
-			++TrimEnd;
-
-			char* TrimStart = ThisLine;
-			while( (TrimStart < TrimEnd) && ((*TrimStart == ' ') || (*TrimStart == '\t')) )
-			{
-				++TrimStart;
-			}
-
-			ThisLine = TrimStart;
-			size_t Length = TrimEnd - ThisLine;
-
-			Assert(Length < OBJ_MAX_LINE_LENGTH);
-
-			if(Length < 2)
-			{
-				continue;
-			}
-			
-			char LineBuffer[OBJ_MAX_LINE_LENGTH];
-			
-			Copy( Length, ThisLine, LineBuffer );
-			LineBuffer[Length] = '\0';
-
-			char WordBuffer[OBJ_MAX_WORD_LENGTH];
-
-			// Jump over Comment lines
-			if( str::BeginsWith( 1,"#",Length, LineBuffer) )
-			{
-				continue;
-			}
-
-			// Vertices: v x y z [w=1]
-			else if( str::BeginsWith(2,"v ", Length, LineBuffer) )
-			{
-				Assert(verticeIdx < nrVertices);
-				vertices[verticeIdx++] = ParseNumbers(LineBuffer+2);
-			}
-			
-			// Vertex Normals: vn i j k
-			else if( str::BeginsWith(3,"vn ", Length, LineBuffer) )
-			{
-				Assert(vertexNormalIdx<=nrVertexNormals);
-
-				vertexNormals[ vertexNormalIdx ] = ParseNumbers(LineBuffer+3);
-				vertexNormals[ vertexNormalIdx ].W = 0;
-				vertexNormalIdx++;
-				
-			}
-
-			// Vertex Textures: vt u v [w=0]
-			else if( str::BeginsWith(3,"vt ", Length, LineBuffer) )
-			{
-				Assert( texturePointIdx <=nrTexturePoints );
-				texturePoints[ texturePointIdx++ ] = V3( ParseNumbers(LineBuffer+3) );
-			}
-
-			// Faces: f v1[/vt1][/vn1] v2[/vt2][/vn2] v3[/vt3][/vn3] ...
-			else if( str::BeginsWith(2,"f ", Length, LineBuffer) )
-			{
-				char* Start = str::FindFirstNotOf( " \t", LineBuffer+2 );
-
-				
-				face* f = &faces[faceIdx++];
-				f->nv = str::GetWordCount(Start);
-				Assert( f->nv >= 3);
-				Result.nt += f->nv - 2;
-
-				s32 VertIdx = 0;
-
-				while( Start )
-				{
-					char* End = str::FindFirstOf( " \t", Start);
-
-					size_t WordLength = ( End ) ? (End - Start) : str::StringLength(Start);
-
-					Assert(WordLength < OBJ_MAX_WORD_LENGTH);
-
-					Copy( WordLength, Start, WordBuffer );
-					WordBuffer[WordLength] = '\0';
-
-
-					char* StartNr = WordBuffer;
-					char* EndNr = 0;
-					s32 i =0;
-					while( StartNr )
-					{
-						EndNr 	= str::FindFirstOf("/", StartNr);
-						if( EndNr )
-					 	{
-							*EndNr++ = '\0';
-						}
-
-						s32 nr = (s32) str::StringToReal64(StartNr)-1;
-						Assert(nr>=0);
-						Assert(VertIdx < f->nv);
-						switch(i)
-						{
-							case 0:
-							{	
-								if( !f->vi )
-								{
-									f->vi = (s32*) PushArray(Arena, f->nv, int); 
-								}
-
-								f->vi[VertIdx] = nr;
-							}break;
-
-							case 1:
-							{
-								if( !f->ti )
-								{
-									f->ti = (s32*) PushArray(Arena, f->nv, int); 
-								}
-
-								f->ti[VertIdx] = nr;
-							}break;
-
-							case 2:
-							{
-								if( !f->ni )
-								{
-									f->ni  = (s32*) PushArray(Arena, f->nv, int); 
-								}
-								f->ni[VertIdx] = nr;
-							}break;
-
-						}
-
-						++i;
-
-						StartNr = str::FindFirstNotOf("/", EndNr);
-						
-					}
-
-					++VertIdx;
-
-					Start = (End) ? str::FindFirstNotOf(" \t", End) : End;
-				}
-
-			}else if(str::BeginsWith(7,"mtllib ", Length, LineBuffer)  ){
-				
-			}else if(str::BeginsWith(2,"g ", Length, LineBuffer)  ){
-				// Unimplemented
-			}else if(str::BeginsWith(7,"usemtl ", Length, LineBuffer)  ){
-				// Unimplemented
-			}else if(str::BeginsWith(2,"s ", Length, LineBuffer)  ){
-				// Unimplemented
-			}
-			
-	
-		}
-
-		FreeEntireFile(Thread, ReadResult.Contents);
-
-		
-		v4 cm = V4(0,0,0,0);
-		for(s32 i = 0; i<Result.nv; ++i)
-		{
-			cm += Result.v[i];
-		}
-		cm = cm/(r32)Result.nv;
-		cm.W = 0;
-
-		// Center the object around origin
-		v4 MaxAxis = V4(0,0,0,0);
-		r32 MaxDistance = 0;
-		for(s32 i = 0; i<Result.nv; ++i)
-		{
-			Result.v[i] = Result.v[i]-cm;
-			r32 distance = Norm( V3(Result.v[i]) ); 
-			if( distance > MaxDistance )
-			{
-				MaxAxis = Result.v[i];
-				MaxDistance = distance;
-			}
-		}
-		if(MaxDistance > 1)
-		{
-			MaxDistance = 1/MaxDistance;
-		}
-		// Scale object to the unit cube
-		for(s32 i = 0; i<Result.nv; ++i)
-		{
-			Result.v[i] = Result.v[i]*MaxDistance; 
-			Result.v[i].W = 1;
-		}
-
-
-		Result.t = PushArray(Arena, Result.nt, triangle);
-		s32 TriangleIdx = 0;
-
-		for(s32 i = 0; i<Result.nf; ++i)
-		{
-			face* f = &Result.f[i];
-			for(s32 j = 0; j < f->nv-2; ++j)
-			{
-
-				triangle* t = &Result.t[TriangleIdx++];
-
-				t->vi[0] = f->vi[0];
-				t->vi[1] = f->vi[1+j];
-				t->vi[2] = f->vi[2+j];
-
-				if(f->ni)
-				{
-					t->vni[0] = f->ni[0];
-					t->vni[1] = f->ni[1 + j];
-					t->vni[2] = f->ni[2 + j];
-					t->HasVerticeNormals = true;
-				}else{
-					t->HasVerticeNormals = false;
-				}
-				
-				v4 v0 = Result.v[f->vi[0]];
-				v4 v1 = Result.v[f->vi[1]];
-				v4 v2 = Result.v[f->vi[2]];
-
-
-				v3 r1 = V3(v1-v0);
-				v3 r2 = V3(v2-v0);
-				v4 triangleNormal = V4( CrossProduct( r1 , r2 ),0);
-				t->n = Normalize( triangleNormal );
-			}
-		}
-	}
-
-	return Result;
-}
-
-internal loaded_bitmap
+#if 1
+internal bitmap
 DEBUGReadBMP( thread_context* Thread, game_state* aGameState, 
 			   debug_platform_read_entire_file* ReadEntireFile,
 			   debug_platfrom_free_file_memory* FreeEntireFile,
@@ -442,7 +58,7 @@ DEBUGReadBMP( thread_context* Thread, game_state* aGameState,
 	//				For a mouse pointer sprite this would for example be on the tip of
 	//				the pointer. Its used to poroperly display the bitmap.
 
-	loaded_bitmap Result = {};
+	bitmap Result = {};
 	debug_read_file_result ReadResult = ReadEntireFile(Thread, FileName);
 
 	if (ReadResult.ContentSize != 0)
@@ -471,11 +87,11 @@ DEBUGReadBMP( thread_context* Thread, game_state* aGameState,
 
 		Assert(RedBitShift.Found);
 		Assert(GreenBitShift.Found);
-		Assert(BlueBitShift.Found);
+		Assert(BlueBitShift.Found);	
 
-		for (int Y = 0; Y < Result.Height; ++Y)
+		for (u32 Y = 0; Y < Result.Height; ++Y)
 		{
-			for (int X = 0; X < Result.Width; ++X)
+			for (u32 X = 0; X < Result.Width; ++X)
 			{
 				u32 Pixel = *Source--;
 	
@@ -508,96 +124,137 @@ DEBUGReadBMP( thread_context* Thread, game_state* aGameState,
 	return Result;
 }
 
+void CreateMuroScene(thread_context* Thread, game_memory* Memory, game_input* Input, game_offscreen_buffer* Buffer)
+{
+		game_state* GameState = Memory->GameState;
+		
+		u32 NrMaxWorldEntities = 256;
+		GameState->World = AllocateWorld( NrMaxWorldEntities );
+
+		entity* Camera = NewEntity( GameState->World );
+		NewComponents( GameState->World, Camera, COMPONENT_TYPE_CAMERA |  COMPONENT_TYPE_CONTROLLER );
+		CreateCameraComponent(Camera->CameraComponent, 60, -0.1, -100, (r32) Buffer->Width, (r32) Buffer->Height );
+		LookAt( Camera->CameraComponent, 10* Normalize( V3(0,0,1) ), V3(0,0,0));
+		Camera->ControllerComponent->Controller = GetController( Input, 1 );
+		
+		entity* Light = NewEntity( GameState->World );
+		NewComponents( GameState->World, Light, COMPONENT_TYPE_LIGHT );
+		component_light* L = Light->LightComponent;
+		L->Position = V4(5,3,3,1);
+		L->Color 	= V4(0.8,0.8,0.8,1);
+
+		Light = NewEntity( GameState->World );
+		NewComponents( GameState->World, Light, COMPONENT_TYPE_LIGHT );
+		L = Light->LightComponent;
+		L->Position = V4(5,-3,3,1);
+		L->Color 	= V4(0.2,0.2,0.2,1);
+
+		loaded_obj_file* ObjFile = ReadOBJFile(Thread, GameState, 
+							Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+							Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,	
+								"C:\\Users\\Mother Shabobo\\Desktop\\handmade\\data\\geometry\\muro\\muro.obj");
+
+		SetMeshAndMaterialComponentFromObjFile( GameState->World, ObjFile );
+
+}
+
+void CreateCubeScene(thread_context* Thread, game_memory* Memory, game_input* Input, game_offscreen_buffer* Buffer)
+{
+		game_state* GameState = Memory->GameState;
+
+		u32 NrMaxWorldEntities = 256;
+		GameState->World = AllocateWorld( NrMaxWorldEntities );
+
+		entity* Camera = NewEntity( GameState->World );
+		NewComponents( GameState->World, Camera, COMPONENT_TYPE_CAMERA |  COMPONENT_TYPE_CONTROLLER );
+		CreateCameraComponent(Camera->CameraComponent, 60, -0.1, -100, (r32) Buffer->Width, (r32) Buffer->Height );
+		LookAt( Camera->CameraComponent, 10* Normalize( V3(0,0,1) ), V3(0,0,0));
+		Camera->ControllerComponent->Controller = GetController( Input, 1 );
+		
+		r32 PixelsPerUnitDistance = 16;
+
+		entity* Light = NewEntity( GameState->World );
+		NewComponents( GameState->World, Light, COMPONENT_TYPE_LIGHT );
+		component_light* L = Light->LightComponent;
+		L->Position = V4(5,3,3,1);
+		L->Color 	= V4(1,1,1,1);
+
+		loaded_obj_file* ObjFile = ReadOBJFile(Thread, GameState, 
+							Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+							Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,	
+								"..\\handmade\\data\\geometry\\square.obj");
+
+		bitmap* FloorTiles = LoadTGA( Thread, &GameState->AssetArena, 
+								Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+								Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+				  "C:\\Users\\Mother Shabobo\\Desktop\\handmade\\data\\Floor\\FloorTile.tga");
+
+
+		s32 Width = 16;
+		r32 Side = 1;
+		u32 RandNrIdx = 0;
+		r32 Height = 4;
+		for( s32 i = 0; i <= Width; ++i )
+		{
+			r32 RandomNumber = GetRandomNumber(RandNrIdx++) * 100;
+			u32 ModelIndex = ( ( (s32)RandomNumber ) % ObjFile->ObjectCount);
+			obj_group* Grp = &ObjFile->Objects[ ModelIndex ];
+			entity* WallTile = SetMeshAndMaterialComponentFromObjGroup( GameState->World, Grp,  ObjFile->MeshData );
+			Scale(     V4( Side, Side, Side, 1 ), WallTile->RenderMeshComponent->T );
+			Translate( V4( (r32) (-Width/2 + i)*Side, -Height*Side, 0, 1 ), WallTile->RenderMeshComponent->T );
+
+			RandomNumber = GetRandomNumber(RandNrIdx++) * 100;
+			ModelIndex = ( ( (s32)RandomNumber ) % ObjFile->ObjectCount);
+			Grp = &ObjFile->Objects[ ModelIndex ];
+			WallTile = SetMeshAndMaterialComponentFromObjGroup( GameState->World, Grp, ObjFile->MeshData );
+			Scale(     V4( Side, Side, Side, 1 ), WallTile->RenderMeshComponent->T );
+			Translate( V4( (r32) (-Width/2 + i)*Side, Height*Side, 0, 1 ), WallTile->RenderMeshComponent->T );
+		}
+
+		for( s32 i = 0; i <= 2*Height; ++i )
+		{
+			r32 RandomNumber = GetRandomNumber(RandNrIdx++) * 100;
+			u32 ModelIndex = ( ( (s32)RandomNumber ) % ObjFile->ObjectCount);
+			obj_group* Grp = &ObjFile->Objects[ ModelIndex ];
+			entity* WallTile = SetMeshAndMaterialComponentFromObjGroup( GameState->World, Grp,  ObjFile->MeshData );
+			Scale(     V4( Side, Side, Side, 1 ), WallTile->RenderMeshComponent->T );
+			Translate( V4( (r32) (-Width/2 + i)*Side, -Height*Side, 0, 1 ), WallTile->RenderMeshComponent->T );
+
+			RandomNumber = GetRandomNumber(RandNrIdx++) * 100;
+			ModelIndex = ( ( (s32)RandomNumber ) % ObjFile->ObjectCount);
+			Grp = &ObjFile->Objects[ ModelIndex ];
+			WallTile = SetMeshAndMaterialComponentFromObjGroup( GameState->World, Grp, ObjFile->MeshData );
+			Scale(     V4( Side, Side, Side, 1 ), WallTile->RenderMeshComponent->T );
+			Translate( V4( (r32) (-Width/2 + i)*Side, Height*Side, 0, 1 ), WallTile->RenderMeshComponent->T );
+		}
+
+		//obj_group* Grp = &ObjFile->Objects[1];
+		//SetMeshAndMaterialComponentFromObjGroup(GameState->World, Grp, ObjFile->MeshData );
+		//SetMeshAndMaterialComponentFromObjFile( GameState->World, ObjFile );
+
+}
+
 void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input, game_offscreen_buffer* Buffer)
 {
 	if( ! Memory->GameState )
 	{
-
 		Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
 
 		game_state* GameState = Memory->GameState;
 
-		GameState->testBMP = DEBUGReadBMP(Thread, GameState, 
-											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-											"..\\handmade\\data\\test\\test_hero_front_head.bmp");
+		GameState->testBMP = *LoadTGA( Thread, &GameState->AssetArena, 
+								Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+								Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+				 "C:\\Users\\Mother Shabobo\\Desktop\\handmade\\data\\blue3.tga");
 
-		GameState->testOBJ0 = DEBUGReadOBJ(Thread, GameState, 
-											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-											"..\\handmade\\data\\geometry\\teapot.obj");		
-
-		GameState->testOBJ1 = DEBUGReadOBJ(Thread, GameState, 
-											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,	
-											"..\\handmade\\data\\geometry\\cube.obj");		
-
-		GameState->testOBJ2 = DEBUGReadOBJ(Thread, GameState, 
-											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-											"..\\handmade\\data\\geometry\\sphere.obj");
-		
-		GameState->testOBJ3 = DEBUGReadOBJ(Thread, GameState, 
-											Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-											Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-											"..\\handmade\\data\\geometry\\Cube\\Cube_obj.obj");
 		memory_arena* AssetArena = &GameState->AssetArena;
-
 		GameState->DepthBuffer = {};
 		GameState->DepthBuffer.Width = Buffer->Width;
 		GameState->DepthBuffer.Height = Buffer->Height;
 		GameState->DepthBuffer.Buffer = PushArray(AssetArena, Buffer->Width*Buffer->Height, r32 );
 
-		u32 NrMaxWorldEntities = 16;
-		GameState->World = AllocateWorld( NrMaxWorldEntities );
-
-		entity* Camera = AllocateNewEntity( GameState->World, COMPONENT_TYPE_CAMERA |  COMPONENT_TYPE_CONTROLLER );
-		CreateCameraComponent(Camera->CameraComponent, 60, -0.1, -100, (r32) Buffer->Width, (r32) Buffer->Height );
-		LookAt( Camera->CameraComponent, 3* Normalize( V3(1,1,1) ), V3(0,0,0));
-		Camera->ControllerComponent->Controller = GetController( Input, 1 );
-
-		entity* Light = AllocateNewEntity( GameState->World, COMPONENT_TYPE_LIGHT );
-		component_light* L = Light->LightComponent;
-		L->Position = V4(3,2,3,1);
-		L->Color 	= V4(0.7,0.2,0.2,1);
-
-		Light = AllocateNewEntity( GameState->World, COMPONENT_TYPE_LIGHT );
-		L = Light->LightComponent;
-		L->Position = V4(4,-2,-3,1);
-		L->Color 	= V4(0.1,0.8,0.3,1);
-
-		Light = AllocateNewEntity( GameState->World, COMPONENT_TYPE_LIGHT );
-		L = Light->LightComponent;
-		L->Position = V4(-4,-2,-3,1);
-		L->Color 	= V4(0.2,0.2,0.7,1);
-
-		entity* XAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
-		component_mesh* X = XAxis->MeshComponent;
-		X->Object = &GameState->testOBJ0;
-		X->T = M4Identity();
-		Translate( V4(2,0,0,0), X->T);
-		SetMaterial(XAxis->MaterialComponent, MATERIAL_RED_RUBBER);
-
-		entity* YAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
-		component_mesh* Y = YAxis->MeshComponent;
-		Y->Object = &GameState->testOBJ1;
-		Y->T = M4Identity();
-		Translate( V4(0,0,0,0), Y->T);
-		SetMaterial(YAxis->MaterialComponent, MATERIAL_RED_PLASTIC);
-
-		entity* ZAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
-		component_mesh* Z = ZAxis->MeshComponent;
-		Z->Object = &GameState->testOBJ2;
-		Z->T = M4Identity();
-		Translate( V4(0,0,2,0), Z->T);
-		SetMaterial(ZAxis->MaterialComponent, MATERIAL_SILVER);
-
-		entity* WAxis = AllocateNewEntity( GameState->World, COMPONENT_TYPE_MESH | COMPONENT_TYPE_MATERIAL);
-		component_mesh* W = WAxis->MeshComponent;
-		W->Object = &GameState->testOBJ3;
-		W->T = M4Identity();
-		Translate( V4(0,0,0,0), W->T);
-		SetMaterial(WAxis->MaterialComponent, MATERIAL_GOLD);
+		CreateCubeScene(Thread, Memory, Input, Buffer);
+		//CreateMuroScene(Thread, Memory, Input, Buffer);
 
 		for(s32 ControllerIndex = 0; 
 			ControllerIndex < ArrayCount(Input->Controllers); 
@@ -610,6 +267,7 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 	}
 }
 
+#endif
 /* 
 	Note: 
 	extern "C" prevents the C++ compiler from renaming the functions which it does for function-overloading reasons (among other things) by forcing it to use C conventions which does not support overloading. Also called 'name mangling' or 'name decoration'. The actual function names are visible in the outputted .map file in the build directory
@@ -621,11 +279,11 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 //							  game_input* Input )
 
 platform_api Platform;
-#include "entity_components.h"
 
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
 
+#if 1
 	local_persist r32 t = 0;
 
 	Platform = Memory->PlatformAPI;
@@ -647,12 +305,16 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
 	ClearPushBuffer(&PushBuffer);
 
+	BlitBMP( Buffer, 20,20, GameState->testBMP );
+
 	t += Pi32/60;
 	if(t >= 200*Pi32)
 	{
 		t -=200*Pi32;
 	}
 	CheckArena(&Memory->GameState->TemporaryArena);
+
+	#endif
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)

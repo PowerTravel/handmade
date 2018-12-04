@@ -1,7 +1,7 @@
 #ifndef MATERIALS_H
 #define MATERIALS_H
 
-enum material
+enum MATERIAL_TYPE
 {
 	MATERIAL_EMERALD,
 	MATERIAL_JADE,
@@ -29,9 +29,9 @@ enum material
 	MATERIAL_YELLOW_RUBBER
 };
 
-void SetMaterial(component_material* Material, u32 MaterialType)
+void SetMaterial(material* Material, u32 MaterialType)
 {
-	local_persist component_material mtl[24] = 
+	local_persist material mtl[24] = 
 	{ 
 	  { V4(0.0215,   0.1745,   0.0215,   1), V4( 0.07568,  0.61424,    0.07568,    1), V4( 0.633,      0.727811,   0.633,      1), 0.6        }, // emerald
 	  { V4(0.135,    0.2225,   0.1575,   1), V4( 0.54,     0.89,       0.63,       1), V4( 0.316228,   0.316228,   0.316228,   1), 0.1        }, // jade

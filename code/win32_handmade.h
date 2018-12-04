@@ -1,5 +1,9 @@
 
 #include "types.h"
+//#include "intrinsics.h"
+//#include "memory.h"
+#include "string.h"
+#include "platform.h"
 
 struct win32_offscreen_buffer
 {
