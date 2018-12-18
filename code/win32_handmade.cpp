@@ -27,6 +27,7 @@
 #include <windows.h>
 #include <xinput.h>
 #include <dsound.h>
+#include <gl/gl.h>
 
 #include "win32_handmade.h"
 
@@ -367,6 +368,37 @@ Win32InitDSound( HWND aWindow, win32_sound_output* aSoundOutput)
 
 }
 
+internal void
+Wind32InitOpenGL(HWND Window)
+{
+	HDC  WindowDC = GetDC(Window);
+
+	PIXELFORMATDESCRIPTOR DesiredPixelFormat = {};
+  	DesiredPixelFormat.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+  	DesiredPixelFormat.nVersion = 1;
+  	DesiredPixelFormat.dwFlags  = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
+  	DesiredPixelFormat.iPixelType;
+  	DesiredPixelFormat.cColorBits = 32;
+  	DesiredPixelFormat.cAlphaBits = 8;
+  	DesiredPixelFormat.iLayerType = PFD_MAIN_PLANE;
+
+  	int SuggestedPixelFormatIndex = ChoosePixelFormat(WindowDC, &DesiredPixelFormat);
+  	PIXELFORMATDESCRIPTOR SuggestedPixelFormat;
+  	DescribePixelFormat(WindowDC, SuggestedPixelFormatIndex, 
+  						sizeof( SuggestedPixelFormat ),   &SuggestedPixelFormat );
+  	SetPixelFormat( WindowDC, SuggestedPixelFormatIndex, &SuggestedPixelFormat );
+
+	
+	HGLRC OpenGLRC = wglCreateContext(WindowDC);
+	if( wglMakeCurrent(WindowDC, OpenGLRC) )
+	{
+
+	}else{
+		Assert(0);
+	}
+	ReleaseDC(Window, WindowDC);
+}
+
 internal win32_window_dimension 
 Win32GetWindowDimension( HWND aWindow )
 {
@@ -417,6 +449,7 @@ internal void
 Win32DisplayBufferInWindow( HDC aDeviceContext, s32 aWindowWidth, s32 aWindowHeight )
 {	
 
+#if 0
 	//TODO(Jakob): Fix so that aspect ration always is kept when resizing
 
 	win32_offscreen_buffer* Buffer = &GlobalBackBuffer;
@@ -454,6 +487,11 @@ Win32DisplayBufferInWindow( HDC aDeviceContext, s32 aWindowWidth, s32 aWindowHei
 						&Buffer->Info,
 					    DIB_RGB_COLORS, SRCCOPY);
 	}
+#endif 
+	glViewport( 0, 0, aWindowWidth, aWindowHeight);
+	glClearColor(0.7f, 0.7f, 0.f, 0.f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	SwapBuffers(aDeviceContext);
 
 }
 
@@ -1539,7 +1577,8 @@ WinMain(	HINSTANCE aInstance,
 
 		if(Window != NULL)
 		{
-
+			Wind32InitOpenGL(Window);
+			
 			// TODO: How do we reliably query this on windows?
 			s32 MonitorRefreshHz = 60;
 			HDC DC = GetDC(Window);
