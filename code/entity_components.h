@@ -89,10 +89,12 @@ struct component_render_mesh
 	mesh_data* Data;
 };
 
-struct component_collidable_rect
+struct component_spatial
 {
-	v2 Position;
-	v2 Dimensions;
+	v3 Position;
+	v3 Velocity;
+	b32 IsDynamic;
+	v3 AABBDimensions;
 };
 
 struct entity
@@ -104,7 +106,7 @@ struct entity
 	component_controller*  		ControllerComponent;
 	component_light*			LightComponent;
 	component_render_mesh* 		RenderMeshComponent;
-	component_collidable_rect*  CollidableRectComponent;
+	component_spatial*	 		SpatialComponent;
 };
 
 struct world
@@ -115,7 +117,6 @@ struct world
 	memory_arena 	Arena;
 };
 
-
 enum component_types
 {
 	COMPONENT_TYPE_EMPTY        	= 0x00,
@@ -123,7 +124,7 @@ enum component_types
 	COMPONENT_TYPE_LIGHT   			= 0x02,
 	COMPONENT_TYPE_CONTROLLER   	= 0x04,
 	COMPONENT_TYPE_RENDER_MESH 	  	= 0x08,
-	COMPONENT_TYPE_COLLIDABLE_RECT  = 0x20, 
+	COMPONENT_TYPE_SPATIAL			= 0x10,
 	COMPONENT_TYPE_FINAL 			= 0x40
 };
 
@@ -152,6 +153,10 @@ void NewComponents( world* World, entity* Entity, u32 EntityFlags )
 	{
 		Entity->CameraComponent = (component_camera*) PushStruct(&World->Arena, component_camera);
 	}
+	if( EntityFlags & COMPONENT_TYPE_LIGHT )
+	{
+		Entity->LightComponent = (component_light*) PushStruct(&World->Arena, component_light);
+	}
 	if( EntityFlags & COMPONENT_TYPE_CONTROLLER )
 	{
 		Entity->ControllerComponent = (component_controller*) PushStruct(&World->Arena, component_controller);
@@ -160,13 +165,9 @@ void NewComponents( world* World, entity* Entity, u32 EntityFlags )
 	{
 		Entity->RenderMeshComponent = (component_render_mesh*) PushStruct(&World->Arena, component_render_mesh);
 	}
-	if( EntityFlags & COMPONENT_TYPE_LIGHT )
+	if( EntityFlags & COMPONENT_TYPE_SPATIAL )
 	{
-		Entity->LightComponent = (component_light*) PushStruct(&World->Arena, component_light);
-	}
-	if( EntityFlags & COMPONENT_TYPE_COLLIDABLE_RECT )
-	{
-		Entity->CollidableRectComponent = (component_collidable_rect*) PushStruct(&World->Arena, component_collidable_rect);
+		Entity->SpatialComponent = (component_spatial*) PushStruct(&World->Arena, component_spatial);
 	}
 }
 
