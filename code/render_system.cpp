@@ -16,6 +16,12 @@ void RenderSystemUpdate( world* World, render_push_buffer* RenderPushBuffer )
 			PushLight( RenderPushBuffer, Entity->LightComponent );
 		}
 
+		if( ( Entity->Types & ( COMPONENT_TYPE_RENDER_MESH  | COMPONENT_TYPE_SPATIAL ) ) )
+		{
+			Entity->RenderMeshComponent->T = M4Identity();
+			Translate( V4( Entity->SpatialComponent->Position, 1), Entity->RenderMeshComponent->T);
+		}
+
 		if( ( Entity->Types & ( COMPONENT_TYPE_RENDER_MESH  ) )  )
 		{
 			PushRenderGroup( RenderPushBuffer, Entity->RenderMeshComponent );

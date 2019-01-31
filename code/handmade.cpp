@@ -4,6 +4,7 @@
 #include "render.cpp"
 #include "camera_system.cpp"
 #include "render_system.cpp"
+#include "spatial_system.cpp"
 #include "obj_loader.cpp"
 
 internal void
@@ -158,6 +159,43 @@ void CreateMuroScene(thread_context* Thread, game_memory* Memory, game_input* In
 
 }
 
+ void SetSpatialComponentFromRenderMesh( component_render_mesh* Mesh, component_spatial* Spatial )
+ {
+ 	face* Triangle = &Mesh->Triangles[0];
+ 	v4 Vertex = Mesh->T * Mesh->Data->v[ Triangle->vi[0] ];
+ 	r32 MinX = Vertex.X;
+ 	r32 MaxX = Vertex.X;
+ 	r32 MinY = Vertex.Y;
+ 	r32 MaxY = Vertex.Y;
+ 	r32 MinZ = Vertex.Z;
+ 	r32 MaxZ = Vertex.Z;
+
+ 	for( u32 TriangleIndex = 0; TriangleIndex < Mesh->TriangleCount; ++TriangleIndex )
+ 	{
+ 		Triangle = &Mesh->Triangles[TriangleIndex];
+ 		Assert(Triangle->nv == 3);
+ 		for( u32 VerticeIndex = 0; VerticeIndex < Triangle->nv; ++VerticeIndex )
+ 		{
+ 			Vertex = Mesh->T  * Mesh->Data->v[Triangle->vi[ VerticeIndex ] ];
+
+	 		MaxX = ( Vertex.X > MaxX ) ? Vertex.X : MaxX;
+	 		MinX = ( Vertex.X < MinX ) ? Vertex.X : MinX;
+
+	 		MaxY = ( Vertex.Y > MaxY ) ? Vertex.Y : MaxY;
+	 		MinY = ( Vertex.Y < MinY ) ? Vertex.Y : MinY;
+
+	 		MaxZ = ( Vertex.Z > MaxZ ) ? Vertex.Z : MaxZ;
+	 		MinZ = ( Vertex.Z < MinZ ) ? Vertex.Z : MinZ;
+ 		}
+ 	}
+
+ 	Spatial->AABBDimensions = V3(MaxX - MinX, MaxY - MinY, MaxZ - MinZ);
+ 	Spatial->Position  = V3(MinX + Spatial->AABBDimensions.X/2, 
+ 						    MinY + Spatial->AABBDimensions.Y/2, 
+ 						    MinZ + Spatial->AABBDimensions.Z/2);
+ 	
+ }
+
 void CreateCubeScene(thread_context* Thread, game_memory* Memory, game_input* Input, game_offscreen_buffer* Buffer)
 {
 		game_state* GameState = Memory->GameState;
@@ -196,41 +234,23 @@ void CreateCubeScene(thread_context* Thread, game_memory* Memory, game_input* In
 		r32 Height = 4;
 		for( s32 i = 0; i <= Width; ++i )
 		{
-			r32 RandomNumber = GetRandomNumber(RandNrIdx++) * 100;
-			u32 ModelIndex = ( ( (s32)RandomNumber ) % ObjFile->ObjectCount);
+			r32 RandomNumber = GetRandomReal(RandNrIdx++) * 100;
+			u32 ModelIndex = ( ( (s32)RandomNumber ) % ( ObjFile->ObjectCount - 1));
 			obj_group* Grp = &ObjFile->Objects[ ModelIndex ];
-			entity* WallTile = SetMeshAndMaterialComponentFromObjGroup( GameState->World, Grp,  ObjFile->MeshData );
+			entity* WallTile = SetMeshAndMaterialComponentFromObjGroup( GameState->World, Grp, ObjFile->MeshData );
 			Scale(     V4( Side, Side, Side, 1 ), WallTile->RenderMeshComponent->T );
 			Translate( V4( (r32) (-Width/2 + i)*Side, -Height*Side, 0, 1 ), WallTile->RenderMeshComponent->T );
 
-			RandomNumber = GetRandomNumber(RandNrIdx++) * 100;
-			ModelIndex = ( ( (s32)RandomNumber ) % ObjFile->ObjectCount);
-			Grp = &ObjFile->Objects[ ModelIndex ];
-			WallTile = SetMeshAndMaterialComponentFromObjGroup( GameState->World, Grp, ObjFile->MeshData );
-			Scale(     V4( Side, Side, Side, 1 ), WallTile->RenderMeshComponent->T );
-			Translate( V4( (r32) (-Width/2 + i)*Side, Height*Side, 0, 1 ), WallTile->RenderMeshComponent->T );
+			NewComponents( GameState->World,  WallTile, COMPONENT_TYPE_SPATIAL );
+			SetSpatialComponentFromRenderMesh( WallTile->RenderMeshComponent, WallTile->SpatialComponent );
 		}
 
-		for( s32 i = 0; i <= 2*Height; ++i )
-		{
-			r32 RandomNumber = GetRandomNumber(RandNrIdx++) * 100;
-			u32 ModelIndex = ( ( (s32)RandomNumber ) % ObjFile->ObjectCount);
-			obj_group* Grp = &ObjFile->Objects[ ModelIndex ];
-			entity* WallTile = SetMeshAndMaterialComponentFromObjGroup( GameState->World, Grp,  ObjFile->MeshData );
-			Scale(     V4( Side, Side, Side, 1 ), WallTile->RenderMeshComponent->T );
-			Translate( V4( (r32) (-Width/2 + i)*Side, -Height*Side, 0, 1 ), WallTile->RenderMeshComponent->T );
 
-			RandomNumber = GetRandomNumber(RandNrIdx++) * 100;
-			ModelIndex = ( ( (s32)RandomNumber ) % ObjFile->ObjectCount);
-			Grp = &ObjFile->Objects[ ModelIndex ];
-			WallTile = SetMeshAndMaterialComponentFromObjGroup( GameState->World, Grp, ObjFile->MeshData );
-			Scale(     V4( Side, Side, Side, 1 ), WallTile->RenderMeshComponent->T );
-			Translate( V4( (r32) (-Width/2 + i)*Side, Height*Side, 0, 1 ), WallTile->RenderMeshComponent->T );
-		}
-
-		//obj_group* Grp = &ObjFile->Objects[1];
-		//SetMeshAndMaterialComponentFromObjGroup(GameState->World, Grp, ObjFile->MeshData );
-		//SetMeshAndMaterialComponentFromObjFile( GameState->World, ObjFile );
+		obj_group* Grp = &ObjFile->Objects[ ObjFile->ObjectCount-1 ];
+		entity* BouncingBlock = SetMeshAndMaterialComponentFromObjGroup( GameState->World, Grp, ObjFile->MeshData );
+		NewComponents( GameState->World,  BouncingBlock, COMPONENT_TYPE_SPATIAL );
+		SetSpatialComponentFromRenderMesh( BouncingBlock->RenderMeshComponent, BouncingBlock->SpatialComponent );
+		BouncingBlock->SpatialComponent->IsDynamic = true;
 
 }
 
@@ -298,6 +318,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 	DrawRectangle(Buffer, 0,0, (r32) Buffer->Width,   (r32) Buffer->Height, 1,1,1);
 	DrawRectangle(Buffer, 1,1, (r32) Buffer->Width-2, (r32) Buffer->Height-2, 0.3,0.3,0.3);
 
+	SpatialSystemUpdate(GameState->World);
 	CameraSystemUpdate(GameState->World);
 	RenderSystemUpdate(GameState->World, &PushBuffer);
 
