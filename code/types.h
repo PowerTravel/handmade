@@ -21,6 +21,8 @@
 #define Assert(Expression)
 #endif // HANDMADE_SLOW
 
+#define INVALID_CODE_PATH Assert(0);
+
 typedef int8_t  s8;
 typedef int16_t s16;
 typedef int32_t s32;
@@ -35,12 +37,14 @@ typedef uint64_t u64;
 
 typedef size_t memory_index;
 
+typedef uintptr_t umm;
+typedef intptr_t smm;
+
 typedef float  r32;
 typedef double r64;
 
 #define Maximum(A, B) ((A > B) ? (A) : (B))
 #define Minimum(A, B) ((A < B) ? (A) : (B))
-
 
 #define U32Max ( (u32)-1 )
 
@@ -55,5 +59,39 @@ typedef double r64;
 #define global_variable  static
 
 #define Pi32 3.14159265359f
+
+#include "vector_math.h"
+
+union rect
+{
+	struct{
+		r32 X,Y,W,H;
+	};
+	struct{
+		r32 X0,Y0,X1,Y1;
+	};
+};
+
+rect Rect( r32 a, r32 b, r32 c, r32 d )
+{
+	rect Result = {a,b,c,d};
+	return Result;
+}
+
+struct cube
+{
+	struct{
+		r32 X,Y,Z,W,H,D;
+	};
+	v3 P0, P1;
+};
+
+inline cube Cube( v3 P0, v3 P1 )
+{
+	cube Result = {};
+	Result.P0 = P0;
+	Result.P1 = P1;
+	return Result;
+};
 
 #endif

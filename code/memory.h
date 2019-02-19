@@ -1,6 +1,8 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
+#include "platform.h"
+
 #define CopyArray( Count, Source, Dest ) Copy( (Count)*sizeof( *(Source) ), ( Source ), ( Dest ) )
 
 inline void* Copy(memory_index aSize, void *SourceInit, void *DestInit)

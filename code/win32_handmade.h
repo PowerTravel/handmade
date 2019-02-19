@@ -1,6 +1,6 @@
 
 #include "types.h"
-//#include "intrinsics.h"
+#include "intrinsics.h"
 //#include "memory.h"
 #include "string.h"
 #include "platform.h"

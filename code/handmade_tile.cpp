@@ -1,22 +1,23 @@
-#include "handmade_tile.h"
 
-inline uint32
-Get3DIdx(int32 x, int32 y, int32 z, int32 X, int32 Y, int32 Z  )
+#include "handmade_tile.h"
+#include "entity_components.h"
+
+
+inline u32
+Get3DIdx(s32 x, s32 y, s32 z, s32 X, s32 Y, s32 Z  )
 {
-	int32 Result = x + y*X + z*X*Y;
+	s32 Result = x + y*X + z*X*Y;
 	Assert(Result<X*Y*Z);
 	Assert(Result >= 0);
 	return Result;
 }
 
-
 inline void
-RecanonicalizeCoord(tile_map* TileMap, uint32* Tile, real32* TilePos  )
+RecanonicalizeCoord(tile_map* TileMap, u32* Tile, r32* TilePos, r32 TileSideInMeters  )
 {
-
 	// Since the origin is in the middle of each chunk the offset will be 0 if we are
 	// within a chunk (abs(TilePagePos) < 0.5*TilePageSide) but +- 1 otherwise. 
-	int32 Offset = RoundReal32ToInt32(*TilePos / TileMap->TileSideInMeters);
+	s32 Offset = RoundReal32ToInt32(*TilePos / TileSideInMeters);
 
 	// The 8 lower bits says which tile we are in a page.
 	// The other high bits says which chunk we are in a map
@@ -25,11 +26,11 @@ RecanonicalizeCoord(tile_map* TileMap, uint32* Tile, real32* TilePos  )
 	// we are automaticallty indexed to the first tile in a new chunk. Genious.
 	// No if/else statements needed. Everything is handeled automatically.
 	*Tile += Offset;
-	*TilePos -= Offset*TileMap->TileSideInMeters;
+	*TilePos -= Offset*TileSideInMeters;
 
 	// Assert that we are inside a tile
-	Assert(*TilePos <= 0.5 * TileMap->TileSideInMeters);
-	Assert(*TilePos >= -0.5 * TileMap->TileSideInMeters);
+	Assert(*TilePos <=  0.5 * TileSideInMeters);
+	Assert(*TilePos >= -0.5 * TileSideInMeters);
 }
 
 inline tile_map_position 
@@ -37,28 +38,21 @@ RecanonicalizePosition(tile_map* TileMap, tile_map_position CanPos)
 {
 	tile_map_position Result = CanPos;
 
-	RecanonicalizeCoord(TileMap, &Result.AbsTileX, &Result.RelTile.X);
-	RecanonicalizeCoord(TileMap, &Result.AbsTileY, &Result.RelTile.Y);
-	RecanonicalizeCoord(TileMap, &Result.AbsTileY, &Result.RelTile.Z);
+	RecanonicalizeCoord(TileMap, &Result.AbsTileX, &Result.RelTileX, TileMap->TileWidthInMeters );
+	RecanonicalizeCoord(TileMap, &Result.AbsTileY, &Result.RelTileY, TileMap->TileHeightInMeters );
+	RecanonicalizeCoord(TileMap, &Result.AbsTileZ, &Result.RelTileZ, TileMap->TileDepthInMeters );
 
 	return Result;
 }
 
 internal tile_map_position 
-MoveNewTileMapPosition(tile_map* TileMap, tile_map_position OldCanPos, v3 dr)
+MoveNewTileMapPosition(tile_map* TileMap, tile_map_position OldCanPos, r32 dx, r32 dy, r32 dz)
 {
 	tile_map_position TempResult = OldCanPos;
-	TempResult.RelTile += dr;
+	TempResult.RelTileX += dx;
+	TempResult.RelTileY += dy;
+	TempResult.RelTileZ += dz;
 	tile_map_position Result = RecanonicalizePosition(TileMap, TempResult);
-	return Result;
-}
-
-internal tile_map_position 
-MoveNewTileMapPosition(tile_map* TileMap, tile_map_position OldCanPos,
-							real32 dx, real32 dy, real32 dz)
-{
-	v3 dr =  V3(dx,dy,dz);
-	tile_map_position Result = MoveNewTileMapPosition(TileMap, OldCanPos, dr);
 	return Result;
 }
 
@@ -66,19 +60,19 @@ MoveNewTileMapPosition(tile_map* TileMap, tile_map_position OldCanPos,
 #define TILE_PAGE_UNINITIALIZED INT32_MAX
 
 inline tile_page*
-GetTilePage(tile_map* TileMap, int32 TilePageX, int32 TilePageY, int32 TilePageZ, 
+GetTilePage(tile_map* TileMap, s32 TilePageX, s32 TilePageY, s32 TilePageZ, 
 			memory_arena* Arena = 0)
 {
 	Assert( TilePageX > -TILE_PAGE_SAFE_MARGIN);
 	Assert( TilePageY > -TILE_PAGE_SAFE_MARGIN);
 	Assert( TilePageZ > -TILE_PAGE_SAFE_MARGIN);
-	Assert( TilePageX < TILE_PAGE_SAFE_MARGIN); 
-	Assert( TilePageY < TILE_PAGE_SAFE_MARGIN); 
-	Assert( TilePageZ < TILE_PAGE_SAFE_MARGIN); 
+	Assert( TilePageX <  TILE_PAGE_SAFE_MARGIN); 
+	Assert( TilePageY <  TILE_PAGE_SAFE_MARGIN); 
+	Assert( TilePageZ <  TILE_PAGE_SAFE_MARGIN); 
 
-	// TODO (Jakob): Make a bett er hash function
-	uint32 HashValue = 19 * TilePageX + 7*TilePageY + 3 * TilePageZ;
-	uint32 HashSlot = HashValue & ( ArrayCount(TileMap->MapHash) - 1);
+	// TODO (Jakob): Make a bett er hash function (lol)
+	u32 HashValue = 19 * TilePageX + 7*TilePageY + 3 * TilePageZ;
+	u32 HashSlot = HashValue & ( ArrayCount(TileMap->MapHash) - 1);
 	Assert( HashSlot < ArrayCount(TileMap->MapHash) );
 	
 	tile_page* Page = TileMap->MapHash + HashSlot;
@@ -91,29 +85,30 @@ GetTilePage(tile_map* TileMap, int32 TilePageX, int32 TilePageY, int32 TilePageZ
 			break;
 		}
 
-		if( Arena && (Page->PageX != TILE_PAGE_UNINITIALIZED) && (!Page->NextInHash) )
+		if( Arena && ( Page->PageX != TILE_PAGE_UNINITIALIZED ) && ( !Page->NextInHash ) )
 		{
-			Page->NextInHash = PushStruct(Arena, tile_page );
-			Page->NextInHash->PageX=TILE_PAGE_UNINITIALIZED;
+			Page->NextInHash = PushStruct( Arena, tile_page );
+			Page->NextInHash->PageX = TILE_PAGE_UNINITIALIZED;
 			Page = Page->NextInHash;
 			break;
 		}
 
-		if( Arena && (Page->PageX == TILE_PAGE_UNINITIALIZED) )
+		if( Arena && ( Page->PageX == TILE_PAGE_UNINITIALIZED ) )
 		{
-			uint32 TileCount = TileMap->PageDim * TileMap->PageDim;
+			u32 TileCount = TileMap->PageDim * TileMap->PageDim;
 
 			Page->PageX = TilePageX;
 			Page->PageY = TilePageY;
 			Page->PageZ = TilePageZ;
 
-			Page->Page = PushArray(Arena, TileCount, uint32);
+			// For now a page is just a 2d grid of tile_contents
+			Page->Page = PushArray(Arena, TileCount, tile_contents);
 
 			Page->NextInHash = 0;
 			
-			for(uint32 TileIndex = 0; TileIndex < TileCount; TileIndex++)
+			for( u32 TileIndex = 0; TileIndex < TileCount; ++TileIndex )
 			{
-				Page->Page[TileIndex] = 1;
+				Page->Page[TileIndex] = {};
 			}
 			break;
 		}
@@ -126,7 +121,7 @@ GetTilePage(tile_map* TileMap, int32 TilePageX, int32 TilePageY, int32 TilePageZ
 }
 
 inline tile_index 
-GetTileIndex(tile_map* TileMap, int32 AbsTileX, int32 AbsTileY, int32 AbsTileZ)
+GetTileIndex(tile_map* TileMap, s32 AbsTileX, s32 AbsTileY, s32 AbsTileZ)
 {
 	tile_index Result = {};
 
@@ -144,60 +139,61 @@ GetTileIndex(tile_map* TileMap, int32 AbsTileX, int32 AbsTileY, int32 AbsTileZ)
 
 
 
-inline uint32
-GetTileValueUnchecked(tile_map* TileMap, tile_page* TilePage, int32 RelTileIndexX, int32 RelTileIndexY)
+inline tile_contents
+GetTileContentsUnchecked(tile_map* TileMap, tile_page* TilePage, s32 RelTileIndexX, s32 RelTileIndexY ) 
 {
  	Assert(TilePage);
 	Assert(RelTileIndexX < TileMap->PageDim);
 	Assert(RelTileIndexY < TileMap->PageDim);
-	int32 TileIdx = Get3DIdx(RelTileIndexX, RelTileIndexY, 0,
+
+	s32 TileIdx = Get3DIdx(RelTileIndexX, RelTileIndexY, 0,
 			TileMap->PageDim,TileMap->PageDim,1);
-	uint32 Result = TilePage->Page[TileIdx];
+	tile_contents Result = TilePage->Page[TileIdx];
 	return Result;
 }
 
 inline void
-SetTileValueUnchecked(tile_map* TileMap, tile_page* TilePage, int32 RelTileIndexX, int32 RelTileIndexY, uint32 TileValue)
+SetTileContentsUnchecked(tile_map* TileMap, tile_page* TilePage, s32 RelTileIndexX, s32 RelTileIndexY, tile_contents TileContents)
 {
 	Assert(TilePage);
 	Assert(RelTileIndexX < TileMap->PageDim);
 	Assert(RelTileIndexY < TileMap->PageDim);
 
-	int32 TileIdx = Get3DIdx(RelTileIndexX, RelTileIndexY, 0,
+	s32 TileIdx = Get3DIdx(RelTileIndexX, RelTileIndexY, 0,
 			TileMap->PageDim,TileMap->PageDim, 1);
-	TilePage->Page[TileIdx] = TileValue;
+
+	TilePage->Page[TileIdx] = TileContents;
 }
 
-inline uint32 
-GetTileValue(tile_map* TileMap, tile_page* TilePage, int32 RelTileIndexX, int32 RelTileIndexY)
+inline tile_contents 
+GetTileContents(tile_map* TileMap, tile_page* TilePage, s32 RelTileIndexX, s32 RelTileIndexY )
 {
-	uint32 Result = 0;
+	tile_contents Result = {};
 	if(TilePage && TilePage->Page)
 	{
-		Result = GetTileValueUnchecked(TileMap, TilePage, RelTileIndexX, RelTileIndexY);
+		Result = GetTileContentsUnchecked(TileMap, TilePage, RelTileIndexX, RelTileIndexY);
 	}
 	return Result;
 }
 
 
-inline uint32 
-GetTileValue(tile_map* TileMap, int32 AbsTileX, int32 AbsTileY, int32 AbsTileZ)
+inline tile_contents 
+GetTileContents(tile_map* TileMap, s32 AbsTileX, s32 AbsTileY, s32 AbsTileZ)
 {
-	uint32 Result = 0;
+	tile_contents Result = {};
 
-	tile_index TilePos = GetTileIndex(TileMap, AbsTileX,AbsTileY,AbsTileZ);
+	tile_index TilePos  = GetTileIndex(TileMap, AbsTileX, AbsTileY, AbsTileZ);
 	tile_page* TilePage = GetTilePage(TileMap, TilePos.PageX, TilePos.PageY, TilePos.PageZ);
 
-
 	if(TilePage && TilePage->Page)
 	{
-		Result = GetTileValueUnchecked(TileMap, TilePage, TilePos.TileX,TilePos.TileY );
+		Result = GetTileContentsUnchecked(TileMap, TilePage, TilePos.TileX, TilePos.TileY );
 	}
 	return Result;
 }
 
-inline uint32 
-GetTileValue(tile_map* TileMap, tile_map_position CanPos)
+inline tile_contents 
+GetTileContents(tile_map* TileMap, tile_map_position CanPos)
 {
 	tile_index TilePosition = GetTileIndex(TileMap, 
 			CanPos.AbsTileX, CanPos.AbsTileY, CanPos.AbsTileZ);
@@ -205,24 +201,24 @@ GetTileValue(tile_map* TileMap, tile_map_position CanPos)
 	tile_page* TilePage = GetTilePage(TileMap, TilePosition.PageX, 
 										TilePosition.PageY, TilePosition.PageZ);
 
-	return GetTileValue(TileMap, TilePage, 
-						TilePosition.TileX,
-						TilePosition.TileY);
+	return GetTileContents(TileMap, TilePage, 
+						   TilePosition.TileX,
+						   TilePosition.TileY);
 }
 
 inline void
-SetTileValueAbs(memory_arena* Arena, tile_map* TileMap, int32 AbsTileX, int32 AbsTileY, int32 AbsTileZ, uint32 TileValue)
+SetTileContentsAbs(memory_arena* Arena, tile_map* TileMap, s32 AbsTileX, s32 AbsTileY, s32 AbsTileZ, tile_contents TileContents)
 {
 	tile_index TilePos = GetTileIndex(TileMap, AbsTileX, AbsTileY, AbsTileZ);
 	tile_page* TilePage = GetTilePage(TileMap, TilePos.PageX, TilePos.PageY, TilePos.PageZ, Arena);
-	SetTileValueUnchecked(TileMap, TilePage, TilePos.TileX, TilePos.TileY, TileValue );
+	SetTileContentsUnchecked(TileMap, TilePage, TilePos.TileX, TilePos.TileY, TileContents );
 }
 
 
-internal bool32 
+internal b32 
 IsTileMapPointEmpty(tile_map* TileMap, tile_map_position CanPos)
 {
-	bool32 Result = true;
+	b32 Result = true;
 
 	tile_index TilePosition = GetTileIndex(TileMap, 
 			CanPos.AbsTileX, CanPos.AbsTileY, CanPos.AbsTileZ);
@@ -230,22 +226,24 @@ IsTileMapPointEmpty(tile_map* TileMap, tile_map_position CanPos)
 	tile_page* TilePage = GetTilePage(TileMap, TilePosition.PageX, 
 										TilePosition.PageY, TilePosition.PageZ);
 
-	uint32 TileValue  = GetTileValue(TileMap, TilePage, TilePosition.TileX,TilePosition.TileY);
-	Result = ( TileValue != 2);
+	tile_contents TileContents  = GetTileContents(TileMap, TilePage, TilePosition.TileX,TilePosition.TileY);
+	Result = ( TileContents.Sprite != 0 );
 	return Result;
 }
 
 internal void 
 InitializeTileMap( tile_map* TileMap )
 {
-	TileMap->TileSideInMeters = 1.4f; 
+	TileMap->TileWidthInMeters = 1.f;
+	TileMap->TileHeightInMeters = 1.f; 
+	TileMap->TileDepthInMeters = 1.f; 
 	TileMap->PageShift = 4;
-	TileMap->PageMask = (1<<TileMap->PageShift)-1;		
+	TileMap->PageMask = (1<<TileMap->PageShift)-1;
 	TileMap->PageDim = (1<<TileMap->PageShift);
 
-	for(uint32 TilePageIndex = 0;
-		TilePageIndex < ArrayCount(TileMap->MapHash);
-		++TilePageIndex)
+	for( u32 TilePageIndex = 0;
+		 TilePageIndex < ArrayCount(TileMap->MapHash);
+		 ++TilePageIndex)
 	{
 		TileMap->MapHash[TilePageIndex].PageX = TILE_PAGE_UNINITIALIZED;
 	}

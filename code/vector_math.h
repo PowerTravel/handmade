@@ -1,6 +1,8 @@
 #ifndef MATH_H
 #define MATH_H
 
+#include "intrinsics.h"
+
 union v2
 {
 	struct{
@@ -22,7 +24,7 @@ union v4
 	struct{
 		 r32 X, Y, Z, W;
 	};
-	 r32 E[4];
+	r32 E[4];
 };
 
 union m4
@@ -168,7 +170,6 @@ operator-=( v2& A, const v2& B )
 	A = A-B;
 	return A;
 }
-
 
 inline b32 
 operator==( const v2& A, const v2& B )
@@ -638,6 +639,18 @@ operator*( const m4& A, const m4& B )
 		            A.r2 * BT.r0, A.r2 * BT.r1, A.r2 * BT.r2, A.r2 * BT.r3,
 		            A.r3 * BT.r0, A.r3 * BT.r1, A.r3 * BT.r2, A.r3 * BT.r3);
 	return Result;	
+}
+
+
+inline m4
+operator-( const m4& A,  const m4& B)
+{
+	m4 Result;
+	Result.r0 = A.r0 - B.r0;
+	Result.r1 = A.r1 - B.r1;
+	Result.r2 = A.r2 - B.r2;
+	Result.r3 = A.r3 - B.r3;
+	return Result;
 }
 
 inline v4

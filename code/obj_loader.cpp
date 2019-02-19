@@ -1,4 +1,7 @@
-
+#include "obj_loader.h"
+#include "string.h"
+#include "utility_macros.h"
+#include "data_containers.h"
 
 struct mtl_material
 {
@@ -32,14 +35,27 @@ struct obj_group
 	u32   FaceCount;  // Nr Faces
 	face* Faces; 	  // Faces
 
+	v3 CenterOfMass;
+	v3 BoundingBoxMin;
+	v3 BoundingBoxMax;
+	
 	mtl_material* Material;
 };
 
+struct loaded_obj_file
+{
+	u32 ObjectCount;
+	obj_group* Objects;
+
+	mesh_data* MeshData;
+
+	obj_mtl_data* MaterialData;
+};
 
 v4 ParseNumbers(char* String)
 {
 	char* Start = str::FindFirstNotOf( " \t", String );
-	char WordBuffer[OBJ_MAX_WORD_LENGTH];
+	char WordBuffer[STR_MAX_WORD_LENGTH];
 	s32 CoordinateIdx = 0;
 	v4 Result = V4(0,0,0,1);
 	while( Start )
@@ -50,7 +66,7 @@ v4 ParseNumbers(char* String)
 
 		size_t WordLength = ( End ) ? (End - Start) : str::StringLength(Start);
 
-		Assert(WordLength < OBJ_MAX_WORD_LENGTH);
+		Assert(WordLength < STR_MAX_WORD_LENGTH);
 
 		Copy( WordLength, Start, WordBuffer );
 		WordBuffer[WordLength] = '\0';
@@ -291,7 +307,7 @@ bool GetTrimmedLine( char* SrcLineStart, char* SrcLineEnd, u32* DstLength, char*
 	SrcLineStart = TrimStart;
 	size_t Length = TrimEnd - SrcLineStart;
 
-	Assert(Length < OBJ_MAX_LINE_LENGTH);
+	Assert(Length < STR_MAX_LINE_LENGTH);
 
 	if(Length < 2)
 	{
@@ -304,7 +320,6 @@ bool GetTrimmedLine( char* SrcLineStart, char* SrcLineEnd, u32* DstLength, char*
 	return true;
 }
 
-
 face* ParseFaceLine(memory_arena* Arena, char* ParsedLine )
 {
 	face* Result = (face*) PushStruct(Arena, face);
@@ -313,14 +328,14 @@ face* ParseFaceLine(memory_arena* Arena, char* ParsedLine )
 
 	u32 VertIdx = 0;
 	char* Start = ParsedLine;
-	char WordBuffer[OBJ_MAX_WORD_LENGTH];
+	char WordBuffer[STR_MAX_WORD_LENGTH];
 	while( Start )
 	{
 		char* End = str::FindFirstOf( " \t", Start);
 
 		size_t WordLength = ( End ) ? (End - Start) : str::StringLength(Start);
 
-		Assert(WordLength < OBJ_MAX_WORD_LENGTH);
+		Assert(WordLength < STR_MAX_WORD_LENGTH);
 
 		Copy( WordLength, Start, WordBuffer );
 		WordBuffer[WordLength] = '\0';
@@ -371,9 +386,25 @@ face* ParseFaceLine(memory_arena* Arena, char* ParsedLine )
 					Result->ni[VertIdx] = nr;
 				}break;
 
+				default:
+				{
+					INVALID_CODE_PATH
+				}break;
 			}
-
+			
+			// A face specified with ____ looks like: "_____"
+			//   1: Vertice, Texture Vertice and Normals: "10/11/12"
+			//	 2: Only Vertice and Normals:             "10//12"
+			//   3: Only Vertice and Texture Vertice:     "10/11"
+			//   4: Only Vertice                          "10"
+			// Case 1,2 and 4 is handled by just increasing i sequentially.
 			++i;
+
+			// Case 3 requires us to increase i two steps skipping case i==2.
+			if( EndNr && *EndNr == '/' ) 
+			{
+				++i;
+			}
 
 			StartNr = str::FindFirstNotOf("/", EndNr);
 			
@@ -386,6 +417,59 @@ face* ParseFaceLine(memory_arena* Arena, char* ParsedLine )
 	return Result;
 }
 
+// makes the packing compact
+#pragma pack(push, 1)
+struct tga_header
+{
+	/*
+	 * ID length:
+	 * 0 if image file contains no color map
+     * 1 if present
+     * 2–127 reserved by Truevision
+     * 128–255 available for developer use
+
+     Note Jakob, Seems like if > 0 it specifies the length of the 
+     		     image ID Field which comes after the header.
+     */
+	u8 IDLength; 
+
+	/*
+	 * ColorMapType:
+     * 0 if image file contains no color map
+     * 1 if present
+     * 2–127 reserved by Truevision
+     * 128–255 available for developer use
+     */
+	u8 ColorMapType;
+
+	/*
+	 * ImageType is enumerated in the lower three bits, with the fourth bit as a flag for RLE. Some possible values are:
+     * 0 no image data is present
+     * 1 uncompressed color-mapped image
+     * 2 uncompressed true-color image
+     * 3 uncompressed black-and-white (grayscale) image
+     * 9 run-length encoded color-mapped image
+     * 10 run-length encoded true-color image
+     * 11 run-length encoded black-and-white (grayscale) image
+	 */	
+	u8 ImageType;
+
+	// ColorMapSpecification
+	u16 FirstEntryIndex;  // index of first color map entry that is included in the file
+	u16 ColorMapLength;   // number of entries of the color map that are included in the file
+	u8  ColorMapEntrySize; // number of bits per pixel
+
+	// ImageSpecification
+	u16 XOrigin; 			// absolute coordinate of lower-left corner for displays where origin is at the lower left
+	u16 YOrigin; 			// as for X-origin.  0,0 emans first pixel is lower left. 
+	                        // Data is stored in BGRA Format.
+	u16 Width;	 			// width in pixels
+	u16 Height;  			// height in pixels
+	u8  PixelDepth; 		// Bits per pixel
+	u8 	ImageDescriptor; 	// bits 3-0 give the alpha channel depth, bits 5-4 give direction
+};
+#pragma pack(pop)
+
 bitmap* LoadTGA( thread_context* Thread, memory_arena* AssetArena,
 				 debug_platform_read_entire_file* ReadEntireFile,
 				 debug_platfrom_free_file_memory* FreeEntireFile,
@@ -396,64 +480,73 @@ bitmap* LoadTGA( thread_context* Thread, memory_arena* AssetArena,
 
 	if( !ReadResult.ContentSize ) { return {}; }
 
-	Assert(ReadResult.ContentSize > 18);
 
-	u8* ScanPtr = (u8*) ReadResult.Contents;
+	u32 HeaderSize = sizeof(tga_header);
+	Assert(ReadResult.ContentSize > HeaderSize);
 
-	u8 ImageIdFieldSize = *ScanPtr++;
-	Assert(ImageIdFieldSize == 0);  // No Image ID Field
-	Assert(*ScanPtr++ == 0); 		// No Color Map included
-	Assert(*ScanPtr++ == 2); 		// Uncompressed true color image
+	tga_header& Header = *(tga_header*) ReadResult.Contents;
 
-	for( u32 i = 0; i < 5; ++i )
-	{
-		Assert(*ScanPtr++ == 0); // Color Map specification
-	}
+  	// Note Jakob: Seems like if > 0 it specifies the length of the 
+    // 		       image ID Field which comes after the header.
+    // 		       But specification says Header.IDLength == 1 means it
+    // 			   just exists. So I will treat the field like a length between
+    // 			   header and pixel data unless it's 1 and I want to investigate.
+	Assert(Header.IDLength !=  1);
+	Assert((Header.ImageType == 2) || (Header.ImageType == 3) ); // Uncompressed true color image
+	Assert(Header.XOrigin == 0 );
+	Assert(Header.YOrigin == 0 );
 
-	u32 XOrigin = *( (u16*) ScanPtr);
-	ScanPtr += 2;
-	u32 YOrigin = *( (u16*) ScanPtr);
-	ScanPtr += 2;
-	u32 Width = *( (u16*) ScanPtr);
-	ScanPtr += 2;
-	u32 Height = *( (u16*) ScanPtr);
-	ScanPtr += 2;
+	u32 BytesPerPixel = Header.PixelDepth/8;
+	u32 MinimumFileSize = (HeaderSize + Header.Width*Header.Height * BytesPerPixel );
+	Assert(ReadResult.ContentSize >= MinimumFileSize);
 
-	u8 PixelDepth = *ScanPtr++;
-
-	u8 ImageDescriptor = *ScanPtr++;
-
-	Assert( (ImageDescriptor & 0x30) == 0x00 );
-
-	Assert(ReadResult.ContentSize > ( 18 + Width*Height*( PixelDepth/8 )));
 
 	bitmap* Result = (bitmap*) PushStruct( AssetArena, bitmap );
-	Result->Pixels = PushArray( AssetArena, Width*Height, u32);
+	Result->Handle = 0;
+	Result->Pixels = PushArray( AssetArena, Header.Width*Header.Height, u32);
 
+
+	u8* ScanPtr = ((u8*) ReadResult.Contents) + (sizeof(tga_header) + Header.IDLength);
 	u32* Dest = (u32*) Result->Pixels;
 
-	u32 BytesPerPixel = PixelDepth/8;
-	for( u32 i = 0; i < Width*Height; ++i )
+	for( s32 i = 0; i < Header.Width*Header.Height; ++i )
 	{
 		u32 Pixel = 0;
-		for(u32 j = 0; j<BytesPerPixel; ++j)
+		u8 R = 0;
+		u8 G = 0;
+		u8 B = 0;
+		u8 A = 0;
+		if(BytesPerPixel == 4) 
 		{
-			u8 ColorValue = *(ScanPtr+j);
-			Pixel =  Pixel | ( ColorValue << (8*j) );
+			B = *(ScanPtr + 0);
+			G = *(ScanPtr + 1);
+			R = *(ScanPtr + 2); 
+			A = *(ScanPtr + 3);
 		}
-		if(BytesPerPixel != 4)
-		{
-			// Set Alpha to 255;
-			Pixel =  Pixel | ( 0xff << 24 );	
+		else if(BytesPerPixel == 1){
+			R = G = B = *ScanPtr;
+			A = 255;
+		}else if( BytesPerPixel == 3 ){
+			B = *(ScanPtr+0);
+			G = *(ScanPtr+1);
+			R = *(ScanPtr+2);
+			A = 255;
+		}else{
+			INVALID_CODE_PATH;
 		}
+
+		// BGRA Format
+		//Pixel = (B << 24) | (G << 16) | (R << 8) | (A << 0);
+		// ARGB Format
+		Pixel = (A << 24) | (R << 16) | (G << 8) | (B << 0);
 
 		ScanPtr += BytesPerPixel;
 
 		*Dest++ = Pixel;
 	}
 
-	Result->Width = Width;
-	Result->Height = Height;
+	Result->Width = Header.Width;
+	Result->Height = Header.Height;
 	FreeEntireFile(Thread, ReadResult.Contents);
 
 	return Result;
@@ -516,7 +609,7 @@ void CreateNewFilePath(char* BaseFilePath, char* NewFileName, u32 NewFilePathLen
 	Assert(Start < End)
 	
 	u32 NewFileNameLength =(u32) (End - Start);
-	Assert( (BaseFolderLength + NewFileNameLength) < OBJ_MAX_LINE_LENGTH );
+	Assert( (BaseFolderLength + NewFileNameLength) < STR_MAX_LINE_LENGTH );
 
 	str::CatStrings(	BaseFolderLength,    BaseFilePath,
 						NewFileNameLength,   Start,
@@ -532,7 +625,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
 
 	if( !ReadResult.ContentSize ) { return 0; }
 
-	char LineBuffer[OBJ_MAX_LINE_LENGTH];
+	char LineBuffer[STR_MAX_LINE_LENGTH];
 
 	memory_arena* AssetArena = &aGameState->AssetArena;
 	memory_arena* TemporaryArena = &aGameState->TemporaryArena;
@@ -667,7 +760,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
 
 
 
-				char TGAFilePath[OBJ_MAX_LINE_LENGTH] = {};
+				char TGAFilePath[STR_MAX_LINE_LENGTH] = {};
 				CreateNewFilePath( FileName, DataType.String, sizeof(TGAFilePath), TGAFilePath );
 				
 				ActieveMaterial->MapKd = LoadTGA( Thread, AssetArena,
@@ -676,7 +769,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
 			}break;
 			case MTL_MAP_KS:
 			{
-				// Unimplemented Settings 
+				// Unimplemented Settings
 				u32 SettingLength = str::StringLength( DataType.String );
 				
 				// -blendu on | off			
@@ -707,7 +800,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
  				Assert( ! str::Contains( 8, "-texres ", SettingLength, DataType.String ) );
 
 
-				char TGAFilePath[OBJ_MAX_LINE_LENGTH] = {};
+				char TGAFilePath[STR_MAX_LINE_LENGTH] = {};
 				CreateNewFilePath( FileName, DataType.String, sizeof(TGAFilePath), TGAFilePath );
 				
 				ActieveMaterial->MapKs = LoadTGA( Thread, AssetArena,
@@ -769,7 +862,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
  				char* SettingStartPtr = 0;
  				// -bm mult, mult: [0,1]
 
-				char LeftoverString[OBJ_MAX_LINE_LENGTH] = {};
+				char LeftoverString[STR_MAX_LINE_LENGTH] = {};
 
 				fifo_queue<char*> SettingQueue = ExtractMTLSettings( TemporaryArena, 1, "-bm ",  " \t",  DataType.String,  LeftoverString );
 				Assert(SettingQueue.GetSize() == 1);
@@ -777,7 +870,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
 				ActieveMaterial->BumpMapBM = (r32) str::StringToReal64( SettingQueue.Pop() );
 
 				
-				char TGAFilePath[OBJ_MAX_LINE_LENGTH] = {};
+				char TGAFilePath[STR_MAX_LINE_LENGTH] = {};
 				CreateNewFilePath( FileName, LeftoverString, sizeof(TGAFilePath), TGAFilePath );
 				
 				ActieveMaterial->BumpMap = LoadTGA( Thread, AssetArena,
@@ -827,25 +920,66 @@ struct group_to_parse
 };
 
 
-void CenterObjectAtOrigin( loaded_obj_file* Obj )
+void SetCenterOfMassAndBoundingBoxToOBJFile( loaded_obj_file* OBJFile, memory_arena* TemporaryArena )
 {
-	v4 CenterOfMass = V4(0,0,0,0);
-	mesh_data* MeshData = Obj->MeshData;
-	for(u32 i = 0; i < MeshData->nv; ++i)
+	mesh_data* MeshData = OBJFile->MeshData;
+	for( u32 GroupIndex = 0; GroupIndex < OBJFile->ObjectCount; ++GroupIndex )
 	{
-		CenterOfMass += MeshData->v[i];	
-	}
-	
-	CenterOfMass = CenterOfMass/(r32) Obj->MeshData->nv;
-	CenterOfMass.W = 0;
+		temporary_memory TempMem = BeginTemporaryMemory(TemporaryArena);
+		b32* IsVertexCounted = (b32*) PushArray(TemporaryArena,  MeshData->nv, u32 );
 
-	for(u32 i = 0; i < MeshData->nv; ++i)
-	{
-		MeshData->v[i] -= CenterOfMass;	
+		obj_group& OBJGroup = OBJFile->Objects[GroupIndex];
+
+		v3 CenterOfMass = V3(0,0,0); 
+		r32 VertexCount = 0;
+
+		u32 FirstVertexIndex = OBJGroup.Faces->vi[0];
+		v4  FirstVertexOfGroup = MeshData->v[FirstVertexIndex];
+		v3  Max = V3(FirstVertexOfGroup);
+		v3  Min = V3(FirstVertexOfGroup);
+
+		for( u32 FaceIndex = 0; FaceIndex < OBJGroup.FaceCount; ++FaceIndex )
+		{
+			face Face = OBJGroup.Faces[FaceIndex];
+
+			// Make sure face is triangulated;
+			Assert(Face.nv == 3);
+
+			for( u32 TriangleIndex = 0; TriangleIndex < Face.nv; ++TriangleIndex )
+			{	
+				
+				u32 VertexIndex = Face.vi[TriangleIndex];
+				Assert(VertexIndex < MeshData->nv);
+
+				if( ! IsVertexCounted[VertexIndex] )
+				{
+					IsVertexCounted[VertexIndex] = true;
+					
+					v4 Vertex = MeshData->v[VertexIndex];
+
+					Max.X = Max.X > Vertex.X ? Max.X : Vertex.X;
+					Max.Y = Max.Y > Vertex.Y ? Max.Y : Vertex.Y;
+					Max.Z = Max.Z > Vertex.Z ? Max.Z : Vertex.Z;
+
+					Min.X = Min.X < Vertex.X ? Min.X : Vertex.X;
+					Min.Y = Min.Y < Vertex.Y ? Min.Y : Vertex.Y;
+					Min.Z = Min.Z < Vertex.Z ? Min.Z : Vertex.Z;
+
+					CenterOfMass += V3( Vertex );
+					++VertexCount;
+				}
+			}
+		}
+
+		OBJGroup.CenterOfMass = CenterOfMass / VertexCount;
+		OBJGroup.BoundingBoxMin = Min - CenterOfMass;
+		OBJGroup.BoundingBoxMax = Max - CenterOfMass;
+
+		EndTemporaryMemory(TempMem);	
 	}
 }
 
-void ScaleObjectToUnitQube( loaded_obj_file* Obj )
+void ScaleObjectToUnitCube( loaded_obj_file* Obj )
 {
 	mesh_data* MeshData = Obj->MeshData;
 
@@ -853,15 +987,20 @@ void ScaleObjectToUnitQube( loaded_obj_file* Obj )
 	r32 MaxDistance = 0;
 	for( u32 i = 0; i < MeshData->nv; ++i )
 	{
-		r32 Distance = Norm( V3(MeshData->v[i]) ); 
+		v4 Point = MeshData->v[i];
+
+		r32 Distance = Point.X;
+		Distance = GetAbsoluteMax( Distance, Point.Y );
+		Distance = GetAbsoluteMax( Distance, Point.Z );
+
 		if( Distance > MaxDistance )
 		{
-			MaxAxis = MeshData->v[i];
+			MaxAxis = Point;
 			MaxDistance = Distance;
 		}
 	}
 
-	if(MaxDistance > 1)
+	if(MaxDistance < 1)
 	{
 		MaxDistance = 1/MaxDistance;
 	}
@@ -880,7 +1019,7 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 {
 	debug_read_file_result ReadResult = ReadEntireFile(Thread, FileName);
 
-	char LineBuffer[OBJ_MAX_LINE_LENGTH];
+	char LineBuffer[STR_MAX_LINE_LENGTH];
 	
 	if( !ReadResult.ContentSize ){ return {}; }
 
@@ -979,7 +1118,7 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 
 			case obj_data_types::OBJ_MATERIAL_LIBRARY:
 			{
-				char MTLFileName[OBJ_MAX_LINE_LENGTH] = {};
+				char MTLFileName[STR_MAX_LINE_LENGTH] = {};
 
 				CreateNewFilePath( FileName, DataType.String, sizeof(MTLFileName), MTLFileName );
 				
@@ -1129,80 +1268,90 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 
 	Assert( GroupToParse.IsEmpty() );
 
-	EndTemporaryMemory( TempMem );
-
 	Result->MeshData  = MeshData;
 	Result->ObjectCount = ObjectCount;
 	Result->Objects   = Objects;
 
-	CenterObjectAtOrigin( Result );
-	//ScaleObjectToUnitQube( Result );
+	SetCenterOfMassAndBoundingBoxToOBJFile(Result, TempArena);
+
+	EndTemporaryMemory(TempMem);
+
+	CheckArena(TempArena);
 
 	return Result;
 }
 
-entity* SetMeshAndMaterialComponentFromObjGroup( world* World, obj_group* Grp, mesh_data* MeshData )
+entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* MeshData )
 {
 	entity* Entity = NewEntity( World );
-	NewComponents( World, Entity,  COMPONENT_TYPE_RENDER_MESH );
+	NewComponents( World, Entity,  COMPONENT_TYPE_MESH |  COMPONENT_TYPE_SURFACE | COMPONENT_TYPE_SPATIAL );
 
-	Entity->RenderMeshComponent->TriangleCount = Grp->FaceCount;
-	Entity->RenderMeshComponent->Triangles = Grp->Faces;
-	Entity->RenderMeshComponent->Data = MeshData;
-	Entity->RenderMeshComponent->T = M4Identity();
+	Entity->MeshComponent->TriangleCount = OBJGrp->FaceCount;
+	Entity->MeshComponent->Triangles = OBJGrp->Faces;
+	Entity->MeshComponent->Data = MeshData;
 
-	if( Grp->Material )
+	v3 Size = OBJGrp->BoundingBoxMax - OBJGrp->BoundingBoxMin;
+	Entity->SpatialComponent->Position = OBJGrp->CenterOfMass;
+	Entity->SpatialComponent->Velocity = V3(0,0,0);
+	Entity->SpatialComponent->RotationAngle = 0;
+	Entity->SpatialComponent->RotationAxis = V3(0,0,1);
+	Entity->SpatialComponent->IsDynamic = true;
+	Entity->SpatialComponent->Width  = Size.X;
+	Entity->SpatialComponent->Height = Size.Y;
+	Entity->SpatialComponent->Depth  = Size.Z;
+
+	if( OBJGrp->Material )
 	{
-		surface_property* SurfaceProperty = &Entity->RenderMeshComponent->SurfaceProperty;
+		component_surface* Surface = Entity->SurfaceComponent;
 
-		if( Grp->Material->Ka || Grp->Material->Kd || Grp->Material->Ks || Grp->Material->Ns )
+		if( OBJGrp->Material->Ka || OBJGrp->Material->Kd || OBJGrp->Material->Ks || OBJGrp->Material->Ns )
 		{
-			SurfaceProperty->Material = PushStruct( &World->Arena, material);
-			if(Grp->Material->Ka)
+			Surface->Material = PushStruct( &World->Arena, material);
+			if(OBJGrp->Material->Ka)
 			{
-				SurfaceProperty->Material->AmbientColor  = *Grp->Material->Ka;
+				Surface->Material->AmbientColor  = *OBJGrp->Material->Ka;
 			}else{
-				SurfaceProperty->Material->AmbientColor = V4(1,1,1,1);
+				Surface->Material->AmbientColor = V4(1,1,1,1);
 			}
 
-			if(Grp->Material->Kd)
+			if(OBJGrp->Material->Kd)
 			{
-				SurfaceProperty->Material->DiffuseColor  = *Grp->Material->Kd;
+				Surface->Material->DiffuseColor  = *OBJGrp->Material->Kd;
 			}else{
-				SurfaceProperty->Material->DiffuseColor = V4(1,1,1,1);
+				Surface->Material->DiffuseColor = V4(1,1,1,1);
 			}
 
-			if(Grp->Material->Ks)
+			if(OBJGrp->Material->Ks)
 			{
-				SurfaceProperty->Material->SpecularColor  = *Grp->Material->Ks;
+				Surface->Material->SpecularColor  = *OBJGrp->Material->Ks;
 			}else{
-				SurfaceProperty->Material->SpecularColor = V4(1,1,1,1);
+				Surface->Material->SpecularColor = V4(1,1,1,1);
 			}
 
-			if( Grp->Material->Ns )
+			if( OBJGrp->Material->Ns )
 			{
-				SurfaceProperty->Material->Shininess  	 = *Grp->Material->Ns;
+				Surface->Material->Shininess  	 = *OBJGrp->Material->Ns;
 			}else{
-				SurfaceProperty->Material->Shininess 	 = 1;
+				Surface->Material->Shininess 	 = 1;
 			}
 		}
 
-		SurfaceProperty->DiffuseMap  = Grp->Material->MapKd;
+		Surface->Material->DiffuseMap  = OBJGrp->Material->MapKd;
 	}
 
 	return Entity;
 }
 
-void SetMeshAndMaterialComponentFromObjFile( world* World, loaded_obj_file* ObjFile )
+void CreateEntitiesFromOBJFile( world* World, loaded_obj_file* ObjFile )
 {
 	for( u32  ObjectIndex = 0; ObjectIndex < ObjFile->ObjectCount; ++ObjectIndex )
 	{
 		obj_group* Grp = &ObjFile->Objects[ObjectIndex];
-		SetMeshAndMaterialComponentFromObjGroup(World, Grp, ObjFile->MeshData );
+		CreateEntityFromOBJGroup(World, Grp, ObjFile->MeshData );
 	}
 }
 
-
+#if 0
 #include "mesh.h"
 
 
@@ -1211,3 +1360,5 @@ ordered_mesh* CreateOrderedMesh( memory_arena* Arena, loaded_obj_file*  LoadedOb
 	ordered_mesh* Mesh = PushArray(Arena, LoadedObject->ObjectCount, ordered_mesh );
 	return 0;
 }
+
+#endif

@@ -1,14 +1,19 @@
 #ifndef STRING_H
 #define STRING_H
 
+
+#define STR_MAX_LINE_LENGTH 512
+#define STR_MAX_WORD_LENGTH 64
+
+
 namespace str
 {
 
 internal u32
 StringLength( const char* String )
 {
-	// foo++ -> increment after
-	// ++foo -> increment before
+	if(!String){return 0;}
+
 	u32 Count = 0;
 	while(*String++)
 	{
@@ -64,6 +69,13 @@ Contains( size_t LookForLength, char* LookForString, size_t SearchInLength, char
 
 	return 0;
 }
+
+char*
+Contains( char* LookForString, char* SearchInString )
+{
+	return Contains( StringLength(LookForString), LookForString, StringLength(SearchInString), SearchInString );
+}
+
 
 b32
 Equals( char* StringA, char* StringB )

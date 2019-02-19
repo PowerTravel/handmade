@@ -3,17 +3,19 @@ void SpatialSystemUpdate( world* World )
 {
 	v3 Gravity = V3( 0, -9, 0 );
 	v3 Collition = V3( 0, 0, 0 );
-	r32 t = 0.01;
+	r32 dt = 1/60.f;
 	for(u32 Index = 0;  Index < World->NrEntities; ++Index )
 	{
-		entity* E1 = &World->Entities[Index];
+		entity* E = &World->Entities[Index];
 
-		if( E1->Types & COMPONENT_TYPE_SPATIAL )
+		if( E->Types & COMPONENT_TYPE_SPATIAL )
 		{
-			component_spatial* S1 = E1->SpatialComponent;
+			component_spatial* S = E->SpatialComponent;
+			S->Position = S->Position + (dt/2) * S->Velocity;
 
-			if(S1->IsDynamic)
+			if(S->IsDynamic)
 			{
+				#if 0
 				S1->Velocity += t * Gravity;
 				S1->Position += t * S1->Velocity;
 
@@ -36,6 +38,13 @@ void SpatialSystemUpdate( world* World )
 						}
 					}
 				}
+				
+				#else
+				
+				//E1->SpatialComponent->RotationAngle += 0.03;
+				//E1->SpatialComponent->RotationAxis = V3(0,0,1);
+
+				#endif 
 			}
 		}
 	}

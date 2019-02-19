@@ -1,6 +1,8 @@
 #ifndef DATA_CONTAINER_H
 #define DATA_CONTAINER_H
 
+#include "memory.h"
+
 template <class T>
 class list
 {
@@ -62,8 +64,8 @@ class list
 			Position = Sentinel;
 		}
 
-		u32 GetSize(){ return Size; };
-		b32 IsEmpty(){ return ( Size==0 ); }
+		u32 GetSize() { return Size; };
+		b32 IsEmpty() { return ( Size==0 ); }
 		b32 IsEnd()   { return (Position == Sentinel); };
 		
 
@@ -119,6 +121,7 @@ class fifo_queue
 
 		fifo_queue(){};
 		fifo_queue( memory_arena* aArena ) : List(aArena){};
+
 		void Initiate( memory_arena* aArena )
 		{
 			List.Initiate();
