@@ -46,6 +46,8 @@
 
 #include <stddef.h> // size_t exists in this header on some platforms
 
+#include "vector_math.h"
+
 struct thread_context
 {
 	s32 placeholder;
@@ -86,20 +88,24 @@ SafeTruncateReal32( u32 Value )
 	return Result;
 }
 
+
 /*
   NOTE: Services that the game provides to the platform layer.
 */
-struct game_offscreen_buffer
+
+struct game_render_commands
 {
-	// Note: Pixels are always 32-bits wide: Memory Order BB GG RR XX
-	void* Memory;
-	// In Pixels
 	s32 Width;
 	s32 Height;
-	s32 Pitch;
-	
-	s32 BytesPerPixel;
+
+	u32 MaxPushBufferSize;
+	u32 PushBufferSize;
+	u8* PushBuffer;
+
+	u32 PushBufferElementCount;
 };
+
+#define RenderCommandStruct (MaxPushBufferSize, PushBuffer, Width, Height) {Width,Height, MaxPushBufferSize, 0, (u8*) PushBuffer, 0 , MaxPushBufferSize };
 
 struct game_sound_output_buffer
 {
@@ -300,7 +306,6 @@ struct platform_api
 
     platform_allocate_memory* AllocateMemory;
     platform_deallocate_memory* DeallocateMemory;
-    
 
 #if HANDMADE_INTERNAL
 //     TODO(casey): Get rid of these eventually, make them just go through
@@ -326,7 +331,7 @@ struct game_memory
 	platform_api PlatformAPI;
 };
 
-#define GAME_UPDATE_AND_RENDER(name) void name(thread_context* Thread, game_memory* Memory, game_offscreen_buffer* Buffer, game_input* Input )
+#define GAME_UPDATE_AND_RENDER(name) void name(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
 typedef GAME_UPDATE_AND_RENDER( game_update_and_render );
 
 

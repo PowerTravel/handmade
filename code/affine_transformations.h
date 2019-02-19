@@ -1,6 +1,7 @@
 #ifndef AFFINE_TRANSFORMATIONS
 #define AFFINE_TRANSFORMATIONS
 
+#include "vector_math.h"
 
 inline m4
 AffineInverse( const m4& A )
@@ -120,6 +121,31 @@ Translate( const v4& Translation, m4& M )
 	M.E[11] += Translation.Z;
 }
 
+inline m4 
+GetTranslationMatrix( const v4& Translation )
+{
+	m4 Result = M4Identity();
+	Translate( Translation, Result );
+	return Result; 
+}
+
+inline v4 
+GetTranslationFromMatrix( const m4& M )
+{
+	v4 Result = V4( M.r0.E[3],
+					M.r1.E[3],
+					M.r2.E[3],1);
+	return Result; 
+}
+
+inline void 
+SetPositionToAffineMatrix( const v4& Position, m4& M )
+{
+	M.E[3]  = Position.X;
+	M.E[7]  = Position.Y;
+	M.E[11] = Position.Z;
+}
+
 inline void 
 Rotate( const r32 Angle, const v4& Axis, m4& T )
 {
@@ -138,12 +164,25 @@ Rotate( const r32 Angle, const v4& Axis, m4& T )
 	T =  bfo * RotMat * tto * T;
 }
 
+// Todo( Jakob ): Add a version of Scale that functions as Rotate, 
+//                That inverts T back to origin before scaling then moves back.
+ 				   
 inline void 
-Scale( const v4& Scale, m4& T ) 
+ScaleAroundOrigin( const v4& Scale, m4& T ) 
 {
 	T.E[0]  *= Scale.X;
 	T.E[5]  *= Scale.Y;
 	T.E[10] *= Scale.Z;
+}
+ 
+inline m4 
+GetScaleMatrix( const v4& Scale ) 
+{
+	m4 ScaleMat = M4Identity();
+	ScaleMat.E[0]  = Scale.X;
+	ScaleMat.E[5]  = Scale.Y;
+	ScaleMat.E[10] = Scale.Z;
+	return ScaleMat;
 }
 
 inline v4 

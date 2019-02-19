@@ -1,6 +1,8 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
+#include "platform.h"
+
 #define CopyArray( Count, Source, Dest ) Copy( (Count)*sizeof( *(Source) ), ( Source ), ( Dest ) )
 
 inline void* Copy(memory_index aSize, void *SourceInit, void *DestInit)
@@ -29,6 +31,8 @@ struct temporary_memory
     platform_memory_block *Block;
     uintptr_t Used;
 };
+
+
 
 inline void
 SetMinimumBlockSize( memory_arena *Arena, memory_index MinimumBlockSize )
@@ -261,18 +265,35 @@ Clear( memory_arena *Arena )
     }
 }
 
+struct scoped_temporary_memory 
+{
+    temporary_memory TempMem;
+
+    scoped_temporary_memory(memory_arena* Arena)
+    {
+        TempMem = BeginTemporaryMemory( Arena );
+    };
+
+    ~scoped_temporary_memory()
+    {
+        EndTemporaryMemory( TempMem );
+    };
+
+};
+
 inline void
 CheckArena( memory_arena *Arena )
 {
     Assert( Arena->TempCount == 0 );
 }
 
-#define BootstrapPushStruct( type, Member, ... ) (type*) BootstrapPushSize_( sizeof( type ), 8, ## __VA_ARGS__ )
+#define BootstrapPushStruct( type, Member, ... ) (type*) BootstrapPushSize_( sizeof( type ), OffsetOf(type, Member), ## __VA_ARGS__ )
 inline void *
 BootstrapPushSize_( uintptr_t StructSize, uintptr_t OffsetToArena,
                     arena_bootstrap_params BootstrapParams = DefaultBootstrapParams(), 
                     arena_push_params Params = DefaultArenaParams() )
 {
+
     memory_arena Bootstrap = {};
     Bootstrap.AllocationFlags = BootstrapParams.AllocationFlags;
     Bootstrap.MinimumBlockSize = BootstrapParams.MinimumBlockSize;

@@ -1,7 +1,6 @@
 #ifndef MESH_H
 #define MESH_H
 
-
 typedef v3 point;
 struct triangle;
 

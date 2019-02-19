@@ -7,7 +7,6 @@
 #define UINT32_MAX 0xffffffff
 #endif
 
-#define OffsetOf(type, Member) (uintptr_t) &( ( (type* )0 )->Member )
 
 #define Kilobytes(Value)  ((Value)*1024LL)
 #define Megabytes(Value)  (Kilobytes(Value)*1024LL)
@@ -20,6 +19,8 @@
 #else
 #define Assert(Expression)
 #endif // HANDMADE_SLOW
+
+#define INVALID_CODE_PATH Assert(0);
 
 typedef int8_t  s8;
 typedef int16_t s16;
@@ -35,12 +36,14 @@ typedef uint64_t u64;
 
 typedef size_t memory_index;
 
+typedef uintptr_t umm;
+typedef intptr_t smm;
+
 typedef float  r32;
 typedef double r64;
 
 #define Maximum(A, B) ((A > B) ? (A) : (B))
 #define Minimum(A, B) ((A < B) ? (A) : (B))
-
 
 #define U32Max ( (u32)-1 )
 
@@ -55,5 +58,21 @@ typedef double r64;
 #define global_variable  static
 
 #define Pi32 3.14159265359f
+
+union rect2f
+{
+	struct{
+		r32 X,Y,W,H;
+	};
+	struct{
+		r32 X0,Y0,X1,Y1;
+	};
+};
+
+rect2f Rect2f( r32 a, r32 b, r32 c, r32 d )
+{
+	rect2f Result = {a,b,c,d};
+	return Result;
+};
 
 #endif

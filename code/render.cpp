@@ -1,12 +1,14 @@
-#include "render.h"
+
+#include "platform.h"
+#include "affine_transformations.h"
 
 internal void
-DrawRectangle( game_offscreen_buffer* Buffer, r32 RealMinX, r32 RealMinY, r32 Width, r32 Height, r32 R, r32 G, r32 B )
+DrawRectangle( bitmap* Buffer, r32 RealMinX, r32 RealMinY, r32 Width, r32 Height, r32 R, r32 G, r32 B )
 {
-	s32 MinX = RoundReal32ToInt32( RealMinX );
-	s32 MinY = RoundReal32ToInt32( RealMinY );
-	s32 MaxX = RoundReal32ToInt32( RealMinX + Width);
-	s32 MaxY = RoundReal32ToInt32( RealMinY + Height);
+	s32 MinX = RoundReal32ToUInt32( RealMinX );
+	s32 MinY = RoundReal32ToUInt32( RealMinY );
+	s32 MaxX = RoundReal32ToUInt32( RealMinX + Width);
+	s32 MaxY = RoundReal32ToUInt32( RealMinY + Height);
 
 	if( MinX < 0 )
 	{
@@ -16,37 +18,44 @@ DrawRectangle( game_offscreen_buffer* Buffer, r32 RealMinX, r32 RealMinY, r32 Wi
 	{
 		MinY = 0;
 	}
-	if( MaxX > Buffer->Width )
+	if( MaxX > (s32) Buffer->Width )
 	{
 		MaxX = Buffer->Width;
 	}
-	if( MaxY > Buffer->Height )
+	if( MaxY > (s32) Buffer->Height )
 	{
 		MaxY = Buffer->Height;
 	}
 
-	u8* Row = ( (u8*) Buffer->Memory + MinX*Buffer->BytesPerPixel + MinY*Buffer->Pitch );
-	for( s32 Y = MinY; Y < MaxY; ++Y )
+	// Note (Jakob) Move this to bitmap?
+	u32 BytesPerPixel = 4;
+	u32 Pitch =  Buffer->Width * BytesPerPixel;
+
+	u8* Row = ( (u8*) Buffer->Pixels + MinX*BytesPerPixel + MinY*Pitch );
+	for( u32 Y = MinY; Y < (u32) MaxY; ++Y )
 	{
 		u32* Pixel = (u32*) Row;
-		for( s32 X = MinX; X < MaxX; ++X )
+		for( u32 X = MinX; X < (u32) MaxX; ++X )
 		{
 			*Pixel++ = ( (TruncateReal32ToInt32( R*255.f ) << 16 ) |
 						 (TruncateReal32ToInt32( G*255.f ) << 8  ) |
 						 (TruncateReal32ToInt32( B*255.f ) << 0  ) );
 		}
-		Row += Buffer->Pitch;
+		Row += Pitch;
 	}
 }
 
-void PutPixel( game_offscreen_buffer* Buffer, s32 X, s32 Y, r32 R, r32 G, r32 B )
+void PutPixel( bitmap* Buffer, u32 X, u32 Y, r32 R, r32 G, r32 B )
 {
 	if( ( X < 0 ) || ( Y < 0 ) || ( X >= Buffer->Width ) || ( Y >= Buffer->Height ) )
 	{
 		return;
 	} 
 
-	u8*  PixelLocation = ( (u8*) Buffer->Memory + X*Buffer->BytesPerPixel + Y*Buffer->Pitch );
+	u32 BytesPerPixel = 4;
+	u32 Pitch =  Buffer->Width * BytesPerPixel;
+
+	u8*  PixelLocation = ( (u8*) Buffer->Pixels + X*BytesPerPixel + Y*Pitch );
 	u32* Pixel = (u32*) PixelLocation;
 	*Pixel = ( (TruncateReal32ToInt32( R*255.f ) << 16 ) |
 			   (TruncateReal32ToInt32( G*255.f ) << 8  ) |
@@ -54,7 +63,7 @@ void PutPixel( game_offscreen_buffer* Buffer, s32 X, s32 Y, r32 R, r32 G, r32 B 
 }
 
 
-void DrawCircle( game_offscreen_buffer* Buffer, r32 RealX0, r32 RealY0, r32 RealRadius, r32 R = 1, r32 G = 1, r32 B = 1 )
+void DrawCircle( bitmap* Buffer, r32 RealX0, r32 RealY0, r32 RealRadius, r32 R = 1, r32 G = 1, r32 B = 1 )
 {
 	s32 x0 = RoundReal32ToInt32( RealX0 );
 	s32 y0 = RoundReal32ToInt32( RealY0 );
@@ -107,57 +116,13 @@ void DrawCircle( game_offscreen_buffer* Buffer, r32 RealX0, r32 RealY0, r32 Real
 
 }
 
-
-// makes the packing compact
-#pragma pack(push, 1)
-struct bmp_header
-{
-	u16 FileType;     /* File type, always 4D42h ("BM") */
-	u32 FileSize;     /* Size of the file in bytes */
-	u16 Reserved1;    /* Always 0 */
-	u16 Reserved2;    /* Always 0 */
-	u32 BitmapOffset; /* Starting position of image data in bytes */
-
-	u32 HeaderSize;       /* Size of this header in bytes */
-	s32 Width;           /* Image width in pixels */
-	s32 Height;          /* Image height in pixels */
-	u16 Planes;          /* Number of color planes */
-	u16 BitsPerPixel;    /* Number of bits per pixel */
-	u32 Compression;     /* Compression methods used */
-	u32 SizeOfBitmap;    /* Size of bitmap in bytes */
-	s32 HorzResolution;  /* Horizontal resolution in pixels per meter */
-	s32 VertResolution;  /* Vertical resolution in pixels per meter */
-	u32 ColorsUsed;      /* Number of colors in the image */
-	u32 ColorsImportant; /* Minimum number of important colors */
-	/* Fields added for Windows 4.x follow this line */
-
-	u32 RedMask;       /* Mask identifying bits of red component */
-	u32 GreenMask;     /* Mask identifying bits of green component */
-	u32 BlueMask;      /* Mask identifying bits of blue component */
-	u32 AlphaMask;     /* Mask identifying bits of alpha component */
-	u32 CSType;        /* Color space type */
-	s32 RedX;          /* X coordinate of red endpoint */
-	s32 RedY;          /* Y coordinate of red endpoint */
-	s32 RedZ;          /* Z coordinate of red endpoint */
-	s32 GreenX;        /* X coordinate of green endpoint */
-	s32 GreenY;        /* Y coordinate of green endpoint */
-	s32 GreenZ;        /* Z coordinate of green endpoint */
-	s32 BlueX;         /* X coordinate of blue endpoint */
-	s32 BlueY;         /* Y coordinate of blue endpoint */
-	s32 BlueZ;         /* Z coordinate of blue endpoint */
-	u32 GammaRed;      /* Gamma red coordinate scale value */
-	u32 GammaGreen;    /* Gamma green coordinate scale value */
-	u32 GammaBlue;     /* Gamma blue coordinate scale value */
-};
-#pragma pack(pop)
-
 internal void
-BlitBMP( game_offscreen_buffer* Buffer, r32 RealMinX, r32 RealMinY, bitmap BitMap )
+BlitBMP( bitmap* Buffer, r32 RealMinX, r32 RealMinY, bitmap BitMap )
 {
-	s32 MinX = RoundReal32ToInt32( RealMinX );
-	s32 MinY = RoundReal32ToInt32( RealMinY );
-	s32 MaxX = RoundReal32ToInt32( RealMinX + (r32) BitMap.Width  );
-	s32 MaxY = RoundReal32ToInt32( RealMinY + (r32) BitMap.Height );
+	s32 MinX =(u32) RoundReal32ToInt32( RealMinX );
+	s32 MinY =(u32) RoundReal32ToInt32( RealMinY );
+	s32 MaxX =(u32) RoundReal32ToInt32( RealMinX + (r32) BitMap.Width  );
+	s32 MaxY =(u32) RoundReal32ToInt32( RealMinY + (r32) BitMap.Height );
 
 
 	u32 ClippingOffsetX = 0;
@@ -172,20 +137,21 @@ BlitBMP( game_offscreen_buffer* Buffer, r32 RealMinX, r32 RealMinY, bitmap BitMa
 		ClippingOffsetY = -MinY;
 		MinY = 0;
 	}
-	if( MaxX > Buffer->Width )
+	if( (u32) MaxX > Buffer->Width )
 	{
 		MaxX = Buffer->Width;
 	}
-	if( MaxY > Buffer->Height )
+	if( (u32) MaxY > Buffer->Height )
 	{
 		MaxY = Buffer->Height;
 	}
 
 
 	u32 BytesPerPixel = 4;
+	u32 BufferPitch =  Buffer->Width * BytesPerPixel;
 
 	u8* SourceRow = (u8*) BitMap.Pixels + ( BitMap.Width*ClippingOffsetY + ClippingOffsetX )*BytesPerPixel;
-	u8* DestinationRow = (u8*) ( (u8*) Buffer->Memory + MinY*Buffer->Pitch + MinX*Buffer->BytesPerPixel );
+	u8* DestinationRow = (u8*) ( (u8*) Buffer->Pixels + MinY*BufferPitch + MinX*BytesPerPixel );
 
 
 	u32 BitmapPitch = BitMap.Width*BytesPerPixel;
@@ -229,13 +195,13 @@ BlitBMP( game_offscreen_buffer* Buffer, r32 RealMinX, r32 RealMinY, bitmap BitMa
 
 		}
 
-		DestinationRow += Buffer->Pitch;
+		DestinationRow += BufferPitch;
 		SourceRow += BitmapPitch;
 
 	}
 }
 
-void DrawLineBresLow( game_offscreen_buffer* Buffer, s32 x0, s32 y0, s32 x1, s32 y1, v4 Color )
+void DrawLineBresLow( bitmap* Buffer, s32 x0, s32 y0, s32 x1, s32 y1, v4 Color )
 {
 	s32 dx = x1 - x0;
 	s32 dy = y1 - y0;
@@ -261,7 +227,7 @@ void DrawLineBresLow( game_offscreen_buffer* Buffer, s32 x0, s32 y0, s32 x1, s32
 }
 
 
-void DrawLineBresHigh( game_offscreen_buffer* Buffer, s32 x0, s32 y0, s32 x1, s32 y1, v4 Color )
+void DrawLineBresHigh( bitmap* Buffer, s32 x0, s32 y0, s32 x1, s32 y1, v4 Color )
 {
 	s32 dx = x1 - x0;
 	s32 dy = y1 - y0;
@@ -286,7 +252,7 @@ void DrawLineBresHigh( game_offscreen_buffer* Buffer, s32 x0, s32 y0, s32 x1, s3
 	}
 }
 
-void DrawLineBres( game_offscreen_buffer* Buffer, s32 x0, s32 y0, s32 x1, s32 y1, v4 Color )
+void DrawLineBres( bitmap* Buffer, s32 x0, s32 y0, s32 x1, s32 y1, v4 Color )
 {
 
 	if( Abs((r32) (y1 - y0)) < Abs((r32) (x1 - x0)) )
@@ -307,6 +273,14 @@ void DrawLineBres( game_offscreen_buffer* Buffer, s32 x0, s32 y0, s32 x1, s32 y1
 	}
 }
 
+m4 GetRasterMatrix( r32 ScreenWidth, r32 ScreenHeight )
+{
+	m4 Result = M4( ScreenWidth/2.f,                0, 0,  ScreenWidth/2.f, 
+				    			  0, ScreenHeight/2.f, 0, ScreenHeight/2.f, 
+				    			  0,                0, 1,                0,
+				    			  0,                0, 0,                1);
+	return Result;
+}
 
 struct calculated_color
 {
@@ -349,39 +323,6 @@ struct aabb2d
 	v2 max;
 };
 
-
-void PushLight( render_push_buffer* PushBuffer, component_light* Light )
-{
-	PushBuffer->Lights.Last();
-	PushBuffer->Lights.InsertAfter(Light);
-}
-
-void PushRenderGroup( render_push_buffer* PushBuffer, component_render_mesh* Mesh )
-{
-	render_group* NewRenderGroup = (render_group*) PushStruct( PushBuffer->Arena, render_group );
-	NewRenderGroup->Mesh = Mesh;
-	PushBuffer->RenderGroups.Push(NewRenderGroup);
-}
-
-void InitiatePushBuffer(render_push_buffer* PushBuffer, game_offscreen_buffer* aOffscreenBuffer, depth_buffer* DepthBuffer, memory_arena* aArena)
-{	
-	*PushBuffer = {};
-	PushBuffer->Arena = aArena;
-	PushBuffer->DepthBuffer = DepthBuffer;
-	PushBuffer->TemporaryMemory = BeginTemporaryMemory(PushBuffer->Arena);
-	PushBuffer->OffscreenBuffer = aOffscreenBuffer;
-	PushBuffer->RenderGroups = filo_queue<render_group*>( PushBuffer->Arena );
-	PushBuffer->Lights = list<component_light*>(PushBuffer->Arena);
-}
-
-void ClearPushBuffer(render_push_buffer* Buffer)
-{
-	Assert(Buffer->Arena);
-	Assert(Buffer->OffscreenBuffer);
-	EndTemporaryMemory(Buffer->TemporaryMemory);
-	*Buffer = {};
-}
-
 aabb2d getBoundingBox(v2 a, v2 b, v2 c)
 {
 	v2 p[3] = {a,b,c};
@@ -410,10 +351,12 @@ struct fragment_color
 };
 
 
-void DrawTriangle(game_offscreen_buffer* OffscreenBuffer, depth_buffer* DepthBuffer, 
+void DrawTriangle(  bitmap* OffscreenBuffer, bitmap* DepthBuffer, 
 					aabb2d* RasterBB, v2* PointsInScreenSpace, 
 					v4* PointInCameraSpace, v2* TextureCoordinates, bitmap* TextureMap, r32 PremulArea2, calculated_color* Color)
 {
+	u32 BytesPerPixel = 4;
+	u32 Pitch =  OffscreenBuffer->Width * BytesPerPixel;
 	r32 near_clipping_plane = -1;
 	for(s32 Y = RoundReal32ToInt32( RasterBB->min.Y ); Y < RasterBB->max.Y; ++Y)
 	{
@@ -438,13 +381,14 @@ void DrawTriangle(game_offscreen_buffer* OffscreenBuffer, depth_buffer* DepthBuf
 
 				r32 PixelDepthValue = Lambda0 * PointInCameraSpace[0].Z + Lambda1 * PointInCameraSpace[1].Z + Lambda2 * PointInCameraSpace[2].Z;
 
-				r32* BufferDepthValue = &DepthBuffer->Buffer[ Y * DepthBuffer->Width  + X];
+				r32* DepthBufferPixels = (r32*) DepthBuffer->Pixels;
+				r32* BufferDepthValue =  &DepthBufferPixels[ Y * DepthBuffer->Width  + X];
 
 				if( ( PixelDepthValue > *BufferDepthValue) && ( PixelDepthValue < near_clipping_plane ) )
 				{
 					*BufferDepthValue = PixelDepthValue;
-					u8* PixelLocation = ((u8*)OffscreenBuffer->Memory + X * OffscreenBuffer->BytesPerPixel +
-										Y * OffscreenBuffer->Pitch);
+					u8* PixelLocation = ((u8*)OffscreenBuffer->Pixels + X * BytesPerPixel +
+										Y * Pitch);
 
 					v4 InterpolatedAmbientColor  = Lambda0 * Color[0].ambient  + Lambda1 * Color[1].ambient  + Lambda2 * Color[2].ambient;
 					v4 InterpolatedDiffuseColor  = Lambda0 * Color[0].diffuse  + Lambda1 * Color[1].diffuse  + Lambda2 * Color[2].diffuse;
@@ -497,7 +441,7 @@ void DrawTriangle(game_offscreen_buffer* OffscreenBuffer, depth_buffer* DepthBuf
 	}
 }
 
-void GouradShading(game_offscreen_buffer* OffscreenBuffer, depth_buffer* DepthBuffer, 
+void GouradShading(bitmap* OffscreenBuffer, bitmap* DepthBuffer, 
 					v4* CameraPosition, aabb2d* RasterBB, v2* PointsInScreenSpace, 
 					v4* Vertices, v4* VertexNormals, v4* PointInCameraSpace, 
 					u32 NrFragmentColors, fragment_color* PerLightColors, v2* TextureCoordinates, bitmap* TextureMap )
@@ -555,18 +499,20 @@ void ClampToOne( v4* A )
 	A->W = (A->W > 1) ? 1 : A->W; 
 }
 
-void DrawTriangles( render_push_buffer* PushBuffer )
+void DrawTriangles( game_render_commands* RenderCommands, bitmap* OutputBitMap  )
 {
+#if 0
+	render_push_buffer* PushBuffer = (render_push_buffer*)  RenderCommands->PushBuffer;
+
 	// Get camera matrices
 	m4& V =  PushBuffer->Camera->V; 	// ViewMatrix
 	m4& P =  PushBuffer->Camera->P;		// ProjectionMatrix
-	m4& R =  PushBuffer->Camera->R;		// RasterizationMatrix
+	m4 R =  GetRasterMatrix( (r32) OutputBitMap->Width, (r32) OutputBitMap->Height);		// RasterizationMatrix
 	m4 	RPV= R*P*V;						// All in one
 
 	v4 CameraPosition = Transpose( RigidInverse( V ) ).r3;
 
 	// 'Reset' DepthBuffer
-	game_offscreen_buffer* OffscreenBuffer =  PushBuffer->OffscreenBuffer;
 	depth_buffer* DepthBuffer = PushBuffer->DepthBuffer;
 	for( u32 i = 0; i<DepthBuffer->Width*DepthBuffer->Height; ++i)
 	{
@@ -675,22 +621,23 @@ void DrawTriangles( render_push_buffer* PushBuffer )
 			// OffScreenCulling
 			if( (ScreenBoundingBox.max.X < 0)  || 
 				(ScreenBoundingBox.max.Y < 0 ) ||
-				(ScreenBoundingBox.min.X >= OffscreenBuffer->Width) || 
-				(ScreenBoundingBox.min.Y >= OffscreenBuffer->Height))
+				(ScreenBoundingBox.min.X >= OutputBitMap->Width) || 
+				(ScreenBoundingBox.min.Y >= OutputBitMap->Height))
 			{
 				continue;
 			}
 
 			ScreenBoundingBox.min.X = Maximum(0, ScreenBoundingBox.min.X);
-			ScreenBoundingBox.max.X = Minimum((r32) OffscreenBuffer->Width, ScreenBoundingBox.max.X);
+			ScreenBoundingBox.max.X = Minimum((r32) OutputBitMap->Width, ScreenBoundingBox.max.X);
 			ScreenBoundingBox.min.Y = Maximum(0, ScreenBoundingBox.min.Y);
-			ScreenBoundingBox.max.Y = Minimum((r32) OffscreenBuffer->Height, ScreenBoundingBox.max.Y);
+			ScreenBoundingBox.max.Y = Minimum((r32) OutputBitMap->Height, ScreenBoundingBox.max.Y);
 
 			v4 PointInCameraSpace[3] ={ V*v[0] ,V*v[1] , V*v[2] };
 
-			GouradShading(OffscreenBuffer, DepthBuffer, &CameraPosition, &ScreenBoundingBox, PointsInScreenSpace, v, vn, PointInCameraSpace,  PushBuffer->Lights.GetSize(), PerLightColors, tc, DiffuseMap);
+			GouradShading(OutputBitMap, DepthBuffer, &CameraPosition, &ScreenBoundingBox, PointsInScreenSpace, v, vn, PointInCameraSpace,  PushBuffer->Lights.GetSize(), PerLightColors, tc, DiffuseMap);
 
 		}
 		EndTemporaryMemory( LightMemory );
 	}
+	#endif
 }

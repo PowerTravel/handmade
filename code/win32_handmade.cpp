@@ -1,17 +1,12 @@
 /*
   TODO:
   - Saved game locations
-  - Getting a handle to our own executable file
   - Asset loading path
   - Threading (launch a thread)
   - Raw Input (support for multiple keyboards)
   - Sleep/timeBeginPeriod
-  - ClipCursor() (for multimonitor support)
-  - Fullscreen support
   - WM_SETCURSOR (control cursor visibility)
-  - QueryCancelAutoplay
   - WM_ACTIVATEAPP (for when we are not the active application)
-  - Blit speed improvements (BitBlt)
   - Hardware acceleration (OpenGL or Direct3D or BOTH??)
   - GetKeyboardLayout (for French keyboards, international WASD support)
 
@@ -19,9 +14,6 @@
 */
 
 // Note(Jakob): If you have windows questions, look for answers given by Raymond Chen
-
-
-//#include "handmade.h"
 
 #include <stdio.h>
 #include <windows.h>
@@ -33,8 +25,6 @@
 
 platform_api Platform;
 
-// TODO: Global for now
-
 global_variable win32_state GlobalWin32State = {};
 global_variable b32 GlobalRunning;
 global_variable b32 GlobalPause; 
@@ -42,6 +32,10 @@ global_variable win32_offscreen_buffer GlobalBackBuffer;
 global_variable s64 GlobalPerfCounterFrequency;
 global_variable b32 DEBUGGlobalShowCursor;
 global_variable WINDOWPLACEMENT GlobalWindowPosition = {sizeof(GlobalWindowPosition)};
+
+//global_variable GLuint GlobalBlitTextureHandle;
+global_variable GLuint OpenGLDefaultInternalTextureFormat;
+
 
 	// Note(Jakob): Caseys native screen resolution is 960 by 540 times two
 	// Note(Jakob): My native screen resolution is 840 by 525 times two
@@ -78,6 +72,21 @@ global_variable x_input_set_state* XInputSetState_ = XInputSetStateStub;
 
 #define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name( LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter )
 typedef DIRECT_SOUND_CREATE(direct_sound_create );
+
+typedef BOOL WINAPI wgl_swap_interval_ext(int interval);
+global_variable wgl_swap_interval_ext* wglSwapInterval;
+
+typedef HGLRC WINAPI wgl_create_context_attrib_arb(HDC hDC, HGLRC hSharedContext, const int *attribList);
+
+typedef GLuint WINAPI gl_create_shader( GLenum shaderType );
+global_variable gl_create_shader* glCreateShader;
+
+typedef void gl_blend_equation_separate( GLenum modeRGB, GLenum modeAlpha );
+global_variable gl_blend_equation_separate* glBlendEquationSeparate;
+
+
+#include "platform_opengl.cpp"
+#include "render.cpp"
 
 
 DEBUG_PLATFORM_FREE_FILE_MEMORY(DEBUGPlatformFreeFileMemory)
@@ -369,7 +378,7 @@ Win32InitDSound( HWND aWindow, win32_sound_output* aSoundOutput)
 }
 
 internal void
-Wind32InitOpenGL(HWND Window)
+Win32InitOpenGL(HWND Window)
 {
 	HDC  WindowDC = GetDC(Window);
 
@@ -382,7 +391,7 @@ Wind32InitOpenGL(HWND Window)
   	DesiredPixelFormat.cAlphaBits = 8;
   	DesiredPixelFormat.iLayerType = PFD_MAIN_PLANE;
 
-  	int SuggestedPixelFormatIndex = ChoosePixelFormat(WindowDC, &DesiredPixelFormat);
+  	s32 SuggestedPixelFormatIndex = ChoosePixelFormat(WindowDC, &DesiredPixelFormat);
   	PIXELFORMATDESCRIPTOR SuggestedPixelFormat;
   	DescribePixelFormat(WindowDC, SuggestedPixelFormatIndex, 
   						sizeof( SuggestedPixelFormat ),   &SuggestedPixelFormat );
@@ -392,11 +401,79 @@ Wind32InitOpenGL(HWND Window)
 	HGLRC OpenGLRC = wglCreateContext(WindowDC);
 	if( wglMakeCurrent(WindowDC, OpenGLRC) )
 	{
+		b32 ModernContext = false;
+		wgl_create_context_attrib_arb* wglCreateContextAttribsARB = (wgl_create_context_attrib_arb* ) wglGetProcAddress("wglCreateContextAttribsARB");
+		if(wglCreateContextAttribsARB)
+		{
+			// Note(Jakob): This is a modern version of OpenGL
+			s32 Attribs[] = 
+			{
+				WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+				WGL_CONTEXT_MINOR_VERSION_ARB, 0,
+				WGL_CONTEXT_FLAGS_ARB, 0 // WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+#if HANDMADE_INTERNAL				
+				| WGL_CONTEXT_DEBUG_BIT_ARB
+#endif
+				,
+   				WGL_CONTEXT_PROFILE_MASK_ARB, 
+   				WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB, // Gives fixed function pipeline compatibility
+   														  // Todo(Jakob): Remove once we have shaders.
+   				0,
+
+			};
+
+			HGLRC SharedContext = 0;
+			HGLRC ModernGLRC = wglCreateContextAttribsARB(WindowDC, SharedContext, Attribs);
+
+			if(ModernGLRC)
+			{
+				if( wglMakeCurrent(WindowDC, ModernGLRC))
+				{
+					ModernContext = true;
+					wglDeleteContext(OpenGLRC);
+					OpenGLRC = ModernGLRC;	
+				}else{
+					INVALID_CODE_PATH
+				}
+			}else{
+				INVALID_CODE_PATH
+			}
+
+		}else{
+			// Note(Jakob): This is a antiquated version of OpenGL.
+			INVALID_CODE_PATH
+		}
+
+		OpenGLInit(ModernContext);
+
+
+	//	debug_read_file_result SourceCode = DEBUGPlatformReadEntireFile( 0,  "..\\handmade\\shaders\\vertex_shader.glsl" );
+	//	LoadShader( SourceCode.ContentSize, (char*) SourceCode.Contents , 0 );
+
+		//typedef BOOL wgl_swap_interval_ext(int interval);
+		wglSwapInterval = (wgl_swap_interval_ext*) wglGetProcAddress("wglSwapIntervalEXT");
+		if(wglSwapInterval)
+		{
+			wglSwapInterval(1);
+		}
+
+		glCreateShader = (gl_create_shader*)wglGetProcAddress("glCreateShader");
+		if(!glCreateShader)
+		{
+			INVALID_CODE_PATH
+		}
+
+		glBlendEquationSeparate  = (gl_blend_equation_separate*)wglGetProcAddress("glBlendEquationSeparate");
+		if(!glBlendEquationSeparate)
+		{
+			INVALID_CODE_PATH
+		}
 
 	}else{
-		Assert(0);
+		INVALID_CODE_PATH
 	}
 	ReleaseDC(Window, WindowDC);
+
 }
 
 internal win32_window_dimension 
@@ -446,53 +523,75 @@ Win32ResizeDIBSection( win32_offscreen_buffer* aBuffer, s32 aWidth, s32 aHeight 
 }
 
 internal void
-Win32DisplayBufferInWindow( HDC aDeviceContext, s32 aWindowWidth, s32 aWindowHeight )
-{	
+Win32DisplayBufferInWindow( game_render_commands* Commands, HDC aDeviceContext, s32 aWindowWidth, s32 aWindowHeight )
+{
+	
+	b32 InHardware = true;
+	b32 DisplayViaHardware = true;
 
-#if 0
-	//TODO(Jakob): Fix so that aspect ration always is kept when resizing
+	if(InHardware)
+	{	
+		OpenGLRenderGroupToOutput( Commands, aWindowWidth, aWindowHeight );
 
-	win32_offscreen_buffer* Buffer = &GlobalBackBuffer;
+		SwapBuffers(aDeviceContext);
 
-	if( (aWindowWidth >= Buffer->Width*2) && 
-		(aWindowHeight >= Buffer->Height*2) )
-	{
-		// Note: No Stretching for prorotyping purposes. 
-		StretchDIBits(	aDeviceContext, 
-						0,0, aWindowWidth,aWindowHeight,
-						0,0, Buffer->Width, Buffer->Height,
-						Buffer->Memory,
-						&Buffer->Info,
-					    DIB_RGB_COLORS, SRCCOPY);
 	}else{
-		s32 OffsetX = 10;
-		s32 OffsetY = 10;
-		PatBlt(aDeviceContext, Buffer->Width+OffsetX,  0, aWindowWidth, aWindowHeight, BLACKNESS);
-		PatBlt(aDeviceContext, 0, Buffer->Height+OffsetY, aWindowWidth, aWindowHeight, BLACKNESS);
-		PatBlt(aDeviceContext, 0, 0, OffsetX, aWindowHeight, BLACKNESS);
-		PatBlt(aDeviceContext, 0, 0, aWindowWidth, OffsetY,  BLACKNESS);
-		/*
-		StretchDIBits(	aDeviceContext, 
-						0,0, aWindowWidth, aWindowHeight,
-						0,0, Buffer->Width, Buffer->Height,
-						Buffer->Memory,
-						&Buffer->Info,
-					    DIB_RGB_COLORS, SRCCOPY);
-		*/
-		// Note: No Stretching for prorotyping purposes. 
-		StretchDIBits(	aDeviceContext, 
-						OffsetX,OffsetY, Buffer->Width, Buffer->Height,
-						0,0, Buffer->Width, Buffer->Height,
-						Buffer->Memory,
-						&Buffer->Info,
-					    DIB_RGB_COLORS, SRCCOPY);
-	}
-#endif 
-	glViewport( 0, 0, aWindowWidth, aWindowHeight);
-	glClearColor(0.7f, 0.7f, 0.f, 0.f);
-	glClear(GL_COLOR_BUFFER_BIT);
-	SwapBuffers(aDeviceContext);
 
+		bitmap TargetBitMap = {};
+		TargetBitMap.Width = GlobalBackBuffer.Width;
+		TargetBitMap.Height = GlobalBackBuffer.Height;
+		TargetBitMap.Pixels = GlobalBackBuffer.Memory;
+
+		// Clear Screen
+		DrawRectangle(&TargetBitMap, 0, 0, (r32)TargetBitMap.Width, (r32)TargetBitMap.Height, 1, 1, 1);
+		DrawRectangle(&TargetBitMap, 1, 1, (r32)TargetBitMap.Width - 2, (r32)TargetBitMap.Height - 2, 0.3, 0.3, 0.3);
+
+		DrawTriangles( Commands, &TargetBitMap );
+
+
+		if(DisplayViaHardware)
+		{
+			
+			DisplayBitmapViaOpenGL( GlobalBackBuffer.Width, GlobalBackBuffer.Height, GlobalBackBuffer.Memory );
+
+			SwapBuffers(aDeviceContext);
+		}else{
+
+			if( (aWindowWidth  >= GlobalBackBuffer.Width*2 ) && 
+			    (aWindowHeight >= GlobalBackBuffer.Height*2) )
+			{
+				// Note: No Stretching for prorotyping purposes. 
+				StretchDIBits(	aDeviceContext, 
+								0,0, aWindowWidth,aWindowHeight,
+								0,0, GlobalBackBuffer.Width, GlobalBackBuffer.Height,
+								GlobalBackBuffer.Memory,
+								&GlobalBackBuffer.Info,
+							    DIB_RGB_COLORS, SRCCOPY);
+			}else{
+				s32 OffsetX = 10;
+				s32 OffsetY = 10;
+				PatBlt(aDeviceContext, GlobalBackBuffer.Width+OffsetX,  0, aWindowWidth, aWindowHeight, BLACKNESS);
+				PatBlt(aDeviceContext, 0, GlobalBackBuffer.Height+OffsetY, aWindowWidth, aWindowHeight, BLACKNESS);
+				PatBlt(aDeviceContext, 0, 0, OffsetX, aWindowHeight, BLACKNESS);
+				PatBlt(aDeviceContext, 0, 0, aWindowWidth, OffsetY,  BLACKNESS);
+				/*
+				StretchDIBits(	aDeviceContext, 
+								0,0, aWindowWidth, aWindowHeight,
+								0,0, GlobalBackBuffer->Width, GlobalBackBuffer->Height,
+								GlobalBackBuffer->Memory,
+								&GlobalBackBuffer->Info,
+							    DIB_RGB_COLORS, SRCCOPY);
+				*/
+				// Note: No Stretching for prorotyping purposes. 
+				StretchDIBits(	aDeviceContext, 
+								OffsetX,OffsetY, GlobalBackBuffer.Width, GlobalBackBuffer.Height,
+								0,0, GlobalBackBuffer.Width, GlobalBackBuffer.Height,
+								GlobalBackBuffer.Memory,
+								&GlobalBackBuffer.Info,
+							    DIB_RGB_COLORS, SRCCOPY);
+			}
+		}
+	}
 }
 
 
@@ -557,9 +656,10 @@ MainWindowCallback(	HWND aWindow,
 
 			PAINTSTRUCT Paint;
 			HDC DeviceContext = BeginPaint(aWindow, &Paint);
+			#if 0
 			win32_window_dimension Dimension = Win32GetWindowDimension(aWindow);
 			Win32DisplayBufferInWindow(DeviceContext, Dimension.Width, Dimension.Height);
-
+			#endif
 			EndPaint(aWindow, &Paint);
 		}break;
 
@@ -1560,7 +1660,7 @@ WinMain(	HINSTANCE aInstance,
 
 	if(RegisterClass(&WindowClass))
 	{
-		HWND Window = CreateWindowEx(
+		 HWND WindowHandle = CreateWindowEx(
 				0,//WS_EX_TOPMOST|WS_EX_LAYERED,
 				WindowClass.lpszClassName,
 				"HandMade",
@@ -1575,15 +1675,15 @@ WinMain(	HINSTANCE aInstance,
 				NULL);
 
 
-		if(Window != NULL)
+		if( WindowHandle != NULL)
 		{
-			Wind32InitOpenGL(Window);
+			Win32InitOpenGL( WindowHandle);
 			
 			// TODO: How do we reliably query this on windows?
 			s32 MonitorRefreshHz = 60;
-			HDC DC = GetDC(Window);
+			HDC DC = GetDC( WindowHandle);
 			s32 Win32RefreshRate = GetDeviceCaps(DC,VREFRESH);
-			ReleaseDC(Window, DC);
+			ReleaseDC( WindowHandle, DC);
 			if(Win32RefreshRate > 1)
 			{
 				MonitorRefreshHz = Win32RefreshRate;
@@ -1605,7 +1705,7 @@ WinMain(	HINSTANCE aInstance,
 			SoundOutput.BufferSizeInBytes = SoundOutput.BufferSizeInSeconds * SoundOutput.BytesPerSecond;
 
 			SoundOutput.BytesOfLatency = (DWORD) (SoundOutput.TargetSecondsOfLatency  * (r32) SoundOutput.BytesPerSecond );
-			Win32InitDSound(Window, &SoundOutput);
+			Win32InitDSound( WindowHandle, &SoundOutput);
 			
 			Win32ClearSoundBuffer(&SoundOutput);
 			SoundOutput.SecondaryBuffer->Play(0,0, DSBPLAY_LOOPING);
@@ -1715,11 +1815,23 @@ WinMain(	HINSTANCE aInstance,
 				r32 AudioLatencySeconds = 0;
 
 				GlobalRunning = true;
+
 				b32 SoundIsValid = false;
 
 				win32_game_code Game = Win32LoadGameCode(SourceGameCodeDLLFullPath,
 														 TempGameCodeDLLFullPath,
 														 TempGameCodeLockFullPath);
+
+
+				u32 PushBufferSize =  Megabytes(4);
+				platform_memory_block* PushBuffer =  Win32AllocateMemory(PushBufferSize, 0);
+				game_render_commands RenderCommands = {};
+				RenderCommands.Width = GlobalBackBuffer.Width;
+				RenderCommands.Height = GlobalBackBuffer.Height;
+				RenderCommands.MaxPushBufferSize = PushBufferSize;
+				RenderCommands.PushBufferSize = 0;
+				RenderCommands.PushBuffer = (u8*) PushBuffer->Base;
+				RenderCommands.PushBufferElementCount = 0;
 
 				u64 LastCycleCount = __rdtsc();
 				while(GlobalRunning)
@@ -1747,23 +1859,16 @@ WinMain(	HINSTANCE aInstance,
 						Win32ProcessControllerInput( OldInput, NewInput);
 						POINT MouseP;
 						GetCursorPos(&MouseP);
-						ScreenToClient(Window, &MouseP);
+						ScreenToClient( WindowHandle, &MouseP);
 						NewInput->MouseX = MouseP.x;
 						NewInput->MouseY = MouseP.y;
 						NewInput->MouseZ = 0;
-						Win32ProcessKeyboardMessage(&NewInput->MouseButton[0], GetKeyState(VK_LBUTTON) & (1<<15));
-						Win32ProcessKeyboardMessage(&NewInput->MouseButton[1], GetKeyState(VK_MBUTTON) & (1<<15));
-						Win32ProcessKeyboardMessage(&NewInput->MouseButton[2], GetKeyState(VK_RBUTTON) & (1<<15));
+						Win32ProcessKeyboardMessage(&NewInput->MouseButton[0], GetKeyState(VK_LBUTTON)  & (1<<15));
+						Win32ProcessKeyboardMessage(&NewInput->MouseButton[1], GetKeyState(VK_MBUTTON)  & (1<<15));
+						Win32ProcessKeyboardMessage(&NewInput->MouseButton[2], GetKeyState(VK_RBUTTON)  & (1<<15));
 						Win32ProcessKeyboardMessage(&NewInput->MouseButton[3], GetKeyState(VK_XBUTTON1) & (1<<15));
 						Win32ProcessKeyboardMessage(&NewInput->MouseButton[4], GetKeyState(VK_XBUTTON2) & (1<<15));
 
-						game_offscreen_buffer Buffer = {};
-						Buffer.Memory        = GlobalBackBuffer.Memory;
-						Buffer.Width         = GlobalBackBuffer.Width;
-						Buffer.Height        = GlobalBackBuffer.Height;
-						Buffer.Pitch         = GlobalBackBuffer.Pitch;
-						Buffer.BytesPerPixel = GlobalBackBuffer.BytesPerPixel;
-	
 						thread_context Thread = {};
 
 						if(GlobalWin32State.RecordingIndex)
@@ -1778,7 +1883,7 @@ WinMain(	HINSTANCE aInstance,
 	
 						if(Game.UpdateAndRender)
 						{
-							Game.UpdateAndRender(&Thread, &GameMemory, &Buffer, NewInput); 
+							Game.UpdateAndRender(&Thread, &GameMemory, &RenderCommands, NewInput); 
 						}
 	
 						LARGE_INTEGER AudioWallClock = Win32GetWallClock();
@@ -1953,16 +2058,17 @@ WinMain(	HINSTANCE aInstance,
 											Win32GetSecondsElapsed (LastCounter, EndCounter );
 						LastCounter = EndCounter;
 	
-						// Update Window
-						win32_window_dimension Dimension = Win32GetWindowDimension( Window );
 #if HANDMADE_INTERNAL
 				
 						// Note this is wrong on zeroth index
 				// 		Win32DebugSyncDisplay(&GlobalBackBuffer, ArrayCount(DebugTimeMarkers), 	DebugTimeMarkers, DebugTimeMarkerIndex-1, &SoundOutput, 	TargetSecondsPerFrame);
 #endif
-						HDC DeviceContext = GetDC(Window);
-						Win32DisplayBufferInWindow( DeviceContext, Dimension.Width, Dimension.Height);
-						ReleaseDC(Window, DeviceContext);
+
+						// Update Window
+						win32_window_dimension Dimension = Win32GetWindowDimension(  WindowHandle );
+						HDC DeviceContext = GetDC( WindowHandle);
+						Win32DisplayBufferInWindow( &RenderCommands, DeviceContext, Dimension.Width, Dimension.Height);
+						ReleaseDC( WindowHandle, DeviceContext);
 	
 						FlipWallClock = Win32GetWallClock();
 					
