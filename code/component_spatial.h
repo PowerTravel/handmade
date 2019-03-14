@@ -2,6 +2,7 @@
 #define COMPONENT_SPATIAL_H
 
 #include "affine_transformations.h"
+#include "aabb.h"
 
 struct component_spatial
 {
@@ -34,7 +35,7 @@ GetAsMatrix( component_spatial* SpatialComponent )
 	return Result;
 }
 
-inline cube 
+inline aabb3f 
 GetBoundingBox( component_spatial* SpatialComponent )
 {
 	if( ! SpatialComponent )
@@ -44,7 +45,7 @@ GetBoundingBox( component_spatial* SpatialComponent )
 	}
 	v3 Pos = SpatialComponent->Position;
 	v3 Dim = V3(SpatialComponent->Width, SpatialComponent->Height, SpatialComponent->Depth);
-	cube Result = Cube( Pos-Dim/2, Pos+Dim/2 );
+	aabb3f Result = AABB3f( Pos, Pos+Dim );
 	return Result;
 
 }

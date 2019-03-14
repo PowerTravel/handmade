@@ -87,19 +87,19 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 			EntityEntry->Entity = Entity;
 		}
 
-#if 0
+
 		if(Entity->Types & COMPONENT_TYPE_SPATIAL )
 		{
 			entry_type_wirebox* WireEntry = (entry_type_wirebox*) PushNewHeader( RenderCommands, &PreviousEntry, RENDER_TYPE_WIREBOX );
 			
 			v3 Pos  = Entity->SpatialComponent->Position;
-			v3 AABB = Entity->SpatialComponent->AABBDimensions;
-			WireEntry->x = Pos.X;
-			WireEntry->y = Pos.Y;
-			WireEntry->w = AABB.X;
-			WireEntry->h = AABB.Y;
+
+			WireEntry->Rect.X = Pos.X-Entity->SpatialComponent->Width/2;
+			WireEntry->Rect.Y = Pos.Y-Entity->SpatialComponent->Height/2;
+			WireEntry->Rect.W = Entity->SpatialComponent->Width;
+			WireEntry->Rect.H = Entity->SpatialComponent->Height;
 		}
-#endif
+
 		if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
 		{
 			// Store only the sprite to be displayed for current frame

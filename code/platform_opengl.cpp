@@ -21,6 +21,20 @@
 #define ERROR_INVALID_VERSION_ARB               0x2095
 #define ERROR_INVALID_PROFILE_ARB               0x2096
 
+#define GL_MULTISAMPLE                    0x809D
+#define GL_SAMPLE_ALPHA_TO_COVERAGE       0x809E
+#define GL_SAMPLE_ALPHA_TO_ONE            0x809F
+#define GL_SAMPLE_COVERAGE                0x80A0
+#define GL_SAMPLE_BUFFERS                 0x80A8
+#define GL_SAMPLES                        0x80A9
+#define GL_SAMPLE_COVERAGE_VALUE          0x80AA
+#define GL_SAMPLE_COVERAGE_INVERT         0x80AB
+#define GL_TEXTURE_2D_MULTISAMPLE         0x9100
+#define GL_MAX_SAMPLES                    0x8D57
+#define GL_MAX_COLOR_TEXTURE_SAMPLES      0x910E
+#define GL_MAX_DEPTH_TEXTURE_SAMPLES      0x910F
+
+
 struct opengl_info
 {
 	b32 ModernContext;
@@ -32,6 +46,7 @@ struct opengl_info
 	b32 EXT_texture_sRGB_decode;
 	b32 GL_ARB_framebuffer_sRGB;
 	b32 GL_ARB_vertex_shader;
+	b32 GL_blend_func_separate;
 };
 
 global_variable u32 TextureBindCount = 0;
@@ -106,6 +121,12 @@ OpenGLGetExtensions(b32 ModernContext)
 			Result.GL_ARB_vertex_shader = true;
 		}
 
+		if( str::Contains( str::StringLength( "glBlendFuncSeparate" ), "glBlendFuncSeparate",
+					ExtensionStringLength, ExtensionStart ) )
+		{
+			Result.GL_blend_func_separate = true;
+		}
+
 		ExtensionStart = str::FindFirstNotOf(Tokens, ExtensionEnd);
 		ExtensionEnd   = str::FindFirstOf( Tokens, ExtensionStart );
 	}
@@ -127,6 +148,11 @@ void OpenGLInit(b32 ModernContext)
 		// Will take as input LinearRGB and convert to sRGB Space.
 		// sRGB = Pow(LinearRGB, 1/2.2)
 		glEnable(GL_FRAMEBUFFER_SRGB);
+	}
+
+	if(!Info.GL_blend_func_separate)
+	{
+		//INVALID_CODE_PATH;
 	}
 }
 
@@ -252,7 +278,7 @@ internal void DisplayBitmapViaOpenGL( u32 Width, u32 Height, void* Memory )
 
 }
 
-void BindTexture(bitmap* Bitmap)
+void BindTexture(bitmap* Bitmap, b32 IsBackground )
 {
 	glEnable( GL_TEXTURE_2D );
 	if(Bitmap->Handle)
@@ -273,22 +299,59 @@ void BindTexture(bitmap* Bitmap)
 		// Set texture environment state:
 		// See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
 
+		if(IsBackground){
 		// How to treat texture
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
-		glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
+			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+		}else{
+			/*
+			  glActiveTexture(GL_TEXTURE0);
+			  glEnable(GL_TEXTURE_2D);
+			  glBindTexture(GL_TEXTURE_2D, textureID0);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+			  // --------------------
+			  glActiveTexture(GL_TEXTURE1);
+			  glEnable(GL_TEXTURE_2D);
+			  glBindTexture(GL_TEXTURE_2D, textureID1);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_INTERPOLATE);    // Interpolate RGB with RGB
+			  glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB, GL_PREVIOUS);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_RGB, GL_TEXTURE);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE2_RGB, GL_PREVIOUS);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_RGB, GL_SRC_COLOR);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_RGB, GL_SRC_COLOR);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND2_RGB, GL_SRC_ALPHA);
+			  // --------------------
+			  glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA, GL_INTERPOLATE);    // Interpolate ALPHA with ALPHA
+			  glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA, GL_PREVIOUS);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_ALPHA, GL_TEXTURE);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE2_ALPHA, GL_PREVIOUS);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA, GL_SRC_ALPHA);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_ALPHA, GL_SRC_ALPHA);
+			  glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND2_ALPHA, GL_SRC_ALPHA);
+			*/
+		}
 	}
 }
 
 internal void 
-OpenGlPushRect(const v4* Points, const rect* TextureCoordinates, const r32 Brightness  )
+OpenGlPushRect(const v4* Points, const rect2f* TextureCoordinates, const r32 Brightness  )
 {
-	r32 TexXMin = TextureCoordinates->X;
-	r32 TexYMin = TextureCoordinates->Y;
-	r32 TexXMax = TextureCoordinates->X+TextureCoordinates->W;
-	r32 TexYMax = TextureCoordinates->Y+TextureCoordinates->H;
+	r32 TexXMin = 0;
+	r32 TexYMin = 0;
+	r32 TexXMax = 0;
+	r32 TexYMax = 0;
+
+	if(TextureCoordinates)
+	{
+		TexXMin = TextureCoordinates->X;
+		TexYMin = TextureCoordinates->Y;
+		TexXMax = TextureCoordinates->X+TextureCoordinates->W;
+		TexYMax = TextureCoordinates->Y+TextureCoordinates->H;
+	}
 
 	glBegin(GL_TRIANGLES);
 	glTexCoord2f( TexXMin, TexYMin );
@@ -329,7 +392,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 
 	glEnable( GL_BLEND );
 	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-	
 	
 	// Get camera matrices
 	// The 'gl' means to make explicit we use the Column Major convention used by OpenGL.
@@ -439,7 +501,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 				entry_type_sprite* SpriteEntry = (entry_type_sprite*) Body;
 				bitmap* Bitmap = SpriteEntry->Bitmap;
 
-				BindTexture(Bitmap);
+				BindTexture(Bitmap, true);
 
 				v4 Translation = GetTranslationFromMatrix(SpriteEntry->M);
 
@@ -468,39 +530,84 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 
 			
 				r32 Brightness = 0.8;
+
 				OpenGlPushRect( v, SpriteEntry->Coordinates, Brightness  );
 			}break;
+	//		default: Assert(0); break;
+		}
+	}
+
+
+	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
+	{
+		switch(Entry->Type)
+		{
 			case RENDER_TYPE_SPRITE:
 			{
+				glDisable(GL_DEPTH_TEST);
 				u8* Head = (u8*)Entry;
 				u8* Body = Head + sizeof(push_buffer_header);
 
 				entry_type_sprite* SpriteEntry = (entry_type_sprite*) Body;
 				bitmap* Bitmap = SpriteEntry->Bitmap;
 
-				BindTexture(Bitmap);
+				BindTexture(Bitmap, true);
 
 				v4 Translation = GetTranslationFromMatrix(SpriteEntry->M);
 
-				r32 Width  = Index( SpriteEntry->M, 0, 0 );
-				r32 Height = Index( SpriteEntry->M, 1, 1 );
-				r32 Depth  = Index( SpriteEntry->M, 2, 2 );
+				r32 HalfWidth  = Index( SpriteEntry->M, 0, 0 )/2.f;
+				r32 HalfHeight = Index( SpriteEntry->M, 1, 1 )/2.f;
+				r32 HalfDepth  = Index( SpriteEntry->M, 2, 2 )/2.f;
 
 				v4 v[4] = {};
-				v[0] = V4(Translation.X,         Translation.Y,           Translation.Z, 1);
-				v[1] = V4(Translation.X + Width, Translation.Y,           Translation.Z, 1);
-				v[2] = V4(Translation.X + Width, Translation.Y  + Height, Translation.Z, 1);
-				v[3] = V4(Translation.X,         Translation.Y  + Height, Translation.Z, 1);
+				v[0] = V4(Translation.X - HalfWidth, Translation.Y - HalfHeight, Translation.Z, 1);
+				v[1] = V4(Translation.X + HalfWidth, Translation.Y - HalfHeight, Translation.Z, 1);
+				v[2] = V4(Translation.X + HalfWidth, Translation.Y + HalfHeight, Translation.Z, 1);
+				v[3] = V4(Translation.X - HalfWidth, Translation.Y + HalfHeight, Translation.Z, 1);
 
 				r32 Brightness = 0.8;
 				OpenGlPushRect( v, SpriteEntry->Coordinates, Brightness  );
 
 			}break;
+		}
+	}
+
+	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
+	{
+		switch(Entry->Type)
+		{
 			case RENDER_TYPE_WIREBOX:
 			{
+				glDisable(GL_DEPTH_TEST);
+				u8* Head = (u8*)Entry;
+				u8* Body = Head + sizeof(push_buffer_header);
+
+				entry_type_wirebox* SpriteEntry = (entry_type_wirebox*) Body;
+				rect2f R = SpriteEntry->Rect;
+				v4 v[4] = {};
+				v[0] = V4(R.X,         R.Y,           0, 1);
+				v[1] = V4(R.X + R.W,   R.Y,           0, 1);
+				v[2] = V4(R.X + R.W,   R.Y  + R.H,    0, 1);
+				v[3] = V4(R.X,         R.Y  + R.H,    0, 1);
+				glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+
+				glBindTexture(GL_TEXTURE_2D, 0);
+				glColor3f(1, 1, 1);
+				glBegin(GL_TRIANGLES);
+				glVertex3f(v[0].X, v[0].Y, v[0].Z);
+				glVertex3f(v[1].X, v[1].Y, v[1].Z);
+				glVertex3f(v[2].X, v[2].Y, v[2].Z);
+				glEnd();
+
+				glBegin(GL_TRIANGLES);
+				glVertex3f(v[0].X, v[0].Y, v[0].Z);
+				glVertex3f(v[2].X, v[2].Y, v[2].Z);
+				glVertex3f(v[3].X, v[3].Y, v[3].Z);
+				glEnd();
+
+				glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
 
 			}break;
-			default: Assert(0); break;
 		}
 	}
 

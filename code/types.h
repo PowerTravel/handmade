@@ -7,7 +7,6 @@
 #define UINT32_MAX 0xffffffff
 #endif
 
-#define OffsetOf(type, Member) (uintptr_t) &( ( (type* )0 )->Member )
 
 #define Kilobytes(Value)  ((Value)*1024LL)
 #define Megabytes(Value)  (Kilobytes(Value)*1024LL)
@@ -60,9 +59,8 @@ typedef double r64;
 
 #define Pi32 3.14159265359f
 
-#include "vector_math.h"
 
-union rect
+union rect2f
 {
 	struct{
 		r32 X,Y,W,H;
@@ -72,25 +70,9 @@ union rect
 	};
 };
 
-rect Rect( r32 a, r32 b, r32 c, r32 d )
+rect2f Rect2f( r32 a, r32 b, r32 c, r32 d )
 {
-	rect Result = {a,b,c,d};
-	return Result;
-}
-
-struct cube
-{
-	struct{
-		r32 X,Y,Z,W,H,D;
-	};
-	v3 P0, P1;
-};
-
-inline cube Cube( v3 P0, v3 P1 )
-{
-	cube Result = {};
-	Result.P0 = P0;
-	Result.P1 = P1;
+	rect2f Result = {a,b,c,d};
 	return Result;
 };
 

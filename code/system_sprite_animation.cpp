@@ -56,7 +56,6 @@ void SpriteAnimationSystemUpdate(world* World)
 				{
 					ActiveSeries->ActiveFrame = ActiveSeries->Frames;
 				}
-				int a = 0;
 			}
 
 		}

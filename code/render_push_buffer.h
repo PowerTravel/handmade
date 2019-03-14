@@ -22,19 +22,15 @@ struct entry_type_sprite
 {
 	m4 M;
 	bitmap* Bitmap;
-	rect* Coordinates;
+	rect2f* Coordinates;
 };
 
 
 typedef entry_type_sprite entry_type_floor_tile;
 
-
 struct entry_type_wirebox
 {
-	r32 x;
-	r32 y;
-	r32 w;
-	r32 h;
+	rect2f Rect;
 };
 
 struct push_buffer_header

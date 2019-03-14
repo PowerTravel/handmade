@@ -1,7 +1,7 @@
 
 #include "handmade_tile.h"
 #include "entity_components.h"
-
+#include "data_containers.h"
 
 inline u32
 Get3DIdx(s32 x, s32 y, s32 z, s32 X, s32 Y, s32 Z  )
@@ -15,22 +15,19 @@ Get3DIdx(s32 x, s32 y, s32 z, s32 X, s32 Y, s32 Z  )
 inline void
 RecanonicalizeCoord(tile_map* TileMap, u32* Tile, r32* TilePos, r32 TileSideInMeters  )
 {
-	// Since the origin is in the middle of each chunk the offset will be 0 if we are
-	// within a chunk (abs(TilePagePos) < 0.5*TilePageSide) but +- 1 otherwise. 
-	s32 Offset = RoundReal32ToInt32(*TilePos / TileSideInMeters);
+	// Note(Jakob): Using floor sets the Origin of tile is in the lower corner.
+	// 				I changed from using Round because it caused the border of the tile
+	// 				to be undefined. A tile position AbsTile 1 and RelTile 0.5 would flip
+	//              flop between AbsTile 2, RelTile -0.5 and AbsTile 1 and RelTile 0.5 by
+	// 				Successive calls to RecanonicalizeCoord;
+	s32 Offset = FloorReal32ToInt32(*TilePos / TileSideInMeters);
 
-	// The 8 lower bits says which tile we are in a page.
-	// The other high bits says which chunk we are in a map
-	// When we add one only the lower 8 bits are affected
-	// When they become greater than 255 the 9th bit flips and
-	// we are automaticallty indexed to the first tile in a new chunk. Genious.
-	// No if/else statements needed. Everything is handeled automatically.
 	*Tile += Offset;
 	*TilePos -= Offset*TileSideInMeters;
 
 	// Assert that we are inside a tile
-	Assert(*TilePos <=  0.5 * TileSideInMeters);
-	Assert(*TilePos >= -0.5 * TileSideInMeters);
+	Assert( *TilePos >=  0 );
+	Assert( *TilePos < TileSideInMeters );
 }
 
 inline tile_map_position 
@@ -45,6 +42,17 @@ RecanonicalizePosition(tile_map* TileMap, tile_map_position CanPos)
 	return Result;
 }
 
+inline tile_map_position 
+CanonicalizePosition( tile_map* TileMap, v3 Pos )
+{
+	tile_map_position CanPos = {};
+	CanPos.RelTileX = Pos.X;
+	CanPos.RelTileY = Pos.Y;
+	CanPos.RelTileZ = Pos.Z;
+	tile_map_position Result = RecanonicalizePosition(TileMap, CanPos);
+	return Result;
+}
+
 internal tile_map_position 
 MoveNewTileMapPosition(tile_map* TileMap, tile_map_position OldCanPos, r32 dx, r32 dy, r32 dz)
 {
@@ -53,6 +61,29 @@ MoveNewTileMapPosition(tile_map* TileMap, tile_map_position OldCanPos, r32 dx, r
 	TempResult.RelTileY += dy;
 	TempResult.RelTileZ += dz;
 	tile_map_position Result = RecanonicalizePosition(TileMap, TempResult);
+	return Result;
+}
+
+internal aabb3f
+GetTileAABB(tile_map* TileMap, tile_map_position CanPos )
+{
+
+	r32 HalfWidth  = TileMap->TileWidthInMeters;
+	r32 HalfHeight = TileMap->TileHeightInMeters;
+	r32 HalfDepth  = TileMap->TileDepthInMeters;
+
+	// Lower Left Back
+	v3 P0 = V3( CanPos.AbsTileX*TileMap->TileWidthInMeters , 
+				CanPos.AbsTileY*TileMap->TileHeightInMeters,
+				CanPos.AbsTileZ*TileMap->TileDepthInMeters );
+
+	// Upper Right Front
+	v3 P1 = V3( P0.X + TileMap->TileWidthInMeters , 
+				P0.Y + TileMap->TileHeightInMeters,
+				P0.Z /* Tilemap in Z direction is 2d Slices */);
+	 
+	aabb3f Result = AABB3f(P0,P1);
+	
 	return Result;
 }
 
@@ -226,7 +257,8 @@ IsTileMapPointEmpty(tile_map* TileMap, tile_map_position CanPos)
 	tile_page* TilePage = GetTilePage(TileMap, TilePosition.PageX, 
 										TilePosition.PageY, TilePosition.PageZ);
 
-	tile_contents TileContents  = GetTileContents(TileMap, TilePage, TilePosition.TileX,TilePosition.TileY);
+
+	tile_contents TileContents  = GetTileContents(TileMap, TilePage, TilePosition.TileX, TilePosition.TileY);
 	Result = ( TileContents.Sprite != 0 );
 	return Result;
 }
@@ -246,5 +278,31 @@ InitializeTileMap( tile_map* TileMap )
 		 ++TilePageIndex)
 	{
 		TileMap->MapHash[TilePageIndex].PageX = TILE_PAGE_UNINITIALIZED;
+	}
+}
+
+
+void GetIntersectingTiles(tile_map* TileMap, list<tile_map_position>* OutputList, aabb3f* AABB )
+{
+	s32 MinXIdx = FloorReal32ToInt32(AABB->P0.X / TileMap->TileWidthInMeters);
+	s32 MinYIdx = FloorReal32ToInt32(AABB->P0.Y / TileMap->TileHeightInMeters);
+	s32 MinZIdx = FloorReal32ToInt32(AABB->P0.Z / TileMap->TileDepthInMeters);
+	s32 MaxXIdx = FloorReal32ToInt32(AABB->P1.X / TileMap->TileWidthInMeters);
+	s32 MaxYIdx = FloorReal32ToInt32(AABB->P1.Y / TileMap->TileHeightInMeters);
+	s32 MaxZIdx = FloorReal32ToInt32(AABB->P1.Z / TileMap->TileDepthInMeters);
+	OutputList->First();
+	for( s32 IdxZ = MinZIdx; IdxZ <= MaxZIdx; ++IdxZ  )
+	{
+		r32 Z = IdxZ * TileMap->TileDepthInMeters;
+		for( s32 IdxY = MinYIdx; IdxY <= MaxYIdx; ++IdxY  )
+		{
+			r32 Y = IdxY * TileMap->TileHeightInMeters;
+			for( s32 IdxX = MinXIdx; IdxX <= MaxXIdx; ++IdxX  )
+			{
+				r32 X = IdxX * TileMap->TileWidthInMeters;
+				tile_map_position TilePos = CanonicalizePosition( TileMap, V3( X, Y, Z ) );
+				OutputList->InsertAfter(TilePos);
+			}
+		}
 	}
 }

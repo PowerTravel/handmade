@@ -24,15 +24,14 @@ void ExtractRegularFrameRow( memory_arena* AssetArena, sprite_series* SpriteSeri
 	r32 StartYFromTop  = (r32) OffsetY / (r32) SpriteSheetHeight; 
 	r32 StartYFromBot  = 1 - StartYFromTop; 
 
-	SpriteSeries->Frames = PushArray(AssetArena, SpriteSeries->NrFrames, rect);
+	SpriteSeries->Frames = PushArray(AssetArena, SpriteSeries->NrFrames, rect2f);
 
 	for( u32 FrameIdx = 0; FrameIdx < NrFrames; ++FrameIdx )
 	{
 		Assert( (StartXFromLeft + (FrameIdx+1) * StrideX) <= 1);
 		Assert( (StartYFromBot  + StrideY ) <= 1);
-		rect* Frame = &SpriteSeries->Frames[FrameIdx];
+		rect2f* Frame = &SpriteSeries->Frames[FrameIdx];
 
-#if 1
 		if(InvertX)
 		{
 			Frame->X = StartXFromLeft + FrameIdx * StrideX + StrideX;  // From
@@ -50,15 +49,6 @@ void ExtractRegularFrameRow( memory_arena* AssetArena, sprite_series* SpriteSeri
 			Frame->Y = StartYFromBot;  // From
 			Frame->H = StrideY;
 		}
-
-
-
-#else
-		Frame->X = StartXFromLeft + FrameIdx * StrideX;  // From 
-		Frame->Y = StartYFromBot;  // From Top to Bottom
-		Frame->W = InvertX ? -StrideX : StrideX;;
-		Frame->H = InvertY ? -StrideY : StrideY;
-#endif
 	}
 	
 	SpriteSeries->ActiveFrame = SpriteSeries->Frames;

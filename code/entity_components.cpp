@@ -1,12 +1,11 @@
 
 #include "entity_components.h"
 
+#include "utility_macros.h"
+
 world* AllocateWorld( u32 NrMaxEntities )
 {
-	memory_arena WorldArena = {};
-	world* Result = (world*) PushStruct( &WorldArena, world );
-	Copy(sizeof(memory_arena), &WorldArena, &Result->Arena);
-	Assert(WorldArena.CurrentBlock == Result->Arena.CurrentBlock);
+	world* Result = BootstrapPushStruct( world, Arena );
 
 	InitializeTileMap( &Result->TileMap );
 

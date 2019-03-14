@@ -6,7 +6,7 @@
 struct tile_map_position{
 
 	// Position within a tile
-	// Measured from center
+	// Measured from lower left 
 	r32 RelTileX;
 	r32 RelTileY;
 	r32 RelTileZ;
@@ -31,14 +31,21 @@ struct tile_index{
 	u32 TileY;
 };
 
+enum tile_type
+{
+	TILE_TYPE_FLOOR,
+	TILE_TYPE_WALL
+};
+
 struct floor_tile_sprite
 {
 	bitmap* Bitmap;
-	rect TextureCoordinates;
+	rect2f TextureCoordinates;
 };
 
 struct tile_contents
 {
+	tile_type Type;
 	floor_tile_sprite* Sprite;
 };
 
@@ -64,5 +71,6 @@ struct tile_map{
 	// NOTE(Jakob): At the moment this needs to be a power of 2
 	tile_page MapHash[4096];
 };
+
 
 #endif // HANDMADE_TILE_H

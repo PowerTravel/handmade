@@ -15,6 +15,8 @@
 #include "system_sprite_animation.cpp"
 #include "system_controller.cpp"
 
+#include "unit_tests.cpp"
+
 // makes the packing compact
 #pragma pack(push, 1)
 struct bmp_header
@@ -311,31 +313,34 @@ void CreateMapScene(thread_context* Thread, game_memory* Memory, game_render_com
 		for( u32 j = 0;  j < TilesPerRoomWidth; ++j)
 		{
 			tile_contents TileContents = {};
+
+			TileContents.Type = TILE_TYPE_WALL;
 			
 			if( i == 0 && j == 0)
 			{
-				TileContents = { BottomLeftDrop };
+				TileContents.Sprite = BottomLeftDrop;
 			} else if( i == 0 && (j+1) == TilesPerRoomWidth ){
-				TileContents = { BottomRightDrop };
+				TileContents.Sprite = BottomRightDrop;
 			}else if( (i+1) == TilesPerRoomHeight && j == 0 ){
-				TileContents = { TopLeftDrop };
+				TileContents.Sprite = TopLeftDrop;
 			}else if( (i+1) == TilesPerRoomHeight && (j+1) == TilesPerRoomWidth ){
-				TileContents = { TopRightDrop };
+				TileContents.Sprite = TopRightDrop;
 			}
 			else if( i == 0 )
 			{
-				TileContents = { BottomDrop };
+				TileContents.Sprite = BottomDrop;
 			}else if( (i+1) == TilesPerRoomHeight ){
-				TileContents = { TopDrop };
+				TileContents.Sprite = TopDrop;
 			}else if( j == 0 ){
-				TileContents = { LeftDrop };
+				TileContents.Sprite = LeftDrop;
 			}else if( (j+1) == TilesPerRoomWidth )
 			{
-				TileContents = { RightDrop };
+				TileContents.Sprite = RightDrop;
 			}else{
 				r32 Random = GetRandomReal(i*j);
 				u32 RandIDX = ((s32)(Random * 1000 )) % World->Assets->NrFloorTiles;
-				TileContents = {  &Assets->FloorTiles[RandIDX] };	
+				TileContents.Sprite =  &Assets->FloorTiles[RandIDX];
+				TileContents.Type = TILE_TYPE_FLOOR;
 			}
 			
 			SetTileContentsAbs(&GameState->AssetArena, &World->TileMap, j, i, 0, TileContents );	
@@ -353,8 +358,9 @@ void CreateMapScene(thread_context* Thread, game_memory* Memory, game_render_com
 	ExtractPrinny( AssetArena, PrinnySet, PrinnyHero->SpriteAnimationComponent);
 
 	component_spatial* PrinnySpatial = PrinnyHero->SpatialComponent;
-	PrinnySpatial->Position = V3(1,1,0);
-	PrinnySpatial->Velocity = V3(0,0,0);
+
+	PrinnySpatial->Position = V3(2.5,3,0);
+	PrinnySpatial->Velocity = V3(20,-20,0);
 	PrinnySpatial->RotationAngle = 0;
 	PrinnySpatial->RotationAxis = V3(0,0,1);
 	PrinnySpatial->Width  = 1;
@@ -363,7 +369,6 @@ void CreateMapScene(thread_context* Thread, game_memory* Memory, game_render_com
 
 	PrinnyHero->ControllerComponent->Controller = GetController(Input, 1);
 	PrinnyHero->ControllerComponent->ControllerMappingFunction = HeroController;
-
 
 	Assets->PrinnySet = PrinnyHero->SpriteAnimationComponent;
 
@@ -391,14 +396,12 @@ void CreateMapScene(thread_context* Thread, game_memory* Memory, game_render_com
 */
 }
 
-
 void initiateGame(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
 {
 	if (!Memory->GameState)
 	{
 		Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
-
-		//CreateTriangleScene(Thread, Memory, RenderCommands, Input);
+		
 		CreateMapScene(Thread, Memory, RenderCommands, Input );
 		for (s32 ControllerIndex = 0;
 		ControllerIndex < ArrayCount(Input->Controllers);

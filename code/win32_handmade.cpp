@@ -36,13 +36,8 @@ global_variable WINDOWPLACEMENT GlobalWindowPosition = {sizeof(GlobalWindowPosit
 //global_variable GLuint GlobalBlitTextureHandle;
 global_variable GLuint OpenGLDefaultInternalTextureFormat;
 
-
-#include "platform_opengl.cpp"
-#include "render.cpp"
-
-
-	// Note(Jakob): Caseys native screen resolution is 960 by 540 times two
-	// Note(Jakob): My native screen resolution is 840 by 525 times two
+// Note(Jakob): Caseys native screen resolution is 960 by 540 times two
+// Note(Jakob): My native screen resolution is 840 by 525 times two
 #define MONITOR_HEIGHT 525
 #define MONITOR_WIDTH  840
 
@@ -81,6 +76,18 @@ typedef BOOL WINAPI wgl_swap_interval_ext(int interval);
 global_variable wgl_swap_interval_ext* wglSwapInterval;
 
 typedef HGLRC WINAPI wgl_create_context_attrib_arb(HDC hDC, HGLRC hSharedContext, const int *attribList);
+
+
+typedef GLuint WINAPI gl_create_shader( GLenum shaderType );
+global_variable gl_create_shader* glCreateShader;
+
+typedef void gl_blend_equation_separate( GLenum modeRGB, GLenum modeAlpha );
+global_variable gl_blend_equation_separate* glBlendEquationSeparate;
+
+
+#include "platform_opengl.cpp"
+#include "render.cpp"
+
 
 DEBUG_PLATFORM_FREE_FILE_MEMORY(DEBUGPlatformFreeFileMemory)
 {
@@ -450,10 +457,16 @@ Win32InitOpenGL(HWND Window)
 			wglSwapInterval(1);
 		}
 
-		wglSwapInterval = (wgl_swap_interval_ext*)wglGetProcAddress("glCreateShader");
-		if (wglSwapInterval)
+		glCreateShader = (gl_create_shader*)wglGetProcAddress("glCreateShader");
+		if(!glCreateShader)
 		{
-			wglSwapInterval(1);
+			INVALID_CODE_PATH
+		}
+
+		glBlendEquationSeparate  = (gl_blend_equation_separate*)wglGetProcAddress("glBlendEquationSeparate");
+		if(!glBlendEquationSeparate)
+		{
+			INVALID_CODE_PATH
 		}
 
 	}else{
@@ -1811,13 +1824,14 @@ WinMain(	HINSTANCE aInstance,
 
 
 				u32 PushBufferSize =  Megabytes(4);
-				void *PushBuffer =  Win32AllocateMemory(PushBufferSize, 0);
+
+				platform_memory_block* PushBuffer =  Win32AllocateMemory(PushBufferSize, 0);
 				game_render_commands RenderCommands = {};
 				RenderCommands.Width = GlobalBackBuffer.Width;
 				RenderCommands.Height = GlobalBackBuffer.Height;
 				RenderCommands.MaxPushBufferSize = PushBufferSize;
 				RenderCommands.PushBufferSize = 0;
-				RenderCommands.PushBuffer = (u8*) PushBuffer;
+				RenderCommands.PushBuffer = (u8*) PushBuffer->Base;
 				RenderCommands.PushBufferElementCount = 0;
 
 				u64 LastCycleCount = __rdtsc();
@@ -1850,9 +1864,9 @@ WinMain(	HINSTANCE aInstance,
 						NewInput->MouseX = MouseP.x;
 						NewInput->MouseY = MouseP.y;
 						NewInput->MouseZ = 0;
-						Win32ProcessKeyboardMessage(&NewInput->MouseButton[0], GetKeyState(VK_LBUTTON) & (1<<15));
-						Win32ProcessKeyboardMessage(&NewInput->MouseButton[1], GetKeyState(VK_MBUTTON) & (1<<15));
-						Win32ProcessKeyboardMessage(&NewInput->MouseButton[2], GetKeyState(VK_RBUTTON) & (1<<15));
+						Win32ProcessKeyboardMessage(&NewInput->MouseButton[0], GetKeyState(VK_LBUTTON)  & (1<<15));
+						Win32ProcessKeyboardMessage(&NewInput->MouseButton[1], GetKeyState(VK_MBUTTON)  & (1<<15));
+						Win32ProcessKeyboardMessage(&NewInput->MouseButton[2], GetKeyState(VK_RBUTTON)  & (1<<15));
 						Win32ProcessKeyboardMessage(&NewInput->MouseButton[3], GetKeyState(VK_XBUTTON1) & (1<<15));
 						Win32ProcessKeyboardMessage(&NewInput->MouseButton[4], GetKeyState(VK_XBUTTON2) & (1<<15));
 

@@ -96,27 +96,19 @@ void HeroController( entity* HeroEntity )
 	if( Controller->IsAnalog )
 	{
 		r32 dt = (1/60.f);
-		r32 da = 300;
+		r32 da = 100;
 		v3 Acceleration = V3(0,0,0);
-
-		if(Controller->LeftStickLeft.EndedDown)
+		if(Controller->LeftStickLeft.EndedDown || Controller->LeftStickRight.EndedDown )
 		{
-			Acceleration.X = Acceleration.X - da;
-		}
-		if(Controller->LeftStickRight.EndedDown)
-		{
-			Acceleration.X = Acceleration.X + da;
-		}
-		if(Controller->LeftStickUp.EndedDown)
-		{
-			Acceleration.Y = Acceleration.Y + da;
-		}
-		if(Controller->LeftStickDown.EndedDown)
-		{
-			Acceleration.Y = Acceleration.Y - da;
+			Acceleration.X = Controller->LeftStickAverageX;
 		}
 
-		Spatial->Velocity = Acceleration * dt/2;
+		if(Controller->LeftStickUp.EndedDown || Controller->LeftStickDown.EndedDown)
+		{
+			Acceleration.Y = Controller->LeftStickAverageY;
+		}
+
+		Spatial->Velocity += Acceleration *da * dt/2;
 
 	}
 }

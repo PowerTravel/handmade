@@ -66,9 +66,9 @@ struct sprite_series
 	sprite_orientation Orientation;
 
 	// Texture Coordinates for the sprite series
-	rect* Frames;
+	rect2f* Frames;
 
-	rect* ActiveFrame;
+	rect2f* ActiveFrame;
 };
 
 struct component_sprite_animation

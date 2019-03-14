@@ -27,8 +27,8 @@ struct entity
 	component_spatial*	 		SpatialComponent;
 	component_surface*  		SurfaceComponent;
 	component_sprite_animation* SpriteAnimationComponent;
-};
 
+};
 
 struct game_assets
 {
@@ -46,12 +46,13 @@ struct world
 	r32 GlobalTimeSec;
 	r32 dtForFrame;
 
+	memory_arena 	Arena;
+
 	tile_map		TileMap;
 	u32 			NrEntities;
 	u32 			NrMaxEntities;
 	entity* 		Entities;
 	game_assets*	Assets;
-	memory_arena 	Arena;
 };
 
 enum component_types

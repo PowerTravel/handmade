@@ -191,10 +191,18 @@ Norm( const v2& A )
 	return Result;
 }
 
-inline v2 Normalize( const v2& A )
+inline v2 
+Normalize( const v2& A )
 {
 	v2 Result;
 	Result = A / Norm(A);
+	return Result;
+}
+
+inline r32 
+Determinant( const v2& Row0, const v2& Row1 )
+{
+	r32 Result = Row0.X * Row1.Y - Row0.Y * Row1.X;
 	return Result;
 }
 
@@ -246,7 +254,7 @@ V3( const v4& A )
 inline r32 
 operator*( const v3& A, const v3& B )
 {
-	r32 Result;
+	r32 Result = 0;
 	Result = A.X*B.X + A.Y*B.Y + A.Z*B.Z;
 	return Result;	
 }
@@ -254,7 +262,7 @@ operator*( const v3& A, const v3& B )
 inline v3 
 operator*( const r32 A, const v3& B )
 {
-	v3 Result;
+	v3 Result = {};
 	Result.X = A*B.X;
 	Result.Y = A*B.Y;
 	Result.Z = A*B.Z;
@@ -264,7 +272,7 @@ operator*( const r32 A, const v3& B )
 inline v3 
 operator*( const v3& B, const r32 s )
 {
-	v3 Result;
+	v3 Result = {};
 	Result = s*B;
 	return Result;	
 }
@@ -294,7 +302,7 @@ operator/=( v3& V, const r32 s )
 inline v3
 operator+( const v3& A, const v3& B )
 {
-	v3 Result;
+	v3 Result = {};
 	Result.X = A.X + B.X;
 	Result.Y = A.Y + B.Y;
 	Result.Z = A.Z + B.Z;
@@ -321,7 +329,7 @@ operator-( const v3& A, const v3& B )
 inline v3
 operator-( const v3& A )
 {
-	v3 Result;
+	v3 Result = {};
 	Result.X = - A.X;
 	Result.Y = - A.Y;
 	Result.Z = - A.Z;
@@ -339,7 +347,7 @@ operator-=( v3& A, const v3& B )
 inline r32 
 Norm( const v3& A )
 {
-	r32 Result;
+	r32 Result = 0;
 	Result =  (r32) Sqrt( A*A ); 
 	return Result;
 }
@@ -347,7 +355,7 @@ Norm( const v3& A )
 inline v3 
 Normalize( const v3& V )
 {
-	v3 Result;
+	v3 Result = {};
 	Result = V / Norm(V);
 	return Result;
 }
@@ -355,17 +363,25 @@ Normalize( const v3& V )
 inline v3 
 CrossProduct( const v3& A, const v3& B )
 {
-	v3 Result;
+	v3 Result = {};
 	Result.X = A.Y * B.Z - A.Z * B.Y;
 	Result.Y = A.Z * B.X - A.X * B.Z;
 	Result.Z = A.X * B.Y - A.Y * B.X;
 	return Result;
 }
 
+inline r32 
+Determinant( const v3& Row0, const v3& Row1, const v3& Row2 )
+{
+	v3  Cross = CrossProduct(Row1,Row2);
+	r32 Result = Row0 * Cross;
+	return Result;
+}
+
 inline b32 
 operator==( const v3& A, const v3& B )
 {
-	return ( A.X == B.X ) && (A.Y == B.Y ) == (A.Z ==  B.Z); 
+	return ( A.X == B.X ) && (A.Y == B.Y ) && (A.Z == B.Z); 
 }
 
 inline b32
