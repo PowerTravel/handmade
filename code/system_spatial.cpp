@@ -3,13 +3,7 @@
 #include "utility_macros.h"
 #include "aabb.h"
 
-struct collision_data
-{
-	v3 CollisionNormal;
-	v3 ContactPoint;
-	r32 PenetrationDepth;
-};
-
+#if 0
 struct closest_vertex_pair
 {
 	v3 P0;
@@ -324,7 +318,7 @@ closest_vertex_pair EdgeEdge( aabb_feature_edge& Edge0,  aabb_feature_edge& Edge
 	return EdgeEdge( Edge0.P0, Edge0.P1, Edge1.P0, Edge1.P1 );
 }
 
-#if 0
+/*
 Not Tested
 closest_vertex_pair EdgeFace( v3 EdgeStart, v3 EdgeEnd, list<v3>* Face )
 {
@@ -415,34 +409,7 @@ closest_vertex_pair FaceFace( list<v3>* Face1, list<v3>* Face2 )
 
 	return ClosestPoints;
 }
-#endif
-
-
-list< aabb3f > GetIntersectingWallTiles(memory_arena* Arena, tile_map* TileMap, aabb3f* BoundingBox )
-{
-	
-	list< tile_map_position > TilesToTest = list< tile_map_position >( Arena );
-	list< aabb3f > IntersectingAABB = list< aabb3f >( Arena );
-
-	GetIntersectingTiles(TileMap, &TilesToTest, BoundingBox);
-
-	TilesToTest.First();
-	IntersectingAABB.First();
-	while( ! TilesToTest.IsEnd() )
-	{
-		tile_map_position TilePosition = TilesToTest.Get();
-		tile_contents Content = GetTileContents(TileMap, TilePosition);
-		if( Content.Type == TILE_TYPE_WALL )
-		{
-			aabb3f aabb = GetTileAABB( TileMap, TilePosition );
-			IntersectingAABB.InsertAfter(aabb);
-		}
-		TilesToTest.Remove();
-	}
-
-	return IntersectingAABB;
-}
-
+*/
 u32 GetMaxVelocityIndex(v3 V)
 {
 	u32 Result = 0;
@@ -552,169 +519,6 @@ aabb_feature_vertex GetPrincipalContactPoint(aabb_feature_face& FaceA, aabb_feat
 }
 
 
-inline aabb3f 
-MergeAABB( const aabb3f& A, const aabb3f& B, r32 Envelope = 0)
-{
-	aabb3f Result = {};			
-	
-	Result.P0.X = Minimum( A.P0.X, B.P0.X) - Envelope;
-	Result.P0.Y = Minimum( A.P0.Y, B.P0.Y) - Envelope;
-	Result.P0.Z = Minimum( A.P0.Z, B.P0.Z) - Envelope;
-	
-	Result.P1.X = Maximum( A.P1.X, B.P1.X) + Envelope;
-	Result.P1.Y = Maximum( A.P1.Y, B.P1.Y) + Envelope;
-	Result.P1.Z = Maximum( A.P1.Z, B.P1.Z) + Envelope;
-
-	return Result;
-}
-
-
-// Sweep a in the direction of v against b, returns true & info if there was a hit
-// ===================================================================
-bool SweeptAABB( aabb3f& a, aabb3f& b, v3& v, v3& outVel, v3& hitNormal )
-{
-    //Initialise out info
-    outVel = v;
-    hitNormal = V3(0,0,0);
-	
-    // Return early if a & b are already overlapping
-    if( AABBOverlap(a, b) )
-    {
-    	return false; 
-    }
-
-    // Treat b as stationary, so invert v to get relative velocity
-	v3 rv = -v;
-
-    r32 hitTime = 0.0f;
-    r32 outTime = 1.0f;
-    v3 overlapTime = V3(0,0,0);
-
-    // A is traveling to the right relative B
-    if( rv.X < 0 )
-    {	
-    	// A is to the right of B ( They are separating )
-        if( b.P1.X < a.P0.X )
-        { 
-        	return false;
-        }
-
-        // A is to the left of B, potentially overlapping and closing in on eachother.
-        if( b.P1.X > a.P0.X ) 
-        {
-    		outTime = GetMin( (a.P0.X - b.P1.X) / rv.X, outTime );
-    	}
-
-        // A is to the left of B with no overlap and closing in on eachother.
-        if( a.P1.X < b.P0.X )
-        {
-            overlapTime.X = (a.P1.X - b.P0.X) / rv.X;
-            hitTime = GetMax(overlapTime.X, hitTime);
-        }
-    }
-    // A is traveling to the left relative B
-    else if( rv.X > 0 )
-    {
-    	// A is to the left of B ( They are separating )
-        if( b.P0.X > a.P1.X )
-        {
-        	return false;
-        }
-
-        // A is to the right of B, potentially overlapping and closing in on eachother.
-        if( a.P1.X > b.P0.X ) 
-        { 
-        	outTime = GetMin( (a.P1.X - b.P0.X) / rv.X, outTime );
-        }
-
-        // A is to the right of B with no overlap and closing in on eachother.
-        if( b.P1.X < a.P0.X )
-        {
-            overlapTime.X = (a.P0.X - b.P1.X) / rv.X;
-            hitTime = GetMax(overlapTime.X, hitTime);
-        }
-    }
-
-    if( hitTime > outTime )
-    {
-    	return false;
-    }
-
-    //=================================
-
-    // Y axis overlap
-    if( rv.Y < 0 )
-    {
-        if( b.P1.Y < a.P0.Y )
-        {
-        	return false;
-        }
-
-        if( b.P1.Y > a.P0.Y ) 
-        { 
-        	outTime = GetMin( (a.P0.Y - b.P1.Y) / rv.Y, outTime );
-        }
-
-        if( a.P1.Y < b.P0.Y )
-        {
-            overlapTime.Y = (a.P1.Y - b.P0.Y) / rv.Y;
-            hitTime = GetMax(overlapTime.Y, hitTime);
-        }           
-    }
-    else if( rv.Y > 0 )
-    {
-        if( b.P0.Y > a.P1.Y )
-        {
-        	return false;
-        }
-        		
-        if( a.P1.Y > b.P0.Y ) 
-        { 
-        	outTime = GetMin( (a.P1.Y - b.P0.Y) / rv.Y, outTime );
-        }
-
-        if( b.P1.Y < a.P0.Y )
-        {
-            overlapTime.Y = (a.P0.Y - b.P1.Y) / rv.Y;
-            hitTime = GetMax(overlapTime.Y, hitTime);
-        }
-    }
-
-    if( hitTime > outTime )
-    {
-    	return false;
-    }
-
-    // Scale resulting velocity by normalized hit time
-    outVel = -rv * hitTime;
-	r32 Tol = 0.01;
-    // Hit normal is along axis with the highest overlap time
-	if( overlapTime.X > overlapTime.Y )
-    {
-    	if( rv.X  > 0 )
-    	{
-    		hitNormal = V3(1, 0, 0);
-    	}else if(rv.X  < 0){
-    		hitNormal = V3(-1, 0, 0);
-    	}else{
-    		Assert(0);
-    	}
-    }
-    else
-    {
-    	if( rv.Y  > 0 )
-    	{
-    		hitNormal = V3(0, 1, 0);
-    	}else if( rv.Y  < 0 ){
-    		hitNormal = V3(0, -1, 0);
-    	}else{
-    		Assert(0);
-    	}
-    }
-
-    return true;
-}
-
 v3 GetPointOfIntersection(v3& PrincipalContactPoint, v3& DeltaR, aabb3f& A, aabb3f& B)
 {
 	v3 ACenter = A.P0 + (A.P1-A.P0)/2;
@@ -742,16 +546,489 @@ v3 GetPointOfIntersection(v3& PrincipalContactPoint, v3& DeltaR, aabb3f& A, aabb
 	return P;
 }
 
+#endif
+
+inline aabb3f 
+MergeAABB( const aabb3f& A, const aabb3f& B, v3 Envelope = {})
+{
+	aabb3f Result = {};			
+	
+	Result.P0.X = Minimum( A.P0.X, B.P0.X) - Envelope.X;
+	Result.P0.Y = Minimum( A.P0.Y, B.P0.Y) - Envelope.Y;
+	Result.P0.Z = Minimum( A.P0.Z, B.P0.Z) - Envelope.Z;
+	
+	Result.P1.X = Maximum( A.P1.X, B.P1.X) + Envelope.X;
+	Result.P1.Y = Maximum( A.P1.Y, B.P1.Y) + Envelope.Y;
+	Result.P1.Z = Maximum( A.P1.Z, B.P1.Z) + Envelope.Z;
+
+	return Result;
+}
+
+
+list< aabb3f > GetOverlappingWallTiles(memory_arena* Arena, tile_map* TileMap, aabb3f* BoundingBox, v3 CollisionEnvelope = {} )
+{
+	aabb3f EnvelopedBoundingBox = *BoundingBox;
+	EnvelopedBoundingBox.P0 -= CollisionEnvelope;
+	EnvelopedBoundingBox.P1 += CollisionEnvelope;
+
+	list< tile_map_position > TilesToTest = list< tile_map_position >( Arena );
+	GetIntersectingTiles(TileMap, &TilesToTest, &EnvelopedBoundingBox);
+
+	list< aabb3f > IntersectingWallTiles = list< aabb3f >( Arena );
+	for(TilesToTest.First(); 
+	   !TilesToTest.IsEnd();
+	    TilesToTest.Next() )
+	{
+		tile_map_position TilePosition = TilesToTest.Get();
+		tile_contents Content = GetTileContents(TileMap, TilePosition);
+		if( Content.Type == TILE_TYPE_WALL )
+		{
+			aabb3f WallTile = GetTileAABB( TileMap, TilePosition );
+			IntersectingWallTiles.InsertAfter(WallTile);
+		}
+	}
+
+	return IntersectingWallTiles;
+}
+
+
+b32 FindEarliestCollision( aabb3f& A, list<aabb3f>& BList, v3& dR, v3& OutFirstCollision, v3& OutCollisionNormal )
+{
+	r32 FirstHitPercentage = 1;
+	b32 Intersection = false;
+
+	r32 OvneOverdRNorm = 1/Norm(dR);
+
+	for(BList.First();
+	   !BList.IsEnd();
+		BList.Next() )
+	{
+		v3 dROut = {};
+		v3 HitNormal = {};
+		
+		aabb3f B = BList.Get();
+		aabb_contact Contact = AABBContact(A, B);
+		if( Contact.Type != AABB_CONTACT_TYPE_SEPARATE )
+		{
+			continue;
+		}else{
+			if( SweeptAABB( A, B, dR, dROut, HitNormal ) )
+			{
+				r32 HitPercentage = Norm( dROut ) * OvneOverdRNorm;
+				if( (HitPercentage < FirstHitPercentage) && (HitPercentage >= 0) )
+				{
+					FirstHitPercentage = HitPercentage;
+					OutFirstCollision = dROut;
+					OutCollisionNormal = HitNormal;
+					Intersection = true;
+				}
+			}			
+		}
+
+	}
+
+	return Intersection;
+}
+
+struct timestep_progression 
+{
+	v3 P0;
+	v3 P1;
+	v3 Velocity;
+	r32 DistanceToTravel;
+	r32 DistanceTraveled;
+};
+
+timestep_progression ForwardEuler( r32 dt, r32 Mass, v3 Position, v3 Velocity, v3 ExternalForce, v3 (*ForceEquation)(v3&,v3&,v3&) )
+{
+	timestep_progression Result = {};
+	
+	v3 f  = {};
+	if(ForceEquation)
+	{
+		f = ForceEquation(Position, Velocity, ExternalForce);
+	}
+
+	v3 Acceleration = f * Mass;
+	Result.Velocity = Velocity + dt * Acceleration;
+
+	Result.P0 = Position;
+	Result.P1 = Position + dt * Result.Velocity;
+
+	Result.DistanceToTravel = Norm(Result.P1 - Result.P0);
+	Result.DistanceTraveled = 0;
+	return Result;
+}
+
+void Reflect(v3 PointOfImpact, v3 CollisionNormal,  timestep_progression* TP )
+{
+	Assert(TP->DistanceToTravel > 0);
+	Assert(TP->DistanceToTravel > TP->DistanceTraveled);
+	Assert(Norm(CollisionNormal) == 1);
+
+	r32  DistanceToCollision = Norm( PointOfImpact - TP->P0 );
+	r32  RemainingDistance   = Norm( TP->P1 - PointOfImpact );
+
+	v3 Perpendicular = ( TP->Velocity * CollisionNormal) * CollisionNormal;
+	v3 Parallel  = TP->Velocity - Perpendicular;
+ 	v3 ReflectedVelocity = Parallel - Perpendicular;
+
+	TP->DistanceTraveled += DistanceToCollision;
+	TP->P0 = PointOfImpact;
+	TP->P1 = PointOfImpact + RemainingDistance * Normalize( ReflectedVelocity );
+	TP->Velocity = ReflectedVelocity;
+
+	Assert( TP->DistanceTraveled <= TP->DistanceToTravel );
+}
+
+void Slide(v3 PointOfImpact, v3 CollisionNormal, timestep_progression* TP )
+{
+	Assert(TP->DistanceToTravel > 0);
+	Assert(TP->DistanceToTravel > TP->DistanceTraveled);
+
+	r32  DistanceToCollision = Norm( PointOfImpact - TP->P0 );
+	r32  RemainingDistance   = Norm( TP->P1 - PointOfImpact );
+
+	v3 Perpendicular = ( TP->Velocity * CollisionNormal) * CollisionNormal;
+	v3 Parallel  = TP->Velocity - Perpendicular;
+
+	TP->DistanceTraveled = TP->DistanceToTravel;
+	r32 ParallelNorm = Norm( Parallel );
+	if( ParallelNorm > 0 )
+	{
+	//	TP->P1 = PointOfImpact + ( RemainingDistance *  (1 / ParallelNorm );
+	}else{
+		TP->P1 = PointOfImpact;
+	}
+	
+	TP->Velocity = Parallel;
+
+	Assert( TP->DistanceTraveled <= TP->DistanceToTravel );
+}
+
+v3 HeroForceEquation( v3& Position, v3& Velocity, v3& ExternalForce )
+{
+	r32 WindDampingFactor = 5.f;
+	r32 VelDot = Velocity * Velocity;
+	v3 WindResistance = {};
+	if(VelDot != 0)
+	{
+		WindResistance = WindDampingFactor * VelDot * Normalize(Velocity);
+	}
+
+	r32 FrictionDampingFactor = 10.f;
+	v3 Friction = FrictionDampingFactor * Velocity;
+
+	v3 Force = ExternalForce - WindResistance - Friction;
+
+	return Force;
+}
+
+void DoReflectionCollision(memory_arena* Arena, tile_map* TileMap, entity* E, r32 dt)
+{
+	temporary_memory TempMem = BeginTemporaryMemory( Arena );
+
+	component_spatial* S = E->SpatialComponent;
+
+	Assert(S->Depth == 0);
+
+	r32 Mass = 1;
+	timestep_progression TP = ForwardEuler(dt, Mass, S->Position, S->Velocity, S->ExternalForce, HeroForceEquation);
+	
+	v3 Dim = V3(S->Width, S->Height, S->Depth);
+	while( TP.DistanceTraveled < TP.DistanceToTravel )
+	{
+		aabb3f A0 = AABB3f( TP.P0-Dim/2, TP.P0+Dim/2 );
+		aabb3f A1 = AABB3f( TP.P1-Dim/2, TP.P1+Dim/2 );
+		aabb3f IntersectionBoundingBox = MergeAABB(A0, A1);
+		
+		v3 CollisionEnvelope = V3(1E-7,1E-7,0);
+		list< aabb3f > PossibleCollisionAABBs = GetOverlappingWallTiles(Arena, TileMap, &IntersectionBoundingBox, CollisionEnvelope);
+		v3 DistanceToCollision = {};
+		v3 CollisionNormal = {};
+		v3 dR = TP.P1-TP.P0;
+		if( FindEarliestCollision( A0, PossibleCollisionAABBs, dR, DistanceToCollision, CollisionNormal ) )
+		{
+			v3 PointOfImpact = TP.P0 + DistanceToCollision;
+			//if( Norm(TP.Velocity ) > 5 )
+			//{
+				Reflect( PointOfImpact, CollisionNormal, &TP );	
+			//}else{
+			//	Slide( PointOfImpact, CollisionNormal, &TP );
+			//}
+		}else{
+			TP.DistanceTraveled += Norm(TP.P1-TP.P0);	
+		}
+	}
+
+	r32 Speed = Norm(TP.Velocity);
+	if(Speed < 0.05)
+	{
+		Speed = 0;
+		TP.Velocity = {};
+	}
+
+	S->Position = TP.P1;
+	S->Velocity = TP.Velocity;
+	S->ExternalForce = {};
+
+	EndTemporaryMemory(TempMem);
+}
+
+#if 0
+void DoSlidingCollision(memory_arena* Arena, tile_map* TileMap, entity* E, r32 dt)
+{
+	temporary_memory TempMem = BeginTemporaryMemory( Arena );
+
+	component_spatial* S = E->SpatialComponent;
+
+	Assert(S->Depth == 0);
+
+	r32 Mass = 1;
+	timestep_progression TP = ForwardEuler(dt, Mass, S->Position, S->Velocity, S->ExternalForce, HeroForceEquation);
+	v3 ADim = V3(S->Width, S->Height, S->Depth);
+
+	v3 CollisionEnvelope = V3(1E-7,1E-7,0);
+	aabb3f A0 = AABB3f( TP.P0-ADim/2, TP.P0+ADim/2 );
+	aabb3f A1 = AABB3f( TP.P1-ADim/2, TP.P1+ADim/2 );
+	aabb3f IntersectionBoundingBox = MergeAABB(A0, A1);
+
+	list< aabb3f > PossibleCollisionAABBs =  GetOverlappingWallTiles(Arena, TileMap, &IntersectionBoundingBox, CollisionEnvelope);	
+	v3 DistanceToCollision = {};
+	v3 CollisionNormal = {};
+	v3 dR = TP.P1-TP.P0;
+
+
+	r32 FirstHitPercentage = 1;
+	b32 Intersection = false;
+
+	r32 OvneOverdRNorm = 1/Norm(dR);
+
+	//v3 DeepestPenetration = V3(0,0,0);
+	r32 Deeps = 0;
+	r32 DeepestPenetration = 0;
+	aabb3f OverlapBlock = {};
+	u32 Axis = 0;
+
+	// Find Deepest Penetration
+	for(PossibleCollisionAABBs.First();
+	   !PossibleCollisionAABBs.IsEnd();
+		PossibleCollisionAABBs.Next() )
+	{
+		v3 ACenter = GetAABBCenter(A1);
+		v3 ASide   = GetHalfSideLength(A1);
+
+		aabb3f B = PossibleCollisionAABBs.Get();
+		v3 BCenter = GetAABBCenter(B);
+		v3 BSide   = GetHalfSideLength(B);
+
+		v3 ContactSeparation = ASide + BSide;
+
+		v3 Spearation = (BCenter - ACenter); // From A to B;
+		Spearation.X = Abs(Spearation.X);
+		Spearation.Y = Abs(Spearation.Y);
+		Spearation.Z = Abs(Spearation.Z);
+
+		v3 PenetrationDepth = ContactSeparation - Separation;
+
+		r32 DeepestPenetrationForBlock = 0;
+		if(( PenetrationDepth.X >= 0 ) &&
+		   ( PenetrationDepth.Y >= 0 ) &&
+		   ( PenetrationDepth.Z >= 0 ) )
+		{
+			u32 OverlapAxis = 0;
+			if(DeepestPenetrationForBlock < PenetrationDepth.X)
+			{
+				DeepestPenetrationForBlock = PenetrationDepth.X;
+				OverlapAxis = 1;
+			}
+			if(DeepestPenetrationForBlock < PenetrationDepth.Y)
+			{
+				DeepestPenetrationForBlock = PenetrationDepth.Y;
+				OverlapAxis = 2;
+			}
+			if(DeepestPenetrationForBlock < PenetrationDepth.Z)
+			{
+				DeepestPenetrationForBlock = PenetrationDepth.Z;
+				OverlapAxis = 3;
+			}
+		}
+
+		if( DeepestPenetration < DeepestPenetrationForBlock )
+		{
+			DeepestPenetration = DeepestPenetrationForBlock;
+			OverlapBlock = B;
+			Axis = OverlapAxis;
+		}
+
+	}
+
+
+	for(PossibleCollisionAABBs.First();
+	   !PossibleCollisionAABBs.IsEnd();
+		PossibleCollisionAABBs.Next() )
+	{
+		v3 dROut = {};
+		v3 HitNormal = {};
+		
+		v3 ACenter = (A1.P1 + A1.P0) * 0.5;
+		v3 ASide   = (A1.P1 - A1.P0) * 0.5;
+
+		aabb3f B = PossibleCollisionAABBs.Get();
+		v3 BCenter = (B.P1 + B.P0) * 0.5;
+		v3 BSide   = (B.P1 - B.P0) * 0.5;
+
+		v3 ABSeparation = BCenter - ACenter;
+		v3 ABSeparationAbs = V3( Abs(ABSeparation.X), Abs(ABSeparation.Y), Abs(ABSeparation.Z));
+		v3 ABMaxSeparation = BSide + ASide;
+
+		v3 SeparationDiff = ABMaxSeparation - ABSeparationAbs;
+
+
+		if( (Abs( ABSeparation.X ) < ABMaxSeparation.X ) && (Abs( ABSeparation.Y ) < ABMaxSeparation.Y ))
+		{
+			if( Abs( ABSeparation.X ) < ABMaxSeparation.X )
+			{
+				// A is to the left of B
+				if( ABSeparation.X > 0 )
+				{
+					TP.P1.X -= SeparationDiff.X;
+				// A is to the right of B
+				}else{
+					TP.P1.X += SeparationDiff.X;	
+				}
+
+				TP.Velocity.X = 0;
+			}
+
+			if( Abs( ABSeparation.Y ) < ABMaxSeparation.Y )
+			{
+				// A is below B
+				if( ABSeparation.Y > 0 )
+				{
+					TP.P1.Y -= SeparationDiff.Y;
+				// A is above B
+				}else{
+					TP.P1.Y += SeparationDiff.Y;
+				}
+
+				TP.Velocity.Y = 0;
+			}
+		}
+/*
+		if( Abs( ABSeparation.Z ) < ABMaxSeparation.Z )
+		{
+			if( ABSeparation.Z > 0 )
+			{`
+				CollisionNormal = V3( 0,0, -1);
+			}else{
+				CollisionNormal = V3( 0,0, 1);
+			}
+		}
+*/
+
+//		if( SweeptAABB( A, B, dR, dROut, HitNormal ) )
+//		{
+//			r32 HitPercentage = Norm( dROut ) * OvneOverdRNorm;
+//			Assert( (HitPercentage <= FirstHitPercentage) && (HitPercentage >= 0) );
+//			if( (HitPercentage <= FirstHitPercentage) && (HitPercentage >= 0) )
+//			{
+//				FirstHitPercentage = HitPercentage;
+//				OutFirstCollision = dROut;
+//				OutCollisionNormal = HitNormal;
+//				Intersection = true;
+//			}
+//		}
+	}
+
+	   
+	r32 Speed = Norm(TP.Velocity);
+	if(Speed < 0.05)
+	{
+		Speed = 0;
+		TP.Velocity = {};
+	}
+
+	S->Position = TP.P1;
+	S->Velocity = TP.Velocity;
+	S->ExternalForce = {};
+
+	EndTemporaryMemory(TempMem);
+}
+
+#else
+
+void DoSlidingCollision(memory_arena* Arena, tile_map* TileMap, entity* E, r32 dt)
+{
+	temporary_memory TempMem = BeginTemporaryMemory( Arena );
+
+	component_spatial* S = E->SpatialComponent;
+
+	Assert(S->Depth == 0);
+
+	v3 Dim = V3(S->Width, S->Height, S->Depth);
+
+
+	v3 CollisionEnvelope = V3(1E-7,1E-7,0);
+	aabb3f InitialPosition = AABB3f( S->Position-Dim/2, S->Position+Dim/2 );
+	list< aabb3f > Verifications = GetOverlappingWallTiles(Arena, TileMap, &InitialPosition, CollisionEnvelope);
+	for(Verifications.First();
+	   !Verifications.IsEnd();
+		Verifications.Next() )
+	{
+		aabb3f WallTile = Verifications.Get();
+		aabb_contact Contact = AABBContact( InitialPosition, WallTile, CollisionEnvelope );
+		if( Contact.Type == AABB_CONTACT_TYPE_PENETRATION )
+		{
+			Assert(false);
+		}
+	}
+
+	r32 Mass = 1;
+	timestep_progression TP = ForwardEuler(dt, Mass, S->Position, S->Velocity, S->ExternalForce, HeroForceEquation);
+
+	while( TP.DistanceTraveled < TP.DistanceToTravel )
+	{
+		aabb3f A0 = AABB3f( TP.P0-Dim/2, TP.P0+Dim/2 );
+		aabb3f A1 = AABB3f( TP.P1-Dim/2, TP.P1+Dim/2 );
+		
+		list< aabb3f > PossibleCollisionAABBs = GetOverlappingWallTiles(Arena, TileMap, &A1, CollisionEnvelope);
+		v3 DistanceToCollision = {};
+		v3 CollisionNormal = {};
+		v3 dR = TP.P1-TP.P0;
+		if( FindEarliestCollision( A0, PossibleCollisionAABBs, dR, DistanceToCollision, CollisionNormal ) )
+		{
+			v3 PointOfImpact = TP.P0 + DistanceToCollision;
+			Slide( PointOfImpact, CollisionNormal, &TP );
+
+		}else{
+			TP.DistanceTraveled += Norm(TP.P1-TP.P0);	
+		}
+	}
+
+	r32 Speed = Norm(TP.Velocity);
+	if(Speed < 0.05)
+	{
+		Speed = 0;
+		TP.Velocity = {};
+	}
+
+	S->Position = TP.P1;
+	S->Velocity = TP.Velocity;
+	S->ExternalForce = {};
+
+	EndTemporaryMemory(TempMem);
+}
+
+
+#endif
 
 void SpatialSystemUpdate( world* World )
 {
 	v3 Gravity = V3( 0, -9, 0 );
 	r32 dt =  1/60.f;
-	
+
 	memory_arena* Arena = &World->Arena;
-
-	temporary_memory TempMem = BeginTemporaryMemory( Arena );
-
 	tile_map* TileMap = &World->TileMap;
 	
 	for(u32 Index = 0;  Index < World->NrEntities; ++Index )
@@ -760,83 +1037,10 @@ void SpatialSystemUpdate( world* World )
 
 		if( E->Types & COMPONENT_TYPE_SPATIAL )
 		{
-			component_spatial* S = E->SpatialComponent;
-
-			v3 Position0 = S->Position;
-			v3 Dim = V3(S->Width, S->Height, S->Depth);
-			Assert(S->Depth == 0);
-
-			// Propagate forward
-			v3 Velocity = S->Velocity;
-			v3 dR = (dt / 2) * Velocity;
-			v3 Position1 = S->Position + dR;
-
-			aabb3f BoundingBox0 = AABB3f( Position0-Dim/2, Position0+Dim/2 );			
-			aabb3f BoundingBox1 = AABB3f( Position1-Dim/2, Position1+Dim/2 );
-			aabb3f IntersectionBoundingBox = MergeAABB( BoundingBox0, BoundingBox1 );
-
-			list< aabb3f > IntersectingWallTiles =  GetIntersectingWallTiles(Arena, TileMap, &IntersectionBoundingBox);
-
-			v3 FirstHitNormal = {};
-			r32 FirstHitPercentage = 1;
-			u32 LoopSaftey = 10;
-			u32 LoopSafteyCount = 0;
-			while( !IntersectingWallTiles.IsEmpty() )
-			{
-				Assert(LoopSafteyCount++ < LoopSaftey);
-			
-				b32 Intersection = false;
-				for(IntersectingWallTiles.First();
-				   !IntersectingWallTiles.IsEnd();
-					IntersectingWallTiles.Next() )
-				{
-					v3 OutVel = {};
-					v3 HitNormal = {};
-					
-					aabb3f B = IntersectingWallTiles.Get();
-
-					if( SweeptAABB( BoundingBox0, B, dR, OutVel, HitNormal ))
-					{
-						r32 HitPercentage = Norm( OutVel ) / Norm(dR);
-						if( HitPercentage < FirstHitPercentage )
-						{
-							FirstHitPercentage = HitPercentage;
-							dR = OutVel;
-							FirstHitNormal = HitNormal;
-						}
-						Intersection = true;
-					}
-				}
-
-				if(! Intersection)
-				{
-					break;
-				}
-				Position0 = Position0 + FirstHitPercentage * dR;// FirstHit;
-
-				v3 VelocityPerp = ( Velocity * FirstHitNormal) * FirstHitNormal;
-				v3 VelocityPar  = Velocity - VelocityPerp;
-
-				Velocity = VelocityPar - VelocityPerp;
-
-				dR = (1-FirstHitPercentage) * (dt/2) * Velocity;
-				Position1 = Position0 + dR;
-				
-				BoundingBox0 = AABB3f( Position0-Dim/2, Position0+Dim/2 );
-				BoundingBox1 = AABB3f( Position1-Dim/2, Position1+Dim/2 );
-
-				IntersectingWallTiles =  GetIntersectingWallTiles(Arena, TileMap, &BoundingBox1);
-
-				FirstHitNormal = {};
-				FirstHitPercentage = 1;
-			}
-
-			S->Position = Position1;
-			S->Velocity = Velocity;
-
+			//DoReflectionCollision(Arena, TileMap,  E, dt);
+			//DoSlidingCollision(Arena, TileMap,  E, dt);
 		}
 	}
 
-	EndTemporaryMemory(TempMem);
 	CheckArena(Arena);	
 }

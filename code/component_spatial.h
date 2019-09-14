@@ -8,6 +8,7 @@ struct component_spatial
 {
 	v3  Position;
 	v3  Velocity;
+	v3 	ExternalForce;
 	v3  Direction;
 	r32 RotationAngle;
 	v3  RotationAxis;

@@ -32,8 +32,7 @@ struct obj_group
 	u32 GroupNameLength;
 	char* GroupName;
 
-	u32   FaceCount;  // Nr Faces
-	face* Faces; 	  // Faces
+	mesh_indeces Indeces;
 
 	v3 CenterOfMass;
 	v3 BoundingBoxMin;
@@ -320,13 +319,54 @@ bool GetTrimmedLine( char* SrcLineStart, char* SrcLineEnd, u32* DstLength, char*
 	return true;
 }
 
-face* ParseFaceLine(memory_arena* Arena, char* ParsedLine )
+void TriangulateLine(fifo_queue<u32>* Queue, fifo_queue<u32>* ResultQueue)
 {
-	face* Result = (face*) PushStruct(Arena, face);
-	Result->nv = str::GetWordCount( ParsedLine );
-	Assert( Result->nv >= 3);
+	// Triangulate:
+	// We can assume the original .obj file has right handed 
+	// orientation to their faecs.
+	//  4--3             3      4--3
+	//  |  | becomes    /|  and | /
+	//  |  |           / |      |/
+	//  1--2          1--2      1
+	//  Make sure they're righthanded
 
-	u32 VertIdx = 0;
+	u32 FirstIndex  = Queue->Pop();
+	u32 Index = 0;
+	while(!Queue->IsEmpty())
+	{
+		if(Index == 0)
+		{
+			ResultQueue->Push(FirstIndex);
+		}else{
+			ResultQueue->Push(Queue->Pop());
+		}
+		++Index;
+		Index = Index % 3;
+	}
+}
+
+struct group_to_parse
+{
+	u32 GroupNameLength;
+	char* GroupName;
+
+	fifo_queue<u32> vi;
+	fifo_queue<u32> ti;
+	fifo_queue<u32> ni;
+
+	u32 MaterialNameLength;
+	char* MaterialName;
+};
+
+void ParseFaceLine(memory_arena* Arena, char* ParsedLine, group_to_parse* ActiveGroup )
+{
+	u32 NrVerticesInFace = str::GetWordCount( ParsedLine );
+	Assert( NrVerticesInFace >= 3);
+
+	fifo_queue<u32> vi = fifo_queue<u32>(Arena);
+	fifo_queue<u32> ti = fifo_queue<u32>(Arena);
+	fifo_queue<u32> ni = fifo_queue<u32>(Arena);
+
 	char* Start = ParsedLine;
 	char WordBuffer[STR_MAX_WORD_LENGTH];
 	while( Start )
@@ -342,48 +382,35 @@ face* ParseFaceLine(memory_arena* Arena, char* ParsedLine )
 
 
 		char* StartNr = WordBuffer;
-		char* EndNr = 0;
-		u32 i =0;
-		while( StartNr )
+		char* EndNr   = 0;
+		u32 IndexType = 0;
+
+		while(StartNr)
 		{
 			EndNr 	= str::FindFirstOf("/", StartNr);
-			if( EndNr )
+			if(EndNr)
 		 	{
 				*EndNr++ = '\0';
 			}
 
-			u32 nr = (u32) str::StringToReal64(StartNr)-1;
-			Assert(nr>=0);
-			Assert(VertIdx < Result->nv);
-			switch(i)
+			u32 Number = (u32) str::StringToReal64(StartNr)-1;
+			Assert(Number>=0);
+			switch(IndexType)
 			{
+				// Vertex Index
 				case 0:
 				{	
-					if( !Result->vi )
-					{
-						Result->vi = (u32*) PushArray(Arena, Result->nv, u32); 
-					}
-
-					Result->vi[VertIdx] = nr;
+					vi.Push(Number);
 				}break;
-
+				// Texture Index
 				case 1:
 				{
-					if( !Result->ti )
-					{
-						Result->ti = (u32*) PushArray(Arena, Result->nv, u32); 
-					}
-
-					Result->ti[VertIdx] = nr;
+					ti.Push(Number);
 				}break;
-
+				// Normal Index
 				case 2:
 				{
-					if( !Result->ni )
-					{
-						Result->ni  = (u32*) PushArray(Arena, Result->nv, u32); 
-					}
-					Result->ni[VertIdx] = nr;
+					ni.Push(Number);
 				}break;
 
 				default:
@@ -397,24 +424,38 @@ face* ParseFaceLine(memory_arena* Arena, char* ParsedLine )
 			//	 2: Only Vertice and Normals:             "10//12"
 			//   3: Only Vertice and Texture Vertice:     "10/11"
 			//   4: Only Vertice                          "10"
-			// Case 1,2 and 4 is handled by just increasing i sequentially.
-			++i;
+			// Case 1, 3 and 4 is handled by just increasing i sequentially.
+			++IndexType;
 
-			// Case 3 requires us to increase i two steps skipping case i==2.
+			// Case 2 requires us to increase i two steps skipping case IndexType==1.
 			if( EndNr && *EndNr == '/' ) 
 			{
-				++i;
+				++IndexType;
 			}
 
 			StartNr = str::FindFirstNotOf("/", EndNr);
 			
 		}
 
-		++VertIdx;
-
 		Start = (End) ? str::FindFirstNotOf(" \t", End) : End;
 	}
-	return Result;
+
+	// Make sure we have vertex, texture and normal indeces of the right size.
+	Assert( vi.GetSize() == NrVerticesInFace);
+	Assert((ti.GetSize() == NrVerticesInFace) || (ti.GetSize() == 0) );
+	Assert((ni.GetSize() == NrVerticesInFace) || (ni.GetSize() == 0) );	
+
+	TriangulateLine(&vi, &ActiveGroup->vi);
+
+	if(!ti.IsEmpty())
+	{
+		TriangulateLine(&ti, &ActiveGroup->ti);
+	}
+
+	if(!ni.IsEmpty())
+	{
+		TriangulateLine(&ni, &ActiveGroup->ni);
+	}
 }
 
 // makes the packing compact
@@ -615,6 +656,8 @@ void CreateNewFilePath(char* BaseFilePath, char* NewFileName, u32 NewFilePathLen
 						NewFileNameLength,   Start,
 						NewFilePathLength,   NewFilePath );
 }
+
+
 
 obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
 				 debug_platform_read_entire_file* ReadEntireFile,
@@ -907,19 +950,6 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
 	return Result;
 }
 
-struct group_to_parse
-{
-	u32 GroupNameLength;
-	char* GroupName;
-
-	fifo_queue<face*> Faces;
-	u32 TriangleCount;
-
-	u32 MaterialNameLength;
-	char* MaterialName;
-};
-
-
 void SetCenterOfMassAndBoundingBoxToOBJFile( loaded_obj_file* OBJFile, memory_arena* TemporaryArena )
 {
 	mesh_data* MeshData = OBJFile->MeshData;
@@ -932,42 +962,33 @@ void SetCenterOfMassAndBoundingBoxToOBJFile( loaded_obj_file* OBJFile, memory_ar
 
 		v3 CenterOfMass = V3(0,0,0); 
 		r32 VertexCount = 0;
+		mesh_indeces* Indeces = &OBJGroup.Indeces;
 
-		u32 FirstVertexIndex = OBJGroup.Faces->vi[0];
+		u32 FirstVertexIndex = Indeces->vi[0];
 		v4  FirstVertexOfGroup = MeshData->v[FirstVertexIndex];
 		v3  Max = V3(FirstVertexOfGroup);
 		v3  Min = V3(FirstVertexOfGroup);
 
-		for( u32 FaceIndex = 0; FaceIndex < OBJGroup.FaceCount; ++FaceIndex )
+		for( u32 Index=0; Index < Indeces->Count; ++Index )
 		{
-			face Face = OBJGroup.Faces[FaceIndex];
-
-			// Make sure face is triangulated;
-			Assert(Face.nv == 3);
-
-			for( u32 TriangleIndex = 0; TriangleIndex < Face.nv; ++TriangleIndex )
-			{	
+			u32 VertexIndex = Indeces->vi[Index];
+			
+			if( ! IsVertexCounted[VertexIndex] )
+			{
+				IsVertexCounted[VertexIndex] = true;
 				
-				u32 VertexIndex = Face.vi[TriangleIndex];
-				Assert(VertexIndex < MeshData->nv);
+				v4 Vertex = MeshData->v[VertexIndex];
 
-				if( ! IsVertexCounted[VertexIndex] )
-				{
-					IsVertexCounted[VertexIndex] = true;
-					
-					v4 Vertex = MeshData->v[VertexIndex];
+				Max.X = Max.X > Vertex.X ? Max.X : Vertex.X;
+				Max.Y = Max.Y > Vertex.Y ? Max.Y : Vertex.Y;
+				Max.Z = Max.Z > Vertex.Z ? Max.Z : Vertex.Z;
 
-					Max.X = Max.X > Vertex.X ? Max.X : Vertex.X;
-					Max.Y = Max.Y > Vertex.Y ? Max.Y : Vertex.Y;
-					Max.Z = Max.Z > Vertex.Z ? Max.Z : Vertex.Z;
+				Min.X = Min.X < Vertex.X ? Min.X : Vertex.X;
+				Min.Y = Min.Y < Vertex.Y ? Min.Y : Vertex.Y;
+				Min.Z = Min.Z < Vertex.Z ? Min.Z : Vertex.Z;
 
-					Min.X = Min.X < Vertex.X ? Min.X : Vertex.X;
-					Min.Y = Min.Y < Vertex.Y ? Min.Y : Vertex.Y;
-					Min.Z = Min.Z < Vertex.Z ? Min.Z : Vertex.Z;
-
-					CenterOfMass += V3( Vertex );
-					++VertexCount;
-				}
+				CenterOfMass += V3( Vertex );
+				++VertexCount;
 			}
 		}
 
@@ -1029,7 +1050,9 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 
 	fifo_queue<group_to_parse*> GroupToParse = fifo_queue<group_to_parse*>(TempArena);
 	group_to_parse* DefaultGroup = (group_to_parse*) PushStruct(TempArena, group_to_parse);
-	DefaultGroup->Faces = fifo_queue<face*>(TempArena);
+	DefaultGroup->vi = fifo_queue<u32>(TempArena);
+	DefaultGroup->ti = fifo_queue<u32>(TempArena);
+	DefaultGroup->ni = fifo_queue<u32>(TempArena);
 	
 	group_to_parse* ActiveGroup = DefaultGroup;
 
@@ -1038,7 +1061,6 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 	fifo_queue<v3> TextureVerticeBuffer = fifo_queue<v3>( TempArena );
 
 	obj_mtl_data* MaterialFile = 0;
-
 
 	char* ScanPtr = ( char* ) ReadResult.Contents;
 	char* FileEnd =  ( char* ) ReadResult.Contents + ReadResult.ContentSize;
@@ -1091,11 +1113,7 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 			// Faces: f v1[/vt1][/vn1] v2[/vt2][/vn2] v3[/vt3][/vn3] ...
 			case obj_data_types::OBJ_FACE:
 			{
-				face* Face = ParseFaceLine( TempArena, DataType.String );
-				ActiveGroup->Faces.Push(Face);
-				Assert( Face->nv >= 3 );
-				ActiveGroup->TriangleCount += Face->nv - 2;
-
+				ParseFaceLine( TempArena, DataType.String, ActiveGroup );
 			}break;
 
 			// Group: name1 name2 ....
@@ -1110,7 +1128,9 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 					ActiveGroup->GroupName = (char*) PushArray(TempArena, ObjectNameLength+1, char );
 					str::CopyStrings(ObjectNameLength,  DataType.String, ObjectNameLength, ActiveGroup->GroupName );
 
-					ActiveGroup->Faces = fifo_queue<face*>(TempArena);
+					ActiveGroup->vi = fifo_queue<u32>(TempArena);
+					ActiveGroup->ti = fifo_queue<u32>(TempArena);
+					ActiveGroup->ni = fifo_queue<u32>(TempArena);
 
 					GroupToParse.Push( ActiveGroup );
 				}
@@ -1125,9 +1145,7 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 				if(!MaterialFile)
 				{
 					// Stores materials to Asset Arena
-					MaterialFile = ReadMTLFile( Thread, aGameState,
-												ReadEntireFile, FreeEntireFile,
-		 										MTLFileName);
+					MaterialFile =  ReadMTLFile(Thread, aGameState, ReadEntireFile, FreeEntireFile, MTLFileName);
 				}
 
 
@@ -1200,12 +1218,14 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 	Assert(TextureVerticeBuffer.IsEmpty());
 
 
-	u32 ObjectCount = GroupToParse.GetSize();
-	obj_group* Objects = (obj_group*) PushArray(AssetArena, ObjectCount, obj_group);
-	for( u32 GroupIndex = 0; GroupIndex < ObjectCount; ++GroupIndex )
+	Result->ObjectCount = GroupToParse.GetSize();
+	Result->Objects = (obj_group*) PushArray(AssetArena, Result->ObjectCount, obj_group);
+	Result->MeshData    = MeshData;
+
+	obj_group* NewGroup = Result->Objects;
+	while( !GroupToParse.IsEmpty() )
 	{
 		group_to_parse* ParsedGroup = GroupToParse.Pop();
-		obj_group* NewGroup = &Objects[GroupIndex];
 
 		NewGroup->GroupNameLength = ParsedGroup->GroupNameLength;
 		NewGroup->GroupName = (char*) PushArray( AssetArena, ParsedGroup->GroupNameLength+1, char );
@@ -1223,54 +1243,37 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 			}
 		}
 
-		NewGroup->FaceCount = ParsedGroup->TriangleCount;
-		NewGroup->Faces = (face*) PushArray( AssetArena, ParsedGroup->TriangleCount, face );
+		mesh_indeces* Indeces = &NewGroup->Indeces;
+		Indeces->Count = ParsedGroup->vi.GetSize();
 
-		fifo_queue<face*> ParsedFaceBuffer = ParsedGroup->Faces;
-		u32 FaceCount = ParsedFaceBuffer.GetSize();
-		u32 TriangleIndex = 0;
-		for( u32 FaceLoopCount = 0; FaceLoopCount < FaceCount; ++FaceLoopCount )
+		Indeces->vi    = (u32*) PushArray( AssetArena, Indeces->Count, u32 );
+		for( u32 i = 0; i < Indeces->Count; ++i )
 		{
-			face* ParsedFace = ParsedFaceBuffer.Pop();
-			
-			for( u32 j = 0; j < ParsedFace->nv-2; ++j)
+			Indeces->vi[i] = ParsedGroup->vi.Pop();
+		}
+
+		if(ParsedGroup->ti.GetSize())
+		{
+			Indeces->ti    = (u32*) PushArray( AssetArena, Indeces->Count, u32 );
+			for( u32 i = 0; i < Indeces->Count; ++i )
 			{
-				face* NewFace = &NewGroup->Faces[TriangleIndex++];
-
-				Assert(ParsedFace->vi);
-
-				NewFace->nv = 3;
-				NewFace->vi = (u32*)PushArray(AssetArena, 3, u32);
-				NewFace->vi[0] = ParsedFace->vi[0];
-				NewFace->vi[1] = ParsedFace->vi[1+j];
-				NewFace->vi[2] = ParsedFace->vi[2+j];
-
-				if(ParsedFace->ni)
-				{
-					NewFace->ni = (u32*) PushArray( AssetArena, 3, u32);
-					NewFace->ni[0] = ParsedFace->ni[0];
-					NewFace->ni[1] = ParsedFace->ni[1 + j];
-					NewFace->ni[2] = ParsedFace->ni[2 + j];
-				}
-		
-				if(ParsedFace->ti)
-				{
-					NewFace->ti = (u32*) PushArray( AssetArena, 3, u32);
-					NewFace->ti[0] = ParsedFace->ti[0];
-					NewFace->ti[1] = ParsedFace->ti[1 + j];
-					NewFace->ti[2] = ParsedFace->ti[2 + j];
-				}
-
+				Indeces->ti[i] = ParsedGroup->ti.Pop();
 			}
 		}
-		Assert( ParsedFaceBuffer.IsEmpty() );
+
+		if(ParsedGroup->ni.GetSize())
+		{
+			Indeces->ni    = (u32*) PushArray( AssetArena, Indeces->Count, u32 );
+			for( u32 i = 0; i < Indeces->Count; ++i )
+			{
+				Indeces->ni[i] = ParsedGroup->ni.Pop();			
+			}
+		}
+
+		NewGroup++;
 	}
 
 	Assert( GroupToParse.IsEmpty() );
-
-	Result->MeshData  = MeshData;
-	Result->ObjectCount = ObjectCount;
-	Result->Objects   = Objects;
 
 	SetCenterOfMassAndBoundingBoxToOBJFile(Result, TempArena);
 
@@ -1284,10 +1287,9 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* MeshData )
 {
 	entity* Entity = NewEntity( World );
-	NewComponents( World, Entity,  COMPONENT_TYPE_MESH |  COMPONENT_TYPE_SURFACE | COMPONENT_TYPE_SPATIAL );
+	NewComponents( World, Entity,  COMPONENT_TYPE_MESH | COMPONENT_TYPE_SPATIAL );
 
-	Entity->MeshComponent->TriangleCount = OBJGrp->FaceCount;
-	Entity->MeshComponent->Triangles = OBJGrp->Faces;
+	Entity->MeshComponent->Indeces = OBJGrp->Indeces;
 	Entity->MeshComponent->Data = MeshData;
 
 	v3 Size = OBJGrp->BoundingBoxMax - OBJGrp->BoundingBoxMin;
@@ -1302,6 +1304,7 @@ entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* Me
 
 	if( OBJGrp->Material )
 	{
+		NewComponents( World, Entity,  COMPONENT_TYPE_SURFACE );
 		component_surface* Surface = Entity->SurfaceComponent;
 
 		if( OBJGrp->Material->Ka || OBJGrp->Material->Kd || OBJGrp->Material->Ks || OBJGrp->Material->Ns )

@@ -67,7 +67,6 @@ struct sprite_series
 
 	// Texture Coordinates for the sprite series
 	rect2f* Frames;
-
 	rect2f* ActiveFrame;
 };
 
@@ -75,6 +74,7 @@ struct component_sprite_animation
 {
 	bitmap* Bitmap;
 	u32 NrEntries;
+	rect2f Dimensions;
 	sprite_series* Animations;
 	sprite_series* ActiveSeries;
 };

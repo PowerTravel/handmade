@@ -426,25 +426,269 @@ list<aabb_feature_face> GetAABBFaces( memory_arena* Arena, aabb3f* AABB )
 	return Faces;
 }
 
-bool AABBOverlap(aabb3f& A, aabb3f& B)
+inline v3
+GetAABBCenter( const aabb3f AABB )
 {
-	b32 ARightOfB = ( B.P1.X < A.P0.X );
-	b32 ALeftOfB  = ( B.P0.X > A.P1.X );
+	return (AABB.P0 + AABB.P1) * 0.5;
+}
 
-	b32 AOverB      = ( B.P1.Y < A.P0.Y ); 
-	b32 AUnderB     = ( B.P0.Y > A.P1.Y );
-	b32 AInFrontOfB = ( B.P1.Z < A.P0.Z ); 
-	b32	ABehindB    = ( B.P0.Z > A.P1.Z );
+inline v3 
+GetHalfSideLength( const aabb3f& AABB, const v3& CollisionEnvelope = {} )
+{
+	return (AABB.P1 - AABB.P0 + CollisionEnvelope) * 0.5;
+}
 
-	// No Overlap
-	if(  (( B.P1.X < A.P0.X) || ( B.P0.X > A.P1.X )) || 
-		 (( B.P1.Y < A.P0.Y) || ( B.P0.Y > A.P1.Y )) || 
-		 (( B.P1.Z < A.P0.Z) || ( B.P0.Z > A.P1.Z )) ) 
-	{ 
-		return false; 
+inline v3 
+GetPenetrationDepth( const aabb3f& A, const aabb3f& B )
+{
+	v3 ACenter = GetAABBCenter(A);
+	v3 ASide   = GetHalfSideLength(A);
+
+	v3 BCenter = GetAABBCenter(B);
+	v3 BSide   = GetHalfSideLength(B);
+
+	v3 ContactSeparation = ASide + BSide;
+
+	v3 ABSeparation = Abs( BCenter - ACenter);
+
+	v3 PenetrationDepth = ABSeparation - ContactSeparation;
+	
+	return PenetrationDepth;	
+}
+
+enum aabb_contact_type
+{
+	AABB_CONTACT_TYPE_SEPARATE,
+	AABB_CONTACT_TYPE_RESTING,
+	AABB_CONTACT_TYPE_PENETRATION
+};
+
+struct aabb_contact
+{
+	aabb_contact_type Type;
+	v3 CollisionNormal;
+	v3 PenetrationDepth;
+};
+
+aabb_contact AABBContact( aabb3f& A, aabb3f& B, v3 ContactTolerance = V3(1E-7, 1E-7, 1E-7) )
+{
+	aabb_contact Result = {};
+	Result.Type = AABB_CONTACT_TYPE_SEPARATE;
+
+	Result.PenetrationDepth  = GetPenetrationDepth( A, B );
+
+	if( ( Result.PenetrationDepth.X < 0 ) || 
+		( Result.PenetrationDepth.Y < 0 ) ||
+		( Result.PenetrationDepth.Z < 0 ) )
+	{
+		return Result;
 	}
 
-	return true;
+	if( ( Result.PenetrationDepth.X <= ContactTolerance.X ) &&
+	    ( Result.PenetrationDepth.Y <= ContactTolerance.Y ) &&
+	    ( Result.PenetrationDepth.Z <= ContactTolerance.Z ) )
+	{
+		Result.Type = AABB_CONTACT_TYPE_RESTING;
+		return Result;
+	}
 
+	Result.Type = AABB_CONTACT_TYPE_PENETRATION;
+
+	return Result;
 }
-#endif
+
+bool AABBRestingContact(aabb3f& A, aabb3f& B, v3 ContactTolerance = V3(1E-7,1E-7,1E-7) )
+{
+	v3 ACenter = GetAABBCenter(A);
+	v3 ASide   = GetHalfSideLength(A);
+
+	v3 BCenter = GetAABBCenter(B);
+	v3 BSide   = GetHalfSideLength(B);
+
+	v3 ContactSeparation = ASide + BSide;
+
+	v3 ABSeparation = Abs( BCenter - ACenter);
+
+	v3 PenetrationDepth = ABSeparation - ContactSeparation;
+
+	if( ( PenetrationDepth.X >= 0 ) && ( PenetrationDepth.X <= ContactTolerance.X ) && 
+		( PenetrationDepth.Y >= 0 ) && ( PenetrationDepth.Y <= ContactTolerance.Y ) &&
+		( PenetrationDepth.Z >= 0 ) && ( PenetrationDepth.Z <= ContactTolerance.Z ) )
+	{
+		return true;
+	}
+
+	return false;
+}
+
+
+// Sweep a in the direction of v against b, returns true & info if there was a hit
+// ===================================================================
+bool SweeptAABB( aabb3f& a, aabb3f& b, v3& v, v3& outVel, v3& hitNormal )
+{
+    //Initialise out info
+    outVel = v;
+    hitNormal = V3(0,0,0);
+
+	if( (v.X == 0) && (v.Y == 0) )
+	{
+		return false;
+	}
+
+    // Treat b as stationary, so invert v to get relative velocity
+	v3 rv = -v;
+
+    r32 hitTime = 0.0f;
+    r32 outTime = 1.0f;
+    v3 overlapTime = V3(0,0,0);
+
+    // A is traveling to the right relative B
+    if( rv.X < 0 )
+    {	
+    	// A is to the right of B ( They are separating )
+        if( b.P1.X <= a.P0.X )
+        { 
+        	return false;
+        }
+
+        // Left edge of A is to the left of Bs right edge, potentially overlapping and closing in on eachother.
+        if( b.P1.X > a.P0.X ) 
+        {
+    		outTime = Minimum( (a.P0.X - b.P1.X) / rv.X, outTime );
+    	}
+
+        // A is to the left of B with no overlap and closing in on eachother.
+        if( a.P1.X <= b.P0.X )
+        {
+            overlapTime.X = (a.P1.X - b.P0.X) / rv.X;
+            hitTime = Maximum(overlapTime.X, hitTime);
+        }
+    }
+    // A is traveling to the left relative B
+    else if( rv.X > 0 )
+    {
+    	// A is to the left of B ( They are separating )
+        if( b.P0.X >= a.P1.X )
+        {
+        	return false;
+        }
+
+        // Right edge of A is to the right of Bs left edge, potentially overlapping and closing in on eachother.
+        if( a.P1.X > b.P0.X ) 
+        { 
+        	outTime = Minimum( (a.P1.X - b.P0.X) / rv.X, outTime );
+        }
+
+        // A is to the right of B with no overlap and closing in on eachother.
+        if( b.P1.X <= a.P0.X )
+        {
+            overlapTime.X = (a.P0.X - b.P1.X) / rv.X;
+            hitTime = Maximum(overlapTime.X, hitTime);
+        }
+    }
+
+    if( hitTime > outTime )
+    {
+    	return false;
+    }
+
+    //=================================
+
+    // A is traveling up relative to B
+    if( rv.Y < 0 )
+    {
+    	// A is above B and separating
+        if( b.P1.Y <= a.P0.Y )
+        {
+        	return false;
+        }
+
+        // Bottom of A is below top of B, potentially overlapping and closing in on eachother.
+        if( b.P1.Y > a.P0.Y ) 
+        { 
+        	outTime = Minimum( (a.P0.Y - b.P1.Y) / rv.Y, outTime );
+        }
+
+        // A is below B with no overlap and closing in on eachother.
+        if( a.P1.Y <= b.P0.Y )
+        {
+            overlapTime.Y = (a.P1.Y - b.P0.Y) / rv.Y;
+            hitTime = Maximum(overlapTime.Y, hitTime);
+        }           
+    }
+    // A is traveling down relative to B
+    else if( rv.Y > 0 )
+    {
+    	// A is below B and separating
+        if( b.P0.Y >= a.P1.Y )
+        {
+        	return false;
+        }
+       
+        // Top of A is above bottom of B, potentially overlapping and closing in on eachother.
+        if( a.P1.Y > b.P0.Y ) 
+        { 
+        	outTime = Minimum( (a.P1.Y - b.P0.Y) / rv.Y, outTime );
+        }
+
+        // A is above B with no overlap and closing in on eachother.
+        if( b.P1.Y <= a.P0.Y )
+        {
+            overlapTime.Y = (a.P0.Y - b.P1.Y) / rv.Y;
+            hitTime = Maximum(overlapTime.Y, hitTime);
+        }
+    }
+
+    if( hitTime > outTime )
+    {
+    	return false;
+    }
+
+    // Scale resulting velocity by normalized hit time
+    outVel = -rv * hitTime;
+	r32 Tol = 0.01;
+
+    // Hit normal is along axis with the highest overlap time
+	if( overlapTime.X > overlapTime.Y )
+    {
+    	if( rv.X  > 0 )
+    	{
+    		hitNormal = V3(1, 0, 0);
+    	}else if(rv.X  < 0){
+    		hitNormal = V3(-1, 0, 0);
+    	}else{
+    		Assert(0);
+    	}
+    }
+    else if( overlapTime.X < overlapTime.Y )
+    {
+    	if( rv.Y  > 0 )
+    	{
+    		hitNormal = V3(0, 1, 0);
+    	}else if( rv.Y  < 0 ){
+    		hitNormal = V3(0, -1, 0);
+    	}else{
+    		Assert(0);
+    	}
+	}else{
+		if( rv.X  > 0 )
+    	{
+    		hitNormal = V3(1, 0, 0);
+    	}else if(rv.X  < 0){
+    		hitNormal = V3(-1, 0, 0);
+    	}else if( rv.Y  > 0 )
+    	{
+    		hitNormal = V3(0, 1, 0);
+    	}else if( rv.Y  < 0 ){
+    		hitNormal = V3(0, -1, 0);
+		}else{
+			Assert(0);
+		}		
+	}
+
+    return true;
+}
+
+
+
+#endif // AABB_H

@@ -25,7 +25,6 @@ struct entry_type_sprite
 	rect2f* Coordinates;
 };
 
-
 typedef entry_type_sprite entry_type_floor_tile;
 
 struct entry_type_wirebox

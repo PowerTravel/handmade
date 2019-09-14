@@ -98,6 +98,8 @@ struct game_render_commands
 	s32 Width;
 	s32 Height;
 
+	opengl_program RenderProgram;
+
 	u32 MaxPushBufferSize;
 	u32 PushBufferSize;
 	u8* PushBuffer;
@@ -105,7 +107,7 @@ struct game_render_commands
 	u32 PushBufferElementCount;
 };
 
-#define RenderCommandStruct (MaxPushBufferSize, PushBuffer, Width, Height) {Width,Height, MaxPushBufferSize, 0, (u8*) PushBuffer, 0 , MaxPushBufferSize };
+//#define RenderCommandStruct (MaxPushBufferSize, PushBuffer, Width, Height) {Width,Height, MaxPushBufferSize, 0, (u8*) PushBuffer, 0 , MaxPushBufferSize };
 
 struct game_sound_output_buffer
 {
@@ -290,7 +292,7 @@ enum platform_open_file_mode_flags
 
 #define PlatformNoFileErrors(Handle) ((Handle)->NoErrors)
 
-#define PLATFORM_ALLOCATE_MEMORY(name) platform_memory_block *name(memory_index aSize, u64 aFlags)
+#define PLATFORM_ALLOCATE_MEMORY(name) platform_memory_block* name(memory_index aSize, u64 aFlags)
 typedef PLATFORM_ALLOCATE_MEMORY(platform_allocate_memory);
 
 #define PLATFORM_DEALLOCATE_MEMORY(name) void name(platform_memory_block *aBlock)

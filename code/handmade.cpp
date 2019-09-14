@@ -5,17 +5,17 @@
 #include "handmade_tile.cpp"
 #include "entity_components.cpp"
 #include "camera_system.cpp"
-#include "spatial_system.cpp"
 #include "obj_loader.cpp"
 
 #include "render.cpp"
 
 #include "render_push_buffer.cpp"
 #include "sprite_mapping.h"
+#include "system_spatial.cpp"
 #include "system_sprite_animation.cpp"
 #include "system_controller.cpp"
 
-#include "unit_tests.cpp"
+//#include "unit_tests.cpp"
 
 // makes the packing compact
 #pragma pack(push, 1)
@@ -177,9 +177,53 @@ DEBUGReadBMP(thread_context* Thread, game_state* aGameState,
 
 	return Result;
 }
+void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
+{
+	game_state* GameState = Memory->GameState;
+	memory_arena* AssetArena = &GameState->AssetArena;
+
+	GameState->World = AllocateWorld(256);
+	world* World = GameState->World;
+	entity* Camera = NewEntity( World );
 
 
-void CreateMapScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
+	NewComponents( World, Camera, COMPONENT_TYPE_CAMERA | COMPONENT_TYPE_CONTROLLER );
+	r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
+	r32 FieldOfView =  90;
+	CreateCameraComponent(Camera->CameraComponent, FieldOfView, AspectRatio );
+	LookAt(Camera->CameraComponent, V3(0,0,1), V3(0,1,0));
+
+	Camera->ControllerComponent->Controller = GetController(Input, 1);
+	Camera->ControllerComponent->ControllerMappingFunction = CameraController;
+
+	GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
+	game_assets* Assets = GameState->World->Assets;
+
+#if 0
+	loaded_obj_file* square = ReadOBJFile(Thread, GameState,
+			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+				 "..\\handmade\\data\\cube.obj" );
+#else
+	loaded_obj_file* square = ReadOBJFile(Thread, GameState,
+		   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+			 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+			 "..\\handmade\\data\\square.obj" );
+#endif
+	CreateEntitiesFromOBJFile( World, square );
+
+	for(u32 Index = 0; Index < World->NrEntities; ++Index)
+	{
+		entity* Entity = &World->Entities[Index];
+		if( Entity->Types & COMPONENT_TYPE_MESH )
+		{
+//			Memory->PlatformAPI.ToGPU();
+		}
+ 	}
+
+}
+
+void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
 {
 	game_state* GameState = Memory->GameState;
 	memory_arena* AssetArena = &GameState->AssetArena;
@@ -206,7 +250,7 @@ void CreateMapScene(thread_context* Thread, game_memory* Memory, game_render_com
 	Camera->ControllerComponent->ControllerMappingFunction = CameraController;
 
 
-	GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets );
+	GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
 	game_assets* Assets = GameState->World->Assets;
 
 	
@@ -315,34 +359,33 @@ void CreateMapScene(thread_context* Thread, game_memory* Memory, game_render_com
 			tile_contents TileContents = {};
 
 			TileContents.Type = TILE_TYPE_WALL;
-			
-			if( i == 0 && j == 0)
-			{
+			if( i == 0 && j == 0){
 				TileContents.Sprite = BottomLeftDrop;
-			} else if( i == 0 && (j+1) == TilesPerRoomWidth ){
+			}else if( i == 0 && (j+1) == TilesPerRoomWidth ){
 				TileContents.Sprite = BottomRightDrop;
 			}else if( (i+1) == TilesPerRoomHeight && j == 0 ){
 				TileContents.Sprite = TopLeftDrop;
 			}else if( (i+1) == TilesPerRoomHeight && (j+1) == TilesPerRoomWidth ){
 				TileContents.Sprite = TopRightDrop;
-			}
-			else if( i == 0 )
-			{
+			}else if( i == 0 ){
 				TileContents.Sprite = BottomDrop;
 			}else if( (i+1) == TilesPerRoomHeight ){
 				TileContents.Sprite = TopDrop;
 			}else if( j == 0 ){
 				TileContents.Sprite = LeftDrop;
-			}else if( (j+1) == TilesPerRoomWidth )
-			{
+			}else if( (j+1) == TilesPerRoomWidth ){
 				TileContents.Sprite = RightDrop;
 			}else{
-				r32 Random = GetRandomReal(i*j);
-				u32 RandIDX = ((s32)(Random * 1000 )) % World->Assets->NrFloorTiles;
-				TileContents.Sprite =  &Assets->FloorTiles[RandIDX];
-				TileContents.Type = TILE_TYPE_FLOOR;
+				if( (i == ( (u32) TilesPerRoomHeight/2)) && (j == ( (u32) TilesPerRoomWidth/2))  ){
+					TileContents.Sprite =  TopDrop;
+				}else{		
+					r32 Random = GetRandomReal(i*j);
+					u32 RandIDX = ((s32)(Random * 1000 )) % World->Assets->NrFloorTiles;
+					TileContents.Sprite =  &Assets->FloorTiles[RandIDX];
+					TileContents.Type = TILE_TYPE_FLOOR;
+				}
 			}
-			
+
 			SetTileContentsAbs(&GameState->AssetArena, &World->TileMap, j, i, 0, TileContents );	
 		}
 	}
@@ -359,10 +402,13 @@ void CreateMapScene(thread_context* Thread, game_memory* Memory, game_render_com
 
 	component_spatial* PrinnySpatial = PrinnyHero->SpatialComponent;
 
-	PrinnySpatial->Position = V3(2.5,3,0);
-	PrinnySpatial->Velocity = V3(20,-20,0);
+	PrinnySpatial->Position = V3(1.5, 3, 0);
+	PrinnySpatial->Velocity = V3(0,0,0);
+	PrinnySpatial->ExternalForce = V3(0,0,0);
 	PrinnySpatial->RotationAngle = 0;
 	PrinnySpatial->RotationAxis = V3(0,0,1);
+	PrinnySpatial->Width  = 0.8;
+	PrinnySpatial->Height = 1.5;
 	PrinnySpatial->Width  = 1;
 	PrinnySpatial->Height = 2;
 	PrinnySpatial->Depth  = 0;
@@ -402,7 +448,8 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
 	{
 		Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
 		
-		CreateMapScene(Thread, Memory, RenderCommands, Input );
+		//Create2DScene(Thread, Memory, RenderCommands, Input );
+		Create3DScene(Thread, Memory, RenderCommands, Input );
 		for (s32 ControllerIndex = 0;
 		ControllerIndex < ArrayCount(Input->Controllers);
 			++ControllerIndex)

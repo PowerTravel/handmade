@@ -58,6 +58,8 @@ union m4
 // r norm
 // v2 normalize
 
+// v2 Abs
+
 // bool v2 == v2
 // bool v2 !- v2
 
@@ -195,7 +197,9 @@ inline v2
 Normalize( const v2& A )
 {
 	v2 Result;
-	Result = A / Norm(A);
+	r32 N = Norm(A);
+	Assert( N != 0 );
+	Result = A / N;
 	return Result;
 }
 
@@ -203,6 +207,13 @@ inline r32
 Determinant( const v2& Row0, const v2& Row1 )
 {
 	r32 Result = Row0.X * Row1.Y - Row0.Y * Row1.X;
+	return Result;
+}
+
+inline v2 
+Abs( const v2& V )
+{
+	v2 Result = V2(Abs(V.X), Abs(V.Y) );
 	return Result;
 }
 
@@ -225,6 +236,8 @@ Determinant( const v2& Row0, const v2& Row1 )
 // r norm
 // v3 = normalize
 // v3 = Cross
+
+// v3 Abs(v3)
 
 // bool v3 == v3
 // bool v3 !- v3
@@ -356,7 +369,17 @@ inline v3
 Normalize( const v3& V )
 {
 	v3 Result = {};
-	Result = V / Norm(V);
+	r32 N = Norm(V);
+	Assert( N != 0 );
+	Result = V / N;
+	return Result;
+}
+
+
+inline v3 
+Abs( const v3& V )
+{
+	v3 Result = V3( Abs(V.X), Abs(V.Y), Abs( V.Z ) );
 	return Result;
 }
 
@@ -408,6 +431,8 @@ operator!=( const v3& A, const v3& B )
 
 // bool v4 == v4
 // bool v4 !- v4
+
+// v4 Abs(v4)
 
 //  r32 norm
 // v4 normalize
@@ -556,7 +581,16 @@ inline v4
 Normalize( const v4& R )
 {
 	v4 Result;
-	Result = R / Norm(R); 
+	r32 N = Norm(R);
+	Assert( N != 0 );
+	Result = R / N; 
+	return Result;
+}
+
+inline v4 
+Abs( const v4& V )
+{
+	v4 Result = V4( Abs(V.X), Abs(V.Y), Abs(V.Z), Abs(V.W) );
 	return Result;
 }
 

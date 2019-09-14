@@ -4,6 +4,8 @@
 #include <stdio.h>
 
 #include "types.h"
+
+#include "platform_opengl.h"
 #include "platform.h"
 #include "memory.h"
 #include "render_push_buffer.h"

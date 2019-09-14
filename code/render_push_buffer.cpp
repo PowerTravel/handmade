@@ -1,5 +1,7 @@
 #include "render_push_buffer.h"
 
+#define GetRenderCommandsTail( RenderCommands ) ( RenderCommands->PushBuffer + RenderCommands->PushBufferSize )
+
 u8* PushNewHeader(game_render_commands* RenderCommands, push_buffer_header** PreviousEntry, u32 Type)
 {
 	Assert(PreviousEntry);
@@ -30,10 +32,10 @@ u8* PushNewHeader(game_render_commands* RenderCommands, push_buffer_header** Pre
 	Assert(TypeSize);
 
 	render_push_buffer* PushBuffer = (render_push_buffer*) RenderCommands->PushBuffer;
-	push_buffer_header* NewEntryHeader = (push_buffer_header*) ( RenderCommands->PushBuffer + RenderCommands->PushBufferSize );
+	push_buffer_header* NewEntryHeader = (push_buffer_header*) GetRenderCommandsTail( RenderCommands );
 	RenderCommands->PushBufferSize += sizeof(push_buffer_header);
 	RenderCommands->PushBufferElementCount++;
-	Assert(  RenderCommands->PushBufferSize < RenderCommands->MaxPushBufferSize );
+	Assert( RenderCommands->PushBufferSize < RenderCommands->MaxPushBufferSize );
 	NewEntryHeader->Type = Type;
 	NewEntryHeader->Next = 0;
 	
@@ -46,7 +48,7 @@ u8* PushNewHeader(game_render_commands* RenderCommands, push_buffer_header** Pre
 		*PreviousEntry = NewEntryHeader;
 	}
 
-	u8* Entry = (u8*) ( RenderCommands->PushBuffer + RenderCommands->PushBufferSize );
+	u8* Entry = (u8*)  GetRenderCommandsTail( RenderCommands );
 	RenderCommands->PushBufferSize += TypeSize;
 	return Entry;
 }
@@ -56,8 +58,8 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 	Assert(RenderCommands);
 	Assert(RenderCommands->PushBuffer);
 	Assert(RenderCommands->MaxPushBufferSize);
-	Assert(RenderCommands->PushBufferElementCount == 0 );
-	Assert(RenderCommands->PushBufferSize == 0);
+	RenderCommands->PushBufferElementCount = 0;
+	RenderCommands->PushBufferSize = 0;
 	
 	// Reset Render Commands
 	RenderCommands->PushBufferElementCount = 0;
@@ -68,8 +70,8 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
  	PushBuffer->First = 0;
  	PushBuffer->Assets = World->Assets;
 	PushBuffer->RenderCommands = RenderCommands;
-	push_buffer_header* PreviousEntry = 0;
 
+	push_buffer_header* PreviousEntry = 0;
 
 	for(u32 Index = 0; Index <  World->NrEntities; ++Index )
 	{
@@ -81,12 +83,11 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 			PushBuffer->ViewMatrix       = Entity->CameraComponent->V;
 		}
 
-		if(Entity->Types & COMPONENT_TYPE_MESH )
+		if( Entity->Types & COMPONENT_TYPE_MESH )
 		{
 			entry_type_entity* EntityEntry = (entry_type_entity*) PushNewHeader( RenderCommands, &PreviousEntry, RENDER_TYPE_ENTITY );
 			EntityEntry->Entity = Entity;
 		}
-
 
 		if(Entity->Types & COMPONENT_TYPE_SPATIAL )
 		{
@@ -107,16 +108,16 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 			SpriteEntry->Bitmap = Entity->SpriteAnimationComponent->Bitmap;
 			SpriteEntry->Coordinates = Entity->SpriteAnimationComponent->ActiveSeries->ActiveFrame;
 			
+			SpriteEntry->M = M4Identity();
+			m4 SpriteSize   = GetScaleMatrix( V4( Entity->SpriteAnimationComponent->Dimensions.W, Entity->SpriteAnimationComponent->Dimensions.H, 1, 0 ) );
+			m4 SpriteOffset = GetTranslationMatrix( V4( Entity->SpriteAnimationComponent->Dimensions.X, Entity->SpriteAnimationComponent->Dimensions.Y, 0, 0 ) );
 			if( Entity->Types & COMPONENT_TYPE_SPATIAL )
 			{
-				SpriteEntry->M = GetAsMatrix( Entity->SpatialComponent );
-				SpriteEntry->M = SpriteEntry->M * GetScaleMatrix( V4( Entity->SpatialComponent->Width, Entity->SpatialComponent->Height, Entity->SpatialComponent->Depth, 0 ) );
-			}else{
-				SpriteEntry->M = M4Identity();
+				SpriteEntry->M = GetAsMatrix( Entity->SpatialComponent ) * SpriteOffset * SpriteSize;
 			}
 		}
 	}
-
+#if 0
 	u32 Width = 40;
 	u32 Height = 40;
 	for(u32 i = 0; i < Height; ++i )
@@ -146,5 +147,6 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 			}
 		}
 	}
+#endif
 
 };

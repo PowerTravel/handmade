@@ -3,6 +3,8 @@
 #include "intrinsics.h"
 
 #include "string.h"
+
+#include "platform_opengl.h"
 #include "platform.h"
 
 struct win32_offscreen_buffer

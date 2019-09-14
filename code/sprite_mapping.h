@@ -65,6 +65,10 @@ void ExtractPrinny( memory_arena* AssetArena, bitmap* Bitmap, component_sprite_a
 	Assert(AnimationComponent->Bitmap);
 
 	AnimationComponent->Animations = PushArray(AssetArena, AnimationComponent->NrEntries, sprite_series);
+	AnimationComponent->Dimensions.X = 0;
+	AnimationComponent->Dimensions.Y = 0;
+	AnimationComponent->Dimensions.W = 1;
+	AnimationComponent->Dimensions.H = 2;
 
 	u32 NrFrames            = 7;
 	u32 FrameWidthInPixels  = 32;
@@ -78,7 +82,7 @@ void ExtractPrinny( memory_arena* AssetArena, bitmap* Bitmap, component_sprite_a
 	ExtractRegularFrameRow( AssetArena,         &AnimationComponent->Animations[0], 7,
 							0,                  FrameHeightInPixels, 
 							FrameWidthInPixels, (Row+1) * FrameHeightInPixels,
-							BitmapWidth,   	 BitmapHeight,
+							BitmapWidth,   		BitmapHeight,
 							false, 				false,
 							SPRITE_TYPE_IDLE,   SPRITE_ORIENTATION_M0P);
 	// First Row Inverted X (idle front right)
@@ -142,6 +146,7 @@ void ExtractPrinny( memory_arena* AssetArena, bitmap* Bitmap, component_sprite_a
 
 
 	AnimationComponent->ActiveSeries = AnimationComponent->Animations;
+
 }
 #if 0
 	s32 PrinnyIdx = 0;

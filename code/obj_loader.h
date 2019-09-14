@@ -11,4 +11,6 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 			   debug_platfrom_free_file_memory* FreeEntireFile,
 			   char* FileName);
 
+void CreateEntitiesFromOBJFile( world* World, loaded_obj_file* ObjFile );
+
 #endif OBJ_LOADER_H

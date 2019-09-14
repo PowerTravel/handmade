@@ -3,79 +3,176 @@
 #include "affine_transformations.h"
 #include "string.h"
 
-#define GL_FRAMEBUFFER_SRGB               0x8DB9
-#define GL_SRGB8_ALPHA8                   0x8C43
-#define GL_SHADING_LANGUAGE_VERSION 	  0x8B8C
-
-// Windows Specific defines. WGL = WindowsOpenGL
-#define WGL_CONTEXT_MAJOR_VERSION_ARB             0x2091
-#define WGL_CONTEXT_MINOR_VERSION_ARB             0x2092
-#define WGL_CONTEXT_LAYER_PLANE_ARB               0x2093
-#define WGL_CONTEXT_FLAGS_ARB                     0x2094
-#define WGL_CONTEXT_PROFILE_MASK_ARB              0x9126
-#define WGL_CONTEXT_DEBUG_BIT_ARB                 0x0001
-#define WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB    0x0002
-#define WGL_CONTEXT_CORE_PROFILE_BIT_ARB          0x00000001
-#define WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB 0x00000002
-
-#define ERROR_INVALID_VERSION_ARB               0x2095
-#define ERROR_INVALID_PROFILE_ARB               0x2096
-
-#define GL_MULTISAMPLE                    0x809D
-#define GL_SAMPLE_ALPHA_TO_COVERAGE       0x809E
-#define GL_SAMPLE_ALPHA_TO_ONE            0x809F
-#define GL_SAMPLE_COVERAGE                0x80A0
-#define GL_SAMPLE_BUFFERS                 0x80A8
-#define GL_SAMPLES                        0x80A9
-#define GL_SAMPLE_COVERAGE_VALUE          0x80AA
-#define GL_SAMPLE_COVERAGE_INVERT         0x80AB
-#define GL_TEXTURE_2D_MULTISAMPLE         0x9100
-#define GL_MAX_SAMPLES                    0x8D57
-#define GL_MAX_COLOR_TEXTURE_SAMPLES      0x910E
-#define GL_MAX_DEPTH_TEXTURE_SAMPLES      0x910F
-
-
-struct opengl_info
-{
-	b32 ModernContext;
-	char* Vendor;
-	char* Renderer;
-	char* Version;
-	char* ShadingLanguageVersion;
-	char* Extensions;
-	b32 EXT_texture_sRGB_decode;
-	b32 GL_ARB_framebuffer_sRGB;
-	b32 GL_ARB_vertex_shader;
-	b32 GL_blend_func_separate;
-};
-
 global_variable u32 TextureBindCount = 0;
 
-internal GLuint LoadShader( u32 CodeLength, char* SourceCode, GLenum ShaderType )
+internal GLuint OpenGLLoadShader( char* SourceCode, GLenum ShaderType )
 {
-	//GLuint ShaderHandle = glCreateShader(ShaderType);
-	// GLuint FragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	char* LineStart = SourceCode;
-	char* LineEnd = str::FindFirstOf("\r\n", LineStart);
+	GLuint ShaderHandle = glCreateShader(ShaderType);
 
-	while(LineStart)
+	// Upload the shader
+	glShaderSource( ShaderHandle, 1, (const GLchar**) &SourceCode, NULL );
+	glCompileShader( ShaderHandle );
+	
+	#if 1
+	GLint Compiled;
+	glGetShaderiv(ShaderHandle , GL_COMPILE_STATUS, &Compiled);
+	if( !Compiled )
 	{
- 		umm LineLength	= LineEnd ? ( LineEnd - LineStart ) : (CodeLength - (LineStart - SourceCode));
-
-		Assert(LineLength < STR_MAX_LINE_LENGTH );
-
-		char LineBuffer[STR_MAX_LINE_LENGTH] = {};
-		char* ScanPtrSrc = LineStart;
-		char* ScanPtrDst = LineBuffer;
-		str::CopyStrings( LineLength, LineStart, STR_MAX_LINE_LENGTH, LineBuffer );
-
-
-
-		LineStart = str::FindFirstNotOf("\r\n", LineEnd);
-		LineEnd   = str::FindFirstOf("\r\n", LineStart);
-
+		void* CompileMessage;
+		GLint CompileMessageSize;
+		glGetShaderiv( ShaderHandle, GL_INFO_LOG_LENGTH, &CompileMessageSize );
+		
+		CompileMessage = VirtualAlloc(0, CompileMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+		void* Tmp 	   = VirtualAlloc(0, CompileMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+		glGetShaderInfoLog(ShaderHandle, CompileMessageSize, NULL, (GLchar*) CompileMessage);
+		snprintf((char*)Tmp, CompileMessageSize, "%s", (char*) CompileMessage);
+		//VirtualFree(CompileMessage, 0, MEM_RELEASE );
+		//VirtualFree(Tmp, 0, MEM_RELEASE );
+		Assert(0);
+		exit(1);
 	}
-	return 0;
+	#endif
+
+	return ShaderHandle;
+};
+
+opengl_program OpenGLCreateShaderProgram()
+{
+	global_variable	char VertexShaderCode[] = 
+	{
+"#version  330 core\n\
+layout (location = 0) in vec4 vPosition;\n\
+uniform mat4 M, V, P;\n\
+\n\
+void main(){\n\
+	//gl_Position = P*V*M*vPosition;\n\
+	//mat4 X = V * P;\n\
+	gl_Position = M*vPosition;\n\
+}"
+	};
+
+	global_variable	char FragmentShaderCode[] = 
+	{
+"#version 330 core\n\
+//out vec4 fragColor;\n\
+layout(location = 0) out vec3 fragColor;\n\
+\n\
+void main(){\n\
+	fragColor = vec3(1, 0, 0);\n\
+}"
+	};
+
+	char* SourceCode = NULL;
+
+	GLuint VertexShader   = OpenGLLoadShader( VertexShaderCode,   GL_VERTEX_SHADER   );
+	GLuint FragmentShader = OpenGLLoadShader( FragmentShaderCode, GL_FRAGMENT_SHADER );
+
+	
+	GLuint Program = glCreateProgram();
+
+	// Attatch the shader to the program
+	glAttachShader(Program, VertexShader);
+	glAttachShader(Program, FragmentShader);
+	glLinkProgram( Program );
+
+	glDetachShader(Program, VertexShader);
+	glDetachShader(Program, FragmentShader);
+
+	glDeleteShader(VertexShader);
+	glDeleteShader(FragmentShader);
+
+	GLint Linked;
+	glGetProgramiv(Program, GL_LINK_STATUS, &Linked);
+	if( !Linked )
+	{
+		void* ProgramMessage;
+		GLint ProgramMessageSize;
+		glGetProgramiv( Program, GL_INFO_LOG_LENGTH, &ProgramMessageSize );
+		
+		ProgramMessage = VirtualAlloc(0, ProgramMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+		void* Tmp 	   = VirtualAlloc(0, ProgramMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+		glGetProgramInfoLog(Program, ProgramMessageSize, NULL, (GLchar*) ProgramMessage);
+		snprintf((char*)Tmp, ProgramMessageSize, "%s",(char*) ProgramMessage);
+		VirtualFree(ProgramMessage, 0, MEM_RELEASE );
+		VirtualFree(Tmp, 0, MEM_RELEASE );
+		exit(1);
+	}
+
+
+	opengl_program Result = {};
+	Result.Program 				   = Program;
+	glUseProgram(Program);
+	Result.UniformModel 		 = glGetUniformLocation(Program, "M");
+	u32 error = glGetError();
+	Result.UniformProjection = glGetUniformLocation(Program, "P");
+	error = glGetError();
+	Result.UniformView 			 = glGetUniformLocation(Program, "V");
+	error = glGetError();
+
+	glUseProgram(0);
+	
+	return Result;
+} 
+
+void OpenGLPushDataToArrayBuffer(u32 Slot, u32 Dimension, size_t NrEntries, r32* Data )
+{
+	if(!Data) return;
+
+	// Generate a generic buffer
+	GLuint BufferID;
+	glGenBuffers(1, &BufferID);
+	
+	// Bind the buffer ot the GL_ARRAY_BUFFER slot
+	glBindBuffer( GL_ARRAY_BUFFER, BufferID);
+
+	// Send data to it
+	glBufferData( GL_ARRAY_BUFFER, NrEntries * Dimension * sizeof(GLfloat), Data, GL_STATIC_DRAW);
+
+	// Say how to interpret the buffer data
+	glVertexAttribPointer(Slot, Dimension, GL_FLOAT, GL_FALSE, 0, (GLvoid*)NULL);
+
+	// Enable the Slot
+	glEnableVertexAttribArray(Slot);
+}
+
+void OpenGLSendMeshToGPU( u32* VAO,	
+												  u32 NrVertices,  r32* Vertices, 
+											    u32 NrTexCoords, r32* TexCoords, 
+											    u32 NrNormals,   r32* Normals,
+											    u32 NrFaces,     u32* Faces )
+{
+	Assert(Vertices);
+	Assert(Faces);
+	
+	// Generate vao
+	glGenVertexArrays(1, VAO);
+
+	// set it as current one	
+	glBindVertexArray(*VAO);
+
+	OpenGLPushDataToArrayBuffer( 0, 4, NrVertices,  Vertices);
+	OpenGLPushDataToArrayBuffer( 1, 2, NrTexCoords, TexCoords);
+	OpenGLPushDataToArrayBuffer( 2, 3, NrNormals,   Normals);
+
+	GLuint FaceBuffer;
+	glGenBuffers(1, &FaceBuffer);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, FaceBuffer);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, NrFaces * 3 * sizeof(GLuint), Faces, GL_STATIC_DRAW);
+	
+	glBindVertexArray(0);
+}	
+
+void OpenGLDraw( u32 VertexArrayObject, u32 nrFaces )
+{
+	glBindVertexArray( VertexArrayObject );
+	glDrawElements( GL_TRIANGLES, nrFaces, GL_UNSIGNED_INT, (void*)0);
+	glBindVertexArray(0);
+}
+
+void OpenGLBeginFrame( u32 Program )
+{
+	
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	
 }
 
 internal opengl_info
@@ -84,9 +181,9 @@ OpenGLGetExtensions(b32 ModernContext)
 	opengl_info Result = {};
 
 	Result.ModernContext = ModernContext;
-	Result.Vendor = (char*) glGetString(GL_VENDOR);
+	Result.Vendor   = (char*) glGetString(GL_VENDOR);
 	Result.Renderer = (char*) glGetString(GL_RENDERER);
-	Result.Version = (char*) glGetString(GL_VERSION);
+	Result.Version  = (char*) glGetString(GL_VERSION);
 
 	if(Result.ModernContext)
 	{
@@ -121,7 +218,7 @@ OpenGLGetExtensions(b32 ModernContext)
 			Result.GL_ARB_vertex_shader = true;
 		}
 
-		if( str::Contains( str::StringLength( "glBlendFuncSeparate" ), "glBlendFuncSeparate",
+		if( str::Contains( str::StringLength( "GL_EXT_blend_func_separate" ), "GL_EXT_blend_func_separate",
 					ExtensionStringLength, ExtensionStart ) )
 		{
 			Result.GL_blend_func_separate = true;
@@ -150,10 +247,12 @@ void OpenGLInit(b32 ModernContext)
 		glEnable(GL_FRAMEBUFFER_SRGB);
 	}
 
-	if(!Info.GL_blend_func_separate)
+	if(Info.GL_blend_func_separate)
 	{
-		//INVALID_CODE_PATH;
+		// Not sure I want this
+		//glEnable(GL_BLEND);
 	}
+
 }
 
 void OpenGLSetViewport( r32 ViewPortAspectRatio, s32 WindowWidth, s32 WindowHeight )
@@ -223,7 +322,7 @@ internal void DisplayBitmapViaOpenGL( u32 Width, u32 Height, void* Memory )
 	// Make our texture slot current
 	glBindTexture( GL_TEXTURE_2D, 0 );
 
-//  GL_BGRA or GL_RGBA
+	//  GL_BGRA or GL_RGBA
 	// Send a Texture to GPU referenced to the texture handle
 	glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
   				  Width,  Height, 
@@ -383,23 +482,33 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 {
 	render_push_buffer* RenderPushBuffer = (render_push_buffer*) Commands->PushBuffer;
 
+	// Enable depth test
+	glEnable(GL_DEPTH_TEST);
+	// Accept fragment if it closer to the camera than the former one
+	glDepthFunc(GL_LESS); 
+	// Cull triangles which normal is not towards the camera
+	glEnable(GL_CULL_FACE);	
+
+	glClearColor(0,0,0.4,1);
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
 	const r32 DesiredAspectRatio = 1.77968526f;
 	OpenGLSetViewport( DesiredAspectRatio, WindowWidth, WindowHeight );
 
-	glEnable(GL_DEPTH_TEST);
-	glClearColor(0.f, 0.f, 0.f, 0.f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	glEnable( GL_BLEND );
-	glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
-	
-	// Get camera matrices
-	// The 'gl' means to make explicit we use the Column Major convention used by OpenGL.
+	// OpenGL uses Column major convention.
 	// Our math library uses Row major convention which means we need to transpose the 
 	// matrices AND reverse the order of multiplication.
 	// Transpose(A*B) = Transpose(B) * Transpose(A)
-	m4 V = RenderPushBuffer->ViewMatrix;
+	
+	const m4 V = RenderPushBuffer->ViewMatrix;
+	const m4 P = RenderPushBuffer->ProjectionMatrix;
 
+	opengl_program Prog = Commands->RenderProgram;
+	glUniformMatrix4fv(Prog.UniformModel, 1, GL_TRUE, V.E);
+	glUniformMatrix4fv(Prog.UniformView,  1, GL_TRUE, V.E);
+#if 0
 	glMatrixMode(GL_MODELVIEW);
 	glLoadMatrixf( Transpose(V).E );
 
@@ -407,9 +516,8 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadMatrixf(glP.E);	
+#endif
 
-	r32 Color = 0.5;
-	b32 Odd = true;
 	// For each render group
 	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
 	{
@@ -422,14 +530,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 
 				entity* Entity = ( (entry_type_entity*) Body)->Entity;
 
-				if(Odd)
-				{
-					Color = 0.3;
-				}
-				else {
-					Color = 0.5;
-				}
-				Odd = !Odd;
 				if( Entity->Types & COMPONENT_TYPE_LIGHT )
 				{
 
@@ -437,7 +537,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 
 				if( Entity->Types & COMPONENT_TYPE_SURFACE)
 				{
-
 					component_surface* Surface = Entity->SurfaceComponent;
 					bitmap* DiffuseMap = Surface->Material->DiffuseMap;
 					if(DiffuseMap)
@@ -446,12 +545,36 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 					}
 				}
 
-				if( Entity->Types & COMPONENT_TYPE_MESH )
+				if(( Entity->Types & COMPONENT_TYPE_MESH ) && 
+					 ( Entity->Types & COMPONENT_TYPE_SPATIAL ))
 				{
+					Assert(Entity->Types & COMPONENT_TYPE_SPATIAL);
+
 					glDisable( GL_TEXTURE_2D );
 					component_mesh* Mesh = Entity->MeshComponent;
-					mesh_data* MeshData = Mesh->Data;
 
+					mesh_data* MeshData = Mesh->Data;
+					if(!Mesh->VAO)
+					{
+						OpenGLSendMeshToGPU(  &Mesh->VAO,	
+								MeshData->nv, (r32*) MeshData->v, 
+								0, NULL, 
+								0, NULL,
+								Mesh->Indeces.Count, Mesh->Indeces.vi );
+					}
+
+
+					local_persist float t = 0;
+					r32 s = (r32) sin(t);
+					r32 c = (r32) cos(t);
+		 			m4 M = GetAsMatrix( Entity->SpatialComponent );
+					M = GetScaleMatrix( V4( 0.5, 0.5, 0.5, 1) );
+					m4 PP = GetTranslationMatrix(V4(c,s,0,0));
+					t+=0.02;
+					glUniformMatrix4fv(Prog.UniformModel, 1, GL_TRUE, (M*PP).E);
+					
+					OpenGLDraw( Mesh->VAO, Mesh->Indeces.Count );
+#if 0
 					m4 M = M4Identity();
 					if(Entity->Types & COMPONENT_TYPE_SPATIAL)
 					{
@@ -491,6 +614,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 						glVertex3f( v[2].X, v[2].Y, v[2].Z );
 						glEnd();
 					}
+					#endif
 				}
 			}break;
 			case RENDER_TYPE_FLOOR_TILE:
@@ -571,7 +695,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 			}break;
 		}
 	}
-
+#if 0
 	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
 	{
 		switch(Entry->Type)
@@ -610,8 +734,9 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 			}break;
 		}
 	}
-
+#endif
 	Commands->PushBufferSize = 0;
 	Commands->PushBufferElementCount = 0;
 
 }
+

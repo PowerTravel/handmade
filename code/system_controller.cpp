@@ -64,7 +64,7 @@ void CameraController( entity* CameraEntity )
 		if(Controller->X.EndedDown)
 		{
 			// at X, top is Y, X is Left
-			LookAt( Camera, V3(0,0,1), V3(0,0,0));
+	//		LookAt( Camera, V3(0,0,1), V3(0,0,0));
 		}
 		if(Controller->Y.EndedDown)
 		{
@@ -95,20 +95,26 @@ void HeroController( entity* HeroEntity )
 
 	if( Controller->IsAnalog )
 	{
-		r32 dt = (1/60.f);
-		r32 da = 100;
-		v3 Acceleration = V3(0,0,0);
+		r32 ImpulseStrength = 100;
+		v2 StickAverage = V2(0,0);
 		if(Controller->LeftStickLeft.EndedDown || Controller->LeftStickRight.EndedDown )
 		{
-			Acceleration.X = Controller->LeftStickAverageX;
+			StickAverage.X = Controller->LeftStickAverageX;
 		}
 
 		if(Controller->LeftStickUp.EndedDown || Controller->LeftStickDown.EndedDown)
 		{
-			Acceleration.Y = Controller->LeftStickAverageY;
+			StickAverage.Y = Controller->LeftStickAverageY;
 		}
 
-		Spatial->Velocity += Acceleration *da * dt/2;
+		Spatial->ExternalForce = ImpulseStrength * V3( StickAverage ); 
 
+		if(Controller->X.EndedDown)
+		{
+			// at X, top is Y, X is Left
+			Spatial->Position = V3(3,3,0);
+			Spatial->Velocity = V3(0,0,0);
+			Spatial->ExternalForce = {};
+		}
 	}
 }
