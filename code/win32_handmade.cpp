@@ -244,7 +244,7 @@ global_variable gl_uniform_matrix_3x4fv* glUniformMatrix3x4fv;
 global_variable gl_uniform_matrix_4x3fv* glUniformMatrix4x3fv;
 
 #include "platform_opengl.cpp"
-#include "render.cpp"
+//#include "render.cpp"
 
 
 DEBUG_PLATFORM_FREE_FILE_MEMORY(DEBUGPlatformFreeFileMemory)
@@ -776,18 +776,18 @@ Win32DisplayBufferInWindow( game_render_commands* Commands, HDC aDeviceContext, 
 
 		SwapBuffers(aDeviceContext);
 	}else{
-
 		bitmap TargetBitMap = {};
 		TargetBitMap.Width  = GlobalBackBuffer.Width;
 		TargetBitMap.Height = GlobalBackBuffer.Height;
 		TargetBitMap.Pixels = GlobalBackBuffer.Memory;
 
 		// Clear Screen
-		DrawRectangle(&TargetBitMap, 0, 0, (r32)TargetBitMap.Width, (r32)TargetBitMap.Height, 1, 1, 1);
+//		DrawRectangle(&TargetBitMap, 0, 0, (r32)TargetBitMap.Width, (r32)TargetBitMap.Height, 1, 1, 1);
 		
+		// What was here?
 		(&TargetBitMap, 1, 1, (r32)TargetBitMap.Width - 2, (r32)TargetBitMap.Height - 2, 0.3, 0.3, 0.3);
 
-		DrawTriangles( Commands, &TargetBitMap );
+//		DrawTriangles( Commands, &TargetBitMap );
 
 		if(DisplayViaHardware)
 		{

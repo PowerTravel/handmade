@@ -45,16 +45,13 @@ layout (location = 0) in vec4 vPosition;\n\
 uniform mat4 M, V, P;\n\
 \n\
 void main(){\n\
-	//gl_Position = P*V*M*vPosition;\n\
-	//mat4 X = V * P;\n\
-	gl_Position = M*vPosition;\n\
+	gl_Position = P*V*M*vPosition;\n\
 }"
 	};
 
 	global_variable	char FragmentShaderCode[] = 
 	{
 "#version 330 core\n\
-//out vec4 fragColor;\n\
 layout(location = 0) out vec3 fragColor;\n\
 \n\
 void main(){\n\
@@ -436,45 +433,13 @@ void BindTexture(bitmap* Bitmap, b32 IsBackground )
 	}
 }
 
-internal void 
-OpenGlPushRect(const v4* Points, const rect2f* TextureCoordinates, const r32 Brightness  )
+v4 Blend(v4* A, v4* B)
 {
-	r32 TexXMin = 0;
-	r32 TexYMin = 0;
-	r32 TexXMax = 0;
-	r32 TexYMax = 0;
-
-	if(TextureCoordinates)
-	{
-		TexXMin = TextureCoordinates->X;
-		TexYMin = TextureCoordinates->Y;
-		TexXMax = TextureCoordinates->X+TextureCoordinates->W;
-		TexYMax = TextureCoordinates->Y+TextureCoordinates->H;
-	}
-
-	glBegin(GL_TRIANGLES);
-	glTexCoord2f( TexXMin, TexYMin );
-	glColor3f( Brightness, Brightness, Brightness );
-	glVertex3f( Points[0].X,  Points[0].Y, Points[0].Z );
-	glTexCoord2f( TexXMax, TexYMin );
-	glColor3f( Brightness, Brightness, Brightness );
-	glVertex3f( Points[1].X,  Points[1].Y, Points[1].Z );
-	glTexCoord2f( TexXMax, TexYMax );
-	glColor3f( Brightness, Brightness, Brightness );
-	glVertex3f( Points[2].X,  Points[2].Y, Points[2].Z );
-	glEnd(); 
-
-	glBegin(GL_TRIANGLES);
-	glTexCoord2f( TexXMin, TexYMin );
-	glColor3f( Brightness, Brightness, Brightness );
-	glVertex3f( Points[0].X, Points[0].Y, Points[0].Z );
-	glTexCoord2f( TexXMax, TexYMax );
-	glColor3f( Brightness, Brightness, Brightness );
-	glVertex3f( Points[2].X, Points[2].Y, Points[2].Z );
-	glTexCoord2f( TexXMin, TexYMax );
-	glColor3f( Brightness, Brightness, Brightness );
-	glVertex3f( Points[3].X, Points[3].Y, Points[3].Z );
-	glEnd();
+	v4 Result =  V4( A->X * B->X,  
+				     A->Y * B->Y,  
+				     A->Z * B->Z,  
+				     A->W * B->W );
+	return Result;
 }
 
 internal void
@@ -502,21 +467,15 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 	// matrices AND reverse the order of multiplication.
 	// Transpose(A*B) = Transpose(B) * Transpose(A)
 	
-	const m4 V = RenderPushBuffer->ViewMatrix;
-	const m4 P = RenderPushBuffer->ProjectionMatrix;
+	m4 V = RenderPushBuffer->ViewMatrix;
+	m4 P = RenderPushBuffer->ProjectionMatrix;
 
 	opengl_program Prog = Commands->RenderProgram;
-	glUniformMatrix4fv(Prog.UniformModel, 1, GL_TRUE, V.E);
+	glUniformMatrix4fv(Prog.UniformProjection, 1, GL_TRUE, P.E);
 	glUniformMatrix4fv(Prog.UniformView,  1, GL_TRUE, V.E);
-#if 0
-	glMatrixMode(GL_MODELVIEW);
-	glLoadMatrixf( Transpose(V).E );
 
-	m4 glP = Transpose( RenderPushBuffer->ProjectionMatrix );
-
-	glMatrixMode(GL_PROJECTION);
-	glLoadMatrixf(glP.E);	
-#endif
+	v3 LightPosition = V3(0,2,0);
+	v3 LightColor    = V3(0.7,0.7,0.7);
 
 	// For each render group
 	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
@@ -541,7 +500,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 					bitmap* DiffuseMap = Surface->Material->DiffuseMap;
 					if(DiffuseMap)
 					{
-						LoadTexture(DiffuseMap);
+//						LoadTexture(DiffuseMap);
 					}
 				}
 
@@ -571,93 +530,12 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 					M = GetScaleMatrix( V4( 0.5, 0.5, 0.5, 1) );
 					m4 PP = GetTranslationMatrix(V4(c,s,0,0));
 					t+=0.02;
-					glUniformMatrix4fv(Prog.UniformModel, 1, GL_TRUE, (M*PP).E);
+					glUniformMatrix4fv(Prog.UniformModel, 1, GL_TRUE, (PP*M).E);
 					
 					OpenGLDraw( Mesh->VAO, Mesh->Indeces.Count );
-#if 0
-					m4 M = M4Identity();
-					if(Entity->Types & COMPONENT_TYPE_SPATIAL)
-					{
-		 				M = GetAsMatrix( Entity->SpatialComponent );
-					}
 
-					glMatrixMode(GL_MODELVIEW);
-					m4 ModelView = V*M;
-					m4 glModelView = Transpose(ModelView);
-					glLoadMatrixf( glModelView.E );
-
-
-					glMatrixMode(GL_PROJECTION);
-					glLoadMatrixf( glP.E  );
-					m4 P = RenderPushBuffer->ProjectionMatrix;
-
-
-					m4 ProjectionModelView = P*V;
-					for( u32 TriangleIndex = 0; TriangleIndex < Mesh->TriangleCount; ++TriangleIndex)
-					{
-						face* Triangle = &Mesh->Triangles[TriangleIndex];
-						Assert(Triangle->nv == 3);
-
-						v4 v[3]  = {};
-
-						v[0] = MeshData->v[ Triangle->vi[0] ];
-						v[1] = MeshData->v[ Triangle->vi[1] ];
-						v[2] = MeshData->v[ Triangle->vi[2] ];
-
-						r32 LinearColor = 0.3;
-						glBegin(GL_TRIANGLES);
-						glColor3f( LinearColor, 0.f, 0.f );
-						glVertex3f( v[0].X, v[0].Y, v[0].Z );
-						glColor3f( LinearColor, 0.f, 0.f );
-						glVertex3f( v[1].X, v[1].Y, v[1].Z );
-						glColor3f( LinearColor, 0.f, 0.f );
-						glVertex3f( v[2].X, v[2].Y, v[2].Z );
-						glEnd();
-					}
-					#endif
 				}
 			}break;
-			case RENDER_TYPE_FLOOR_TILE:
-			{
-				u8* Head = (u8*)Entry;
-				u8* Body = Head + sizeof(push_buffer_header);
-				
-				entry_type_sprite* SpriteEntry = (entry_type_sprite*) Body;
-				bitmap* Bitmap = SpriteEntry->Bitmap;
-
-				BindTexture(Bitmap, true);
-
-				v4 Translation = GetTranslationFromMatrix(SpriteEntry->M);
-
-				r32 Width  = Index( SpriteEntry->M, 0, 0 );
-				r32 Height = Index( SpriteEntry->M, 1, 1 );
-				r32 Depth  = Index( SpriteEntry->M, 2, 2 );
-
-				v4 v[4] = {};
-				// BottomSquare (Depth = 0,)
-				// Lower Left
-				v[0] = V4(Translation.X, Translation.Y , Translation.Z, 1);
-//				v[0].X = ( 2*v[0].Y + v[0].X ) / 2.f;
-//				v[0].Y = ( 2*v[0].Y - v[0].X ) / 2.f;
-				// Lower Right
-				v[1] = V4(Translation.X + Width, Translation.Y , Translation.Z, 1);
-//				v[1].X = ( 2*v[1].Y + v[1].X ) / 2.f;
-//				v[1].Y = ( 2*v[1].Y - v[1].X ) / 2.f;
-				// Upper Right
-				v[2] = V4(Translation.X + Width, Translation.Y  + Height, Translation.Z, 1);
-//				v[2].X = ( 2*v[2].Y + v[2].X ) / 2.f;
-//				v[2].Y = ( 2*v[2].Y - v[2].X ) / 2.f;
-				// Upper Left
-				v[3] = V4(Translation.X, Translation.Y  + Height, Translation.Z, 1);
-//				v[3].X = ( 2*v[3].Y + v[3].X ) / 2.f;
-//				v[3].Y = ( 2*v[3].Y - v[3].X ) / 2.f;
-
-			
-				r32 Brightness = 0.8;
-
-				OpenGlPushRect( v, SpriteEntry->Coordinates, Brightness  );
-			}break;
-	//		default: Assert(0); break;
 		}
 	}
 
@@ -690,51 +568,12 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 				v[3] = V4(Translation.X - HalfWidth, Translation.Y + HalfHeight, Translation.Z, 1);
 
 				r32 Brightness = 0.8;
-				OpenGlPushRect( v, SpriteEntry->Coordinates, Brightness  );
+//				OpenGlPushRect( v, SpriteEntry->Coordinates, Brightness  );
 
 			}break;
 		}
 	}
-#if 0
-	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
-	{
-		switch(Entry->Type)
-		{
-			case RENDER_TYPE_WIREBOX:
-			{
-				glDisable(GL_DEPTH_TEST);
-				u8* Head = (u8*)Entry;
-				u8* Body = Head + sizeof(push_buffer_header);
 
-				entry_type_wirebox* SpriteEntry = (entry_type_wirebox*) Body;
-				rect2f R = SpriteEntry->Rect;
-				v4 v[4] = {};
-				v[0] = V4(R.X,         R.Y,           0, 1);
-				v[1] = V4(R.X + R.W,   R.Y,           0, 1);
-				v[2] = V4(R.X + R.W,   R.Y  + R.H,    0, 1);
-				v[3] = V4(R.X,         R.Y  + R.H,    0, 1);
-				glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
-
-				glBindTexture(GL_TEXTURE_2D, 0);
-				glColor3f(1, 1, 1);
-				glBegin(GL_TRIANGLES);
-				glVertex3f(v[0].X, v[0].Y, v[0].Z);
-				glVertex3f(v[1].X, v[1].Y, v[1].Z);
-				glVertex3f(v[2].X, v[2].Y, v[2].Z);
-				glEnd();
-
-				glBegin(GL_TRIANGLES);
-				glVertex3f(v[0].X, v[0].Y, v[0].Z);
-				glVertex3f(v[2].X, v[2].Y, v[2].Z);
-				glVertex3f(v[3].X, v[3].Y, v[3].Z);
-				glEnd();
-
-				glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-
-			}break;
-		}
-	}
-#endif
 	Commands->PushBufferSize = 0;
 	Commands->PushBufferElementCount = 0;
 

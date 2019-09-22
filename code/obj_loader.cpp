@@ -1306,10 +1306,10 @@ entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* Me
 	{
 		NewComponents( World, Entity,  COMPONENT_TYPE_SURFACE );
 		component_surface* Surface = Entity->SurfaceComponent;
+		Surface->Material = PushStruct( &World->Arena, material);
 
 		if( OBJGrp->Material->Ka || OBJGrp->Material->Kd || OBJGrp->Material->Ks || OBJGrp->Material->Ns )
 		{
-			Surface->Material = PushStruct( &World->Arena, material);
 			if(OBJGrp->Material->Ka)
 			{
 				Surface->Material->AmbientColor  = *OBJGrp->Material->Ka;

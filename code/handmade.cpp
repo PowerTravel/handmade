@@ -7,7 +7,7 @@
 #include "camera_system.cpp"
 #include "obj_loader.cpp"
 
-#include "render.cpp"
+//#include "render.cpp" // Software rendere, deprecated
 
 #include "render_push_buffer.cpp"
 #include "sprite_mapping.h"
@@ -194,16 +194,16 @@ void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 	LookAt(Camera->CameraComponent, V3(0,0,1), V3(0,1,0));
 
 	Camera->ControllerComponent->Controller = GetController(Input, 1);
-	Camera->ControllerComponent->ControllerMappingFunction = CameraController;
+	Camera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
 
 	GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
 	game_assets* Assets = GameState->World->Assets;
 
-#if 0
+#if 1
 	loaded_obj_file* square = ReadOBJFile(Thread, GameState,
 			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-				 "..\\handmade\\data\\cube.obj" );
+				 "..\\handmade\\data\\cube\\cube.obj" );
 #else
 	loaded_obj_file* square = ReadOBJFile(Thread, GameState,
 		   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,

@@ -85,6 +85,94 @@ void CameraController( entity* CameraEntity )
 	}
 }
 
+void FlyingCameraController( entity* CameraEntity )
+{
+	component_camera* Camera = CameraEntity->CameraComponent;
+	game_controller_input* Controller = CameraEntity->ControllerComponent->Controller;
+	Assert(Camera);
+	Assert(Controller);
+	if( Controller->IsAnalog )
+	{
+		b32 hasMoved = false;
+		r32 dr = 0.05;
+		r32 da = 0.05;
+		r32 Length = 1;
+		
+		if(Controller->RightStickUp.EndedDown)
+		{
+			TranslateCamera(Camera, V3(dr,0,0));
+		}
+		if(Controller->RightStickDown.EndedDown)
+		{
+			TranslateCamera(Camera, V3(-dr,0,0));	
+		}		
+		if(Controller->RightStickLeft.EndedDown)
+		{
+			TranslateCamera(Camera, V3(0,0,-dr));
+		}
+		if(Controller->RightStickRight.EndedDown)
+		{
+			TranslateCamera(Camera, V3(0,0,dr));	
+		}
+		if(Controller->LeftStickUp.EndedDown)
+		{
+			RotateCamera( Camera, da, V3(0,0,1) );
+		}
+		if(Controller->LeftStickDown.EndedDown)
+		{
+			RotateCamera( Camera, -da, V3(0,0,1) );
+		}		
+		if(Controller->LeftStickLeft.EndedDown)
+		{
+			RotateCamera( Camera, da, V3(0,1,0) );
+		}
+		if(Controller->LeftStickRight.EndedDown)
+		{
+			RotateCamera( Camera, -da, V3(0,1,0) );
+		}
+		if(Controller->RightTrigger.EndedDown)
+		{
+			TranslateCamera(Camera, V3(0,0,-dr));
+		}
+		if(Controller->LeftTrigger.EndedDown)
+		{
+			TranslateCamera(Camera, V3( 0, 0, dr));
+		}
+		if(Controller->A.EndedDown)
+		{
+			// at Z, top is Y, X is Right
+			LookAt( Camera, V3(0,0,1),V3(0,0,0));
+		}
+		if(Controller->B.EndedDown)
+		{
+			// at X, top is Y, X is Left
+			LookAt( Camera, Normalize( V3(0,0,1) ),V3(1,1,0), V3(0,0,1));			
+		}
+		if(Controller->X.EndedDown)
+		{
+			// at X, top is Y, X is Left
+	//		LookAt( Camera, V3(0,0,1), V3(0,0,0));
+		}
+		if(Controller->Y.EndedDown)
+		{
+			LookAt( Camera,  V3(1,1,1), V3(0,0,0));
+		}
+		if(Controller->RightShoulder.EndedDown)
+		{
+			r32 NearClippingPlane = -100;
+			r32 FarClippingPlane = 100;
+			SetOrthoProj( Camera, NearClippingPlane, FarClippingPlane, 8, -8, 4.5, -4.5 );
+		}
+		if(Controller->LeftShoulder.EndedDown)
+		{
+			r32 NearClippingPlane = 0.1;
+			r32 FarClippingPlane = 100;
+			SetPerspectiveProj( Camera, NearClippingPlane, FarClippingPlane );
+		}
+	}
+}
+
+
 void HeroController( entity* HeroEntity )
 {
 	game_controller_input* Controller = HeroEntity->ControllerComponent->Controller;

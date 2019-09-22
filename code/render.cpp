@@ -501,7 +501,7 @@ void ClampToOne( v4* A )
 
 void DrawTriangles( game_render_commands* RenderCommands, bitmap* OutputBitMap  )
 {
-#if 0
+#if 1
 	render_push_buffer* PushBuffer = (render_push_buffer*)  RenderCommands->PushBuffer;
 
 	// Get camera matrices
@@ -562,7 +562,7 @@ void DrawTriangles( game_render_commands* RenderCommands, bitmap* OutputBitMap  
 				Fragment.Shininess = 1;
 			}
 
-			Fragment.AmbientColor  = DiffsePremul*Fragment.AmbientColor;
+			Fragment.AmbientColor  = DiffsePremul * Fragment.AmbientColor;
 			Fragment.SpecularColor = (SpecularPremul * (Fragment.Shininess + 8) ) * Fragment.SpecularColor;
 
 			LightQueue.Next();
