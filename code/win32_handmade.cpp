@@ -775,6 +775,12 @@ Win32DisplayBufferInWindow( game_render_commands* Commands, HDC aDeviceContext, 
 		OpenGLRenderGroupToOutput( Commands, aWindowWidth, aWindowHeight );
 
 		SwapBuffers(aDeviceContext);
+
+
+		// TODO (Jakob): Re-implement this again when you have a working softwarerenderer again
+		//               USE SIMD THIS TIME
+		// DisplayBitmapViaOpenGL( u32 Width, u32 Height, void* Memory );
+		// SwapBuffers(aDeviceContext);
 	}else{
 		bitmap TargetBitMap = {};
 		TargetBitMap.Width  = GlobalBackBuffer.Width;

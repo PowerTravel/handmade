@@ -4,13 +4,13 @@
 
 #include "handmade_tile.cpp"
 #include "entity_components.cpp"
-#include "camera_system.cpp"
 #include "obj_loader.cpp"
 
 //#include "render.cpp" // Software rendere, deprecated
 
 #include "render_push_buffer.cpp"
 #include "sprite_mapping.h"
+#include "system_camera.cpp"
 #include "system_spatial.cpp"
 #include "system_sprite_animation.cpp"
 #include "system_controller.cpp"

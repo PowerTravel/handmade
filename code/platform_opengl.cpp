@@ -18,14 +18,14 @@ internal GLuint OpenGLLoadShader( char* SourceCode, GLenum ShaderType )
 	glGetShaderiv(ShaderHandle , GL_COMPILE_STATUS, &Compiled);
 	if( !Compiled )
 	{
-		void* CompileMessage;
+		char* CompileMessage;
 		GLint CompileMessageSize;
 		glGetShaderiv( ShaderHandle, GL_INFO_LOG_LENGTH, &CompileMessageSize );
 		
-		CompileMessage = VirtualAlloc(0, CompileMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-		void* Tmp 	   = VirtualAlloc(0, CompileMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+		CompileMessage = (char*) VirtualAlloc(0, CompileMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+		char* Tmp 	   = (char*) VirtualAlloc(0, CompileMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 		glGetShaderInfoLog(ShaderHandle, CompileMessageSize, NULL, (GLchar*) CompileMessage);
-		snprintf((char*)Tmp, CompileMessageSize, "%s", (char*) CompileMessage);
+		snprintf((char*)Tmp, CompileMessageSize, "%s", CompileMessage);
 		//VirtualFree(CompileMessage, 0, MEM_RELEASE );
 		//VirtualFree(Tmp, 0, MEM_RELEASE );
 		Assert(0);
@@ -38,7 +38,7 @@ internal GLuint OpenGLLoadShader( char* SourceCode, GLenum ShaderType )
 
 opengl_program OpenGLCreateShaderProgram()
 {
-	global_variable	char VertexShaderCode[] = 
+	global_variable	char SimpleVertexShader[] = 
 	{
 "#version  330 core\n\
 layout (location = 0) in vec4 vPosition;\n\
@@ -49,7 +49,7 @@ void main(){\n\
 }"
 	};
 
-	global_variable	char FragmentShaderCode[] = 
+	global_variable	char SimpleFragmentShader[] = 
 	{
 "#version 330 core\n\
 layout(location = 0) out vec3 fragColor;\n\
@@ -59,10 +59,78 @@ void main(){\n\
 }"
 	};
 
+
+	global_variable	char PhongVertexShader[] = 
+	{
+"#version  330 core\n\
+layout (location = 0) in vec4 vPos;\n\
+layout (location = 1) in vec2 tempTex;\n\
+layout (location = 2) in vec3 vNormals;\n\
+uniform mat4 M, V, P; // Model, View, Camera\n\
+uniform vec4 lightPosition;\n\
+\n\
+out vec4 L,E,H,N;\n\
+out float R;\n\
+\n\
+void main()\n\
+{\n\
+	mat4 VM = V*M;\n\
+	vec4 vWorldPos = VM * vPos;\n\
+\n\
+    vec4 vertexToLight = V*lightPosition - vWorldPos;\n\
+	R = length(vertexToLight);\n\
+	L = normalize(vertexToLight);\n\
+	E = normalize(-vWorldPos);\n\
+	H = normalize(L+E);\n\
+	N = normalize(VM*vec4(vNormals,0));\n\
+\n\
+	gl_Position = P*vWorldPos;\n\
+}\n\
+"
+	};
+
+	global_variable	char PhongFragmentShader[] = 
+	{
+"#version 330 core\n\
+out vec4 fragColor;\n\
+\n\
+uniform vec4 ambientProduct, diffuseProduct, specularProduct; \n\
+uniform float attenuation;\n\
+uniform float shininess;\n\
+\n\
+in vec4 L,E,H,N;\n\
+in float R;\n\
+\n\
+void main() \n\
+{ \n\
+	vec4 color = vec4(0,0,0,0);\n\
+	vec4 ambient, diffuse, specular;\n\
+	\n\
+	ambient = ambientProduct;\n\
+\n\
+	float Kd = max(dot(L,N), 0.0);\n\
+	diffuse = Kd*diffuseProduct;\n\
+\n\
+	float Ks = pow(max( dot(N,H), 0.0 ), shininess);\n\
+	specular = Ks * specularProduct;\n\
+\n\
+	if(dot(L,N) < 0.0)\n\
+	{\n\
+		diffuse = vec4(0.0,0.0,0.0,1.0);\n\
+		specular = vec4(0.0, 0.0, 0.0, 1.0);\n\
+	}\n\
+\n\
+	float att = 1/( 1 + attenuation*pow(R,2) );\n\
+	color += ambient+att*(diffuse+specular);\n\
+	fragColor = color;\n\
+}\n\
+"
+	};
+
 	char* SourceCode = NULL;
 
-	GLuint VertexShader   = OpenGLLoadShader( VertexShaderCode,   GL_VERTEX_SHADER   );
-	GLuint FragmentShader = OpenGLLoadShader( FragmentShaderCode, GL_FRAGMENT_SHADER );
+	GLuint VertexShader   = OpenGLLoadShader( PhongVertexShader,   GL_VERTEX_SHADER   );
+	GLuint FragmentShader = OpenGLLoadShader( PhongFragmentShader, GL_FRAGMENT_SHADER );
 
 	
 	GLuint Program = glCreateProgram();
@@ -97,15 +165,18 @@ void main(){\n\
 
 
 	opengl_program Result = {};
-	Result.Program 				   = Program;
+	Result.Program 		     = Program;
 	glUseProgram(Program);
-	Result.UniformModel 		 = glGetUniformLocation(Program, "M");
-	u32 error = glGetError();
-	Result.UniformProjection = glGetUniformLocation(Program, "P");
-	error = glGetError();
-	Result.UniformView 			 = glGetUniformLocation(Program, "V");
-	error = glGetError();
+	Result.M = glGetUniformLocation(Program, "M");
+	Result.P = glGetUniformLocation(Program, "P");
+	Result.V = glGetUniformLocation(Program, "V");
 
+    Result.lightPosition   = glGetUniformLocation(Program, "lightPosition");
+    Result.ambientProduct  = glGetUniformLocation(Program, "ambientProduct");
+    Result.diffuseProduct  = glGetUniformLocation(Program, "diffuseProduct");
+    Result.specularProduct = glGetUniformLocation(Program, "specularProduct");
+    Result.attenuation     = glGetUniformLocation(Program, "attenuation");
+    Result.shininess       = glGetUniformLocation(Program, "shininess");
 	glUseProgram(0);
 	
 	return Result;
@@ -123,7 +194,7 @@ void OpenGLPushDataToArrayBuffer(u32 Slot, u32 Dimension, size_t NrEntries, r32*
 	glBindBuffer( GL_ARRAY_BUFFER, BufferID);
 
 	// Send data to it
-	glBufferData( GL_ARRAY_BUFFER, NrEntries * Dimension * sizeof(GLfloat), Data, GL_STATIC_DRAW);
+	glBufferData( GL_ARRAY_BUFFER, NrEntries * Dimension * sizeof(r32), Data, GL_STATIC_DRAW);
 
 	// Say how to interpret the buffer data
 	glVertexAttribPointer(Slot, Dimension, GL_FLOAT, GL_FALSE, 0, (GLvoid*)NULL);
@@ -133,10 +204,10 @@ void OpenGLPushDataToArrayBuffer(u32 Slot, u32 Dimension, size_t NrEntries, r32*
 }
 
 void OpenGLSendMeshToGPU( u32* VAO,	
-												  u32 NrVertices,  r32* Vertices, 
-											    u32 NrTexCoords, r32* TexCoords, 
-											    u32 NrNormals,   r32* Normals,
-											    u32 NrFaces,     u32* Faces )
+	 u32 NrVertices,  r32* Vertices, 
+	 u32 NrTexCoords, r32* TexCoords, 
+	 u32 NrNormals,   r32* Normals,
+	 u32 NrFaces,     u32* Faces )
 {
 	Assert(Vertices);
 	Assert(Faces);
@@ -435,9 +506,9 @@ void BindTexture(bitmap* Bitmap, b32 IsBackground )
 
 v4 Blend(v4* A, v4* B)
 {
-	v4 Result =  V4( A->X * B->X,  
-				     A->Y * B->Y,  
-				     A->Z * B->Z,  
+	v4 Result =  V4( A->X * B->X,
+				     A->Y * B->Y,
+				     A->Z * B->Z,
 				     A->W * B->W );
 	return Result;
 }
@@ -470,12 +541,21 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 	m4 V = RenderPushBuffer->ViewMatrix;
 	m4 P = RenderPushBuffer->ProjectionMatrix;
 
-	opengl_program Prog = Commands->RenderProgram;
-	glUniformMatrix4fv(Prog.UniformProjection, 1, GL_TRUE, P.E);
-	glUniformMatrix4fv(Prog.UniformView,  1, GL_TRUE, V.E);
+	opengl_program* Prog = &Commands->RenderProgram;
+	glUniformMatrix4fv(Prog->P,  1, GL_TRUE, P.E);
+	glUniformMatrix4fv(Prog->V,  1, GL_TRUE, V.E);
 
-	v3 LightPosition = V3(0,2,0);
-	v3 LightColor    = V3(0.7,0.7,0.7);
+    local_persist float t = 0;
+    r32 s = (r32) sin(t);
+    r32 c = (r32) cos(t);
+    t+=0.02;
+
+    v4 LightPosition = V4(c,2,s,1);
+    r32 Attenuation = 1;
+	glUniform4fv( Prog->lightPosition, 1, LightPosition.E);
+	glUniform1f(  Prog->attenuation, Attenuation);
+
+	v4 LightColor    = V4(1,1,1,1);
 
 	// For each render group
 	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
@@ -497,11 +577,21 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 				if( Entity->Types & COMPONENT_TYPE_SURFACE)
 				{
 					component_surface* Surface = Entity->SurfaceComponent;
-					bitmap* DiffuseMap = Surface->Material->DiffuseMap;
-					if(DiffuseMap)
+                    material* Material =  Surface->Material;
+					
+					if(Material->DiffuseMap)
 					{
 //						LoadTexture(DiffuseMap);
 					}
+                    v4 AmbientColor   = Blend(&LightColor, &Material->AmbientColor);
+                    v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor);
+                    v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor);
+                    
+                    glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
+                    glUniform4fv( Prog->diffuseProduct,  1, DiffuseColor.E);
+                    glUniform4fv( Prog->specularProduct, 1, SpecularColor.E);
+                    glUniform1f( Prog->shininess,   Material->Shininess);
+
 				}
 
 				if(( Entity->Types & COMPONENT_TYPE_MESH ) && 
@@ -518,19 +608,13 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 						OpenGLSendMeshToGPU(  &Mesh->VAO,	
 								MeshData->nv, (r32*) MeshData->v, 
 								0, NULL, 
-								0, NULL,
+								MeshData->nvn, (r32*) MeshData->vn,
 								Mesh->Indeces.Count, Mesh->Indeces.vi );
 					}
 
-
-					local_persist float t = 0;
-					r32 s = (r32) sin(t);
-					r32 c = (r32) cos(t);
 		 			m4 M = GetAsMatrix( Entity->SpatialComponent );
-					M = GetScaleMatrix( V4( 0.5, 0.5, 0.5, 1) );
-					m4 PP = GetTranslationMatrix(V4(c,s,0,0));
-					t+=0.02;
-					glUniformMatrix4fv(Prog.UniformModel, 1, GL_TRUE, (PP*M).E);
+					glUniformMatrix4fv(Prog->M,  1, GL_TRUE, M.E);
+
 					
 					OpenGLDraw( Mesh->VAO, Mesh->Indeces.Count );
 

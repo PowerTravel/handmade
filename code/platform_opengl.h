@@ -99,9 +99,16 @@ struct opengl_info
 struct opengl_program
 {
 	u32 Program;
-	u32 UniformModel;
-	u32 UniformProjection;
-	u32 UniformView;
+	s32 M;
+	s32 P;
+	s32 V;
+
+	s32 lightPosition;
+	s32 ambientProduct;
+	s32 diffuseProduct;
+	s32 specularProduct;
+	s32 attenuation;
+	s32 shininess;
 };
 
 struct opengl_buffer_object
