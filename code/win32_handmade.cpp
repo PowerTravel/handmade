@@ -2068,12 +2068,19 @@ WinMain(	HINSTANCE aInstance,
 														 TempGameCodeLockFullPath);
 
 
-				u32 PushBufferSize =  Megabytes(4);
-
+				u32 PushBufferSize = Megabytes(4);
+				u32 TempBuferSize  = Megabytes(16);
 				platform_memory_block* PushBuffer =  Win32AllocateMemory(PushBufferSize, 0);
+				platform_memory_block* TempBuffer =  Win32AllocateMemory(TempBuferSize, 0);
+
 				game_render_commands RenderCommands = {};
 				RenderCommands.Width = GlobalBackBuffer.Width;
 				RenderCommands.Height = GlobalBackBuffer.Height;
+
+				RenderCommands.MaxTempBufferSize = TempBuferSize;
+				RenderCommands.TempBufferSize = 0;
+				RenderCommands.TempBuffer = (u8*) TempBuffer->Base;
+
 				RenderCommands.MaxPushBufferSize = PushBufferSize;
 				RenderCommands.PushBufferSize = 0;
 				RenderCommands.PushBuffer = (u8*) PushBuffer->Base;

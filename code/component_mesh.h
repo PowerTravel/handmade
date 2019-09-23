@@ -12,17 +12,17 @@ struct mesh_data
 	u32 nvn; 	 // Nr Vertice Normals
 	u32 nvt; 	 // Nr Trxture Vertices 
 
-	v4* v;		 // Vertices
-	v4* vn;		 // Vertice Normals
-	v3* vt; 	 // Texture Vertices
+	v3* v;		 // Vertices
+	v3* vn;		 // Vertice Normals
+	v2* vt; 	 // Texture Vertices
 };
 
 struct mesh_indeces
 {
 	u32 Count;
-	u32* vi; 	// Vertex Indeces,  3 components per triangle
-	u32* ti;  	// Texture Indeces, 2 components per triangle
-	u32* ni;	// Normal Indeces,  1 components per triangle
+	u32* vi; 	// Vertex Indeces
+	u32* ti;  	// Texture Indeces
+	u32* ni;	// Normal Indeces
 };
 
 struct component_mesh

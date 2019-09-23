@@ -201,7 +201,7 @@ void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 	game_assets* Assets = GameState->World->Assets;
 
 #if 1
-	loaded_obj_file* square = ReadOBJFile(Thread, GameState,
+	obj_loaded_file* square = ReadOBJFile(Thread, GameState,
 			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
 				 "..\\handmade\\data\\cube\\cube.obj" );

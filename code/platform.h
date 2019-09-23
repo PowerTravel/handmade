@@ -100,6 +100,10 @@ struct game_render_commands
 
 	opengl_program RenderProgram;
 
+	u32 MaxTempBufferSize;
+	u32 TempBufferSize;
+	u8* TempBuffer;
+
 	u32 MaxPushBufferSize;
 	u32 PushBufferSize;
 	u8* PushBuffer;

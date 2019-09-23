@@ -82,6 +82,15 @@
 #define GL_DYNAMIC_READ                   0x88E9
 #define GL_DYNAMIC_COPY                   0x88EA
 
+#include "vector_math.h"
+
+struct opengl_vertex
+{
+	v3 v;
+	v3 vn;
+	v2 vt;
+};
+
 struct opengl_info
 {
 	b32 ModernContext;

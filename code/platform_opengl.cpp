@@ -41,21 +41,21 @@ opengl_program OpenGLCreateShaderProgram()
 	global_variable	char SimpleVertexShader[] = 
 	{
 "#version  330 core\n\
-layout (location = 0) in vec4 vPosition;\n\
+layout (location = 0) in vec3 vPosition;\n\
 uniform mat4 M, NM, V, P; // Model, NormlModel = Transpose( RigidInverse(M) ), View, Camera \n\
 \n\
 void main(){\n\
-	gl_Position = P*V*M*vPosition;\n\
+	gl_Position = P*V*M*vec4(vPosition,1);\n\
 }"
 	};
 
 	global_variable	char SimpleFragmentShader[] = 
 	{
 "#version 330 core\n\
-layout(location = 0) out vec3 fragColor;\n\
+out vec4 fragColor;\n\
 \n\
 void main(){\n\
-	fragColor = vec3(1, 0, 0);\n\
+	fragColor = vec4(1, 0, 0, 1);\n\
 }"
 	};
 
@@ -63,9 +63,9 @@ void main(){\n\
 	global_variable	char PhongVertexShader[] = 
 	{
 "#version  330 core\n\
-layout (location = 0) in vec4 vPos;\n\
-layout (location = 1) in vec2 tempTex;\n\
-layout (location = 2) in vec4 vNormals;\n\
+layout (location = 0) in vec3 vPos;\n\
+layout (location = 1) in vec3 vNormals;\n\
+layout (location = 2) in vec2 tempTex;\n\
 uniform mat4 M, NM, V, P; // Model, NormlModel = Transpose( RigidInverse(M) ), View, Camera \n\
 uniform vec4 lightPosition;\n\
 \n\
@@ -75,14 +75,14 @@ out float R;\n\
 void main()\n\
 {\n\
 	mat4 VM = V*M;\n\
-	vec4 vWorldPos = VM * vPos;\n\
+	vec4 vWorldPos = VM * vec4(vPos,1);\n\
 \n\
     vec4 vertexToLight = V*lightPosition - vWorldPos;\n\
 	R = length(vertexToLight);\n\
 	L = normalize(vertexToLight);\n\
 	E = normalize(-vWorldPos);\n\
 	H = normalize(L+E);\n\
-	N = normalize(NM*vNormals);\n\
+	N = normalize(NM*vec4(vNormals,0));\n\
 \n\
 	gl_Position = P*vWorldPos;\n\
 }\n\
@@ -121,17 +121,22 @@ void main() \n\
 	}\n\
 \n\
 	float att = 1/( 1 + attenuation*pow(R,2) );\n\
-	color += ambient+att*(diffuse+specular);\n\
+	color = ambient+att*(diffuse+specular);\n\
 	fragColor = color;\n\
+	//fragColor = N;\n\
 }\n\
 "
 	};
 
 	char* SourceCode = NULL;
 
+	#if 1
 	GLuint VertexShader   = OpenGLLoadShader( PhongVertexShader,   GL_VERTEX_SHADER   );
 	GLuint FragmentShader = OpenGLLoadShader( PhongFragmentShader, GL_FRAGMENT_SHADER );
-
+	#else 
+	GLuint VertexShader   = OpenGLLoadShader( SimpleVertexShader,   GL_VERTEX_SHADER   );
+	GLuint FragmentShader = OpenGLLoadShader( SimpleFragmentShader, GL_FRAGMENT_SHADER );
+	#endif
 	
 	GLuint Program = glCreateProgram();
 
@@ -167,10 +172,10 @@ void main() \n\
 	opengl_program Result = {};
 	Result.Program 		     = Program;
 	glUseProgram(Program);
-	Result.M = glGetUniformLocation(Program, "M");
+	Result.M =  glGetUniformLocation(Program, "M");
 	Result.NM = glGetUniformLocation(Program, "NM");
-	Result.P = glGetUniformLocation(Program, "P");
-	Result.V = glGetUniformLocation(Program, "V");
+	Result.P =  glGetUniformLocation(Program, "P");
+	Result.V =  glGetUniformLocation(Program, "V");
 
     Result.lightPosition   = glGetUniformLocation(Program, "lightPosition");
     Result.ambientProduct  = glGetUniformLocation(Program, "ambientProduct");
@@ -183,35 +188,11 @@ void main() \n\
 	return Result;
 } 
 
-void OpenGLPushDataToArrayBuffer(u32 Slot, u32 Dimension, size_t NrEntries, r32* Data )
+void OpenGLSendMeshToGPU( u32* VAO, 
+	 const u32 NrIndeces, const u32* IndexData, const opengl_vertex* VertexData)
 {
-	if(!Data) return;
-
-	// Generate a generic buffer
-	GLuint BufferID;
-	glGenBuffers(1, &BufferID);
-	
-	// Bind the buffer ot the GL_ARRAY_BUFFER slot
-	glBindBuffer( GL_ARRAY_BUFFER, BufferID);
-
-	// Send data to it
-	glBufferData( GL_ARRAY_BUFFER, NrEntries * Dimension * sizeof(r32), Data, GL_STATIC_DRAW);
-
-	// Say how to interpret the buffer data
-	glVertexAttribPointer(Slot, Dimension, GL_FLOAT, GL_FALSE, 0, (GLvoid*)NULL);
-
-	// Enable the Slot
-	glEnableVertexAttribArray(Slot);
-}
-
-void OpenGLSendMeshToGPU( u32* VAO,	
-	 u32 NrVertices,  r32* Vertices, 
-	 u32 NrTexCoords, r32* TexCoords, 
-	 u32 NrNormals,   r32* Normals,
-	 u32 NrFaces,     u32* Faces )
-{
-	Assert(Vertices);
-	Assert(Faces);
+	Assert(VertexData);
+	Assert(IndexData);
 	
 	// Generate vao
 	glGenVertexArrays(1, VAO);
@@ -219,14 +200,28 @@ void OpenGLSendMeshToGPU( u32* VAO,
 	// set it as current one	
 	glBindVertexArray(*VAO);
 
-	OpenGLPushDataToArrayBuffer( 0, 4, NrVertices,  Vertices);
-	OpenGLPushDataToArrayBuffer( 1, 2, NrTexCoords, TexCoords);
-	OpenGLPushDataToArrayBuffer( 2, 4, NrNormals,   Normals);
+	// Generate a generic buffer
+	GLuint DataBuffer;
+	glGenBuffers(1, &DataBuffer);	
+	// Bind the buffer ot the GL_ARRAY_BUFFER slot
+	glBindBuffer( GL_ARRAY_BUFFER, DataBuffer);
+	
+	// Send data to it
+	glBufferData( GL_ARRAY_BUFFER, NrIndeces * sizeof(opengl_vertex), (GLvoid*) VertexData, GL_STATIC_DRAW);
+
+	// Say how to interpret the buffer data
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) NULL);           // Vertecis
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) sizeof(v3) );    // Normals
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) (2*sizeof(v3))); // Textures
+
 
 	GLuint FaceBuffer;
 	glGenBuffers(1, &FaceBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, FaceBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, NrFaces * 3 * sizeof(GLuint), Faces, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, NrIndeces * sizeof(GLuint), IndexData, GL_STATIC_DRAW);
 	
 	glBindVertexArray(0);
 }	
@@ -556,7 +551,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 	glUniform4fv( Prog->lightPosition, 1, LightPosition.E);
 	glUniform1f(  Prog->attenuation, Attenuation);
 
-	v4 LightColor    = V4(0.1,1,0.1,1);
+	v4 LightColor    = V4(0.8,0.8,0.8,1);
 
 	// For each render group
 	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
@@ -601,20 +596,53 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 					Assert(Entity->Types & COMPONENT_TYPE_SPATIAL);
 
 					glDisable( GL_TEXTURE_2D );
-					component_mesh* Mesh = Entity->MeshComponent;
 
-					mesh_data* MeshData = Mesh->Data;
+					component_mesh* Mesh = Entity->MeshComponent;
 					if(!Mesh->VAO)
 					{
-						OpenGLSendMeshToGPU(  &Mesh->VAO,	
-								MeshData->nv, (r32*) MeshData->v, 
-								0, NULL, 
-								MeshData->nvn, (r32*) MeshData->vn,
-								Mesh->Indeces.Count, Mesh->Indeces.vi );
+						mesh_data* MeshData  = Mesh->Data;
+						mesh_indeces Indeces = Mesh->Indeces;
+
+						u32 NrIndeces  = Indeces.Count;
+
+						u32 BytesNeededForVertices = NrIndeces * sizeof(opengl_vertex);
+						opengl_vertex* VertexMemoryStart = (opengl_vertex*) (Commands->TempBuffer + Commands->TempBufferSize);
+						opengl_vertex* VertexMemoryEnd   = (opengl_vertex*) (VertexMemoryStart + BytesNeededForVertices);
+
+
+						u32 BytesNeededForIndeces  = NrIndeces * sizeof(u32);
+						u32* IndexMemoryStart       =  (u32*) VertexMemoryEnd;
+						u32* IndexMemoryEnd         =  (u32*) ( ((u8*)IndexMemoryStart) + BytesNeededForIndeces);
+
+						Assert( (BytesNeededForIndeces + BytesNeededForVertices) < (Commands->MaxTempBufferSize - Commands->TempBufferSize) );
+
+						opengl_vertex* VertexData = (opengl_vertex*) VertexMemoryStart;
+						u32 idx = 0;
+						while( VertexData < VertexMemoryEnd )
+						{
+							u32 VertexIndex  = Indeces.vi[idx];
+							u32 NormalIndex  = Indeces.ni[idx];
+							u32 TextureIndex = Indeces.ti[idx];
+							VertexData->v  = MeshData->v[VertexIndex];
+							VertexData->vn = MeshData->vn[NormalIndex];
+							VertexData->vt = MeshData->vt[TextureIndex];
+							VertexData++;
+							idx++;
+						}
+
+						u32* IndexData = (u32*) IndexMemoryStart;
+						u32 Index = 0;
+						while( IndexData < IndexMemoryEnd )
+						{
+							*(IndexData++) = Index++;
+						}
+
+						OpenGLSendMeshToGPU(  &Mesh->VAO, NrIndeces, IndexMemoryStart, VertexMemoryStart );
 					}
 
 		 			m4 M = GetAsMatrix( Entity->SpatialComponent );
 					glUniformMatrix4fv(Prog->M,  1, GL_TRUE, M.E);
+					glUniformMatrix4fv(Prog->NM,  1, GL_TRUE, Transpose(RigidInverse(M)).E );
 
 					
 					OpenGLDraw( Mesh->VAO, Mesh->Indeces.Count );

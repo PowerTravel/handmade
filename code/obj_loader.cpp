@@ -3,54 +3,6 @@
 #include "utility_macros.h"
 #include "data_containers.h"
 
-struct mtl_material
-{
-	u32 NameLength;
-	char* Name;
-
-	v4 *Kd;
-	v4 *Ka;
-	v4 *Tf;
-	v4 *Ks; 
-	r32 *Ni;
-	r32 *Ns;
-
-	r32 BumpMapBM;
-	bitmap* BumpMap;
-	bitmap* MapKd;
-	bitmap* MapKs;
-};
-
-struct obj_mtl_data
-{
-	u32 MaterialCount;
-	mtl_material* Materials;
-};
-
-struct obj_group
-{
-	u32 GroupNameLength;
-	char* GroupName;
-
-	mesh_indeces Indeces;
-
-	v3 CenterOfMass;
-	v3 BoundingBoxMin;
-	v3 BoundingBoxMax;
-	
-	mtl_material* Material;
-};
-
-struct loaded_obj_file
-{
-	u32 ObjectCount;
-	obj_group* Objects;
-
-	mesh_data* MeshData;
-
-	obj_mtl_data* MaterialData;
-};
-
 v4 ParseNumbers(char* String)
 {
 	char* Start = str::FindFirstNotOf( " \t", String );
@@ -950,7 +902,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
 	return Result;
 }
 
-void SetCenterOfMassAndBoundingBoxToOBJFile( loaded_obj_file* OBJFile, memory_arena* TemporaryArena )
+void SetCenterOfMassAndBoundingBoxToOBJFile( obj_loaded_file* OBJFile, memory_arena* TemporaryArena )
 {
 	mesh_data* MeshData = OBJFile->MeshData;
 	for( u32 GroupIndex = 0; GroupIndex < OBJFile->ObjectCount; ++GroupIndex )
@@ -965,9 +917,9 @@ void SetCenterOfMassAndBoundingBoxToOBJFile( loaded_obj_file* OBJFile, memory_ar
 		mesh_indeces* Indeces = &OBJGroup.Indeces;
 
 		u32 FirstVertexIndex = Indeces->vi[0];
-		v4  FirstVertexOfGroup = MeshData->v[FirstVertexIndex];
-		v3  Max = V3(FirstVertexOfGroup);
-		v3  Min = V3(FirstVertexOfGroup);
+		v3  FirstVertexOfGroup = MeshData->v[FirstVertexIndex];
+		v3  Max = FirstVertexOfGroup;
+		v3  Min = FirstVertexOfGroup;
 
 		for( u32 Index=0; Index < Indeces->Count; ++Index )
 		{
@@ -977,7 +929,7 @@ void SetCenterOfMassAndBoundingBoxToOBJFile( loaded_obj_file* OBJFile, memory_ar
 			{
 				IsVertexCounted[VertexIndex] = true;
 				
-				v4 Vertex = MeshData->v[VertexIndex];
+				v3 Vertex = MeshData->v[VertexIndex];
 
 				Max.X = Max.X > Vertex.X ? Max.X : Vertex.X;
 				Max.Y = Max.Y > Vertex.Y ? Max.Y : Vertex.Y;
@@ -987,7 +939,7 @@ void SetCenterOfMassAndBoundingBoxToOBJFile( loaded_obj_file* OBJFile, memory_ar
 				Min.Y = Min.Y < Vertex.Y ? Min.Y : Vertex.Y;
 				Min.Z = Min.Z < Vertex.Z ? Min.Z : Vertex.Z;
 
-				CenterOfMass += V3( Vertex );
+				CenterOfMass += Vertex;
 				++VertexCount;
 			}
 		}
@@ -1000,15 +952,15 @@ void SetCenterOfMassAndBoundingBoxToOBJFile( loaded_obj_file* OBJFile, memory_ar
 	}
 }
 
-void ScaleObjectToUnitCube( loaded_obj_file* Obj )
+void ScaleObjectToUnitCube( obj_loaded_file* Obj )
 {
 	mesh_data* MeshData = Obj->MeshData;
 
-	v4 MaxAxis = V4(0,0,0,0);
+	v3 MaxAxis = V3(0,0,0);
 	r32 MaxDistance = 0;
 	for( u32 i = 0; i < MeshData->nv; ++i )
 	{
-		v4 Point = MeshData->v[i];
+		v3 Point = MeshData->v[i];
 
 		r32 Distance = Point.X;
 		Distance = GetAbsoluteMax( Distance, Point.Y );
@@ -1028,12 +980,11 @@ void ScaleObjectToUnitCube( loaded_obj_file* Obj )
 
 	for( u32 i = 0; i < MeshData->nv; ++i )
 	{
-		MeshData->v[i] = MeshData->v[i]*MaxDistance; 
-		MeshData->v[i].W = 1;
+		MeshData->v[i] = MeshData->v[i]*MaxDistance;
 	}
 }
 
-loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState, 
+obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState, 
 			   debug_platform_read_entire_file* ReadEntireFile,
 			   debug_platfrom_free_file_memory* FreeEntireFile,
 			   char* FileName)
@@ -1056,9 +1007,9 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 	
 	group_to_parse* ActiveGroup = DefaultGroup;
 
-	fifo_queue<v4> VerticeBuffer 		= fifo_queue<v4>( TempArena );
-	fifo_queue<v4> VerticeNormalBuffer 	= fifo_queue<v4>( TempArena );
-	fifo_queue<v3> TextureVerticeBuffer = fifo_queue<v3>( TempArena );
+	fifo_queue<v3> VerticeBuffer 		= fifo_queue<v3>( TempArena );
+	fifo_queue<v3> VerticeNormalBuffer 	= fifo_queue<v3>( TempArena );
+	fifo_queue<v2> TextureVerticeBuffer = fifo_queue<v2>( TempArena );
 
 	obj_mtl_data* MaterialFile = 0;
 
@@ -1086,11 +1037,10 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 				continue;
 			}break;
 		
-			// Vertices: v x y z [w=1]
+			// Vertices: v x y z
 			case obj_data_types::OBJ_GEOMETRIC_VERTICES:
 			{
-				v4 Vert = ParseNumbers(DataType.String);
-				Vert.W = 1;
+				v3 Vert = V3(ParseNumbers(DataType.String));
 				VerticeBuffer.Push(Vert);
 
 			}break;
@@ -1098,15 +1048,14 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 			// Vertex Normals: vn i j k
 			case obj_data_types::OBJ_VERTEX_NORMALS:
 			{
-				v4 VertNorm = ParseNumbers(DataType.String);
-				VertNorm.W = 0;
+				v3 VertNorm = V3(ParseNumbers(DataType.String));
 				VerticeNormalBuffer.Push(VertNorm);
 			}break;
 
-			// Vertex Textures: vt u v [w=0]
+			// Vertex Textures: vt u v
 			case obj_data_types::OBJ_TEXTURE_VERTICES:
 			{
-				v3 TextureVertice = V3( ParseNumbers(DataType.String) );
+				v2 TextureVertice = V2( ParseNumbers(DataType.String) );
 				TextureVerticeBuffer.Push( TextureVertice );
 			}break;
 
@@ -1187,12 +1136,12 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 
 	memory_arena* AssetArena = &aGameState->AssetArena;
 
-	loaded_obj_file* Result = (loaded_obj_file*) PushStruct( AssetArena, loaded_obj_file );
+	obj_loaded_file* Result = (obj_loaded_file*) PushStruct( AssetArena, obj_loaded_file );
 
 	mesh_data* MeshData = (mesh_data*) PushStruct( AssetArena, mesh_data );
 
 	MeshData->nv = VerticeBuffer.GetSize();
-	MeshData->v = (v4*) PushArray(AssetArena, MeshData->nv, v4);		
+	MeshData->v = (v3*) PushArray(AssetArena, MeshData->nv, v3);		
 	for( u32 Index = 0; Index < MeshData->nv; ++Index )
 	{
 		MeshData->v[Index] = VerticeBuffer.Pop();
@@ -1201,7 +1150,7 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 
 
 	MeshData->nvn = VerticeNormalBuffer.GetSize();
-	MeshData->vn = (v4*) PushArray(AssetArena, MeshData->nvn, v4);
+	MeshData->vn = (v3*) PushArray(AssetArena, MeshData->nvn, v3);
 	for( u32 Index = 0; Index < MeshData->nvn; ++Index )
 	{
 		MeshData->vn[Index] = VerticeNormalBuffer.Pop();
@@ -1210,7 +1159,7 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 
 
 	MeshData->nvt = TextureVerticeBuffer.GetSize();
-	MeshData->vt = (v3*) PushArray(AssetArena, MeshData->nvt, v3);
+	MeshData->vt = (v2*) PushArray(AssetArena, MeshData->nvt, v2);
 	for( u32 Index = 0; Index < MeshData->nvt; ++Index )
 	{
 		MeshData->vt[Index] = TextureVerticeBuffer.Pop();
@@ -1345,7 +1294,7 @@ entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* Me
 	return Entity;
 }
 
-void CreateEntitiesFromOBJFile( world* World, loaded_obj_file* ObjFile )
+void CreateEntitiesFromOBJFile( world* World, obj_loaded_file* ObjFile )
 {
 	for( u32  ObjectIndex = 0; ObjectIndex < ObjFile->ObjectCount; ++ObjectIndex )
 	{
@@ -1358,7 +1307,7 @@ void CreateEntitiesFromOBJFile( world* World, loaded_obj_file* ObjFile )
 #include "mesh.h"
 
 
-ordered_mesh* CreateOrderedMesh( memory_arena* Arena, loaded_obj_file*  LoadedObject )
+ordered_mesh* CreateOrderedMesh( memory_arena* Arena, obj_loaded_file*  LoadedObject )
 {
 	ordered_mesh* Mesh = PushArray(Arena, LoadedObject->ObjectCount, ordered_mesh );
 	return 0;
