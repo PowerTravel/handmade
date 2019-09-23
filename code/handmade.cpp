@@ -134,7 +134,7 @@ void CreateMuroScene(thread_context* Thread, game_memory* Memory, game_input* In
 		entity* Camera = NewEntity( GameState->World );
 		NewComponents( GameState->World, Camera, COMPONENT_TYPE_CAMERA |  COMPONENT_TYPE_CONTROLLER );
 		CreateCameraComponent(Camera->CameraComponent, 60, -0.1, -100, (r32) Buffer->Width, (r32) Buffer->Height );
-		LookAt( Camera->CameraComponent, 10* Normalize( V3(0,0,1) ), V3(0,0,0));
+		LookAt( Camera->CameraComponent, 100* Normalize( V3(0,0,1) ), V3(0,0,0));
 		Camera->ControllerComponent->Controller = GetController( Input, 1 );
 		
 		entity* Light = NewEntity( GameState->World );
@@ -242,10 +242,10 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 
 		game_state* GameState = Memory->GameState;
 
-		GameState->testBMP = *LoadTGA( Thread, &GameState->AssetArena, 
-								Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-								Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-				 "C:\\Users\\Mother Shabobo\\Desktop\\handmade\\data\\blue3.tga");
+//		GameState->testBMP = *LoadTGA( Thread, &GameState->AssetArena, 
+//								Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+//								Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+//				 "C:\\Users\\Mother Shabobo\\Desktop\\handmade\\data\\blue3.tga");
 
 		memory_arena* AssetArena = &GameState->AssetArena;
 		GameState->DepthBuffer = {};
@@ -253,8 +253,8 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_input* Input
 		GameState->DepthBuffer.Height = Buffer->Height;
 		GameState->DepthBuffer.Buffer = PushArray(AssetArena, Buffer->Width*Buffer->Height, r32 );
 
-		CreateCubeScene(Thread, Memory, Input, Buffer);
-		//CreateMuroScene(Thread, Memory, Input, Buffer);
+		//CreateCubeScene(Thread, Memory, Input, Buffer);
+	    CreateMuroScene(Thread, Memory, Input, Buffer);
 
 		for(s32 ControllerIndex = 0; 
 			ControllerIndex < ArrayCount(Input->Controllers); 

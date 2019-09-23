@@ -172,7 +172,7 @@ void UpdateCameraMovement(component_camera* Camera, component_controller* Contro
 	if( Controller->IsAnalog )
 	{
 		b32 hasMoved = false;
-		r32 dr = 0.05;
+		r32 dr = 0.5;
 		r32 da = 0.05;
 		r32 Length = 3;
 		local_persist b32 AngularMovement = false;
