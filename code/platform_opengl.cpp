@@ -42,7 +42,7 @@ opengl_program OpenGLCreateShaderProgram()
 	{
 "#version  330 core\n\
 layout (location = 0) in vec4 vPosition;\n\
-uniform mat4 M, V, P;\n\
+uniform mat4 M, NM, V, P; // Model, NormlModel = Transpose( RigidInverse(M) ), View, Camera \n\
 \n\
 void main(){\n\
 	gl_Position = P*V*M*vPosition;\n\
@@ -65,8 +65,8 @@ void main(){\n\
 "#version  330 core\n\
 layout (location = 0) in vec4 vPos;\n\
 layout (location = 1) in vec2 tempTex;\n\
-layout (location = 2) in vec3 vNormals;\n\
-uniform mat4 M, V, P; // Model, View, Camera\n\
+layout (location = 2) in vec4 vNormals;\n\
+uniform mat4 M, NM, V, P; // Model, NormlModel = Transpose( RigidInverse(M) ), View, Camera \n\
 uniform vec4 lightPosition;\n\
 \n\
 out vec4 L,E,H,N;\n\
@@ -82,7 +82,7 @@ void main()\n\
 	L = normalize(vertexToLight);\n\
 	E = normalize(-vWorldPos);\n\
 	H = normalize(L+E);\n\
-	N = normalize(VM*vec4(vNormals,0));\n\
+	N = normalize(NM*vNormals);\n\
 \n\
 	gl_Position = P*vWorldPos;\n\
 }\n\
@@ -168,6 +168,7 @@ void main() \n\
 	Result.Program 		     = Program;
 	glUseProgram(Program);
 	Result.M = glGetUniformLocation(Program, "M");
+	Result.NM = glGetUniformLocation(Program, "NM");
 	Result.P = glGetUniformLocation(Program, "P");
 	Result.V = glGetUniformLocation(Program, "V");
 
@@ -220,7 +221,7 @@ void OpenGLSendMeshToGPU( u32* VAO,
 
 	OpenGLPushDataToArrayBuffer( 0, 4, NrVertices,  Vertices);
 	OpenGLPushDataToArrayBuffer( 1, 2, NrTexCoords, TexCoords);
-	OpenGLPushDataToArrayBuffer( 2, 3, NrNormals,   Normals);
+	OpenGLPushDataToArrayBuffer( 2, 4, NrNormals,   Normals);
 
 	GLuint FaceBuffer;
 	glGenBuffers(1, &FaceBuffer);
@@ -555,7 +556,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 	glUniform4fv( Prog->lightPosition, 1, LightPosition.E);
 	glUniform1f(  Prog->attenuation, Attenuation);
 
-	v4 LightColor    = V4(1,1,1,1);
+	v4 LightColor    = V4(0.1,1,0.1,1);
 
 	// For each render group
 	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )

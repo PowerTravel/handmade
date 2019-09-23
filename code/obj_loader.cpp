@@ -1266,7 +1266,7 @@ loaded_obj_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 			Indeces->ni    = (u32*) PushArray( AssetArena, Indeces->Count, u32 );
 			for( u32 i = 0; i < Indeces->Count; ++i )
 			{
-				Indeces->ni[i] = ParsedGroup->ni.Pop();			
+				Indeces->ni[i] = ParsedGroup->ni.Pop();	
 			}
 		}
 

@@ -100,6 +100,7 @@ struct opengl_program
 {
 	u32 Program;
 	s32 M;
+	s32 NM;// NoramlModel NM = Transpose( RigidInverse(M) )
 	s32 P;
 	s32 V;
 

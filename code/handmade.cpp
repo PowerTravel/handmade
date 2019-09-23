@@ -191,7 +191,8 @@ void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 	r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
 	r32 FieldOfView =  90;
 	CreateCameraComponent(Camera->CameraComponent, FieldOfView, AspectRatio );
-	LookAt(Camera->CameraComponent, V3(0,0,1), V3(0,1,0));
+
+	LookAt(Camera->CameraComponent, V3(2,2,2), V3(0,0,0));
 
 	Camera->ControllerComponent->Controller = GetController(Input, 1);
 	Camera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
