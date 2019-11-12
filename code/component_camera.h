@@ -44,6 +44,12 @@ void LookAt( component_camera* Camera, v3 aFrom,  v3 aTo,  v3 aTmp = V3(0,1,0) )
 	AssertIdentity(Camera->V * CamToWorld, 0.001 );
 }
 
+v3 GetCameraPosition(const m4* ViewMatrix)
+{
+  	m4 inv = RigidInverse(*ViewMatrix);
+  	return V3(Transpose(inv).r3);
+}
+
 void SetOrthoProj( component_camera* Camera, r32 aNear, r32 aFar, r32 aRight, r32 aLeft, r32 aTop, r32 aBottom )
 {
 	Assert(aNear < 0);

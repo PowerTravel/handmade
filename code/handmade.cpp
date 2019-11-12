@@ -15,8 +15,6 @@
 #include "system_sprite_animation.cpp"
 #include "system_controller.cpp"
 
-//#include "unit_tests.cpp"
-
 // makes the packing compact
 #pragma pack(push, 1)
 struct bmp_header
@@ -205,13 +203,19 @@ void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
 				 "..\\handmade\\data\\cube\\cube.obj" );
+	obj_loaded_file* sphere = ReadOBJFile(Thread, GameState,
+			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+				 "..\\handmade\\data\\sphere.obj" );
+	
+	//CreateEntitiesFromOBJFile( World, square );
+	CreateEntitiesFromOBJFile( World, sphere );
 #else
-	loaded_obj_file* square = ReadOBJFile(Thread, GameState,
+	obj_loaded_file* square = ReadOBJFile(Thread, GameState,
 		   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 			 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
 			 "..\\handmade\\data\\square.obj" );
 #endif
-	CreateEntitiesFromOBJFile( World, square );
 
 	for(u32 Index = 0; Index < World->NrEntities; ++Index)
 	{

@@ -59,6 +59,77 @@ void main(){\n\
 }"
 	};
 
+global_variable	char VertexShaderKEK[] = 
+	{
+"#version  330 core\n\
+layout (location = 0) in vec3 vertice;\n\
+layout (location = 1) in vec3 verticeNormal;\n\
+layout (location = 2) in vec2 unusedTextureCoordinate;\n\
+\n\
+uniform mat4 M;  // Model Matrix - Transforms points from ModelSpace to WorldSpace.\n\
+                 // Includes Translation, Rotation and Scaling\n\
+uniform mat4 NM; // Normal Model Matrix = Transpose( RigidInverse(M) );\n\
+                 // Keeps normals correct under shearing scaling\n\
+uniform mat4 V;  // View Matrix - Camera Position and Orientation in WorldSpace\n\
+uniform mat4 P;  // Projection Matrix - Scales the visible world into the unit cube.\n\
+\n\
+uniform vec4 lightPosition;  // World space\n\
+uniform vec4 cameraPosition; // World space\n\
+\n\
+out vec4  N;  // Normal Vector World Space\n\
+out vec4  L;  // Unit vector of vertex to light in world space;\n\
+out vec4  E;  // Unit vector of vertex to camera in world space;\n\
+out vec4  H;  // Unit vector pointing between between L and E;\n\
+\n\
+//out float r;  // Length of L;\n\
+\n\
+void main()\n\
+{\n\
+	vec4 Vertice = M * vec4(vertice,1);\n\
+	N = normalize( NM * vec4(verticeNormal,0) );\n\
+\n\
+	L = normalize( lightPosition - Vertice );\n\
+\n\
+	E = normalize( cameraPosition - Vertice );\n\
+\n\
+	H = normalize(L+E);\n\
+\n\
+	gl_Position = P*V*Vertice;\n\
+}\n\
+"};
+
+	global_variable	char FragmentShaderKEK[] = 
+	{
+"#version 330 core\n\
+out vec4 fragColor;\n\
+\n\
+uniform vec4 ambientProduct, diffuseProduct, specularProduct; \n\
+uniform float shininess;\n\
+\n\
+in vec4  L;  // Unit vector of vertex to light in world space;\n\
+in vec4  E;  // Unit vector of vertex to camera in world space;\n\
+in vec4  H;  // Unit vector pointing between between L and E;  \n\
+in vec4  N;  // Normal Vector World Space\n\
+\n\
+//  in float attenuation = 1/( 1 + attenuationConstant*pow(r,2) );\n\
+//	fragColor = ambient+attenuation*(diffuse+specular);\n\
+\n\
+\n\
+void main() \n\
+{ \n\
+	vec4 ambient, diffuse, specular;\n\
+	\n\
+	ambient = ambientProduct;\n\
+\n\
+	float Kd = max(dot(L,N), 0.0);\n\
+	diffuse = Kd * diffuseProduct;\n\
+\n\
+	float Ks = pow(max( dot(H,N), 0.0 ), shininess);\n\
+	specular = Kd * Ks * specularProduct;\n\
+\n\
+	fragColor = ambient + diffuse + specular;\n\
+}\n\
+"};
 
 	global_variable	char PhongVertexShader[] = 
 	{
@@ -122,20 +193,20 @@ void main() \n\
 \n\
 	float att = 1/( 1 + attenuation*pow(R,2) );\n\
 	color = ambient+att*(diffuse+specular);\n\
-	fragColor = color;\n\
-	//fragColor = N;\n\
+	//fragColor = color;\n\
+	fragColor = ambient + diffuse + specular;\n\
 }\n\
 "
 	};
 
 	char* SourceCode = NULL;
 
-	#if 1
+	#if 0
 	GLuint VertexShader   = OpenGLLoadShader( PhongVertexShader,   GL_VERTEX_SHADER   );
 	GLuint FragmentShader = OpenGLLoadShader( PhongFragmentShader, GL_FRAGMENT_SHADER );
 	#else 
-	GLuint VertexShader   = OpenGLLoadShader( SimpleVertexShader,   GL_VERTEX_SHADER   );
-	GLuint FragmentShader = OpenGLLoadShader( SimpleFragmentShader, GL_FRAGMENT_SHADER );
+	GLuint VertexShader   = OpenGLLoadShader( VertexShaderKEK,   GL_VERTEX_SHADER   );
+	GLuint FragmentShader = OpenGLLoadShader( FragmentShaderKEK, GL_FRAGMENT_SHADER );
 	#endif
 	
 	GLuint Program = glCreateProgram();
@@ -170,14 +241,16 @@ void main() \n\
 
 
 	opengl_program Result = {};
-	Result.Program 		     = Program;
+	Result.Program = Program;
 	glUseProgram(Program);
+
 	Result.M =  glGetUniformLocation(Program, "M");
 	Result.NM = glGetUniformLocation(Program, "NM");
 	Result.P =  glGetUniformLocation(Program, "P");
 	Result.V =  glGetUniformLocation(Program, "V");
 
     Result.lightPosition   = glGetUniformLocation(Program, "lightPosition");
+    Result.cameraPosition  = glGetUniformLocation(Program, "cameraPosition");
     Result.ambientProduct  = glGetUniformLocation(Program, "ambientProduct");
     Result.diffuseProduct  = glGetUniformLocation(Program, "diffuseProduct");
     Result.specularProduct = glGetUniformLocation(Program, "specularProduct");
@@ -221,15 +294,15 @@ void OpenGLSendMeshToGPU( u32* VAO,
 	GLuint FaceBuffer;
 	glGenBuffers(1, &FaceBuffer);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, FaceBuffer);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, NrIndeces * sizeof(GLuint), IndexData, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, NrIndeces * sizeof(u32), IndexData, GL_STATIC_DRAW);
 	
 	glBindVertexArray(0);
 }	
 
-void OpenGLDraw( u32 VertexArrayObject, u32 nrFaces )
+void OpenGLDraw( u32 VertexArrayObject, u32 nrVertecies )
 {
 	glBindVertexArray( VertexArrayObject );
-	glDrawElements( GL_TRIANGLES, nrFaces, GL_UNSIGNED_INT, (void*)0);
+	glDrawElements( GL_TRIANGLES, nrVertecies, GL_UNSIGNED_INT, (void*)0);
 	glBindVertexArray(0);
 }
 
@@ -549,6 +622,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
     v4 LightPosition = V4(c,2,s,1);
     r32 Attenuation = 1;
 	glUniform4fv( Prog->lightPosition, 1, LightPosition.E);
+	glUniform4fv( Prog->cameraPosition, 1, GetCameraPosition(&V).E);
 	glUniform1f(  Prog->attenuation, Attenuation);
 
 	v4 LightColor    = V4(0.8,0.8,0.8,1);
@@ -579,9 +653,10 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 					{
 //						LoadTexture(DiffuseMap);
 					}
+					u32 SurfaceSmoothnes = 3;
                     v4 AmbientColor   = Blend(&LightColor, &Material->AmbientColor);
-                    v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor);
-                    v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor);
+                    v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
+                    v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
                     
                     glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
                     glUniform4fv( Prog->diffuseProduct,  1, DiffuseColor.E);
@@ -606,43 +681,57 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 						u32 NrIndeces  = Indeces.Count;
 
 						u32 BytesNeededForVertices = NrIndeces * sizeof(opengl_vertex);
-						opengl_vertex* VertexMemoryStart = (opengl_vertex*) (Commands->TempBuffer + Commands->TempBufferSize);
-						opengl_vertex* VertexMemoryEnd   = (opengl_vertex*) (VertexMemoryStart + BytesNeededForVertices);
+						u8* VertexMemoryStart = Commands->TempBuffer + Commands->TempBufferSize;
+						u8* VertexMemoryEnd   = VertexMemoryStart + BytesNeededForVertices;
 
 
 						u32 BytesNeededForIndeces  = NrIndeces * sizeof(u32);
-						u32* IndexMemoryStart       =  (u32*) VertexMemoryEnd;
-						u32* IndexMemoryEnd         =  (u32*) ( ((u8*)IndexMemoryStart) + BytesNeededForIndeces);
+						u8* IndexMemoryStart       =  VertexMemoryEnd;
+						u8* IndexMemoryEnd         =  IndexMemoryStart + BytesNeededForIndeces;
 
 						Assert( (BytesNeededForIndeces + BytesNeededForVertices) < (Commands->MaxTempBufferSize - Commands->TempBufferSize) );
 
-						opengl_vertex* VertexData = (opengl_vertex*) VertexMemoryStart;
+						u8* MemoryScanner = VertexMemoryStart;
 						u32 idx = 0;
-						while( VertexData < VertexMemoryEnd )
+						while( MemoryScanner < VertexMemoryEnd )
 						{
-							u32 VertexIndex  = Indeces.vi[idx];
-							u32 NormalIndex  = Indeces.ni[idx];
-							u32 TextureIndex = Indeces.ti[idx];
-							VertexData->v  = MeshData->v[VertexIndex];
-							VertexData->vn = MeshData->vn[NormalIndex];
-							VertexData->vt = MeshData->vt[TextureIndex];
-							VertexData++;
+							opengl_vertex* VertexData = (opengl_vertex*) MemoryScanner;
+//							if(Indeces.vi)
+//							{
+								u32 VecIndex  = Indeces.vi[idx];
+								VertexData->v  = MeshData->v[VecIndex];
+//							}
+//							if(Indeces.ni)
+//							{
+								u32 NormIndex  = Indeces.ni[idx];
+								VertexData->vn = MeshData->vn[NormIndex];	
+//							}
+//							if(Indeces.ti)
+//							{
+								u32 TexIndex = Indeces.ti[idx];
+								VertexData->vt = MeshData->vt[TexIndex];
+//							}
+							
+							MemoryScanner+=sizeof(opengl_vertex);
 							idx++;
 						}
+						Assert(MemoryScanner == IndexMemoryStart);
 
-						u32* IndexData = (u32*) IndexMemoryStart;
+						
 						u32 Index = 0;
-						while( IndexData < IndexMemoryEnd )
+						while( MemoryScanner < IndexMemoryEnd )
 						{
-							*(IndexData++) = Index++;
+							u32* IndexData = (u32*) MemoryScanner;
+							*IndexData = Index++;
+							MemoryScanner+=sizeof(u32);
 						}
 
-						OpenGLSendMeshToGPU(  &Mesh->VAO, NrIndeces, IndexMemoryStart, VertexMemoryStart );
+						OpenGLSendMeshToGPU(  &Mesh->VAO, NrIndeces, (u32*) IndexMemoryStart, (opengl_vertex*) VertexMemoryStart );
 					}
 
 		 			m4 M = GetAsMatrix( Entity->SpatialComponent );
 					glUniformMatrix4fv(Prog->M,  1, GL_TRUE, M.E);
-					glUniformMatrix4fv(Prog->NM,  1, GL_TRUE, Transpose(RigidInverse(M)).E );
+					glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, Transpose(RigidInverse(M)).E );
 
 					
 					OpenGLDraw( Mesh->VAO, Mesh->Indeces.Count );

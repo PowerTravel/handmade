@@ -973,7 +973,7 @@ void ScaleObjectToUnitCube( obj_loaded_file* Obj )
 		}
 	}
 
-	if(MaxDistance < 1)
+	if(MaxDistance > 0.001)
 	{
 		MaxDistance = 1/MaxDistance;
 	}
@@ -1170,6 +1170,7 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 	Result->ObjectCount = GroupToParse.GetSize();
 	Result->Objects = (obj_group*) PushArray(AssetArena, Result->ObjectCount, obj_group);
 	Result->MeshData    = MeshData;
+	Result->MaterialData = MaterialFile;
 
 	obj_group* NewGroup = Result->Objects;
 	while( !GroupToParse.IsEmpty() )
@@ -1180,15 +1181,16 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 		NewGroup->GroupName = (char*) PushArray( AssetArena, ParsedGroup->GroupNameLength+1, char );
 		str::CopyStrings( ParsedGroup->GroupNameLength, ParsedGroup->GroupName, NewGroup->GroupNameLength, NewGroup->GroupName );
 
-		if(MaterialFile && ParsedGroup->MaterialName )
+		if(Result->MaterialData && ParsedGroup->MaterialName )
 		{
-			for( u32 MaterialIndex = 0; MaterialIndex < MaterialFile->MaterialCount; ++MaterialIndex)
+			for( u32 MaterialIndex = 0; MaterialIndex < Result->MaterialData->MaterialCount; ++MaterialIndex)
 			{
-				mtl_material* mtl =  &MaterialFile->Materials[MaterialIndex];
+				mtl_material* mtl =  &Result->MaterialData->Materials[MaterialIndex];
 				if( str::Equals(ParsedGroup->MaterialName, mtl->Name ) )
 				{
 					NewGroup->Material = mtl;
 				}
+
 			}
 		}
 
@@ -1223,7 +1225,7 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 	}
 
 	Assert( GroupToParse.IsEmpty() );
-
+	ScaleObjectToUnitCube(  Result );
 	SetCenterOfMassAndBoundingBoxToOBJFile(Result, TempArena);
 
 	EndTemporaryMemory(TempMem);
@@ -1236,7 +1238,7 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* MeshData )
 {
 	entity* Entity = NewEntity( World );
-	NewComponents( World, Entity,  COMPONENT_TYPE_MESH | COMPONENT_TYPE_SPATIAL );
+	NewComponents( World, Entity,  COMPONENT_TYPE_MESH | COMPONENT_TYPE_SPATIAL | COMPONENT_TYPE_SURFACE );
 
 	Entity->MeshComponent->Indeces = OBJGrp->Indeces;
 	Entity->MeshComponent->Data = MeshData;
@@ -1251,12 +1253,10 @@ entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* Me
 	Entity->SpatialComponent->Height = Size.Y;
 	Entity->SpatialComponent->Depth  = Size.Z;
 
+	component_surface* Surface = Entity->SurfaceComponent;
+	Surface->Material = PushStruct( &World->Arena, material);
 	if( OBJGrp->Material )
 	{
-		NewComponents( World, Entity,  COMPONENT_TYPE_SURFACE );
-		component_surface* Surface = Entity->SurfaceComponent;
-		Surface->Material = PushStruct( &World->Arena, material);
-
 		if( OBJGrp->Material->Ka || OBJGrp->Material->Kd || OBJGrp->Material->Ks || OBJGrp->Material->Ns )
 		{
 			if(OBJGrp->Material->Ka)
@@ -1289,6 +1289,8 @@ entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* Me
 		}
 
 		Surface->Material->DiffuseMap  = OBJGrp->Material->MapKd;
+	}else{
+		SetMaterial(Surface->Material, MATERIAL_CHROME );
 	}
 
 	return Entity;

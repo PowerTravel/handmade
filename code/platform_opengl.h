@@ -114,6 +114,7 @@ struct opengl_program
 	s32 V;
 
 	s32 lightPosition;
+	s32 cameraPosition;
 	s32 ambientProduct;
 	s32 diffuseProduct;
 	s32 specularProduct;

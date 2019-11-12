@@ -96,82 +96,126 @@ void FlyingCameraController( entity* CameraEntity )
 		b32 hasMoved = false;
 		r32 dr = 0.05;
 		r32 da = 0.05;
-		r32 Length = 1;
-		
-		if(Controller->RightStickUp.EndedDown)
+		r32 Length = 3;
+		local_persist b32 AngularMovement = false;
+		local_persist r32 algular_distance = 0;
+		local_persist s32 BufferFrameCount = 0;
+
+		if(Controller->Start.EndedDown)
 		{
-			TranslateCamera(Camera, V3(dr,0,0));
+			if(BufferFrameCount == 0)
+			{
+				if(!AngularMovement )
+				{
+					m4 CtoW = RigidInverse(Camera->V);
+					v3 P = V3( Transpose(CtoW).r3 ); 
+					algular_distance = Norm(P);
+					AngularMovement = true;
+				}else{
+					AngularMovement = false;
+				}
+				BufferFrameCount = 1;
+			}else{
+				++BufferFrameCount;
+			}
+
+			if(BufferFrameCount > 20)
+			{
+				BufferFrameCount = 0;
+			}
 		}
-		if(Controller->RightStickDown.EndedDown)
-		{
-			TranslateCamera(Camera, V3(-dr,0,0));	
-		}		
-		if(Controller->RightStickLeft.EndedDown)
-		{
-			TranslateCamera(Camera, V3(0,0,-dr));
-		}
-		if(Controller->RightStickRight.EndedDown)
-		{
-			TranslateCamera(Camera, V3(0,0,dr));	
-		}
-		if(Controller->LeftStickUp.EndedDown)
-		{
-			RotateCamera( Camera, da, V3(0,0,1) );
-		}
-		if(Controller->LeftStickDown.EndedDown)
-		{
-			RotateCamera( Camera, -da, V3(0,0,1) );
-		}		
 		if(Controller->LeftStickLeft.EndedDown)
 		{
-			RotateCamera( Camera, da, V3(0,1,0) );
+			TranslateCamera( Camera, V3(-dr,0,0));
+			hasMoved = true;
 		}
 		if(Controller->LeftStickRight.EndedDown)
 		{
-			RotateCamera( Camera, -da, V3(0,1,0) );
+			TranslateCamera( Camera, V3(dr,0,0));
+			hasMoved = true;
+		}
+		if(Controller->LeftStickUp.EndedDown)
+		{
+			TranslateCamera( Camera, V3(0,dr,0));
+			hasMoved = true;
+		}
+		if(Controller->LeftStickDown.EndedDown)
+		{
+			TranslateCamera( Camera, V3(0,-dr,0));
+			hasMoved = true;
+		}
+		if(Controller->RightStickUp.EndedDown)
+		{
+			RotateCamera( Camera, da, V3(1,0,0) );
+			hasMoved = true;
+		}
+		if(Controller->RightStickDown.EndedDown)
+		{
+			RotateCamera( Camera, da, V3(-1,0,0) );
+			hasMoved = true;
+		}		
+		if(Controller->RightStickLeft.EndedDown)
+		{
+			v4 WorldUpCamCoord = Camera->V * V4(0,1,0,0);
+			RotateCamera( Camera, da, V3( WorldUpCamCoord) );
+			hasMoved = true;
+		}
+		if(Controller->RightStickRight.EndedDown)
+		{
+			v4 WorldDownCamCoord = Camera->V * V4(0,-1,0,0);
+			RotateCamera( Camera, da, V3( WorldDownCamCoord ) );
+			hasMoved = true;
 		}
 		if(Controller->RightTrigger.EndedDown)
 		{
 			TranslateCamera(Camera, V3(0,0,-dr));
+			hasMoved = true;
 		}
 		if(Controller->LeftTrigger.EndedDown)
 		{
 			TranslateCamera(Camera, V3( 0, 0, dr));
+			hasMoved = true;
 		}
 		if(Controller->A.EndedDown)
 		{
 			// at Z, top is Y, X is Right
-			LookAt( Camera, V3(0,0,1),V3(0,0,0));
+			LookAt( Camera, Length*V3(0,1,0),V3(0,0,0),V3(0,0,-1));
 		}
 		if(Controller->B.EndedDown)
 		{
 			// at X, top is Y, X is Left
-			LookAt( Camera, Normalize( V3(0,0,1) ),V3(1,1,0), V3(0,0,1));			
+			LookAt( Camera, Length * Normalize( V3(1,0,0) ),V3(0,0,0));			
 		}
 		if(Controller->X.EndedDown)
 		{
 			// at X, top is Y, X is Left
-	//		LookAt( Camera, V3(0,0,1), V3(0,0,0));
+			LookAt( Camera, Length*V3(0,0,1), V3(0,0,0));
 		}
 		if(Controller->Y.EndedDown)
 		{
-			LookAt( Camera,  V3(1,1,1), V3(0,0,0));
+			// at Y, top is X is up, X is Left
+			LookAt( Camera, Length*V3(0,1,1),V3(0,0,0), V3(1,0,0));
 		}
 		if(Controller->RightShoulder.EndedDown)
 		{
-			r32 NearClippingPlane = -100;
-			r32 FarClippingPlane = 100;
-			SetOrthoProj( Camera, NearClippingPlane, FarClippingPlane, 8, -8, 4.5, -4.5 );
+			SetOrthoProj( Camera, -1, 1 );
 		}
 		if(Controller->LeftShoulder.EndedDown)
 		{
-			r32 NearClippingPlane = 0.1;
-			r32 FarClippingPlane = 100;
-			SetPerspectiveProj( Camera, NearClippingPlane, FarClippingPlane );
+			SetPerspectiveProj( Camera, 0.1, 1000 );
+		}
+
+		if(hasMoved)
+		{
+			if(AngularMovement)
+			{
+				UpdateViewMatrixAngularMovement(Camera);
+			}else{
+				UpdateViewMatrix(  Camera );
+			}
 		}
 	}
 }
-
 
 void HeroController( entity* HeroEntity )
 {

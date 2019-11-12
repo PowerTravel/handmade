@@ -291,13 +291,6 @@ struct calculated_color
 // Inputs are in world coordinate space
 calculated_color CalculateColor( v4 Vertice, v4 VerticeNormal, v4 CameraPosition, v4 LightPosition, v4 AmbientProduct, v4 DiffuseProduct, v4 SpecularProduct, r32 Shininess )
 {
-	local_persist r32 t = 0;
-	t += 0.000006;
-	if(t>=10*Pi32)
-	{
-		t-= 10*Pi32;
-	}
-
 	v4 N = Normalize(VerticeNormal);
 	v4 L = Normalize(LightPosition  - Vertice);
 	v4 V = Normalize(CameraPosition - Vertice);
@@ -568,15 +561,15 @@ void DrawTriangles( game_render_commands* RenderCommands, bitmap* OutputBitMap  
 			LightQueue.Next();
 			LightIndex++;
 		};
-			
+
 		// Transform Matrix for points
 		m4& T = RenderGroup->Mesh->T;
 		// Transform Matrix for normals
 		m4 NT = Transpose( RigidInverse(T) );
 
-		component_render_mesh* Mesh = RenderGroup->Mesh;
+		component_render_mesh*  Mesh = RenderGroup->Mesh;
 		u32 NrTrianglesInMesh = Mesh->TriangleCount;
-		mesh_data* MeshData = Mesh->Data;
+		mesh_data* MeshData   = Mesh->Data;
 
 		for( u32 TriangleIndex = 0; TriangleIndex < NrTrianglesInMesh; ++TriangleIndex) 
 		{
