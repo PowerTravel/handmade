@@ -208,8 +208,8 @@ void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
 				 "..\\handmade\\data\\sphere.obj" );
 	
-	//CreateEntitiesFromOBJFile( World, square );
-	CreateEntitiesFromOBJFile( World, sphere );
+	CreateEntitiesFromOBJFile( World, square );
+	//CreateEntitiesFromOBJFile( World, sphere );
 #else
 	obj_loaded_file* square = ReadOBJFile(Thread, GameState,
 		   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,

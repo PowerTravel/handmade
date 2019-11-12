@@ -38,28 +38,8 @@ internal GLuint OpenGLLoadShader( char* SourceCode, GLenum ShaderType )
 
 opengl_program OpenGLCreateShaderProgram()
 {
-	global_variable	char SimpleVertexShader[] = 
-	{
-"#version  330 core\n\
-layout (location = 0) in vec3 vPosition;\n\
-uniform mat4 M, NM, V, P; // Model, NormlModel = Transpose( RigidInverse(M) ), View, Camera \n\
-\n\
-void main(){\n\
-	gl_Position = P*V*M*vec4(vPosition,1);\n\
-}"
-	};
 
-	global_variable	char SimpleFragmentShader[] = 
-	{
-"#version 330 core\n\
-out vec4 fragColor;\n\
-\n\
-void main(){\n\
-	fragColor = vec4(1, 0, 0, 1);\n\
-}"
-	};
-
-global_variable	char VertexShaderKEK[] = 
+global_variable	char VertexShaderCode[] = 
 	{
 "#version  330 core\n\
 layout (location = 0) in vec3 vertice;\n\
@@ -73,141 +53,62 @@ uniform mat4 NM; // Normal Model Matrix = Transpose( RigidInverse(M) );\n\
 uniform mat4 V;  // View Matrix - Camera Position and Orientation in WorldSpace\n\
 uniform mat4 P;  // Projection Matrix - Scales the visible world into the unit cube.\n\
 \n\
+// Premultiplied color values\n\
+uniform vec4 ambientProduct, diffuseProduct, specularProduct; \n\
+\n\
 uniform vec4 lightPosition;  // World space\n\
 uniform vec4 cameraPosition; // World space\n\
 \n\
-out vec4  N;  // Normal Vector World Space\n\
-out vec4  L;  // Unit vector of vertex to light in world space;\n\
-out vec4  E;  // Unit vector of vertex to camera in world space;\n\
-out vec4  H;  // Unit vector pointing between between L and E;\n\
+uniform float shininess; // Shininess of material\n\
+\n\
+out float Kd; // Diffuse angle cos-value\n\
+out float Ks; // Specular angle cos-value\n\
 \n\
 //out float r;  // Length of L;\n\
 \n\
+out vec4 vertexColor;\n\
+\n\
 void main()\n\
 {\n\
+\n\
+// Variable Descriptions:\n\
+// N [Normal Vector], Object Space\n\
+// L [Light Vector] Unit vector of vertex to light in world space;\n\
+// E [Eye Vector]   Unit vector of vertex to camera in world space;\n\
+// H [Half Vector]  Unit vector pointing between between L and E;\n\
+\n\
 	vec4 Vertice = M * vec4(vertice,1);\n\
-	N = normalize( NM * vec4(verticeNormal,0) );\n\
+	vec4 N = normalize( NM * vec4(verticeNormal,0) );\n\
+	vec4 L = normalize( lightPosition - Vertice );\n\
+	Kd = max(dot(L,N), 0.0);\n\
 \n\
-	L = normalize( lightPosition - Vertice );\n\
+	vec4 E = normalize( cameraPosition - Vertice );\n\
+	vec4 H = normalize(L+E);\n\
+	Ks = pow(max( dot(H,N), 0.0 ), shininess);\n\
 \n\
-	E = normalize( cameraPosition - Vertice );\n\
 \n\
-	H = normalize(L+E);\n\
+	vertexColor = ambientProduct + Kd*(diffuseProduct + Ks*specularProduct);\n\
 \n\
 	gl_Position = P*V*Vertice;\n\
 }\n\
 "};
 
-	global_variable	char FragmentShaderKEK[] = 
+	global_variable	char FragmentShaderCode[] = 
 	{
 "#version 330 core\n\
+in vec4  vertexColor;\n\
 out vec4 fragColor;\n\
 \n\
-uniform vec4 ambientProduct, diffuseProduct, specularProduct; \n\
-uniform float shininess;\n\
-\n\
-in vec4  L;  // Unit vector of vertex to light in world space;\n\
-in vec4  E;  // Unit vector of vertex to camera in world space;\n\
-in vec4  H;  // Unit vector pointing between between L and E;  \n\
-in vec4  N;  // Normal Vector World Space\n\
-\n\
-//  in float attenuation = 1/( 1 + attenuationConstant*pow(r,2) );\n\
-//	fragColor = ambient+attenuation*(diffuse+specular);\n\
-\n\
-\n\
 void main() \n\
-{ \n\
-	vec4 ambient, diffuse, specular;\n\
-	\n\
-	ambient = ambientProduct;\n\
-\n\
-	float Kd = max(dot(L,N), 0.0);\n\
-	diffuse = Kd * diffuseProduct;\n\
-\n\
-	float Ks = pow(max( dot(H,N), 0.0 ), shininess);\n\
-	specular = Kd * Ks * specularProduct;\n\
-\n\
-	fragColor = ambient + diffuse + specular;\n\
+{\n\
+	fragColor = vertexColor;\n\
 }\n\
 "};
 
-	global_variable	char PhongVertexShader[] = 
-	{
-"#version  330 core\n\
-layout (location = 0) in vec3 vPos;\n\
-layout (location = 1) in vec3 vNormals;\n\
-layout (location = 2) in vec2 tempTex;\n\
-uniform mat4 M, NM, V, P; // Model, NormlModel = Transpose( RigidInverse(M) ), View, Camera \n\
-uniform vec4 lightPosition;\n\
-\n\
-out vec4 L,E,H,N;\n\
-out float R;\n\
-\n\
-void main()\n\
-{\n\
-	mat4 VM = V*M;\n\
-	vec4 vWorldPos = VM * vec4(vPos,1);\n\
-\n\
-    vec4 vertexToLight = V*lightPosition - vWorldPos;\n\
-	R = length(vertexToLight);\n\
-	L = normalize(vertexToLight);\n\
-	E = normalize(-vWorldPos);\n\
-	H = normalize(L+E);\n\
-	N = normalize(NM*vec4(vNormals,0));\n\
-\n\
-	gl_Position = P*vWorldPos;\n\
-}\n\
-"
-	};
-
-	global_variable	char PhongFragmentShader[] = 
-	{
-"#version 330 core\n\
-out vec4 fragColor;\n\
-\n\
-uniform vec4 ambientProduct, diffuseProduct, specularProduct; \n\
-uniform float attenuation;\n\
-uniform float shininess;\n\
-\n\
-in vec4 L,E,H,N;\n\
-in float R;\n\
-\n\
-void main() \n\
-{ \n\
-	vec4 color = vec4(0,0,0,0);\n\
-	vec4 ambient, diffuse, specular;\n\
-	\n\
-	ambient = ambientProduct;\n\
-\n\
-	float Kd = max(dot(L,N), 0.0);\n\
-	diffuse = Kd*diffuseProduct;\n\
-\n\
-	float Ks = pow(max( dot(N,H), 0.0 ), shininess);\n\
-	specular = Ks * specularProduct;\n\
-\n\
-	if(dot(L,N) < 0.0)\n\
-	{\n\
-		diffuse = vec4(0.0,0.0,0.0,1.0);\n\
-		specular = vec4(0.0, 0.0, 0.0, 1.0);\n\
-	}\n\
-\n\
-	float att = 1/( 1 + attenuation*pow(R,2) );\n\
-	color = ambient+att*(diffuse+specular);\n\
-	//fragColor = color;\n\
-	fragColor = ambient + diffuse + specular;\n\
-}\n\
-"
-	};
-
 	char* SourceCode = NULL;
 
-	#if 0
-	GLuint VertexShader   = OpenGLLoadShader( PhongVertexShader,   GL_VERTEX_SHADER   );
-	GLuint FragmentShader = OpenGLLoadShader( PhongFragmentShader, GL_FRAGMENT_SHADER );
-	#else 
-	GLuint VertexShader   = OpenGLLoadShader( VertexShaderKEK,   GL_VERTEX_SHADER   );
-	GLuint FragmentShader = OpenGLLoadShader( FragmentShaderKEK, GL_FRAGMENT_SHADER );
-	#endif
+	GLuint VertexShader   = OpenGLLoadShader( VertexShaderCode,   GL_VERTEX_SHADER   );
+	GLuint FragmentShader = OpenGLLoadShader( FragmentShaderCode, GL_FRAGMENT_SHADER );
 	
 	GLuint Program = glCreateProgram();
 
