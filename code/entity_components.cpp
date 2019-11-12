@@ -65,3 +65,10 @@ entity* NewEntity( world* World )
 	return NewEntity;
 }
 
+entity* CreateCameraEntity(world* World, r32 AngleOfView, r32 AspectRatio )
+{
+	entity* CameraEntity = NewEntity( World );
+	NewComponents( World, CameraEntity, COMPONENT_TYPE_CAMERA );
+	SetCameraComponent(CameraEntity->CameraComponent, AngleOfView, AspectRatio );
+	return CameraEntity;
+}

@@ -483,6 +483,62 @@ v4 Blend(v4* A, v4* B)
 	return Result;
 }
 
+void PushGeometryToOpenGL( game_render_commands* Commands, component_mesh* Mesh)
+{
+	mesh_data* MeshData  = Mesh->Data;
+	mesh_indeces Indeces = Mesh->Indeces;
+
+	u32 NrIndeces  = Indeces.Count;
+
+	u32 BytesNeededForVertices = NrIndeces * sizeof(opengl_vertex);
+	u8* VertexMemoryStart = Commands->TempBuffer + Commands->TempBufferSize;
+	u8* VertexMemoryEnd   = VertexMemoryStart + BytesNeededForVertices;
+
+
+	u32 BytesNeededForIndeces  = NrIndeces * sizeof(u32);
+	u8* IndexMemoryStart       =  VertexMemoryEnd;
+	u8* IndexMemoryEnd         =  IndexMemoryStart + BytesNeededForIndeces;
+
+	Assert( (BytesNeededForIndeces + BytesNeededForVertices) < (Commands->MaxTempBufferSize - Commands->TempBufferSize) );
+
+	u8* MemoryScanner = VertexMemoryStart;
+	u32 idx = 0;
+	while( MemoryScanner < VertexMemoryEnd )
+	{
+		opengl_vertex* VertexData = (opengl_vertex*) MemoryScanner;
+		if(Indeces.vi)
+		{
+			u32 VecIndex  = Indeces.vi[idx];
+			VertexData->v  = MeshData->v[VecIndex];
+		}
+		if(Indeces.ni)
+		{
+			u32 NormIndex  = Indeces.ni[idx];
+			VertexData->vn = MeshData->vn[NormIndex];	
+		}
+		if(Indeces.ti)
+		{
+			u32 TexIndex = Indeces.ti[idx];
+			VertexData->vt = MeshData->vt[TexIndex];
+		}
+		
+		MemoryScanner+=sizeof(opengl_vertex);
+		idx++;
+	}
+	Assert(MemoryScanner == IndexMemoryStart);
+
+	
+	u32 Index = 0;
+	while( MemoryScanner < IndexMemoryEnd )
+	{
+		u32* IndexData = (u32*) MemoryScanner;
+		*IndexData = Index++;
+		MemoryScanner+=sizeof(u32);
+	}
+
+	OpenGLSendMeshToGPU(  &Mesh->VAO, NrIndeces, (u32*) IndexMemoryStart, (opengl_vertex*) VertexMemoryStart );
+}
+
 internal void
 OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 WindowHeight )
 {
@@ -507,7 +563,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 	// Our math library uses Row major convention which means we need to transpose the 
 	// matrices AND reverse the order of multiplication.
 	// Transpose(A*B) = Transpose(B) * Transpose(A)
-	
 	m4 V = RenderPushBuffer->ViewMatrix;
 	m4 P = RenderPushBuffer->ProjectionMatrix;
 
@@ -515,41 +570,46 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 	glUniformMatrix4fv(Prog->P,  1, GL_TRUE, P.E);
 	glUniformMatrix4fv(Prog->V,  1, GL_TRUE, V.E);
 
-    local_persist float t = 0;
-    r32 s = (r32) sin(t);
-    r32 c = (r32) cos(t);
-    t+=0.02;
-
-    v4 LightPosition = V4(c,2,s,1);
     r32 Attenuation = 1;
-	glUniform4fv( Prog->lightPosition, 1, LightPosition.E);
+	
 	glUniform4fv( Prog->cameraPosition, 1, GetCameraPosition(&V).E);
 	glUniform1f(  Prog->attenuation, Attenuation);
 
-	v4 LightColor    = V4(0.8,0.8,0.8,1);
+	v4 LightColor    = V4(0,0,0,1);
 
 	// For each render group
 	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
 	{
+		u8* Head = (u8*) Entry;
+		u8* Body = Head + sizeof(push_buffer_header);
 		switch(Entry->Type)
 		{
-			case RENDER_TYPE_ENTITY:
+			case RENDER_TYPE_LIGHT:
 			{
-				u8* Head = (u8*) Entry;
-				u8* Body = Head + sizeof(push_buffer_header);
+				entry_type_light* Light = (entry_type_light*) Body;
+				glUniform4fv( Prog->lightPosition,  1, (Light->M * V4(0,0,0,1)).E);
+				LightColor    = Light->Color;
+			}break;
 
-				entity* Entity = ( (entry_type_entity*) Body)->Entity;
+			case RENDER_TYPE_MESH:
+			{
+				entry_type_mesh* MeshEntry = (entry_type_mesh*) Body;
 
-				if( Entity->Types & COMPONENT_TYPE_LIGHT )
+				glUniformMatrix4fv(Prog->M,  1, GL_TRUE, MeshEntry->M.E);
+				glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, MeshEntry->NM.E);;
+
+				glDisable( GL_TEXTURE_2D );
+
+				if(!MeshEntry->Mesh->VAO)
 				{
-
+					PushGeometryToOpenGL(Commands, MeshEntry->Mesh);
 				}
 
-				if( Entity->Types & COMPONENT_TYPE_SURFACE)
+				if( MeshEntry->Surface )
 				{
-					component_surface* Surface = Entity->SurfaceComponent;
+					component_surface* Surface = MeshEntry->Surface;
                     material* Material =  Surface->Material;
-					
+  					
 					if(Material->DiffuseMap)
 					{
 //						LoadTexture(DiffuseMap);
@@ -565,79 +625,9 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
                     glUniform1f( Prog->shininess,   Material->Shininess);
 
 				}
-
-				if(( Entity->Types & COMPONENT_TYPE_MESH ) && 
-					 ( Entity->Types & COMPONENT_TYPE_SPATIAL ))
-				{
-					Assert(Entity->Types & COMPONENT_TYPE_SPATIAL);
-
-					glDisable( GL_TEXTURE_2D );
-
-					component_mesh* Mesh = Entity->MeshComponent;
-					if(!Mesh->VAO)
-					{
-						mesh_data* MeshData  = Mesh->Data;
-						mesh_indeces Indeces = Mesh->Indeces;
-
-						u32 NrIndeces  = Indeces.Count;
-
-						u32 BytesNeededForVertices = NrIndeces * sizeof(opengl_vertex);
-						u8* VertexMemoryStart = Commands->TempBuffer + Commands->TempBufferSize;
-						u8* VertexMemoryEnd   = VertexMemoryStart + BytesNeededForVertices;
-
-
-						u32 BytesNeededForIndeces  = NrIndeces * sizeof(u32);
-						u8* IndexMemoryStart       =  VertexMemoryEnd;
-						u8* IndexMemoryEnd         =  IndexMemoryStart + BytesNeededForIndeces;
-
-						Assert( (BytesNeededForIndeces + BytesNeededForVertices) < (Commands->MaxTempBufferSize - Commands->TempBufferSize) );
-
-						u8* MemoryScanner = VertexMemoryStart;
-						u32 idx = 0;
-						while( MemoryScanner < VertexMemoryEnd )
-						{
-							opengl_vertex* VertexData = (opengl_vertex*) MemoryScanner;
-							if(Indeces.vi)
-							{
-								u32 VecIndex  = Indeces.vi[idx];
-								VertexData->v  = MeshData->v[VecIndex];
-							}
-							if(Indeces.ni)
-							{
-								u32 NormIndex  = Indeces.ni[idx];
-								VertexData->vn = MeshData->vn[NormIndex];	
-							}
-							if(Indeces.ti)
-							{
-								u32 TexIndex = Indeces.ti[idx];
-								VertexData->vt = MeshData->vt[TexIndex];
-							}
-							
-							MemoryScanner+=sizeof(opengl_vertex);
-							idx++;
-						}
-						Assert(MemoryScanner == IndexMemoryStart);
-
-						
-						u32 Index = 0;
-						while( MemoryScanner < IndexMemoryEnd )
-						{
-							u32* IndexData = (u32*) MemoryScanner;
-							*IndexData = Index++;
-							MemoryScanner+=sizeof(u32);
-						}
-
-						OpenGLSendMeshToGPU(  &Mesh->VAO, NrIndeces, (u32*) IndexMemoryStart, (opengl_vertex*) VertexMemoryStart );
-					}
-
-		 			m4 M = GetAsMatrix( Entity->SpatialComponent );
-					glUniformMatrix4fv(Prog->M,  1, GL_TRUE, M.E);
-					glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, Transpose(RigidInverse(M)).E );
-
-					
-					OpenGLDraw( Mesh->VAO, Mesh->Indeces.Count );
-
-				}
+				
+				OpenGLDraw( MeshEntry->Mesh->VAO, MeshEntry->Mesh->Indeces.Count );
+			
 			}break;
 		}
 	}

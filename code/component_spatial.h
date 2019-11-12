@@ -24,7 +24,6 @@ GetAsMatrix( component_spatial* SpatialComponent )
 	if( ! SpatialComponent )
 	{
 		INVALID_CODE_PATH
-		return M4Identity();
 	}
 
 	m4 RotationMatrix = GetRotationMatrix(SpatialComponent->RotationAngle, V4( SpatialComponent->RotationAxis, 0 ) );
@@ -42,7 +41,6 @@ GetBoundingBox( component_spatial* SpatialComponent )
 	if( ! SpatialComponent )
 	{
 		INVALID_CODE_PATH
-		return {};
 	}
 	v3 Pos = SpatialComponent->Position;
 	v3 Dim = V3(SpatialComponent->Width, SpatialComponent->Height, SpatialComponent->Depth);

@@ -28,7 +28,6 @@ struct mesh_indeces
 struct component_mesh
 {
 	u32 VAO;
-
 	mesh_data* Data;
 	mesh_indeces Indeces;
 };

@@ -4,18 +4,29 @@
 #include "entity_components.h"
 #include "component_camera.h"
 #include "component_surface.h"
+#include "component_light.h"
 
 enum render_type
 {
-	RENDER_TYPE_ENTITY,
+	RENDER_TYPE_LIGHT,
+	RENDER_TYPE_MESH,
 	RENDER_TYPE_SPRITE,
 	RENDER_TYPE_FLOOR_TILE,
 	RENDER_TYPE_WIREBOX
 };
 
-struct entry_type_entity
+struct entry_type_light
 {
-	entity* Entity;
+	v4 Color;
+	m4 M;
+};
+
+struct entry_type_mesh
+{
+	component_mesh* Mesh;
+	component_surface* Surface;
+	m4 M;
+	m4 NM;
 };
 
 struct entry_type_sprite

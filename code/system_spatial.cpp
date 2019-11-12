@@ -1035,6 +1035,17 @@ void SpatialSystemUpdate( world* World )
 	{
 		entity* E = &World->Entities[Index];
 
+		if(( E->Types & COMPONENT_TYPE_SPATIAL ) &&
+			( E->Types & COMPONENT_TYPE_LIGHT ))
+		{
+			local_persist float t = 0;
+    		r32 s = (r32) sin(t);
+    		r32 c = (r32) cos(t);
+    		t+=0.02;
+
+			E->SpatialComponent->Position = V3(c,2,s);
+		}
+
 		if( E->Types & COMPONENT_TYPE_SPATIAL )
 		{
 			//DoReflectionCollision(Arena, TileMap,  E, dt);

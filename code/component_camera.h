@@ -44,10 +44,10 @@ void LookAt( component_camera* Camera, v3 aFrom,  v3 aTo,  v3 aTmp = V3(0,1,0) )
 	AssertIdentity(Camera->V * CamToWorld, 0.001 );
 }
 
-v3 GetCameraPosition(const m4* ViewMatrix)
+v3 GetCameraPosition( const m4* ViewMatrix )
 {
   	m4 inv = RigidInverse(*ViewMatrix);
-  	return V3(Transpose(inv).r3);
+  	return V3(Column(Transpose(inv),3));
 }
 
 void SetOrthoProj( component_camera* Camera, r32 aNear, r32 aFar, r32 aRight, r32 aLeft, r32 aTop, r32 aBottom )
@@ -117,20 +117,16 @@ void SetPerspectiveProj( component_camera* Camera, r32 n, r32 f )
 	SetPerspectiveProj( Camera, n, f, r, l, t, b );
 } 
 
-
-void CreateCameraComponent(component_camera* Camera, r32 AngleOfView, r32 AspectRatio )
+void SetCameraComponent(component_camera* Camera, r32 AngleOfView, r32 AspectRatio )
 {
-	Assert(Camera);
-
 	Camera->AngleOfView  = AngleOfView;
 	Camera->AspectRatio = AspectRatio;
 	Camera->DeltaRot = M4Identity();
 	Camera->DeltaPos = V3(0,0,0);
 	Camera->V = M4Identity();
 	Camera->P = M4Identity();
-	SetPerspectiveProj( Camera, 0.1, 100 );
+	SetPerspectiveProj( Camera, 0.1, 1000 );
 }
-
 
 void gluPerspective(
 	const r32& angleOfView, const r32& imageAspectRatio,

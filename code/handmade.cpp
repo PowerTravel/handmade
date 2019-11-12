@@ -182,18 +182,19 @@ void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 
 	GameState->World = AllocateWorld(256);
 	world* World = GameState->World;
-	entity* Camera = NewEntity( World );
-
-
-	NewComponents( World, Camera, COMPONENT_TYPE_CAMERA | COMPONENT_TYPE_CONTROLLER );
+	
 	r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
 	r32 FieldOfView =  90;
-	CreateCameraComponent(Camera->CameraComponent, FieldOfView, AspectRatio );
-
+	entity* Camera = CreateCameraEntity(World, FieldOfView, AspectRatio);
 	LookAt(Camera->CameraComponent, V3(2,2,2), V3(0,0,0));
 
+	NewComponents( World, Camera, COMPONENT_TYPE_CONTROLLER );
 	Camera->ControllerComponent->Controller = GetController(Input, 1);
 	Camera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
+
+	entity* Light = NewEntity( World );
+	NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
+	Light->LightComponent->Color = V4(1,1,1,1);
 
 	GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
 	game_assets* Assets = GameState->World->Assets;
@@ -212,17 +213,7 @@ void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 				 "..\\handmade\\data\\sphere.obj" );
 	
 	//CreateEntitiesFromOBJFile( World, square );
-	CreateEntitiesFromOBJFile( World, box );
-
-	for(u32 Index = 0; Index < World->NrEntities; ++Index)
-	{
-		entity* Entity = &World->Entities[Index];
-		if( Entity->Types & COMPONENT_TYPE_MESH )
-		{
-//			Memory->PlatformAPI.ToGPU();
-		}
- 	}
-
+	CreateEntitiesFromOBJFile( World, sphere );
 }
 
 void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
@@ -239,15 +230,14 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 	r32 TilesPerScreenWidth  = 16;
 	r32 TilesPerScreenHeight = 9;
 
-	entity* Camera = NewEntity( World );
-	NewComponents( World, Camera, COMPONENT_TYPE_CAMERA | COMPONENT_TYPE_CONTROLLER );
+
 	r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
 	r32 FieldOfView =  90;
-	CreateCameraComponent(Camera->CameraComponent, FieldOfView, AspectRatio );
+	entity* Camera = CreateCameraEntity(World, FieldOfView, AspectRatio);
 	LookAt(Camera->CameraComponent, V3(TilesPerScreenWidth/2, TilesPerScreenHeight/2, 1), V3(TilesPerScreenWidth/2, TilesPerScreenHeight/2, 0));
 	SetOrthoProj( Camera->CameraComponent, -100, 100, TilesPerScreenWidth/2, -TilesPerScreenWidth/2, TilesPerScreenHeight/2, -TilesPerScreenHeight/2 );
 
-
+	NewComponents( World, Camera, COMPONENT_TYPE_CONTROLLER );
 	Camera->ControllerComponent->Controller = GetController(Input, 1);
 	Camera->ControllerComponent->ControllerMappingFunction = CameraController;
 

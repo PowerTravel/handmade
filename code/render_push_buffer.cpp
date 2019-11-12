@@ -8,9 +8,13 @@ u8* PushNewHeader(game_render_commands* RenderCommands, push_buffer_header** Pre
 	u32 TypeSize = 0;
 	switch(Type)
 	{
-		case RENDER_TYPE_ENTITY:
+		case RENDER_TYPE_LIGHT:
 		{
-			TypeSize = sizeof(entry_type_entity);
+			TypeSize = sizeof(entry_type_light);
+		}break;
+		case RENDER_TYPE_MESH:
+		{
+			TypeSize = sizeof(entry_type_mesh);
 		}break;
 		case RENDER_TYPE_SPRITE:
 		{
@@ -73,6 +77,35 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 
 	push_buffer_header* PreviousEntry = 0;
 
+	// TODO: Make a proper entity library so we can extracl for example ALL Lights efficiently
+	//       So we don't have to loop over ALL entitis several times
+
+	// Firs push camera
+	for(u32 Index = 0; Index <  World->NrEntities; ++Index )
+	{
+		entity* Entity = &World->Entities[Index];
+
+		if( Entity->Types & COMPONENT_TYPE_CAMERA )
+		{
+			PushBuffer->ProjectionMatrix = Entity->CameraComponent->P;
+			PushBuffer->ViewMatrix       = Entity->CameraComponent->V;
+		}
+	}
+
+	// Then push all the lights
+	for(u32 Index = 0; Index <  World->NrEntities; ++Index )
+	{
+		entity* Entity = &World->Entities[Index];
+
+		if( (Entity->Types & COMPONENT_TYPE_LIGHT) &&
+		 	(Entity->Types & COMPONENT_TYPE_SPATIAL) )
+		{
+			entry_type_light* Entry = (entry_type_light*) PushNewHeader( RenderCommands, &PreviousEntry, RENDER_TYPE_LIGHT );
+			Entry->Color 	= Entity->LightComponent->Color;
+			Entry->M = GetAsMatrix(Entity->SpatialComponent);
+		}
+	}
+
 	for(u32 Index = 0; Index <  World->NrEntities; ++Index )
 	{
 		entity* Entity = &World->Entities[Index];
@@ -85,8 +118,16 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 
 		if( Entity->Types & COMPONENT_TYPE_MESH )
 		{
-			entry_type_entity* EntityEntry = (entry_type_entity*) PushNewHeader( RenderCommands, &PreviousEntry, RENDER_TYPE_ENTITY );
-			EntityEntry->Entity = Entity;
+			entry_type_mesh* MeshEntry = (entry_type_mesh*) PushNewHeader( RenderCommands, &PreviousEntry, RENDER_TYPE_MESH );
+			MeshEntry->Mesh    = Entity->MeshComponent;
+			MeshEntry->Surface = Entity->SurfaceComponent;
+			MeshEntry->M  = M4Identity();
+			MeshEntry->NM = M4Identity();
+			if(Entity->Types & COMPONENT_TYPE_SPATIAL )
+			{
+		 		MeshEntry->M = GetAsMatrix( Entity->SpatialComponent );
+				MeshEntry->NM =Transpose(RigidInverse(MeshEntry->M)); 
+			}
 		}
 
 		if(Entity->Types & COMPONENT_TYPE_SPATIAL )
