@@ -281,19 +281,33 @@ void TriangulateLine(fifo_queue<u32>* Queue, fifo_queue<u32>* ResultQueue)
 	//  |  |           / |      |/
 	//  1--2          1--2      1
 	//  Make sure they're righthanded
-
-	u32 FirstIndex  = Queue->Pop();
-	u32 Index = 0;
-	while(!Queue->IsEmpty())
+	if(Queue->GetSize() <= 3)
 	{
-		if(Index == 0)
+		while(!Queue->IsEmpty())
 		{
-			ResultQueue->Push(FirstIndex);
-		}else{
 			ResultQueue->Push(Queue->Pop());
 		}
-		++Index;
-		Index = Index % 3;
+		return;
+	}
+
+	// Here we assume the Queue Size is greater than three
+	u32 Triangle[3] = {};
+	Triangle[0] = Queue->Pop();
+	Triangle[1] = Queue->Pop();
+	Triangle[2] = Queue->Pop();
+
+	while(true)
+	{	
+		ResultQueue->Push(Triangle[0]);
+		ResultQueue->Push(Triangle[1]);
+		ResultQueue->Push(Triangle[2]);
+		if(!Queue->IsEmpty())
+		{
+			Triangle[1] = Triangle[2];
+			Triangle[2] = Queue->Pop();
+		}else{
+			return;
+		}
 	}
 }
 

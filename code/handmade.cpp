@@ -198,24 +198,21 @@ void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 	GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
 	game_assets* Assets = GameState->World->Assets;
 
-#if 1
 	obj_loaded_file* square = ReadOBJFile(Thread, GameState,
 			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
 				 "..\\handmade\\data\\cube\\cube.obj" );
+	obj_loaded_file* box = ReadOBJFile(Thread, GameState,
+			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+				 "..\\handmade\\data\\box\\box.obj" );
 	obj_loaded_file* sphere = ReadOBJFile(Thread, GameState,
 			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
 				 "..\\handmade\\data\\sphere.obj" );
 	
-	CreateEntitiesFromOBJFile( World, square );
-	//CreateEntitiesFromOBJFile( World, sphere );
-#else
-	obj_loaded_file* square = ReadOBJFile(Thread, GameState,
-		   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-			 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-			 "..\\handmade\\data\\square.obj" );
-#endif
+	//CreateEntitiesFromOBJFile( World, square );
+	CreateEntitiesFromOBJFile( World, box );
 
 	for(u32 Index = 0; Index < World->NrEntities; ++Index)
 	{

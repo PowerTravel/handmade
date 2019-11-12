@@ -597,21 +597,21 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 						while( MemoryScanner < VertexMemoryEnd )
 						{
 							opengl_vertex* VertexData = (opengl_vertex*) MemoryScanner;
-//							if(Indeces.vi)
-//							{
+							if(Indeces.vi)
+							{
 								u32 VecIndex  = Indeces.vi[idx];
 								VertexData->v  = MeshData->v[VecIndex];
-//							}
-//							if(Indeces.ni)
-//							{
+							}
+							if(Indeces.ni)
+							{
 								u32 NormIndex  = Indeces.ni[idx];
 								VertexData->vn = MeshData->vn[NormIndex];	
-//							}
-//							if(Indeces.ti)
-//							{
+							}
+							if(Indeces.ti)
+							{
 								u32 TexIndex = Indeces.ti[idx];
 								VertexData->vt = MeshData->vt[TexIndex];
-//							}
+							}
 							
 							MemoryScanner+=sizeof(opengl_vertex);
 							idx++;
