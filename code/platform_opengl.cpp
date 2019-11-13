@@ -214,21 +214,15 @@ void OpenGLBeginFrame( u32 Program )
 }
 
 internal opengl_info
-OpenGLGetExtensions(b32 ModernContext)
+OpenGLGetExtensions()
 {
 	opengl_info Result = {};
 
-	Result.ModernContext = ModernContext;
 	Result.Vendor   = (char*) glGetString(GL_VENDOR);
 	Result.Renderer = (char*) glGetString(GL_RENDERER);
 	Result.Version  = (char*) glGetString(GL_VERSION);
 
-	if(Result.ModernContext)
-	{
-		Result.ShadingLanguageVersion = (char*) glGetString(GL_SHADING_LANGUAGE_VERSION);
-	}else{
-		Result.ShadingLanguageVersion = "(None)";
- 	}
+	Result.ShadingLanguageVersion = (char*) glGetString(GL_SHADING_LANGUAGE_VERSION);
 	Result.Extensions = (char*) glGetString(GL_EXTENSIONS);
 
 	u32 ExtensionsStringLength = str::StringLength( Result.Extensions );
@@ -239,6 +233,7 @@ OpenGLGetExtensions(b32 ModernContext)
 	{
 		u64 ExtensionStringLength =  ExtensionEnd ? (u64) (ExtensionEnd - ExtensionStart) : (u64) (ExtensionStart - ExtensionsStringLength);
 
+        // NOTE: EXT_texture_sRGB_decode has been core since 2.1
 		if( str::Contains( str::StringLength( "EXT_texture_sRGB_decode" ), "EXT_texture_sRGB_decode", 
 				   ExtensionStringLength, ExtensionStart ) )
 		{
@@ -269,9 +264,9 @@ OpenGLGetExtensions(b32 ModernContext)
 	return Result;
 }
 
-void OpenGLInit(b32 ModernContext)
+void OpenGLInitExtensions()
 {
-	opengl_info Info = OpenGLGetExtensions(ModernContext);
+	opengl_info Info = OpenGLGetExtensions();
 	OpenGLDefaultInternalTextureFormat = GL_RGBA8;
 	if(Info.EXT_texture_sRGB_decode)
 	{

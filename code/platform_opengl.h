@@ -1,5 +1,5 @@
-#ifndef PLATFORM_OPENGL_HPP
-#define PLATFORM_OPENGL_HPP
+#ifndef PLATFORM_OPENGL_H
+#define PLATFORM_OPENGL_H
 
 
 #define GL_FRAMEBUFFER_SRGB               0x8DB9
@@ -93,7 +93,6 @@ struct opengl_vertex
 
 struct opengl_info
 {
-	b32 ModernContext;
 	char* Vendor;
 	char* Renderer;
 	char* Version;
@@ -132,4 +131,6 @@ struct opengl_buffer_object
 	u32 FaceBuffer;
 };
 
-#endif // PLATFORM_OPENGL_HPP
+void OpenGLInitExtensions();
+
+#endif // PLATFORM_OPENGL_H
