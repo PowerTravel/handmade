@@ -44,7 +44,7 @@ global_variable	char VertexShaderCode[] =
 "#version  330 core\n\
 layout (location = 0) in vec3 vertice;\n\
 layout (location = 1) in vec3 verticeNormal;\n\
-layout (location = 2) in vec2 unusedTextureCoordinate;\n\
+layout (location = 2) in vec2 textureCoordinate;\n\
 \n\
 uniform mat4 M;  // Model Matrix - Transforms points from ModelSpace to WorldSpace.\n\
                  // Includes Translation, Rotation and Scaling\n\
@@ -67,6 +67,7 @@ out float Ks; // Specular angle cos-value\n\
 //out float r;  // Length of L;\n\
 \n\
 out vec4 vertexColor;\n\
+out vec2  texCoord;\n\
 \n\
 void main()\n\
 {\n\
@@ -87,8 +88,9 @@ void main()\n\
 	Ks = pow(max( dot(H,N), 0.0 ), shininess);\n\
 \n\
 \n\
-	vertexColor = ambientProduct + Kd*(diffuseProduct + Ks*specularProduct);\n\
+	vertexColor = diffuseProduct + Kd*(diffuseProduct + Ks*specularProduct);\n\
 \n\
+	texCoord = textureCoordinate;\n\
 	gl_Position = P*V*Vertice;\n\
 }\n\
 "};
@@ -97,11 +99,15 @@ void main()\n\
 	{
 "#version 330 core\n\
 in vec4  vertexColor;\n\
+in vec2  texCoord;\n\
 out vec4 fragColor;\n\
+\n\
+uniform sampler2D ourTexture;\n\
 \n\
 void main() \n\
 {\n\
-	fragColor = vertexColor;\n\
+	//fragColor = vertexColor;\n\
+	fragColor = texture(ourTexture, texCoord) * vertexColor;\n\
 }\n\
 "};
 
@@ -176,7 +182,7 @@ void OpenGLSendMeshToGPU( u32* VAO,
 
 	// Generate a generic buffer
 	GLuint DataBuffer;
-	glGenBuffers(1, &DataBuffer);	
+	glGenBuffers(1, &DataBuffer);
 	// Bind the buffer ot the GL_ARRAY_BUFFER slot
 	glBindBuffer( GL_ARRAY_BUFFER, DataBuffer);
 	
@@ -271,7 +277,7 @@ void OpenGLInitExtensions()
 	{
 		// Will take as input LinearRGB and convert to sRGB Space.
 		// sRGB = Pow(LinearRGB, 1/2.2)
-		glEnable(GL_FRAMEBUFFER_SRGB);
+		// glEnable(GL_FRAMEBUFFER_SRGB);
 	}
 
 	if(Info.GL_blend_func_separate)
@@ -319,12 +325,22 @@ void OpenGLSetViewport( r32 ViewPortAspectRatio, s32 WindowWidth, s32 WindowHeig
 
 void LoadTexture( bitmap* RenderTarget )
 {
-	// Enable texture slot 0
-	glBindTexture( GL_TEXTURE_2D, 0 );
+	if(RenderTarget->Handle)
+	{
+		glBindTexture( GL_TEXTURE_2D, RenderTarget->Handle );	
+		return;
+	}
 
-	// Send a Texture to GPU referenced to the texture handle
+	glBindTexture( GL_TEXTURE_2D, RenderTarget->Handle );
+	// Generate a texture slot
+	glGenTextures(1, &RenderTarget->Handle);
+
+	// Enable texture slot
+	glBindTexture( GL_TEXTURE_2D, RenderTarget->Handle );
+
+	// Send a Texture to GPU referenced to the enabled texture slot
 	glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
-  				  RenderTarget->Width,  RenderTarget->Height, 
+  				  RenderTarget->Width,  RenderTarget->Height,
   				  0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
   				  RenderTarget->Pixels);
 
@@ -338,8 +354,209 @@ void LoadTexture( bitmap* RenderTarget )
 	// Wrapping textures, (Mirror. Repeat border color, clamp, repeat etc... )
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
+	glBindTexture( GL_TEXTURE_2D, 0 );
 
 }
+
+v4 Blend(v4* A, v4* B)
+{
+	v4 Result =  V4( A->X * B->X,
+				     A->Y * B->Y,
+				     A->Z * B->Z,
+				     A->W * B->W );
+	return Result;
+}
+
+void PushGeometryToOpenGL( game_render_commands* Commands, component_mesh* Mesh)
+{
+	mesh_data* MeshData  = Mesh->Data;
+	mesh_indeces Indeces = Mesh->Indeces;
+
+	u32 NrIndeces  = Indeces.Count;
+
+	Assert(Commands->TemporaryMemory.IsEmpty());
+
+	u32 MemoryNeeded = NrIndeces * (sizeof(opengl_vertex) + sizeof(u32));
+
+	Assert( MemoryNeeded <= Commands->TemporaryMemory.Remaining() );
+
+	u8* VertexMemory =  Commands->TemporaryMemory.GetTail();
+	for( u32 Index = 0; Index < NrIndeces; ++Index )
+	{
+		opengl_vertex* VertexData = (opengl_vertex*) Commands->TemporaryMemory.GetMemory(sizeof(opengl_vertex));
+		if(Indeces.vi)
+		{
+			u32 VecIndex  = Indeces.vi[Index];
+			VertexData->v  = MeshData->v[VecIndex];
+		}
+		if(Indeces.ni)
+		{
+			u32 NormIndex  = Indeces.ni[Index];
+			VertexData->vn = MeshData->vn[NormIndex];	
+		}
+		if(Indeces.ti)
+		{
+			u32 TexIndex = Indeces.ti[Index];
+			VertexData->vt = MeshData->vt[TexIndex];
+		}
+	}
+	
+	u8* IndexMemory =  Commands->TemporaryMemory.GetTail();
+	for( u32 Index = 0; Index < NrIndeces; ++Index )
+	{
+		u32* IndexData = (u32*) Commands->TemporaryMemory.GetMemory(sizeof(u32));
+		*IndexData = Index;
+	}
+
+	OpenGLSendMeshToGPU(  &Mesh->VAO, NrIndeces, (u32*) IndexMemory, (opengl_vertex*) VertexMemory );
+
+	Commands->TemporaryMemory.Clear();
+}
+
+internal void
+OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 WindowHeight )
+{
+	render_push_buffer* RenderPushBuffer = (render_push_buffer*) Commands->RenderMemory.GetBase();
+
+	// Enable depth test
+	glEnable(GL_DEPTH_TEST);
+	// Enable Textures
+	glEnable(GL_TEXTURE_2D);
+	// Cull triangles which normal is not towards the camera
+	glEnable(GL_CULL_FACE);	
+
+	// Accept fragment if it closer to the camera than the former one
+	glDepthFunc(GL_LESS); 
+
+	glClearColor(0,0,0.4,1);
+
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	const r32 DesiredAspectRatio = 1.77968526f;
+	OpenGLSetViewport( DesiredAspectRatio, WindowWidth, WindowHeight );
+
+	// OpenGL uses Column major convention.
+	// Our math library uses Row major convention which means we need to transpose the 
+	// matrices AND reverse the order of multiplication.
+	// Transpose(A*B) = Transpose(B) * Transpose(A)
+	m4 V = RenderPushBuffer->ViewMatrix;
+	m4 P = RenderPushBuffer->ProjectionMatrix;
+
+	opengl_program* Prog = &Commands->RenderProgram;
+	glUniformMatrix4fv(Prog->P,  1, GL_TRUE, P.E);
+	glUniformMatrix4fv(Prog->V,  1, GL_TRUE, V.E);
+
+    r32 Attenuation = 1;
+	
+	glUniform4fv( Prog->cameraPosition, 1, GetCameraPosition(&V).E);
+	glUniform1f(  Prog->attenuation, Attenuation);
+
+	v4 LightColor    = V4(0,0,0,1);
+
+	// For each render group
+	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
+	{
+		u8* Head = (u8*) Entry;
+		u8* Body = Head + sizeof(push_buffer_header);
+		switch(Entry->Type)
+		{
+			case render_type::LIGHT:
+			{
+				entry_type_light* Light = (entry_type_light*) Body;
+				glUniform4fv( Prog->lightPosition,  1, (Light->M * V4(0,0,0,1)).E);
+				LightColor    = Light->Color;
+			}break;
+
+			case render_type::MESH:
+			{
+				entry_type_mesh* MeshEntry = (entry_type_mesh*) Body;
+
+				glUniformMatrix4fv(Prog->M,  1, GL_TRUE, MeshEntry->M.E);
+				glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, MeshEntry->NM.E);;
+
+				glDisable( GL_TEXTURE_2D );
+
+				if(!MeshEntry->Mesh->VAO)
+				{
+					PushGeometryToOpenGL(Commands, MeshEntry->Mesh);
+				}
+
+				if( MeshEntry->Surface )
+				{
+					component_surface* Surface = MeshEntry->Surface;
+                    material* Material =  Surface->Material;
+  					
+					u32 SurfaceSmoothnes = 3;
+                    v4 AmbientColor   = Blend(&LightColor, &Material->AmbientColor);
+                    v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
+                    v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
+
+					if(Material->DiffuseMap)
+					{
+						LoadTexture(Material->DiffuseMap);
+						AmbientColor + V4(0,0,0,0);
+					}else{
+						local_persist bitmap EmptyBitmap = {};
+						u8 WhitePixel[4] = {255,255,255,255};
+						EmptyBitmap.Width  = 1;
+						EmptyBitmap.Height = 1;
+						EmptyBitmap.Pixels = (void*) WhitePixel;
+						LoadTexture(&EmptyBitmap);
+					}
+                    
+                    glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
+                    glUniform4fv( Prog->diffuseProduct,  1, DiffuseColor.E);
+                    glUniform4fv( Prog->specularProduct, 1, SpecularColor.E);
+                    glUniform1f( Prog->shininess,   Material->Shininess);
+
+				}
+				
+				OpenGLDraw( MeshEntry->Mesh->VAO, MeshEntry->Mesh->Indeces.Count );
+			
+			}break;
+		}
+	}
+
+#if 0
+	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
+	{
+		switch(Entry->Type)
+		{
+			case render_type::SPRITE:
+			{
+				glDisable(GL_DEPTH_TEST);
+				u8* Head = (u8*)Entry;
+				u8* Body = Head + sizeof(push_buffer_header);
+
+				entry_type_sprite* SpriteEntry = (entry_type_sprite*) Body;
+				bitmap* Bitmap = SpriteEntry->Bitmap;
+
+				BindTexture(Bitmap, true);
+
+				v4 Translation = GetTranslationFromMatrix(SpriteEntry->M);
+
+				r32 HalfWidth  = Index( SpriteEntry->M, 0, 0 )/2.f;
+				r32 HalfHeight = Index( SpriteEntry->M, 1, 1 )/2.f;
+				r32 HalfDepth  = Index( SpriteEntry->M, 2, 2 )/2.f;
+
+				v4 v[4] = {};
+				v[0] = V4(Translation.X - HalfWidth, Translation.Y - HalfHeight, Translation.Z, 1);
+				v[1] = V4(Translation.X + HalfWidth, Translation.Y - HalfHeight, Translation.Z, 1);
+				v[2] = V4(Translation.X + HalfWidth, Translation.Y + HalfHeight, Translation.Z, 1);
+				v[3] = V4(Translation.X - HalfWidth, Translation.Y + HalfHeight, Translation.Z, 1);
+
+				r32 Brightness = 0.8;
+//				OpenGlPushRect( v, SpriteEntry->Coordinates, Brightness  );
+
+			}break;
+		}
+	}
+#endif
+}
+
+
+
+#if 1
 
 internal void DisplayBitmapViaOpenGL( u32 Width, u32 Height, void* Memory )
 {
@@ -463,184 +680,4 @@ void BindTexture(bitmap* Bitmap, b32 IsBackground )
 	}
 }
 
-v4 Blend(v4* A, v4* B)
-{
-	v4 Result =  V4( A->X * B->X,
-				     A->Y * B->Y,
-				     A->Z * B->Z,
-				     A->W * B->W );
-	return Result;
-}
-
-void PushGeometryToOpenGL( game_render_commands* Commands, component_mesh* Mesh)
-{
-	mesh_data* MeshData  = Mesh->Data;
-	mesh_indeces Indeces = Mesh->Indeces;
-
-	u32 NrIndeces  = Indeces.Count;
-
-	Assert(Commands->TemporaryMemory.IsEmpty());
-
-	u32 MemoryNeeded = NrIndeces * (sizeof(opengl_vertex) + sizeof(u32));
-
-	Assert( MemoryNeeded <= Commands->TemporaryMemory.Remaining() );
-
-	u8* VertexMemory =  Commands->TemporaryMemory.GetTail();
-	for( u32 Index = 0; Index < NrIndeces; ++Index )
-	{
-		opengl_vertex* VertexData = (opengl_vertex*) Commands->TemporaryMemory.GetMemory(sizeof(opengl_vertex));
-		if(Indeces.vi)
-		{
-			u32 VecIndex  = Indeces.vi[Index];
-			VertexData->v  = MeshData->v[VecIndex];
-		}
-		if(Indeces.ni)
-		{
-			u32 NormIndex  = Indeces.ni[Index];
-			VertexData->vn = MeshData->vn[NormIndex];	
-		}
-		if(Indeces.ti)
-		{
-			u32 TexIndex = Indeces.ti[Index];
-			VertexData->vt = MeshData->vt[TexIndex];
-		}
-	}
-	
-	u8* IndexMemory =  Commands->TemporaryMemory.GetTail();
-	for( u32 Index = 0; Index < NrIndeces; ++Index )
-	{
-		u32* IndexData = (u32*) Commands->TemporaryMemory.GetMemory(sizeof(u32));
-		*IndexData = Index;
-	}
-
-	OpenGLSendMeshToGPU(  &Mesh->VAO, NrIndeces, (u32*) IndexMemory, (opengl_vertex*) VertexMemory );
-}
-
-internal void
-OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 WindowHeight )
-{
-	render_push_buffer* RenderPushBuffer = (render_push_buffer*) Commands->RenderMemory.GetBase();
-
-	// Enable depth test
-	glEnable(GL_DEPTH_TEST);
-	// Accept fragment if it closer to the camera than the former one
-	glDepthFunc(GL_LESS); 
-	// Cull triangles which normal is not towards the camera
-	glEnable(GL_CULL_FACE);	
-
-	glClearColor(0,0,0.4,1);
-
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	const r32 DesiredAspectRatio = 1.77968526f;
-	OpenGLSetViewport( DesiredAspectRatio, WindowWidth, WindowHeight );
-
-	// OpenGL uses Column major convention.
-	// Our math library uses Row major convention which means we need to transpose the 
-	// matrices AND reverse the order of multiplication.
-	// Transpose(A*B) = Transpose(B) * Transpose(A)
-	m4 V = RenderPushBuffer->ViewMatrix;
-	m4 P = RenderPushBuffer->ProjectionMatrix;
-
-	opengl_program* Prog = &Commands->RenderProgram;
-	glUniformMatrix4fv(Prog->P,  1, GL_TRUE, P.E);
-	glUniformMatrix4fv(Prog->V,  1, GL_TRUE, V.E);
-
-    r32 Attenuation = 1;
-	
-	glUniform4fv( Prog->cameraPosition, 1, GetCameraPosition(&V).E);
-	glUniform1f(  Prog->attenuation, Attenuation);
-
-	v4 LightColor    = V4(0,0,0,1);
-
-	// For each render group
-	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
-	{
-		u8* Head = (u8*) Entry;
-		u8* Body = Head + sizeof(push_buffer_header);
-		switch(Entry->Type)
-		{
-			case render_type::LIGHT:
-			{
-				entry_type_light* Light = (entry_type_light*) Body;
-				glUniform4fv( Prog->lightPosition,  1, (Light->M * V4(0,0,0,1)).E);
-				LightColor    = Light->Color;
-			}break;
-
-			case render_type::MESH:
-			{
-				entry_type_mesh* MeshEntry = (entry_type_mesh*) Body;
-
-				glUniformMatrix4fv(Prog->M,  1, GL_TRUE, MeshEntry->M.E);
-				glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, MeshEntry->NM.E);;
-
-				glDisable( GL_TEXTURE_2D );
-
-				if(!MeshEntry->Mesh->VAO)
-				{
-					PushGeometryToOpenGL(Commands, MeshEntry->Mesh);
-				}
-
-				if( MeshEntry->Surface )
-				{
-					component_surface* Surface = MeshEntry->Surface;
-                    material* Material =  Surface->Material;
-  					
-					if(Material->DiffuseMap)
-					{
-//						LoadTexture(DiffuseMap);
-					}
-					u32 SurfaceSmoothnes = 3;
-                    v4 AmbientColor   = Blend(&LightColor, &Material->AmbientColor);
-                    v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
-                    v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
-                    
-                    glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
-                    glUniform4fv( Prog->diffuseProduct,  1, DiffuseColor.E);
-                    glUniform4fv( Prog->specularProduct, 1, SpecularColor.E);
-                    glUniform1f( Prog->shininess,   Material->Shininess);
-
-				}
-				
-				OpenGLDraw( MeshEntry->Mesh->VAO, MeshEntry->Mesh->Indeces.Count );
-			
-			}break;
-		}
-	}
-
-
-	for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
-	{
-		switch(Entry->Type)
-		{
-			case render_type::SPRITE:
-			{
-				glDisable(GL_DEPTH_TEST);
-				u8* Head = (u8*)Entry;
-				u8* Body = Head + sizeof(push_buffer_header);
-
-				entry_type_sprite* SpriteEntry = (entry_type_sprite*) Body;
-				bitmap* Bitmap = SpriteEntry->Bitmap;
-
-				BindTexture(Bitmap, true);
-
-				v4 Translation = GetTranslationFromMatrix(SpriteEntry->M);
-
-				r32 HalfWidth  = Index( SpriteEntry->M, 0, 0 )/2.f;
-				r32 HalfHeight = Index( SpriteEntry->M, 1, 1 )/2.f;
-				r32 HalfDepth  = Index( SpriteEntry->M, 2, 2 )/2.f;
-
-				v4 v[4] = {};
-				v[0] = V4(Translation.X - HalfWidth, Translation.Y - HalfHeight, Translation.Z, 1);
-				v[1] = V4(Translation.X + HalfWidth, Translation.Y - HalfHeight, Translation.Z, 1);
-				v[2] = V4(Translation.X + HalfWidth, Translation.Y + HalfHeight, Translation.Z, 1);
-				v[3] = V4(Translation.X - HalfWidth, Translation.Y + HalfHeight, Translation.Z, 1);
-
-				r32 Brightness = 0.8;
-//				OpenGlPushRect( v, SpriteEntry->Coordinates, Brightness  );
-
-			}break;
-		}
-	}
-}
-
+#endif

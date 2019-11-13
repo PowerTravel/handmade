@@ -1309,12 +1309,14 @@ entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* Me
 	return Entity;
 }
 
-void CreateEntitiesFromOBJFile( world* World, obj_loaded_file* ObjFile )
+void CreateEntitiesFromOBJFile( world* World, obj_loaded_file* ObjFile, v3 Offset = V3(0,0,0) )
 {
 	for( u32  ObjectIndex = 0; ObjectIndex < ObjFile->ObjectCount; ++ObjectIndex )
 	{
 		obj_group* Grp = &ObjFile->Objects[ObjectIndex];
-		CreateEntityFromOBJGroup(World, Grp, ObjFile->MeshData );
+		entity* Entity = CreateEntityFromOBJGroup(World, Grp, ObjFile->MeshData);
+		Entity->SpatialComponent->Position = Offset;
+
 	}
 }
 

@@ -211,9 +211,19 @@ void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
 				 "..\\handmade\\data\\sphere.obj" );
+
+	obj_loaded_file* muro = ReadOBJFile(Thread, GameState,
+			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+				 "..\\handmade\\data\\Old\\geometry\\muro\\muro.obj" );
+
+
+
 	
-	//CreateEntitiesFromOBJFile( World, square );
-	CreateEntitiesFromOBJFile( World, sphere );
+	CreateEntitiesFromOBJFile( World, square, V3(2,0,0) );
+	CreateEntitiesFromOBJFile( World, sphere, V3(0,2,0) );
+	CreateEntitiesFromOBJFile( World, box, V3(0,0,2) );
+	CreateEntitiesFromOBJFile( World, muro, V3(0,-1,0) );
 }
 
 void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )

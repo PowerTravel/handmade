@@ -198,7 +198,7 @@ void FlyingCameraController( entity* CameraEntity )
 		}
 		if(Controller->RightShoulder.EndedDown)
 		{
-			SetOrthoProj( Camera, -1, 1 );
+			SetOrthoProj( Camera, -3, 3 );
 		}
 		if(Controller->LeftShoulder.EndedDown)
 		{
