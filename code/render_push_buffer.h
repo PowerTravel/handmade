@@ -6,13 +6,13 @@
 #include "component_surface.h"
 #include "component_light.h"
 
-enum render_type
+enum class render_type
 {
-	RENDER_TYPE_LIGHT,
-	RENDER_TYPE_MESH,
-	RENDER_TYPE_SPRITE,
-	RENDER_TYPE_FLOOR_TILE,
-	RENDER_TYPE_WIREBOX
+	LIGHT,
+	MESH,
+	SPRITE,
+	FLOOR_TILE,
+	WIREBOX
 };
 
 struct entry_type_light
@@ -45,7 +45,7 @@ struct entry_type_wirebox
 
 struct push_buffer_header
 {
-	u32 Type;
+	render_type Type;
 	u32 SortKey;
 	push_buffer_header* Next;
 };
@@ -56,7 +56,6 @@ struct render_push_buffer
 	m4 ViewMatrix;
 	game_assets* Assets;
 	push_buffer_header* First;
-	game_render_commands* RenderCommands;
 };
 
 #endif // RENDER_PUSH_BUFFER_H

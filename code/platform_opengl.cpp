@@ -207,12 +207,6 @@ void OpenGLDraw( u32 VertexArrayObject, u32 nrVertecies )
 	glBindVertexArray(0);
 }
 
-void OpenGLBeginFrame( u32 Program )
-{
-	
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	
-}
-
 internal opengl_info
 OpenGLGetExtensions()
 {
@@ -485,59 +479,47 @@ void PushGeometryToOpenGL( game_render_commands* Commands, component_mesh* Mesh)
 
 	u32 NrIndeces  = Indeces.Count;
 
-	u32 BytesNeededForVertices = NrIndeces * sizeof(opengl_vertex);
-	u8* VertexMemoryStart = Commands->TempBuffer + Commands->TempBufferSize;
-	u8* VertexMemoryEnd   = VertexMemoryStart + BytesNeededForVertices;
+	Assert(Commands->TemporaryMemory.IsEmpty());
 
+	u32 MemoryNeeded = NrIndeces * (sizeof(opengl_vertex) + sizeof(u32));
 
-	u32 BytesNeededForIndeces  = NrIndeces * sizeof(u32);
-	u8* IndexMemoryStart       =  VertexMemoryEnd;
-	u8* IndexMemoryEnd         =  IndexMemoryStart + BytesNeededForIndeces;
+	Assert( MemoryNeeded <= Commands->TemporaryMemory.Remaining() );
 
-	Assert( (BytesNeededForIndeces + BytesNeededForVertices) < (Commands->MaxTempBufferSize - Commands->TempBufferSize) );
-
-	u8* MemoryScanner = VertexMemoryStart;
-	u32 idx = 0;
-	while( MemoryScanner < VertexMemoryEnd )
+	u8* VertexMemory =  Commands->TemporaryMemory.GetTail();
+	for( u32 Index = 0; Index < NrIndeces; ++Index )
 	{
-		opengl_vertex* VertexData = (opengl_vertex*) MemoryScanner;
+		opengl_vertex* VertexData = (opengl_vertex*) Commands->TemporaryMemory.GetMemory(sizeof(opengl_vertex));
 		if(Indeces.vi)
 		{
-			u32 VecIndex  = Indeces.vi[idx];
+			u32 VecIndex  = Indeces.vi[Index];
 			VertexData->v  = MeshData->v[VecIndex];
 		}
 		if(Indeces.ni)
 		{
-			u32 NormIndex  = Indeces.ni[idx];
+			u32 NormIndex  = Indeces.ni[Index];
 			VertexData->vn = MeshData->vn[NormIndex];	
 		}
 		if(Indeces.ti)
 		{
-			u32 TexIndex = Indeces.ti[idx];
+			u32 TexIndex = Indeces.ti[Index];
 			VertexData->vt = MeshData->vt[TexIndex];
 		}
-		
-		MemoryScanner+=sizeof(opengl_vertex);
-		idx++;
 	}
-	Assert(MemoryScanner == IndexMemoryStart);
-
 	
-	u32 Index = 0;
-	while( MemoryScanner < IndexMemoryEnd )
+	u8* IndexMemory =  Commands->TemporaryMemory.GetTail();
+	for( u32 Index = 0; Index < NrIndeces; ++Index )
 	{
-		u32* IndexData = (u32*) MemoryScanner;
-		*IndexData = Index++;
-		MemoryScanner+=sizeof(u32);
+		u32* IndexData = (u32*) Commands->TemporaryMemory.GetMemory(sizeof(u32));
+		*IndexData = Index;
 	}
 
-	OpenGLSendMeshToGPU(  &Mesh->VAO, NrIndeces, (u32*) IndexMemoryStart, (opengl_vertex*) VertexMemoryStart );
+	OpenGLSendMeshToGPU(  &Mesh->VAO, NrIndeces, (u32*) IndexMemory, (opengl_vertex*) VertexMemory );
 }
 
 internal void
 OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 WindowHeight )
 {
-	render_push_buffer* RenderPushBuffer = (render_push_buffer*) Commands->PushBuffer;
+	render_push_buffer* RenderPushBuffer = (render_push_buffer*) Commands->RenderMemory.GetBase();
 
 	// Enable depth test
 	glEnable(GL_DEPTH_TEST);
@@ -552,7 +534,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 
 	const r32 DesiredAspectRatio = 1.77968526f;
 	OpenGLSetViewport( DesiredAspectRatio, WindowWidth, WindowHeight );
-
 
 	// OpenGL uses Column major convention.
 	// Our math library uses Row major convention which means we need to transpose the 
@@ -579,14 +560,14 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 		u8* Body = Head + sizeof(push_buffer_header);
 		switch(Entry->Type)
 		{
-			case RENDER_TYPE_LIGHT:
+			case render_type::LIGHT:
 			{
 				entry_type_light* Light = (entry_type_light*) Body;
 				glUniform4fv( Prog->lightPosition,  1, (Light->M * V4(0,0,0,1)).E);
 				LightColor    = Light->Color;
 			}break;
 
-			case RENDER_TYPE_MESH:
+			case render_type::MESH:
 			{
 				entry_type_mesh* MeshEntry = (entry_type_mesh*) Body;
 
@@ -632,7 +613,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 	{
 		switch(Entry->Type)
 		{
-			case RENDER_TYPE_SPRITE:
+			case render_type::SPRITE:
 			{
 				glDisable(GL_DEPTH_TEST);
 				u8* Head = (u8*)Entry;
@@ -661,9 +642,5 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 			}break;
 		}
 	}
-
-	Commands->PushBufferSize = 0;
-	Commands->PushBufferElementCount = 0;
-
 }
 

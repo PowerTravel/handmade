@@ -46,6 +46,7 @@
 
 #include <stddef.h> // size_t exists in this header on some platforms
 
+#include "standalone_utility.h"
 #include "vector_math.h"
 
 struct thread_context
@@ -100,18 +101,10 @@ struct game_render_commands
 
 	opengl_program RenderProgram;
 
-	u32 MaxTempBufferSize;
-	u32 TempBufferSize;
-	u8* TempBuffer;
-
-	u32 MaxPushBufferSize;
-	u32 PushBufferSize;
-	u8* PushBuffer;
-
-	u32 PushBufferElementCount;
+	utils::push_buffer TemporaryMemory;     // Buffer used for temporary storage
+	utils::push_buffer RenderMemory;  // The Render Push Buffer
+	u32 RenderMemoryElementCount;
 };
-
-//#define RenderCommandStruct (MaxPushBufferSize, PushBuffer, Width, Height) {Width,Height, MaxPushBufferSize, 0, (u8*) PushBuffer, 0 , MaxPushBufferSize };
 
 struct game_sound_output_buffer
 {

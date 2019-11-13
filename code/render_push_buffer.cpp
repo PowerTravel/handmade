@@ -1,86 +1,50 @@
 #include "render_push_buffer.h"
 
-#define GetRenderCommandsTail( RenderCommands ) ( RenderCommands->PushBuffer + RenderCommands->PushBufferSize )
+//#define GetRenderCommandsTail( RenderCommands ) ( RenderCommands->PushBuffer + RenderCommands->PushBufferSize )
 
-u8* PushNewHeader(game_render_commands* RenderCommands, push_buffer_header** PreviousEntry, u32 Type)
+push_buffer_header* PushNewHeader(game_render_commands* RenderCommands, push_buffer_header** PreviousEntry)
 {
 	Assert(PreviousEntry);
-	u32 TypeSize = 0;
-	switch(Type)
-	{
-		case RENDER_TYPE_LIGHT:
-		{
-			TypeSize = sizeof(entry_type_light);
-		}break;
-		case RENDER_TYPE_MESH:
-		{
-			TypeSize = sizeof(entry_type_mesh);
-		}break;
-		case RENDER_TYPE_SPRITE:
-		{
-			TypeSize = sizeof(entry_type_sprite);
-		}break;
-		case RENDER_TYPE_WIREBOX:
-		{
-			TypeSize = sizeof(entry_type_wirebox);
-		}break;
-		case RENDER_TYPE_FLOOR_TILE:
-		{
-			TypeSize = sizeof(entry_type_floor_tile);
-		}break;
-		default:
-		{
-			INVALID_CODE_PATH
-		}break;
-	}
-	Assert(TypeSize);
 
-	render_push_buffer* PushBuffer = (render_push_buffer*) RenderCommands->PushBuffer;
-	push_buffer_header* NewEntryHeader = (push_buffer_header*) GetRenderCommandsTail( RenderCommands );
-	RenderCommands->PushBufferSize += sizeof(push_buffer_header);
-	RenderCommands->PushBufferElementCount++;
-	Assert( RenderCommands->PushBufferSize < RenderCommands->MaxPushBufferSize );
-	NewEntryHeader->Type = Type;
+	utils::push_buffer* RenderMemory = &RenderCommands->RenderMemory;
+	RenderCommands->RenderMemoryElementCount++;
+
+	push_buffer_header* NewEntryHeader = (push_buffer_header*) RenderMemory->GetMemory(sizeof(push_buffer_header));
+	Assert( NewEntryHeader );
 	NewEntryHeader->Next = 0;
 	
 	if( ! *PreviousEntry )
 	{
+		render_push_buffer* PushBuffer = (render_push_buffer*) RenderMemory->GetBase();
 		PushBuffer->First = NewEntryHeader;
 		*PreviousEntry = PushBuffer->First;
 	}else{
 		(*PreviousEntry)->Next = NewEntryHeader;
 		*PreviousEntry = NewEntryHeader;
 	}
-
-	u8* Entry = (u8*)  GetRenderCommandsTail( RenderCommands );
-	RenderCommands->PushBufferSize += TypeSize;
-	return Entry;
+	return NewEntryHeader;
 }
 
 void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 {
 	Assert(RenderCommands);
-	Assert(RenderCommands->PushBuffer);
-	Assert(RenderCommands->MaxPushBufferSize);
-	RenderCommands->PushBufferElementCount = 0;
-	RenderCommands->PushBufferSize = 0;
-	
-	// Reset Render Commands
-	RenderCommands->PushBufferElementCount = 0;
-	RenderCommands->PushBufferSize = 0;
+	Assert(RenderCommands->RenderMemory.GetBase());
 
-	render_push_buffer* PushBuffer = (render_push_buffer*) RenderCommands->PushBuffer;
-	RenderCommands->PushBufferSize += sizeof(render_push_buffer);
+	RenderCommands->RenderMemory.Clear();
+	RenderCommands->RenderMemoryElementCount = 0;
+	
+	render_push_buffer* PushBuffer = (render_push_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(render_push_buffer));
  	PushBuffer->First = 0;
+	
+	// TODO: Make a proper Asset library so we can extract for example a texture or mesh from a hash id
+	//       Instead of storing pointers everywhere.
  	PushBuffer->Assets = World->Assets;
-	PushBuffer->RenderCommands = RenderCommands;
 
 	push_buffer_header* PreviousEntry = 0;
-
 	// TODO: Make a proper entity library so we can extracl for example ALL Lights efficiently
 	//       So we don't have to loop over ALL entitis several times
 
-	// Firs push camera
+	// First push camera
 	for(u32 Index = 0; Index <  World->NrEntities; ++Index )
 	{
 		entity* Entity = &World->Entities[Index];
@@ -89,6 +53,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 		{
 			PushBuffer->ProjectionMatrix = Entity->CameraComponent->P;
 			PushBuffer->ViewMatrix       = Entity->CameraComponent->V;
+			break;
 		}
 	}
 
@@ -100,9 +65,12 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 		if( (Entity->Types & COMPONENT_TYPE_LIGHT) &&
 		 	(Entity->Types & COMPONENT_TYPE_SPATIAL) )
 		{
-			entry_type_light* Entry = (entry_type_light*) PushNewHeader( RenderCommands, &PreviousEntry, RENDER_TYPE_LIGHT );
-			Entry->Color 	= Entity->LightComponent->Color;
-			Entry->M = GetAsMatrix(Entity->SpatialComponent);
+			push_buffer_header* Header = PushNewHeader( RenderCommands, &PreviousEntry );
+			Header->Type = render_type::LIGHT;
+
+			entry_type_light* Body = (entry_type_light*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_light));
+			Body->Color  = Entity->LightComponent->Color;
+			Body->M      = GetAsMatrix(Entity->SpatialComponent);
 		}
 	}
 
@@ -110,51 +78,48 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 	{
 		entity* Entity = &World->Entities[Index];
 
-		if( Entity->Types & COMPONENT_TYPE_CAMERA )
+		if( (Entity->Types & COMPONENT_TYPE_MESH ) &&
+		 	(Entity->Types & COMPONENT_TYPE_SPATIAL) )
 		{
-			PushBuffer->ProjectionMatrix = Entity->CameraComponent->P;
-			PushBuffer->ViewMatrix       = Entity->CameraComponent->V;
-		}
-
-		if( Entity->Types & COMPONENT_TYPE_MESH )
-		{
-			entry_type_mesh* MeshEntry = (entry_type_mesh*) PushNewHeader( RenderCommands, &PreviousEntry, RENDER_TYPE_MESH );
-			MeshEntry->Mesh    = Entity->MeshComponent;
-			MeshEntry->Surface = Entity->SurfaceComponent;
-			MeshEntry->M  = M4Identity();
-			MeshEntry->NM = M4Identity();
-			if(Entity->Types & COMPONENT_TYPE_SPATIAL )
-			{
-		 		MeshEntry->M = GetAsMatrix( Entity->SpatialComponent );
-				MeshEntry->NM =Transpose(RigidInverse(MeshEntry->M)); 
-			}
+			push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+			Header->Type = render_type::MESH;
+			entry_type_mesh* Body = (entry_type_mesh*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_mesh));
+			Body->Mesh    = Entity->MeshComponent;
+			Body->Surface = Entity->SurfaceComponent;
+			Body->M  = GetAsMatrix( Entity->SpatialComponent );
+			Body->NM = Transpose(RigidInverse(Body->M));
 		}
 
 		if(Entity->Types & COMPONENT_TYPE_SPATIAL )
 		{
-			entry_type_wirebox* WireEntry = (entry_type_wirebox*) PushNewHeader( RenderCommands, &PreviousEntry, RENDER_TYPE_WIREBOX );
-			
-			v3 Pos  = Entity->SpatialComponent->Position;
+			push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+			Header->Type = render_type::WIREBOX;
 
-			WireEntry->Rect.X = Pos.X-Entity->SpatialComponent->Width/2;
-			WireEntry->Rect.Y = Pos.Y-Entity->SpatialComponent->Height/2;
-			WireEntry->Rect.W = Entity->SpatialComponent->Width;
-			WireEntry->Rect.H = Entity->SpatialComponent->Height;
+			entry_type_wirebox* Body = (entry_type_wirebox*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_wirebox));
+			v3 Pos  = Entity->SpatialComponent->Position;
+			Body->Rect.X = Pos.X-Entity->SpatialComponent->Width/2;
+			Body->Rect.Y = Pos.Y-Entity->SpatialComponent->Height/2;
+			Body->Rect.W = Entity->SpatialComponent->Width;
+			Body->Rect.H = Entity->SpatialComponent->Height;
 		}
 
 		if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
 		{
+			push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+			Header->Type = render_type::SPRITE;
+
+			entry_type_sprite* Body = (entry_type_sprite*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_sprite));
+
 			// Store only the sprite to be displayed for current frame
-			entry_type_sprite* SpriteEntry = (entry_type_sprite*) PushNewHeader( RenderCommands, &PreviousEntry, RENDER_TYPE_SPRITE );
-			SpriteEntry->Bitmap = Entity->SpriteAnimationComponent->Bitmap;
-			SpriteEntry->Coordinates = Entity->SpriteAnimationComponent->ActiveSeries->ActiveFrame;
+			Body->Bitmap = Entity->SpriteAnimationComponent->Bitmap;
+			Body->Coordinates = Entity->SpriteAnimationComponent->ActiveSeries->ActiveFrame;
 			
-			SpriteEntry->M = M4Identity();
+			Body->M = M4Identity();
 			m4 SpriteSize   = GetScaleMatrix( V4( Entity->SpriteAnimationComponent->Dimensions.W, Entity->SpriteAnimationComponent->Dimensions.H, 1, 0 ) );
 			m4 SpriteOffset = GetTranslationMatrix( V4( Entity->SpriteAnimationComponent->Dimensions.X, Entity->SpriteAnimationComponent->Dimensions.Y, 0, 0 ) );
 			if( Entity->Types & COMPONENT_TYPE_SPATIAL )
 			{
-				SpriteEntry->M = GetAsMatrix( Entity->SpatialComponent ) * SpriteOffset * SpriteSize;
+				Body->M = GetAsMatrix( Entity->SpatialComponent ) * SpriteOffset * SpriteSize;
 			}
 		}
 	}
