@@ -6,58 +6,12 @@
 #include "entity_components.cpp"
 #include "obj_loader.cpp"
 
-//#include "render.cpp" // Software rendere, deprecated
-
 #include "render_push_buffer.cpp"
 #include "sprite_mapping.h"
 #include "system_camera.cpp"
 #include "system_spatial.cpp"
 #include "system_sprite_animation.cpp"
 #include "system_controller.cpp"
-
-// makes the packing compact
-#pragma pack(push, 1)
-struct bmp_header
-{
-	u16 FileType;     /* File type, always 4D42h ("BM") */
-	u32 FileSize;     /* Size of the file in bytes */
-	u16 Reserved1;    /* Always 0 */
-	u16 Reserved2;    /* Always 0 */
-	u32 BitmapOffset; /* Starting position of image data in bytes */
-
-	u32 HeaderSize;       /* Size of this header in bytes */
-	s32 Width;           /* Image width in pixels */
-	s32 Height;          /* Image height in pixels */
-	u16 Planes;          /* Number of color planes */
-	u16 BitsPerPixel;    /* Number of bits per pixel */
-	u32 Compression;     /* Compression methods used */
-	u32 SizeOfBitmap;    /* Size of bitmap in bytes */
-	s32 HorzResolution;  /* Horizontal resolution in pixels per meter */
-	s32 VertResolution;  /* Vertical resolution in pixels per meter */
-	u32 ColorsUsed;      /* Number of colors in the image */
-	u32 ColorsImportant; /* Minimum number of important colors */
-	/* Fields added for Windows 4.x follow this line */
-
-	u32 RedMask;       /* Mask identifying bits of red component */
-	u32 GreenMask;     /* Mask identifying bits of green component */
-	u32 BlueMask;      /* Mask identifying bits of blue component */
-	u32 AlphaMask;     /* Mask identifying bits of alpha component */
-	u32 CSType;        /* Color space type */
-	s32 RedX;          /* X coordinate of red endpoint */
-	s32 RedY;          /* Y coordinate of red endpoint */
-	s32 RedZ;          /* Z coordinate of red endpoint */
-	s32 GreenX;        /* X coordinate of green endpoint */
-	s32 GreenY;        /* Y coordinate of green endpoint */
-	s32 GreenZ;        /* Z coordinate of green endpoint */
-	s32 BlueX;         /* X coordinate of blue endpoint */
-	s32 BlueY;         /* Y coordinate of blue endpoint */
-	s32 BlueZ;         /* Z coordinate of blue endpoint */
-	u32 GammaRed;      /* Gamma red coordinate scale value */
-	u32 GammaGreen;    /* Gamma green coordinate scale value */
-	u32 GammaBlue;     /* Gamma blue coordinate scale value */
-};
-#pragma pack(pop)
-
 
 internal void
 GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
@@ -93,94 +47,12 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
 	}
 }
 
-#if 1
-internal bitmap
-DEBUGReadBMP(thread_context* Thread, game_state* aGameState,
-	debug_platform_read_entire_file* ReadEntireFile,
-	debug_platfrom_free_file_memory* FreeEntireFile,
-	char* FileName)
-{
-	// Note(Jakob). BMP is stored in little Endian, 
-	// Little endian means that the least significant digit is stored first
-	// So if we read a 32 bit int in 8 bit cunks it would come out as this:
-	// 32bit: 0xAABBCCDD ->  
-	// 8bit chunks:
-	// 0xDD, 0xCC, 0xBB, 0xAA
-
-	// Todo(Jakob): Add hotspots to bitmaps. A hotspot is the alignpoint in pixels. 
-	//				For a mouse pointer sprite this would for example be on the tip of
-	//				the pointer. Its used to poroperly display the bitmap.
-
-	bitmap Result = {};
-	debug_read_file_result ReadResult = ReadEntireFile(Thread, FileName);
-
-	if (ReadResult.ContentSize != 0)
-	{
-		void* imageContentsTmp = ReadResult.Contents;
-		memory_arena* Arena = &aGameState->AssetArena;
-		//ReadResult.Contents = PushCopy(Arena, ReadResult.ContentSize, imageContentsTmp);
-
-		bmp_header* Header = (bmp_header*)ReadResult.Contents;//ReadResult.Contents;
-
-		Assert(Header->BitsPerPixel == 32);
-		Assert(Header->Compression == 3);
-
-		Result.Pixels = PushArray(Arena, Header->Width*Header->Height, u32);
-		Result.Width = Header->Width;
-		Result.Height = Header->Height;
-
-		u32* Target = (u32*)Result.Pixels;
-		u32* Source = (u32*)(((u8*)ReadResult.Contents) + Header->FileSize - 4);
-
-		bit_scan_result RedBitShift = FindLeastSignificantSetBit(Header->RedMask);
-		bit_scan_result GreenBitShift = FindLeastSignificantSetBit(Header->GreenMask);
-		bit_scan_result BlueBitShift = FindLeastSignificantSetBit(Header->BlueMask);
-		bit_scan_result AlphaBitShift = FindLeastSignificantSetBit(Header->AlphaMask);
-
-		Assert(RedBitShift.Found);
-		Assert(GreenBitShift.Found);
-		Assert(BlueBitShift.Found);
-
-		for (u32 Y = 0; Y < Result.Height; ++Y)
-		{
-			for (u32 X = 0; X < Result.Width; ++X)
-			{
-				u32 Pixel = *Source--;
-
-				bit_scan_result BitShift = {};
-
-
-				u32 Red = Pixel & Header->RedMask;
-				u8 R = (u8)(Red >> RedBitShift.Index);
-
-				u32 Green = Pixel & Header->GreenMask;
-				u8 G = (u8)(Green >> GreenBitShift.Index);
-
-				u32 Blue = Pixel & Header->BlueMask;
-				u8 B = (u8)(Blue >> BlueBitShift.Index);
-
-				u8 A = 0xff;
-				if (AlphaBitShift.Found)
-				{
-					u32 Alpha = Pixel & Header->AlphaMask;
-					A = (u8)(Alpha >> AlphaBitShift.Index);
-				}
-				*Target++ = (A << 24) | (R << 16) | (G << 8) | (B << 0);
-
-			}
-		}
-
-		FreeEntireFile(Thread, imageContentsTmp);
-	}
-
-	return Result;
-}
 void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
 {
 	game_state* GameState = Memory->GameState;
 	memory_arena* AssetArena = &GameState->AssetArena;
 
-	GameState->World = AllocateWorld(256);
+	GameState->World = AllocateWorld(10000);
 	world* World = GameState->World;
 	
 	r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
@@ -195,37 +67,105 @@ void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 	entity* Light = NewEntity( World );
 	NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
 	Light->LightComponent->Color = V4(1,1,1,1);
+	Light->SpatialComponent->ModelMatrix = M4Identity();
+	Translate( V3(3,3,3), Light->SpatialComponent );
 
 	GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
 	game_assets* Assets = GameState->World->Assets;
 
-	obj_loaded_file* square = ReadOBJFile(Thread, GameState,
+	obj_loaded_file* CubeObj = ReadOBJFile(Thread, GameState,
 			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
 				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
 				 "..\\handmade\\data\\cube\\cube.obj" );
-	obj_loaded_file* box = ReadOBJFile(Thread, GameState,
-			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-				 "..\\handmade\\data\\box\\box.obj" );
-	obj_loaded_file* sphere = ReadOBJFile(Thread, GameState,
-			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-				 "..\\handmade\\data\\sphere.obj" );
 
-	obj_loaded_file* muro = ReadOBJFile(Thread, GameState,
-			   	 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-				 "..\\handmade\\data\\Old\\geometry\\muro\\muro.obj" );
+	// Create Coordinate System
+	entity* CubeX = CreateEntityFromOBJGroup( World, &CubeObj->Objects[0], CubeObj->MeshData);
+	SetMaterial(CubeX->SurfaceComponent->Material, MATERIAL_RED_RUBBER );
+	CubeX->SurfaceComponent->Material->DiffuseMap = 0;
+	Translate(V3(1.2,0,0), CubeX->SpatialComponent );
+	Scale(V3(1,0.2,0.2), CubeX->SpatialComponent);
 
+	entity* CubeY = CreateEntityFromOBJGroup( World, &CubeObj->Objects[0], CubeObj->MeshData);
+	SetMaterial(CubeY->SurfaceComponent->Material, MATERIAL_GREEN_RUBBER );
+	CubeY->SurfaceComponent->Material->DiffuseMap = 0;
+	Translate(V3(0,1.2,0), CubeY->SpatialComponent );
+	Scale( V3(0.2,1,0.2), CubeY->SpatialComponent);
 
+	entity* CubeZ = CreateEntityFromOBJGroup( World, &CubeObj->Objects[0], CubeObj->MeshData);
+	SetMaterial(CubeZ->SurfaceComponent->Material, MATERIAL_BLUE_RUBBER  );
+	CubeZ->SurfaceComponent->Material->DiffuseMap = 0;
+	Translate(V3(0,0,1.2), CubeZ->SpatialComponent );
+	Scale( V3(0.2,0.2,1), CubeZ->SpatialComponent);
 
-	
-	CreateEntitiesFromOBJFile( World, square, V3(2,0,0) );
-	CreateEntitiesFromOBJFile( World, sphere, V3(0,2,0) );
-	CreateEntitiesFromOBJFile( World, box, V3(0,0,2) );
-	CreateEntitiesFromOBJFile( World, muro, V3(0,-1,0) );
+	entity* Floor = CreateEntityFromOBJGroup( World, &CubeObj->Objects[0], CubeObj->MeshData);
+	Translate(V3(0,-0.2,0), Floor->SpatialComponent );
+	Scale( V3(5,0.2,5), Floor->SpatialComponent);
+
+	entity* DynamicBox = CreateEntityFromOBJGroup( World, &CubeObj->Objects[0], CubeObj->MeshData);
+	Translate(V3(0,3,0), DynamicBox->SpatialComponent );
+	NewComponents( World, DynamicBox, COMPONENT_TYPE_DYNAMICS );
+	component_dynamics* BoxDynamics = DynamicBox->DynamicsComponent;
+	BoxDynamics->Velocity = V3(0,3,0);
+	BoxDynamics->Mass     = 1;
 }
 
+void initiateGame(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
+{
+	if (!Memory->GameState)
+	{
+		Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
+		
+		//Create2DScene(Thread, Memory, RenderCommands, Input );
+		Create3DScene(Thread, Memory, RenderCommands, Input );
+		for (s32 ControllerIndex = 0;
+		ControllerIndex < ArrayCount(Input->Controllers);
+			++ControllerIndex)
+		{
+			game_controller_input* Controller = GetController(Input, ControllerIndex);
+			Controller->IsAnalog = true;
+		}
+
+	}
+}
+
+/*
+	Note:
+	extern "C" prevents the C++ compiler from renaming the functions which it does for function-overloading reasons (among other things) by forcing it to use C conventions which does not support overloading. Also called 'name mangling' or 'name decoration'. The actual function names are visible in the outputted .map file in the build directory
+*/
+// Signature is
+//void game_update_and_render (thread_context* Thread, 
+//							  game_memory* Memory, 
+//							  render_commands* RenderCommands, 
+//							  game_input* Input )
+
+platform_api Platform;
+
+extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
+{
+	Platform = Memory->PlatformAPI;
+	initiateGame(Thread, Memory, RenderCommands, Input);
+
+	game_state* GameState = Memory->GameState;
+	world* World = GameState->World;
+
+	ControllerSystemUpdate(GameState->World);
+	SpatialSystemUpdate(GameState->World);
+	CameraSystemUpdate(GameState->World);
+	SpriteAnimationSystemUpdate(GameState->World);
+
+	FillRenderPushBuffer( World, RenderCommands );
+
+	CheckArena(&GameState->TemporaryArena);
+}
+
+extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
+{
+	GameOutputSound(SoundBuffer, 400);
+}
+
+
+
+#if 0
 void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
 {
 	game_state* GameState = Memory->GameState;
@@ -404,16 +344,16 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 
 	component_spatial* PrinnySpatial = PrinnyHero->SpatialComponent;
 
-	PrinnySpatial->Position = V3(1.5, 3, 0);
-	PrinnySpatial->Velocity = V3(0,0,0);
-	PrinnySpatial->ExternalForce = V3(0,0,0);
-	PrinnySpatial->RotationAngle = 0;
-	PrinnySpatial->RotationAxis = V3(0,0,1);
-	PrinnySpatial->Width  = 0.8;
-	PrinnySpatial->Height = 1.5;
-	PrinnySpatial->Width  = 1;
-	PrinnySpatial->Height = 2;
-	PrinnySpatial->Depth  = 0;
+	// PrinnySpatial->Position = V3(1.5, 3, 0);
+	// PrinnySpatial->Velocity = V3(0,0,0);
+	// PrinnySpatial->ExternalForce = V3(0,0,0);
+	// PrinnySpatial->RotationAngle = 0;
+	// PrinnySpatial->RotationAxis = V3(0,0,1);
+	// PrinnySpatial->Width  = 0.8;
+	// PrinnySpatial->Height = 1.5;
+	// PrinnySpatial->Width  = 1;
+	// PrinnySpatial->Height = 2;
+	// PrinnySpatial->Depth  = 0;
 
 	PrinnyHero->ControllerComponent->Controller = GetController(Input, 1);
 	PrinnyHero->ControllerComponent->ControllerMappingFunction = HeroController;
@@ -444,57 +384,4 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 */
 }
 
-void initiateGame(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
-{
-	if (!Memory->GameState)
-	{
-		Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
-		
-		//Create2DScene(Thread, Memory, RenderCommands, Input );
-		Create3DScene(Thread, Memory, RenderCommands, Input );
-		for (s32 ControllerIndex = 0;
-		ControllerIndex < ArrayCount(Input->Controllers);
-			++ControllerIndex)
-		{
-			game_controller_input* Controller = GetController(Input, ControllerIndex);
-			Controller->IsAnalog = true;
-		}
-
-	}
-}
-
 #endif
-/*
-	Note:
-	extern "C" prevents the C++ compiler from renaming the functions which it does for function-overloading reasons (among other things) by forcing it to use C conventions which does not support overloading. Also called 'name mangling' or 'name decoration'. The actual function names are visible in the outputted .map file in the build directory
-*/
-// Signature is
-//void game_update_and_render (thread_context* Thread, 
-//							  game_memory* Memory, 
-//							  render_commands* RenderCommands, 
-//							  game_input* Input )
-
-platform_api Platform;
-
-extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
-{
-	Platform = Memory->PlatformAPI;
-	initiateGame(Thread, Memory, RenderCommands, Input);
-
-	game_state* GameState = Memory->GameState;
-	world* World = GameState->World;
-
-	ControllerSystemUpdate(GameState->World);
-	SpatialSystemUpdate(GameState->World);
-	CameraSystemUpdate(GameState->World);
-	SpriteAnimationSystemUpdate(GameState->World);
-
-	FillRenderPushBuffer( World, RenderCommands );
-
-	CheckArena(&GameState->TemporaryArena);
-}
-
-extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
-{
-	GameOutputSound(SoundBuffer, 400);
-}

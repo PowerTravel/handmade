@@ -3,6 +3,7 @@
 
 void SpriteAnimationSystemUpdate(world* World)
 {
+	/* TODO: REDO WITH NEW SPATIAL COMPONENT SYSTEM
 	for(u32 Index = 0;  Index < World->NrEntities; ++Index )
 	{
 		entity* Entity = &World->Entities[Index];
@@ -60,4 +61,5 @@ void SpriteAnimationSystemUpdate(world* World)
 
 		}
 	}	
+	*/
 }

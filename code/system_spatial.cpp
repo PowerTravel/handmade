@@ -618,13 +618,12 @@ b32 FindEarliestCollision( aabb3f& A, list<aabb3f>& BList, v3& dR, v3& OutFirstC
 				if( (HitPercentage < FirstHitPercentage) && (HitPercentage >= 0) )
 				{
 					FirstHitPercentage = HitPercentage;
-					OutFirstCollision = dROut;
+					OutFirstCollision  = dROut;
 					OutCollisionNormal = HitNormal;
 					Intersection = true;
 				}
-			}			
+			}
 		}
-
 	}
 
 	return Intersection;
@@ -724,6 +723,7 @@ v3 HeroForceEquation( v3& Position, v3& Velocity, v3& ExternalForce )
 	return Force;
 }
 
+/* TODO: REDO WITH NEW SPATIAL/COLLISION/DYNAMIC COMPONENT
 void DoReflectionCollision(memory_arena* Arena, tile_map* TileMap, entity* E, r32 dt)
 {
 	temporary_memory TempMem = BeginTemporaryMemory( Arena );
@@ -774,6 +774,7 @@ void DoReflectionCollision(memory_arena* Arena, tile_map* TileMap, entity* E, r3
 
 	EndTemporaryMemory(TempMem);
 }
+*/
 
 #if 0
 void DoSlidingCollision(memory_arena* Arena, tile_map* TileMap, entity* E, r32 dt)
@@ -958,6 +959,7 @@ void DoSlidingCollision(memory_arena* Arena, tile_map* TileMap, entity* E, r32 d
 
 #else
 
+/* TODO: REDO WITH NEW SPATIAL/COLLISION/DYNAMIC COMPONENT
 void DoSlidingCollision(memory_arena* Arena, tile_map* TileMap, entity* E, r32 dt)
 {
 	temporary_memory TempMem = BeginTemporaryMemory( Arena );
@@ -1019,9 +1021,14 @@ void DoSlidingCollision(memory_arena* Arena, tile_map* TileMap, entity* E, r32 d
 
 	EndTemporaryMemory(TempMem);
 }
-
+*/
 
 #endif
+
+v3 GravityForceEquation(v3& a,v3& b,v3& c)
+{
+	return V3(0,-1,0);
+}
 
 void SpatialSystemUpdate( world* World )
 {
@@ -1035,21 +1042,22 @@ void SpatialSystemUpdate( world* World )
 	{
 		entity* E = &World->Entities[Index];
 
-		if(( E->Types & COMPONENT_TYPE_SPATIAL ) &&
-			( E->Types & COMPONENT_TYPE_LIGHT ))
-		{
-			local_persist float t = 0;
-    		r32 s = (r32) sin(t);
-    		r32 c = (r32) cos(t);
-    		t+=0.02;
-
-			E->SpatialComponent->Position = V3(c,2,s);
-		}
-
 		if( E->Types & COMPONENT_TYPE_SPATIAL )
 		{
 			//DoReflectionCollision(Arena, TileMap,  E, dt);
 			//DoSlidingCollision(Arena, TileMap,  E, dt);
+		}
+
+		if( E->Types & COMPONENT_TYPE_DYNAMICS )
+		{
+			// Dynamics Requires Spatial and Collision
+			Assert(E->SpatialComponent && E->CollisionComponent && E->DynamicsComponent); 
+			v3 Position = V3(GetTranslationFromMatrix( E->SpatialComponent->ModelMatrix ));
+			v3& Velocity = E->DynamicsComponent->Velocity;
+			r32 Mass = E->DynamicsComponent->Mass;
+			timestep_progression timestep =  ForwardEuler( dt, Mass, Position, Velocity, V3(0,0,0), GravityForceEquation);
+			Translate(timestep.P1-timestep.P0,E->SpatialComponent);
+			Velocity = timestep.Velocity;
 		}
 	}
 

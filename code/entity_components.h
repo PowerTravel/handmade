@@ -25,6 +25,8 @@ struct entity
 	component_light*			LightComponent;
 	component_mesh* 		 	MeshComponent;
 	component_spatial*	 		SpatialComponent;
+	component_collision*	 	CollisionComponent;
+	component_dynamics*	 		DynamicsComponent;
 	component_surface*  		SurfaceComponent;
 	component_sprite_animation* SpriteAnimationComponent;
 
@@ -57,15 +59,17 @@ struct world
 
 enum component_types
 {
-	COMPONENT_TYPE_EMPTY        	= 0x0000,
-	COMPONENT_TYPE_CAMERA 			= 0x0001,
-	COMPONENT_TYPE_LIGHT   			= 0x0002,
-	COMPONENT_TYPE_CONTROLLER   	= 0x0004,
-	COMPONENT_TYPE_MESH 	  		= 0x0008,
-	COMPONENT_TYPE_SPATIAL			= 0x0010,
-	COMPONENT_TYPE_SURFACE 			= 0x0040,
-	COMPONENT_TYPE_SPRITE_ANIMATION = 0x0080,
-	COMPONENT_TYPE_FINAL 			= 0x0100
+	COMPONENT_TYPE_EMPTY        	 = 0x0000,
+	COMPONENT_TYPE_CAMERA 			 = 0x0001,
+	COMPONENT_TYPE_LIGHT   		     = 0x0002,
+	COMPONENT_TYPE_CONTROLLER   	 = 0x0004,
+	COMPONENT_TYPE_MESH 	  		 = 0x0008,
+	COMPONENT_TYPE_SPATIAL			 = 0x0010,
+	COMPONENT_TYPE_COLLISION		 = 0x0020,
+	COMPONENT_TYPE_DYNAMICS			 = 0x0040,
+	COMPONENT_TYPE_SURFACE 		 	 = 0x0080,
+	COMPONENT_TYPE_SPRITE_ANIMATION  = 0x0100,
+	COMPONENT_TYPE_FINAL 			 = 0x0200
 };
 
 

@@ -163,17 +163,6 @@ Rotate( const r32 Angle, const v4& Axis, m4& T )
 
 	T =  bfo * RotMat * tto * T;
 }
-
-// Todo( Jakob ): Add a version of Scale that functions as Rotate, 
-//                That inverts T back to origin before scaling then moves back.
- 				   
-inline void 
-ScaleAroundOrigin( const v4& Scale, m4& T ) 
-{
-	T.E[0]  *= Scale.X;
-	T.E[5]  *= Scale.Y;
-	T.E[10] *= Scale.Z;
-}
  
 inline m4 
 GetScaleMatrix( const v4& Scale ) 
@@ -183,6 +172,32 @@ GetScaleMatrix( const v4& Scale )
 	ScaleMat.E[5]  = Scale.Y;
 	ScaleMat.E[10] = Scale.Z;
 	return ScaleMat;
+}
+
+inline void 
+Scale( const v4& Scale, m4& T )
+{
+	m4 ScaleMat = GetScaleMatrix( Scale );
+
+	m4 tto = M4(1,0,0,-T.E[3],
+				0,1,0,-T.E[7],
+				0,0,1,-T.E[13],
+				0,0,0,1);
+
+	m4 bfo = M4(1,0,0, T.E[3],
+				0,1,0, T.E[7],
+				0,0,1, T.E[13],
+				0,0,0,1);
+
+	T =  bfo * ScaleMat * tto * T;
+}
+
+inline void 
+ScaleAroundOrigin( const v4& Scale, m4& T ) 
+{
+	T.E[0]  *= Scale.X;
+	T.E[5]  *= Scale.Y;
+	T.E[10] *= Scale.Z;
 }
 
 inline v4 

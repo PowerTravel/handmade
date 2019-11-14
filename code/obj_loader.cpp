@@ -1248,48 +1248,49 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 	return Result;
 }
 
+void SetMtlMaterialToSurfaceMaterial(mtl_material* MtlMaterial, material* SurfMaterial)
+{	
+	Assert(SurfMaterial);
+	if( MtlMaterial )
+	{
+		SurfMaterial->AmbientColor  = MtlMaterial->Ka ? *MtlMaterial->Ka : V4(1,1,1,1);
+		SurfMaterial->DiffuseColor  = MtlMaterial->Kd ? *MtlMaterial->Kd : V4(1,1,1,1);
+		SurfMaterial->SpecularColor = MtlMaterial->Ks ? *MtlMaterial->Ks : V4(1,1,1,1);
+		SurfMaterial->Shininess     = MtlMaterial->Ns ? *MtlMaterial->Ns : 1;
+		SurfMaterial->DiffuseMap    = MtlMaterial->MapKd;
+	}else{
+		SetMaterial(SurfMaterial, MATERIAL_CHROME );
+	}
+}
+
 entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* MeshData )
 {
 	entity* Entity = NewEntity( World );
-	NewComponents( World, Entity,  COMPONENT_TYPE_MESH | COMPONENT_TYPE_SPATIAL | COMPONENT_TYPE_SURFACE );
+	NewComponents( World, Entity,  COMPONENT_TYPE_MESH      | 
+								   COMPONENT_TYPE_SPATIAL   | 
+								   COMPONENT_TYPE_COLLISION | 
+								   COMPONENT_TYPE_SURFACE );
 
 	Entity->MeshComponent->Indeces = OBJGrp->Indeces;
 	Entity->MeshComponent->Data = MeshData;
 
-	v3 Size = OBJGrp->BoundingBoxMax - OBJGrp->BoundingBoxMin;
-	Entity->SpatialComponent->Position = OBJGrp->CenterOfMass;
-	Entity->SpatialComponent->Velocity = V3(0,0,0);
-	Entity->SpatialComponent->RotationAngle = 0;
-	Entity->SpatialComponent->RotationAxis = V3(0,0,1);
-	Entity->SpatialComponent->IsDynamic = true;
-	Entity->SpatialComponent->Width  = Size.X;
-	Entity->SpatialComponent->Height = Size.Y;
-	Entity->SpatialComponent->Depth  = Size.Z;
+	Translate( -OBJGrp->CenterOfMass, Entity->SpatialComponent );
 
-	component_surface* Surface = Entity->SurfaceComponent;
-	Surface->Material = PushStruct( &World->Arena, material);
-	if( OBJGrp->Material )
-	{
-		Surface->Material->AmbientColor  = OBJGrp->Material->Ka ? *OBJGrp->Material->Ka : V4(1,1,1,1);
-		Surface->Material->DiffuseColor  = OBJGrp->Material->Kd ? *OBJGrp->Material->Kd : V4(1,1,1,1);
-		Surface->Material->SpecularColor = OBJGrp->Material->Ks ? *OBJGrp->Material->Ks : V4(1,1,1,1);
-		Surface->Material->Shininess     = OBJGrp->Material->Ns ? *OBJGrp->Material->Ns : 1;
-		Surface->Material->DiffuseMap    = OBJGrp->Material->MapKd;
-	}else{
-		SetMaterial(Surface->Material, MATERIAL_CHROME );
-	}
+	Entity->SpatialComponent->ModelMatrix = M4Identity();
+	Entity->CollisionComponent->AABB  = AABB3f(OBJGrp->BoundingBoxMin,OBJGrp->BoundingBoxMax);
+
+	Entity->SurfaceComponent->Material = PushStruct( &World->Arena, material);
+	SetMtlMaterialToSurfaceMaterial( OBJGrp->Material, Entity->SurfaceComponent->Material);
 
 	return Entity;
 }
 
-void CreateEntitiesFromOBJFile( world* World, obj_loaded_file* ObjFile, v3 Offset = V3(0,0,0) )
+void CreateEntitiesFromOBJFile( world* World, obj_loaded_file* ObjFile )
 {
 	for( u32  ObjectIndex = 0; ObjectIndex < ObjFile->ObjectCount; ++ObjectIndex )
 	{
 		obj_group* Grp = &ObjFile->Objects[ObjectIndex];
 		entity* Entity = CreateEntityFromOBJGroup(World, Grp, ObjFile->MeshData);
-		Entity->SpatialComponent->Position = Offset;
-
 	}
 }
 

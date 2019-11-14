@@ -70,7 +70,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 
 			entry_type_light* Body = (entry_type_light*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_light));
 			Body->Color  = Entity->LightComponent->Color;
-			Body->M      = GetAsMatrix(Entity->SpatialComponent);
+			Body->M      = Entity->SpatialComponent->ModelMatrix;
 		}
 	}
 
@@ -86,22 +86,16 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 			entry_type_mesh* Body = (entry_type_mesh*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_mesh));
 			Body->Mesh    = Entity->MeshComponent;
 			Body->Surface = Entity->SurfaceComponent;
-			Body->M  = GetAsMatrix( Entity->SpatialComponent );
+			Body->M  = Entity->SpatialComponent->ModelMatrix;
 			Body->NM = Transpose(RigidInverse(Body->M));
 		}
 
+		#if 0
 		if(Entity->Types & COMPONENT_TYPE_SPATIAL )
 		{
-			push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-			Header->Type = render_type::WIREBOX;
-
-			entry_type_wirebox* Body = (entry_type_wirebox*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_wirebox));
-			v3 Pos  = Entity->SpatialComponent->Position;
-			Body->Rect.X = Pos.X-Entity->SpatialComponent->Width/2;
-			Body->Rect.Y = Pos.Y-Entity->SpatialComponent->Height/2;
-			Body->Rect.W = Entity->SpatialComponent->Width;
-			Body->Rect.H = Entity->SpatialComponent->Height;
+			// TODO: Do Wirebox Rendering
 		}
+		#endif
 
 		if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
 		{
@@ -119,7 +113,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 			m4 SpriteOffset = GetTranslationMatrix( V4( Entity->SpriteAnimationComponent->Dimensions.X, Entity->SpriteAnimationComponent->Dimensions.Y, 0, 0 ) );
 			if( Entity->Types & COMPONENT_TYPE_SPATIAL )
 			{
-				Body->M = GetAsMatrix( Entity->SpatialComponent ) * SpriteOffset * SpriteSize;
+				Body->M = Entity->SpatialComponent->ModelMatrix * SpriteOffset * SpriteSize;
 			}
 		}
 	}

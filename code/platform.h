@@ -144,7 +144,6 @@ struct game_controller_input
 		game_button_state Button[24];
 		struct
 		{
-
 			game_button_state DPadUp;
 			game_button_state DPadDown;
 			game_button_state DPadLeft;

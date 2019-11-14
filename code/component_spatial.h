@@ -6,47 +6,49 @@
 
 struct component_spatial
 {
-	v3  Position;
-	v3  Velocity;
-	v3 	ExternalForce;
-	v3  Direction;
-	r32 RotationAngle;
-	v3  RotationAxis;
-	b32 IsDynamic;
-	r32 Width;
-	r32 Height;
-	r32 Depth;
+	// Specifies location
+	component_spatial() : ModelMatrix(M4Identity()) {}
+	m4 ModelMatrix;
 };
 
-inline m4 
-GetAsMatrix( component_spatial* SpatialComponent )
+void Translate( const v3 dr, component_spatial* c )
 {
-	if( ! SpatialComponent )
-	{
-		INVALID_CODE_PATH
-	}
-
-	m4 RotationMatrix = GetRotationMatrix(SpatialComponent->RotationAngle, V4( SpatialComponent->RotationAxis, 0 ) );
-
-	m4 TranslationMatrix = GetTranslationMatrix( V4( SpatialComponent->Position , 1 ) );
-
-	m4 Result = TranslationMatrix * RotationMatrix;
-
-	return Result;
+	Assert(c);
+	Translate(V4(dr,1), c->ModelMatrix);
 }
+
+void Scale( const v3 ds, component_spatial* c )
+{
+	Assert(c);
+	Scale( V4(ds,0), c->ModelMatrix );
+}
+
+void Rotate( const r32 Angle, const v3 Axis, component_spatial* c )
+{
+	Assert(c);
+	Rotate( Angle, V4(Axis,0), c->ModelMatrix );
+}
+
+// Requires location
+struct component_collision
+{
+	// Specifies extent
+	aabb3f AABB;
+};
 
 inline aabb3f 
-GetBoundingBox( component_spatial* SpatialComponent )
+GetBoundingBox( component_collision* CollisionComponent )
 {
-	if( ! SpatialComponent )
-	{
-		INVALID_CODE_PATH
-	}
-	v3 Pos = SpatialComponent->Position;
-	v3 Dim = V3(SpatialComponent->Width, SpatialComponent->Height, SpatialComponent->Depth);
-	aabb3f Result = AABB3f( Pos, Pos+Dim );
-	return Result;
-
+	return CollisionComponent->AABB;
 }
+
+
+// Requires spatial and collision primitive
+struct component_dynamics
+{
+	v3  Velocity;
+	r32 Mass;
+};
+
 
 #endif // COMPONENT_SPATIAL_H

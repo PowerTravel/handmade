@@ -85,10 +85,10 @@ void main()\n\
 \n\
 	vec4 E = normalize( cameraPosition - Vertice );\n\
 	vec4 H = normalize(L+E);\n\
-	Ks = pow(max( dot(H,N), 0.0 ), shininess);\n\
+	Ks = pow(max(dot(H,N), 0.0 ), shininess);\n\
 \n\
 \n\
-	vertexColor = diffuseProduct + Kd*(diffuseProduct + Ks*specularProduct);\n\
+	vertexColor = ambientProduct + Kd*(diffuseProduct + Ks*specularProduct);\n\
 \n\
 	texCoord = textureCoordinate;\n\
 	gl_Position = P*V*Vertice;\n\
@@ -106,7 +106,6 @@ uniform sampler2D ourTexture;\n\
 \n\
 void main() \n\
 {\n\
-	//fragColor = vertexColor;\n\
 	fragColor = texture(ourTexture, texCoord) * vertexColor;\n\
 }\n\
 "};
@@ -348,8 +347,8 @@ void LoadTexture( bitmap* RenderTarget )
 	// See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
 
 	// How to resize textures
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR ); // Just take nearest
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR ); // Just take nearest
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST ); // Just take nearest
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST ); // Just take nearest
 
 	// Wrapping textures, (Mirror. Repeat border color, clamp, repeat etc... )
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
@@ -463,7 +462,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 			case render_type::LIGHT:
 			{
 				entry_type_light* Light = (entry_type_light*) Body;
-				glUniform4fv( Prog->lightPosition,  1, (Light->M * V4(0,0,0,1)).E);
+				glUniform4fv( Prog->lightPosition,  1, (Light->M*V4(0,0,0,1)).E);
 				LightColor    = Light->Color;
 			}break;
 
@@ -507,7 +506,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
                     glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
                     glUniform4fv( Prog->diffuseProduct,  1, DiffuseColor.E);
                     glUniform4fv( Prog->specularProduct, 1, SpecularColor.E);
-                    glUniform1f( Prog->shininess,   Material->Shininess);
+                    glUniform1f( Prog->shininess, Material->Shininess);
 
 				}
 				

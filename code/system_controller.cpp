@@ -225,6 +225,7 @@ void HeroController( entity* HeroEntity )
 	Assert(Spatial);
 	Assert(Controller);
 
+/* TODO: REDO WITH NEW SPATIAL/COLLISION/DYNAMIC COMPONENT
 	if( Controller->IsAnalog )
 	{
 		r32 ImpulseStrength = 100;
@@ -249,4 +250,5 @@ void HeroController( entity* HeroEntity )
 			Spatial->ExternalForce = {};
 		}
 	}
+*/	
 }
