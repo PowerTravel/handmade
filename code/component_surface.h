@@ -20,12 +20,14 @@ enum MATERIAL_TYPE
 	MATERIAL_CYAN_PLASTIC,
 	MATERIAL_GREEN_PLASTIC,
 	MATERIAL_RED_PLASTIC,
+	MATERIAL_BLUE_PLASTIC,
 	MATERIAL_WHITE_PLASTIC,
 	MATERIAL_YELLOW_PLASTIC,
 	MATERIAL_BLACK_RUBBER,
 	MATERIAL_CYAN_RUBBER,
 	MATERIAL_GREEN_RUBBER,
 	MATERIAL_RED_RUBBER,
+	MATERIAL_BLUE_RUBBER,
 	MATERIAL_WHITE_RUBBER,
 	MATERIAL_YELLOW_RUBBER
 };
@@ -46,7 +48,7 @@ struct component_surface
 
 void SetMaterial(material* Material, u32 MaterialType)
 {
-	local_persist material mtl[24] = 
+	local_persist material mtl[26] = 
 	{ 
 	  { V4(0.0215,   0.1745,   0.0215,   1), V4( 0.07568,  0.61424,    0.07568,    1), V4( 0.633,      0.727811,   0.633,      1), 0.6        }, // emerald
 	  { V4(0.135,    0.2225,   0.1575,   1), V4( 0.54,     0.89,       0.63,       1), V4( 0.316228,   0.316228,   0.316228,   1), 0.1        }, // jade
@@ -63,15 +65,17 @@ void SetMaterial(material* Material, u32 MaterialType)
 	  { V4(0.0,      0.0,      0.0,      1), V4( 0.01,     0.01,       0.01,       1), V4( 0.50,       0.50,       0.50,       1), 0.25       }, // black plastic 	
 	  { V4(0.0,      0.1,      0.06,     1), V4( 0.0,      0.50980392, 0.50980392, 1), V4( 0.50196078, 0.50196078, 0.50196078, 1), 0.25       }, // cyan plastic 	
 	  { V4(0.0,      0.0,      0.0,      1), V4( 0.1,      0.35,       0.1,        1), V4( 0.45,       0.55,       0.45,       1), 0.25       }, // green plastic 	
-	  { V4(0.0,      0.0,      0.0,      1), V4( 0.5,      0.0,        0.0,        1), V4( 0.7,        0.6,        0.6,        1), 0.25       }, // red plastic 	
+	  { V4(0.0,      0.0,      0.0,      1), V4( 0.5,      0.0,        0.0,        1), V4( 0.7,        0.6,        0.6,        1), 0.25       }, // red plastic 
+	  { V4(0.0,      0.0,      0.0,      1), V4( 0.0,      0.0,        0.5,        1), V4( 0.6,        0.6,        0.7,        1), 0.25       }, // blue plastic  		
 	  { V4(0.0,      0.0,      0.0,      1), V4( 0.55,     0.55,       0.55,       1), V4( 0.70,       0.70,       0.70,       1), 0.25       }, // white plastic 	
-	  { V4(0.0,      0.0,      0.0,      1), V4( 0.5,      0.5,        0.0,        1), V4( 0.60,       0.60,       0.50,       1), 0.25       }, // yellow plastic 	
+	  { V4(0.0,      0.0,      0.0,      1), V4( 0.5,      0.5,        0.0,        1), V4( 0.60,       0.60,       0.50,       1), 0.25       }, // yellow plastic
 	  { V4(0.02,     0.02,     0.02,     1), V4( 0.01,     0.01,       0.01,       1), V4( 0.4,        0.4,        0.4,        1), 0.078125   }, // black rubber 	
 	  { V4(0.0,      0.05,     0.05,     1), V4( 0.4,      0.5,        0.5,        1), V4( 0.04,       0.7,        0.7,        1), 0.078125   }, // cyan rubber 	
 	  { V4(0.0,      0.05,     0.0,      1), V4( 0.4,      0.5,        0.4,        1), V4( 0.04,       0.7,        0.04,       1), 0.078125   }, // green rubber 	
 	  { V4(0.05,     0.0,      0.0,      1), V4( 0.5,      0.4,        0.4,        1), V4( 0.7,        0.04,       0.04,       1), 0.078125   }, // red rubber 	    
+	  { V4(0.00,     0.0,      0.05,     1), V4( 0.4,      0.4,        0.5,        1), V4( 0.04,       0.04,       0.7,        1), 0.078125   }, // blue rubber 
 	  { V4(0.05,     0.05,     0.05,     1), V4( 0.5,      0.5,        0.5,        1), V4( 0.7,        0.7,        0.7,        1), 0.078125   }, // white rubber 	
-	  { V4(0.05,     0.05,     0.0,      1), V4( 0.5,      0.5,        0.4,        1), V4( 0.7,        0.7,        0.04,       1), 0.078125   }, // yellow rubber 	
+	  { V4(0.05,     0.05,     0.0,      1), V4( 0.5,      0.5,        0.4,        1), V4( 0.7,        0.7,        0.04,       1), 0.078125   } // yellow rubber 		    
 	};
 
 	switch(MaterialType)
@@ -92,14 +96,16 @@ void SetMaterial(material* Material, u32 MaterialType)
 		case MATERIAL_CYAN_PLASTIC:   *Material = mtl[13]; break; 
 		case MATERIAL_GREEN_PLASTIC:  *Material = mtl[14]; break; 
 		case MATERIAL_RED_PLASTIC:    *Material = mtl[15]; break; 
-		case MATERIAL_WHITE_PLASTIC:  *Material = mtl[16]; break; 
-		case MATERIAL_YELLOW_PLASTIC: *Material = mtl[17]; break; 
-		case MATERIAL_BLACK_RUBBER:   *Material = mtl[18]; break; 
-		case MATERIAL_CYAN_RUBBER:    *Material = mtl[19]; break; 
-		case MATERIAL_GREEN_RUBBER:   *Material = mtl[20]; break; 
-		case MATERIAL_RED_RUBBER:     *Material = mtl[21]; break; 
-		case MATERIAL_WHITE_RUBBER:   *Material = mtl[22]; break; 
-		case MATERIAL_YELLOW_RUBBER:  *Material = mtl[23]; break; 
+		case MATERIAL_BLUE_PLASTIC:    *Material = mtl[16]; break;
+		case MATERIAL_WHITE_PLASTIC:  *Material = mtl[17]; break; 
+		case MATERIAL_YELLOW_PLASTIC: *Material = mtl[18]; break; 
+		case MATERIAL_BLACK_RUBBER:   *Material = mtl[19]; break; 
+		case MATERIAL_CYAN_RUBBER:    *Material = mtl[20]; break; 
+		case MATERIAL_GREEN_RUBBER:   *Material = mtl[21]; break; 
+		case MATERIAL_RED_RUBBER:     *Material = mtl[22]; break; 
+		case MATERIAL_BLUE_RUBBER:     *Material = mtl[23]; break;
+		case MATERIAL_WHITE_RUBBER:   *Material = mtl[24]; break; 
+		case MATERIAL_YELLOW_RUBBER:  *Material = mtl[25]; break; 
 		default: Assert(0) break;
 	}
 }

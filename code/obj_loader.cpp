@@ -1270,38 +1270,11 @@ entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* Me
 	Surface->Material = PushStruct( &World->Arena, material);
 	if( OBJGrp->Material )
 	{
-		if( OBJGrp->Material->Ka || OBJGrp->Material->Kd || OBJGrp->Material->Ks || OBJGrp->Material->Ns )
-		{
-			if(OBJGrp->Material->Ka)
-			{
-				Surface->Material->AmbientColor  = *OBJGrp->Material->Ka;
-			}else{
-				Surface->Material->AmbientColor = V4(1,1,1,1);
-			}
-
-			if(OBJGrp->Material->Kd)
-			{
-				Surface->Material->DiffuseColor  = *OBJGrp->Material->Kd;
-			}else{
-				Surface->Material->DiffuseColor = V4(1,1,1,1);
-			}
-
-			if(OBJGrp->Material->Ks)
-			{
-				Surface->Material->SpecularColor  = *OBJGrp->Material->Ks;
-			}else{
-				Surface->Material->SpecularColor = V4(1,1,1,1);
-			}
-
-			if( OBJGrp->Material->Ns )
-			{
-				Surface->Material->Shininess  	 = *OBJGrp->Material->Ns;
-			}else{
-				Surface->Material->Shininess 	 = 1;
-			}
-		}
-
-		Surface->Material->DiffuseMap  = OBJGrp->Material->MapKd;
+		Surface->Material->AmbientColor  = OBJGrp->Material->Ka ? *OBJGrp->Material->Ka : V4(1,1,1,1);
+		Surface->Material->DiffuseColor  = OBJGrp->Material->Kd ? *OBJGrp->Material->Kd : V4(1,1,1,1);
+		Surface->Material->SpecularColor = OBJGrp->Material->Ks ? *OBJGrp->Material->Ks : V4(1,1,1,1);
+		Surface->Material->Shininess     = OBJGrp->Material->Ns ? *OBJGrp->Material->Ns : 1;
+		Surface->Material->DiffuseMap    = OBJGrp->Material->MapKd;
 	}else{
 		SetMaterial(Surface->Material, MATERIAL_CHROME );
 	}

@@ -7,9 +7,7 @@
   - Sleep/timeBeginPeriod
   - WM_SETCURSOR (control cursor visibility)
   - WM_ACTIVATEAPP (for when we are not the active application)
-  - Hardware acceleration (OpenGL or Direct3D or BOTH??)
   - GetKeyboardLayout (for French keyboards, international WASD support)
-
   Just a partial list of stuff!!
 */
 
