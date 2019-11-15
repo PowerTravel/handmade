@@ -32,31 +32,6 @@ struct entity
 
 };
 
-struct game_assets
-{
-	component_sprite_animation* PrinnySet;
-
-	u32 NrEdgeTiles;
-	floor_tile_sprite* EdgeTiles;
-
-	u32 NrFloorTiles;
-	floor_tile_sprite* FloorTiles;
-};
-
-struct world
-{
-	r32 GlobalTimeSec;
-	r32 dtForFrame;
-
-	memory_arena 	Arena;
-
-	tile_map		TileMap;
-	u32 			NrEntities;
-	u32 			NrMaxEntities;
-	entity* 		Entities;
-	game_assets*	Assets;
-};
-
 enum component_types
 {
 	COMPONENT_TYPE_EMPTY        	 = 0x0000,

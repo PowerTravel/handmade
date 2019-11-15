@@ -258,8 +258,8 @@ IsTileMapPointEmpty(tile_map* TileMap, tile_map_position CanPos)
 										TilePosition.PageY, TilePosition.PageZ);
 
 
-	tile_contents TileContents  = GetTileContents(TileMap, TilePage, TilePosition.TileX, TilePosition.TileY);
-	Result = ( TileContents.Sprite != 0 );
+	tile_contents TileContents = GetTileContents(TileMap, TilePage, TilePosition.TileX, TilePosition.TileY);
+	Result = ( TileContents.TileType != 0 );
 	return Result;
 }
 

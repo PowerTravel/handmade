@@ -18,7 +18,7 @@ struct tile_map_position{
 	u32 AbsTileZ;
 };
 
-// Tile Chunk Position is teh Chunk Index from tile_map_position
+// Tile Chunk Position is the Chunk Index from tile_map_position
 // separated into its parts of high bits and low bits
 struct tile_index{
 	// High bits of PageIndex
@@ -31,22 +31,9 @@ struct tile_index{
 	u32 TileY;
 };
 
-enum tile_type
-{
-	TILE_TYPE_FLOOR,
-	TILE_TYPE_WALL
-};
-
-struct floor_tile_sprite
-{
-	bitmap* Bitmap;
-	rect2f TextureCoordinates;
-};
-
 struct tile_contents
 {
-	tile_type Type;
-	floor_tile_sprite* Sprite;
+	u32 TileType;
 };
 
 struct tile_page{

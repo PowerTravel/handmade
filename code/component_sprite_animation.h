@@ -1,13 +1,7 @@
 #ifndef COMPONENT_SPRITE_ANIMATION_H
 #define	COMPONENT_SPRITE_ANIMATION_H
 
-struct bitmap
-{
-	u32   Handle;
-	u32   Width;
-	u32   Height;
-	void* Pixels;
-};
+#include "bitmap.h"
 
 enum sprite_type
 {

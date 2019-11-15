@@ -50,6 +50,8 @@ struct push_buffer_header
 	push_buffer_header* Next;
 };
 
+struct game_assets;
+
 struct render_push_buffer
 {
 	m4 ProjectionMatrix;
