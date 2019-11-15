@@ -476,6 +476,78 @@ struct tga_header
 };
 #pragma pack(pop)
 
+u32 ReadPixel(u32 BytesPerPixel, u8* SrcData)
+{
+	u8 R,G,B,A;
+	R = G = B = A = 0;
+	switch(BytesPerPixel)
+	{
+		case 1:
+		{
+			R = G = B = *SrcData;
+			A = 255;
+		}break;
+		// RGB but No Alpha Channel
+		case 3:
+		{
+			B = *(SrcData+0);
+			G = *(SrcData+1);
+			R = *(SrcData+2);
+			A = 255;
+		}break;
+		// Full BGRA
+		case 4:
+		{
+			// BGRA Format
+			B = *(SrcData + 0);
+			G = *(SrcData + 1);
+			R = *(SrcData + 2); 
+			A = *(SrcData + 3);
+		}break;
+		default:
+		{
+			INVALID_CODE_PATH
+		}break;
+	}
+	// BGRA Format
+	//Pixel = (B << 24) | (G << 16) | (R << 8) | (A << 0);
+	// ARGB Format
+	u32 Pixel = (A << 24) | (R << 16) | (G << 8) | (B << 0);
+	return Pixel;
+}
+
+void ReadRunLengthEncodedRGB( const u32 NrPixels, const u32 BytesPerPixel, u32* DstPxl, u8* SrcData )
+{
+	u32 PixelsRead = 0;
+	while(PixelsRead < NrPixels)
+	{
+		u8 RunLengthPaket = *SrcData++;
+
+		b32 IsRunLenghtPacket = (RunLengthPaket > 7);
+		u32 RunLength = (RunLengthPaket & 0x7F)+1;
+		if(IsRunLenghtPacket)
+		{
+			// Run Length Packet: Read One pixel and increment Src Data Once
+			u32 Pixel = ReadPixel(BytesPerPixel, SrcData);
+			SrcData += BytesPerPixel;
+			for(u32 i = 0; i < RunLength; ++i)
+			{
+				// And add that one pixel RunLength times to our bitmap
+				*DstPxl++ = Pixel;
+			}
+		}else{
+			// Raw Packets: Read NrRunLength from SrcData Sequentially
+			for( u32 i = 0; i <RunLength; ++i )
+			{
+				*DstPxl++ = ReadPixel(BytesPerPixel, SrcData);
+				SrcData += BytesPerPixel;
+			}
+		}
+		PixelsRead += RunLength;
+	}
+}
+
+
 bitmap* LoadTGA( thread_context* Thread, memory_arena* AssetArena,
 				 debug_platform_read_entire_file* ReadEntireFile,
 				 debug_platfrom_free_file_memory* FreeEntireFile,
@@ -492,67 +564,50 @@ bitmap* LoadTGA( thread_context* Thread, memory_arena* AssetArena,
 
 	tga_header& Header = *(tga_header*) ReadResult.Contents;
 
-  	// Note Jakob: Seems like if > 0 it specifies the length of the 
+  	// Note Jakob: Seems like if IDLength > 0 it specifies the length of the 
     // 		       image ID Field which comes after the header.
     // 		       But specification says Header.IDLength == 1 means it
     // 			   just exists. So I will treat the field like a length between
-    // 			   header and pixel data unless it's 1 and I want to investigate.
+    // 			   header and pixel data unless it's 1 and I should investigate.
 	Assert(Header.IDLength !=  1);
-	Assert((Header.ImageType == 2) || (Header.ImageType == 3) ); // Uncompressed true color image
 	Assert(Header.XOrigin == 0 );
 	Assert(Header.YOrigin == 0 );
 
 	u32 BytesPerPixel = Header.PixelDepth/8;
-	u32 MinimumFileSize = (HeaderSize + Header.Width*Header.Height * BytesPerPixel );
-	Assert(ReadResult.ContentSize >= MinimumFileSize);
-
 
 	bitmap* Result = (bitmap*) PushStruct( AssetArena, bitmap );
 	Result->Handle = 0;
 	Result->Pixels = PushArray( AssetArena, Header.Width*Header.Height, u32);
-
-
-	u8* ScanPtr = ((u8*) ReadResult.Contents) + (sizeof(tga_header) + Header.IDLength);
-	u32* Dest = (u32*) Result->Pixels;
-
-	for( s32 i = 0; i < Header.Width*Header.Height; ++i )
-	{
-		u32 Pixel = 0;
-		u8 R = 0;
-		u8 G = 0;
-		u8 B = 0;
-		u8 A = 0;
-		if(BytesPerPixel == 4) 
-		{
-			B = *(ScanPtr + 0);
-			G = *(ScanPtr + 1);
-			R = *(ScanPtr + 2); 
-			A = *(ScanPtr + 3);
-		}
-		else if(BytesPerPixel == 1){
-			R = G = B = *ScanPtr;
-			A = 255;
-		}else if( BytesPerPixel == 3 ){
-			B = *(ScanPtr+0);
-			G = *(ScanPtr+1);
-			R = *(ScanPtr+2);
-			A = 255;
-		}else{
-			INVALID_CODE_PATH;
-		}
-
-		// BGRA Format
-		//Pixel = (B << 24) | (G << 16) | (R << 8) | (A << 0);
-		// ARGB Format
-		Pixel = (A << 24) | (R << 16) | (G << 8) | (B << 0);
-
-		ScanPtr += BytesPerPixel;
-
-		*Dest++ = Pixel;
-	}
-
 	Result->Width = Header.Width;
 	Result->Height = Header.Height;
+
+
+	u32 PixelCount = Header.Width*Header.Height;
+	u32* DstPxl = (u32*) Result->Pixels;
+	u8*  SrcData = ((u8*) ReadResult.Contents) + (sizeof(tga_header) + Header.IDLength);
+
+	if( (Header.ImageType == 2) || (Header.ImageType == 3) )
+	{
+		// Uncompressed true color image
+		u32 MinimumFileSize = (HeaderSize + PixelCount * BytesPerPixel );
+		Assert(ReadResult.ContentSize >= MinimumFileSize);	
+
+		for( u32 i = 0; i <PixelCount; ++i )
+		{
+			*DstPxl++ = ReadPixel(BytesPerPixel, SrcData);
+			SrcData += BytesPerPixel;
+		}
+	}else if( Header.ImageType == 10 || Header.ImageType == 11 )
+	{
+		// Run-Length Endoded True color Image
+		ReadRunLengthEncodedRGB(PixelCount, BytesPerPixel, (u32*) DstPxl, SrcData);
+	}else{
+		// We only support Black And White RLE Encoded images and True Color Images
+		// IE not color mapping
+		INVALID_CODE_PATH
+	}
+
+	
 	FreeEntireFile(Thread, ReadResult.Contents);
 
 	return Result;
