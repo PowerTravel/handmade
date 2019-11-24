@@ -99,7 +99,8 @@ struct game_render_commands
 	s32 Width;
 	s32 Height;
 
-	opengl_program RenderProgram;
+	opengl_program2D RenderProgram2D;
+	opengl_program3D RenderProgram3D;
 
 	utils::push_buffer TemporaryMemory;     // Buffer used for temporary storage
 	utils::push_buffer RenderMemory;  // The Render Push Buffer

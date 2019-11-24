@@ -19,144 +19,210 @@ internal void
 GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
 {
 
-	local_persist r32 tSine = 0.f;
+  local_persist r32 tSine = 0.f;
 
-	s16 ToneVolume = 2000;
-	int SamplesPerPeriod = SoundBuffer->SamplesPerSecond / ToneHz;
+  s16 ToneVolume = 2000;
+  int SamplesPerPeriod = SoundBuffer->SamplesPerSecond / ToneHz;
 
-	r32 twopi = (r32)(2.0*Pi32);
+  r32 twopi = (r32)(2.0*Pi32);
 
-	s16 *SampleOut = SoundBuffer->Samples;
-	for (int SampleIndex = 0;
-	SampleIndex < SoundBuffer->SampleCount;
-		++SampleIndex)
-	{
+  s16 *SampleOut = SoundBuffer->Samples;
+  for (int SampleIndex = 0;
+  SampleIndex < SoundBuffer->SampleCount;
+    ++SampleIndex)
+  {
 
 #if 0
-		r32 SineValue = Sin(tSine);
-		s16 SampleValue = (s16)(SineValue * ToneVolume);
+    r32 SineValue = Sin(tSine);
+    s16 SampleValue = (s16)(SineValue * ToneVolume);
 
-		tSine += twopi / (r32)SamplesPerPeriod;
-		if (tSine > twopi)
-		{
-			tSine -= twopi;
-		}
-#else	
-		s16 SampleValue = 0;
-#endif	
-		*SampleOut++ = SampleValue; // Left Speker
-		*SampleOut++ = SampleValue; // Rright speaker
-	}
+    tSine += twopi / (r32)SamplesPerPeriod;
+    if (tSine > twopi)
+    {
+      tSine -= twopi;
+    }
+#else
+    s16 SampleValue = 0;
+#endif
+    *SampleOut++ = SampleValue; // Left Speker
+    *SampleOut++ = SampleValue; // Rright speaker
+  }
 }
 
 void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
 {
-	game_state* GameState = Memory->GameState;
-	memory_arena* AssetArena = &GameState->AssetArena;
+  game_state* GameState = Memory->GameState;
+  memory_arena* AssetArena = &GameState->AssetArena;
 
-	GameState->World = AllocateWorld(10000);
-	world* World = GameState->World;
-	
-	r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
-	r32 FieldOfView =  90;
-	entity* Camera = CreateCameraEntity(World, FieldOfView, AspectRatio);
-	LookAt(Camera->CameraComponent, V3(2,2,2), V3(0,0,0));
+  GameState->World = AllocateWorld(10000);
+  world* World = GameState->World;
 
-	NewComponents( World, Camera, COMPONENT_TYPE_CONTROLLER );
-	Camera->ControllerComponent->Controller = GetController(Input, 1);
-	Camera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
+  r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
+  r32 FieldOfView =  90;
+  entity* Camera = CreateCameraEntity(World, FieldOfView, AspectRatio);
+  LookAt(Camera->CameraComponent, V3(2,2,2), V3(0,0,0));
 
-	entity* Light = NewEntity( World );
-	NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
-	Light->LightComponent->Color = V4(1,1,1,1);
-	Light->SpatialComponent->ModelMatrix = M4Identity();
-	Translate( V3(3,3,3), Light->SpatialComponent );
+  NewComponents( World, Camera, COMPONENT_TYPE_CONTROLLER );
+  Camera->ControllerComponent->Controller = GetController(Input, 1);
+  Camera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
 
-	GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
-	game_assets* Assets = GameState->World->Assets;
+  entity* Light = NewEntity( World );
+  NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
+  Light->LightComponent->Color = V4(1,1,1,1);
+  Light->SpatialComponent->ModelMatrix = M4Identity();
+  Translate( V3(3,3,3), Light->SpatialComponent );
+
+  GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
+  game_assets* Assets = GameState->World->Assets;
 
 
-//	Assets->TileMapSpriteSheet.bitmap = LoadTGA( Thread, &GameState->AssetArena,
-//				 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-//				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-//				 "..\\handmade\\data\\Platformer\\tiles_spritesheet.tga" );
-//
-//	static const bitmap_coordinate* coordinates = LoadImageCoordinates(&Assets->TileMapSpriteSheet.EntryCount);
-//	Assets->TileMapSpriteSheet.coordinates = (bitmap_coordinate*)
-//		PushCopy(AssetArena, Assets->TileMapSpriteSheet.EntryCount*sizeof(bitmap_coordinate), (void*) coordinates);
-//
-	bitmap* TileMap = LoadTGA( Thread, &GameState->AssetArena,
-				 Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-				 Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-				 "..\\handmade\\data\\Platformer\\TileMap.tga" );
+  Assets->TileMapSpriteSheet.bitmap = LoadTGA( Thread, &GameState->AssetArena,
+         Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+         Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+        "..\\handmade\\data\\Platformer\\tiles_spritesheet.tga" );
 
-	u32* TileMapPixels = (u32*) TileMap->Pixels;
-	for (u32 X = 0; X < TileMap->Width; ++X)
-	{
-		for (u32 Y = 0; Y < TileMap->Height; ++Y)
-		{
-			// Check IF Alpha Value exists
-			if((*TileMapPixels++ & 0xff) != 0)
-			{
-				tile_contents TileContents = {};
-				TileContents.TileType = 1;
-				SetTileContentsAbs(&GameState->AssetArena, &World->TileMap, X, Y, 0, TileContents );
-			}
-		}
-	}
+  bitmap* TileMap = LoadTGA( Thread, &GameState->AssetArena,
+         Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+         Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+         "..\\handmade\\data\\Platformer\\TileMap.tga" );
+
+  u32* pixels = (u32*) PushStruct(AssetArena, u32);
+
+  bitmap* SpriteSheet = Assets->TileMapSpriteSheet.bitmap;
+  for (u32 X = 0; X < TileMap->Width; ++X)
+  {
+    for (u32 Y = 0; Y < TileMap->Height; ++Y)
+    {
+      // Check IF Alpha Value exists
+      u8 A,R,G,B;
+      u32  CurrentPixel = 0;
+      if(!GetPixelValue(TileMap, X, Y, &CurrentPixel)) break;
+
+      SplitPixelIntoARGBComponents(CurrentPixel,&A,&R,&G,&B);
+
+      if(!A) break;
+
+      tile_contents TileContents = {};
+      TileContents.Bitmap = SpriteSheet;
+      if( G == 0xff )
+      {
+        b32 ToLeft  = false;
+        b32 ToRight = false;
+        TileContents.Type = TILE_TYPE_FLOOR;
+
+        u32 LeftPixelValue = 0;
+        if( GetPixelValue(TileMap, X+1, Y, &LeftPixelValue) )
+        {
+          SplitPixelIntoARGBComponents(LeftPixelValue,&A,&R,&G,&B);
+          if( G == 0xff )
+          {
+            ToLeft = true;
+          }
+        }
+
+        u32 RightPixelValue = 0;
+        if( GetPixelValue(TileMap, X-1, Y, &RightPixelValue) )
+        {
+          SplitPixelIntoARGBComponents(RightPixelValue,&A,&R,&G,&B);
+          if( G == 0xff )
+          {
+            ToRight = true;
+          }
+        }
+
+        if(ToLeft && ToRight)
+        {
+          TileContents.TM = GetSpriteSheetTranslationMatrix(sprite_type_grassMid, SpriteSheet);
+        }else if(ToLeft && !ToRight)
+        {
+          TileContents.TM = GetSpriteSheetTranslationMatrix(sprite_type_grassLeft, SpriteSheet);
+        }else if(!ToLeft && ToRight)
+        {
+          TileContents.TM = GetSpriteSheetTranslationMatrix(sprite_type_grassRight, SpriteSheet);
+        }else if(!ToLeft && !ToRight)
+        {
+          TileContents.TM = GetSpriteSheetTranslationMatrix(sprite_type_grass, SpriteSheet);
+        }
+        SetTileContentsAbs(&GameState->AssetArena, &World->TileMap, X, Y, 0, TileContents );
+      }
+        #if 0
+        sprite_type_grass,
+        sprite_type_grassCenter,
+        sprite_type_grassCenter_rounded,
+        sprite_type_grassCliffLeft,
+        sprite_type_grassCliffLeftAlt,
+        sprite_type_grassCliffRight,
+        sprite_type_grassCliffRightAlt,
+        sprite_type_grassHalf,
+        sprite_type_grassHalfLeft,
+        sprite_type_grassHalfMid,
+        sprite_type_grassHalfRight,
+        sprite_type_grassHillLeft,
+        sprite_type_grassHillLeft2,
+        sprite_type_grassHillRight,
+        sprite_type_grassHillRight2,
+        sprite_type_grassLedgeLeft,
+        sprite_type_grassLedgeRight,
+        sprite_type_grassLeft,
+        sprite_type_grassMid,
+        sprite_type_grassRight,
+        #endif
+
+    }
+  }
 
 }
 
 void initiateGame(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
 {
-	if (!Memory->GameState)
-	{
-		Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
-		
-		//Create2DScene(Thread, Memory, RenderCommands, Input );
-		Create3DScene(Thread, Memory, RenderCommands, Input );
-		for (s32 ControllerIndex = 0;
-		ControllerIndex < ArrayCount(Input->Controllers);
-			++ControllerIndex)
-		{
-			game_controller_input* Controller = GetController(Input, ControllerIndex);
-			Controller->IsAnalog = true;
-		}
+  if (!Memory->GameState)
+  {
+    Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
 
-	}
+    //Create2DScene(Thread, Memory, RenderCommands, Input );
+    Create3DScene(Thread, Memory, RenderCommands, Input );
+    for (s32 ControllerIndex = 0;
+    ControllerIndex < ArrayCount(Input->Controllers);
+      ++ControllerIndex)
+    {
+      game_controller_input* Controller = GetController(Input, ControllerIndex);
+      Controller->IsAnalog = true;
+    }
+
+  }
 }
 
 /*
-	Note:
-	extern "C" prevents the C++ compiler from renaming the functions which it does for function-overloading reasons (among other things) by forcing it to use C conventions which does not support overloading. Also called 'name mangling' or 'name decoration'. The actual function names are visible in the outputted .map file in the build directory
+  Note:
+  extern "C" prevents the C++ compiler from renaming the functions which it does for function-overloading reasons (among other things) by forcing it to use C conventions which does not support overloading. Also called 'name mangling' or 'name decoration'. The actual function names are visible in the outputted .map file in the build directory
 */
 // Signature is
-//void game_update_and_render (thread_context* Thread, 
-//							  game_memory* Memory, 
-//							  render_commands* RenderCommands, 
-//							  game_input* Input )
+//void game_update_and_render (thread_context* Thread,
+//                game_memory* Memory,
+//                render_commands* RenderCommands,
+//                game_input* Input )
 
 platform_api Platform;
 
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
-	Platform = Memory->PlatformAPI;
-	initiateGame(Thread, Memory, RenderCommands, Input);
+  Platform = Memory->PlatformAPI;
+  initiateGame(Thread, Memory, RenderCommands, Input);
 
-	game_state* GameState = Memory->GameState;
-	world* World = GameState->World;
+  game_state* GameState = Memory->GameState;
+  world* World = GameState->World;
 
-	ControllerSystemUpdate(GameState->World);
-	SpatialSystemUpdate(GameState->World);
-	CameraSystemUpdate(GameState->World);
-	SpriteAnimationSystemUpdate(GameState->World);
+  ControllerSystemUpdate(GameState->World);
+  SpatialSystemUpdate(GameState->World);
+  CameraSystemUpdate(GameState->World);
+  SpriteAnimationSystemUpdate(GameState->World);
 
-	FillRenderPushBuffer( World, RenderCommands );
+  FillRenderPushBuffer( World, RenderCommands );
 
-	CheckArena(&GameState->TemporaryArena);
+  CheckArena(&GameState->TemporaryArena);
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
 {
-	GameOutputSound(SoundBuffer, 400);
+  GameOutputSound(SoundBuffer, 400);
 }

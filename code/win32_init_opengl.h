@@ -1,6 +1,6 @@
 /*
  * This file will bootstrap OpenGL on windows.
- * It declares globaly OpenGL functions and gets 
+ * It declares globaly OpenGL functions and gets
  * using wglGetProcAddress
  */
 

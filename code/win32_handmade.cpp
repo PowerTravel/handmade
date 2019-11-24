@@ -411,13 +411,7 @@ Win32DisplayBufferInWindow( game_render_commands* Commands, HDC aDeviceContext, 
 	b32 DisplayViaHardware = true;
 
 	if(InHardware)
-	{	
-		if(!Commands->RenderProgram.Program)
-		{
-			Commands->RenderProgram = OpenGLCreateShaderProgram();
-			glUseProgram(Commands->RenderProgram.Program);
-		}
-		
+	{
 		OpenGLRenderGroupToOutput( Commands, aWindowWidth, aWindowHeight );
 
 		SwapBuffers(aDeviceContext);

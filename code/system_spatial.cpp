@@ -575,13 +575,14 @@ list< aabb3f > GetOverlappingWallTiles(memory_arena* Arena, tile_map* TileMap, a
 	GetIntersectingTiles(TileMap, &TilesToTest, &EnvelopedBoundingBox);
 
 	list< aabb3f > IntersectingWallTiles = list< aabb3f >( Arena );
-	for(TilesToTest.First(); 
+	for(TilesToTest.First();
 	   !TilesToTest.IsEnd();
 	    TilesToTest.Next() )
 	{
 		tile_map_position TilePosition = TilesToTest.Get();
 		tile_contents Content = GetTileContents(TileMap, TilePosition);
-		if( Content.TileType == 1 )
+		if( (Content.Type == TILE_TYPE_WALL) ||
+			(Content.Type == TILE_TYPE_FLOOR) )
 		{
 			aabb3f WallTile = GetTileAABB( TileMap, TilePosition );
 			IntersectingWallTiles.InsertAfter(WallTile);

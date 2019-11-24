@@ -104,14 +104,16 @@ struct opengl_info
 	b32 GL_blend_func_separate;
 };
 
-struct opengl_program
+struct opengl_program3D
 {
 	u32 Program;
 	s32 M;
 	s32 NM;// NoramlModel NM = Transpose( RigidInverse(M) )
+	s32 TM;// A transform Matrix for texture coordinates;
 	s32 P;
 	s32 V;
 
+	// Todo: Create hash-map for these with strings as keys
 	s32 lightPosition;
 	s32 cameraPosition;
 	s32 ambientProduct;
@@ -119,6 +121,18 @@ struct opengl_program
 	s32 specularProduct;
 	s32 attenuation;
 	s32 shininess;
+};
+
+
+struct opengl_program2D
+{
+	u32 Program;
+	s32 M;
+	s32 P;
+	s32 V;
+
+	// Todo: Create hash-map for these with strings as keys
+	s32 texCoord;
 };
 
 struct opengl_buffer_object
