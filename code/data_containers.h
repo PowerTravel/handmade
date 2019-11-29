@@ -4,176 +4,286 @@
 template <class T>
 class list
 {
-	struct entry
-	{
-		T Data;
-		entry* Previous;
-		entry* Next;
-	};
+  struct entry
+  {
+    T Data;
+    entry* Previous;
+    entry* Next;
+  };
 
-	entry* Sentinel;
-	entry* Position;
-	
-	memory_arena* Arena;
+  entry* Sentinel;
+  entry* Position;
 
-	u32 Size;
+  memory_arena* Arena;
 
-	void InsertBetween( entry* A, entry* B, entry* NewEntry )
-	{
-		NewEntry->Previous = A;
-		NewEntry->Next = B;
+  u32 Size;
 
-		if(A)
-		{
-			A->Next = NewEntry;
-		}
+  void InsertBetween( entry* A, entry* B, entry* NewEntry )
+  {
+    NewEntry->Previous = A;
+    NewEntry->Next = B;
 
-		if(B)
-		{
-			B->Previous =NewEntry;
-		}
+    if(A)
+    {
+      A->Next = NewEntry;
+    }
 
-		Position = NewEntry;
+    if(B)
+    {
+      B->Previous =NewEntry;
+    }
 
-		++Size;
-	}
+    Position = NewEntry;
 
-	entry* AllocateNewEntry(const T& Data)
-	{
-		entry* Result = (entry*) PushStruct(Arena, entry);
-		Result->Data = Data;
-		return Result;
-	}
+    ++Size;
+  }
 
-	public:
-		list() : Sentinel(0), Position(0), Arena(0), Size(0){};
+  entry* AllocateNewEntry(const T& Data)
+  {
+    entry* Result = (entry*) PushStruct(Arena, entry);
+    Result->Data = Data;
+    return Result;
+  }
 
-		list(memory_arena* aArena) : Sentinel(0), Position(0), Arena(0), Size(0)
-		{
-			Initiate(aArena);
-		}
+  public:
+    list() : Sentinel(0), Position(0), Arena(0), Size(0){};
 
-		void Initiate( memory_arena* aArena )
-		{
-			Arena = aArena;
-			Sentinel = (entry*) PushStruct(Arena, entry);
-			Sentinel->Previous = Sentinel;
-			Sentinel->Next = Sentinel;
-			Position = Sentinel;
-		}
+    list(memory_arena* aArena) : Sentinel(0), Position(0), Arena(0), Size(0)
+    {
+      Initiate(aArena);
+    }
 
-		u32 GetSize() { return Size; };
-		b32 IsEmpty() { return ( Size==0 ); }
-		b32 IsEnd()   { return (Position == Sentinel); };
-		
+    void Initiate( memory_arena* aArena )
+    {
+      Arena = aArena;
+      Sentinel = (entry*) PushStruct(Arena, entry);
+      Sentinel->Previous = Sentinel;
+      Sentinel->Next = Sentinel;
+      Position = Sentinel;
+    }
 
-		void First()   { Position = Sentinel->Next;     };
-		void Last()    { Position = Sentinel->Previous; };
-		void Next()    { if(!IsEnd()) { Position = Position->Next;     } };
-		void Previous(){ if(!IsEnd()) { Position = Position->Previous; } };
+    u32 GetSize() { return Size; };
+    b32 IsEmpty() { return ( Size==0 ); }
+    b32 IsEnd()   { return (Position == Sentinel); };
 
-		void InsertBefore(const T& Data)
-		{
-			entry* NewEntry = AllocateNewEntry( Data );
-			InsertBetween( Position->Previous, Position, NewEntry );
-		};
 
-		void InsertAfter(const T& Data)
-		{
-			entry* NewEntry = AllocateNewEntry( Data );
-			InsertBetween( Position, Position->Next, NewEntry );
-		}
+    void First()   { Position = Sentinel->Next;     };
+    void Last()    { Position = Sentinel->Previous; };
+    void Next()    { if(!IsEnd()) { Position = Position->Next;     } };
+    void Previous(){ if(!IsEnd()) { Position = Position->Previous; } };
 
-		void Remove()
-		{  
-			if(IsEnd()){ return; }
+    void InsertBefore(const T& Data)
+    {
+      entry* NewEntry = AllocateNewEntry( Data );
+      InsertBetween( Position->Previous, Position, NewEntry );
+    };
 
-			entry* Base = Position->Previous;
-			entry* Next = Position->Next;
+    void InsertAfter(const T& Data)
+    {
+      entry* NewEntry = AllocateNewEntry( Data );
+      InsertBetween( Position, Position->Next, NewEntry );
+    }
 
-			Base->Next = Next;
-			Next->Previous = Base;
-			
-			Position = Base;
-			if(Position == Sentinel)
-			{
-				Position = Sentinel->Next;	
-			}
-			
-			--Size;
-		};
+    void Remove()
+    {
+      if(IsEnd()){ return; }
 
-		T Get()
-		{ 
-			return Position->Data; 
-		};
+      entry* Base = Position->Previous;
+      entry* Next = Position->Next;
+
+      Base->Next = Next;
+      Next->Previous = Base;
+
+      Position = Base;
+      if(Position == Sentinel)
+      {
+        Position = Sentinel->Next;
+      }
+
+      --Size;
+    };
+
+    T Get()
+    {
+      return Position->Data;
+    };
 };
 
 
 template <class T>
 class fifo_queue
 {
-	list<T> List;
+  list<T> List;
 
-	public: 
+  public:
 
-		fifo_queue(){};
-		fifo_queue( memory_arena* aArena ) : List(aArena){};
+    fifo_queue(){};
+    fifo_queue( memory_arena* aArena ) : List(aArena){};
 
-		void Initiate( memory_arena* aArena )
-		{
-			List.Initiate();
-		};
+    void Initiate( memory_arena* aArena )
+    {
+      List.Initiate();
+    };
 
-		void Push( const T& Entry )
-		{
-			List.Last();
-			List.InsertAfter(Entry);
-		};
+    void Push( const T& Entry )
+    {
+      List.Last();
+      List.InsertAfter(Entry);
+    };
 
-		T Pop( )
-		{
-			List.First();
-			T Result = List.Get();
-			List.Remove();
-			return Result;
-		};
+    T Pop( )
+    {
+      List.First();
+      T Result = List.Get();
+      List.Remove();
+      return Result;
+    };
 
-		b32 IsEmpty(){ return List.IsEmpty(); };
-		u32 GetSize(){ return List.GetSize(); };
+    b32 IsEmpty(){ return List.IsEmpty(); };
+    u32 GetSize(){ return List.GetSize(); };
 };
 
 
 template <class T>
 class filo_queue
 {
-	list<T> List;
+  list<T> List;
 
-	public: 
+  public:
 
-		filo_queue( ) : List(){};
-		filo_queue( memory_arena* aArena ) : List(aArena){};
-		void Initiate( memory_arena* aArena )
-		{
-			List.Initiate();
-		};
+    filo_queue( ) : List(){};
+    filo_queue( memory_arena* aArena ) : List(aArena){};
+    void Initiate( memory_arena* aArena )
+    {
+      List.Initiate();
+    };
 
-		void Push( T& Entry )
-		{
-			List.Last();
-			List.InsertBefore(Entry);
-		};
+    void Push( T& Entry )
+    {
+      List.Last();
+      List.InsertBefore(Entry);
+    };
 
-		T Pop( )
-		{
-			List.First();
-			T Result = List.Get();
-			List.Remove();
-			return Result;
-		};
+    T Pop( )
+    {
+      List.First();
+      T Result = List.Get();
+      List.Remove();
+      return Result;
+    };
 
-		u32 GetSize(){ return List.GetSize(); };
-		b32 IsEmpty(){ return List.IsEmpty(); };
+    u32 GetSize(){ return List.GetSize(); };
+    b32 IsEmpty(){ return List.IsEmpty(); };
+};
+
+template <class T>
+class vector
+{
+  T* Base;
+  u32 MaxCount;
+
+public:
+  vector() : Base(0), Arena(0), MaxCount(0){};
+  vector(memory_arena* Arena, u32 Size) : Base(0), MaxCount(Size)
+  {
+    Initiate(Arena,MaxCount);
+  };
+
+  void Initiate(memory_arena* Arena, u32 Size)
+  {
+    Base = (T*) PushArray(Arena, Size, T);
+  }
+
+  void Insert(u32 Idx, T& Value )
+  {
+    Assert(Idx<MaxCount);
+
+    T* Pos = Base+Idx;
+    *Pos = Value;
+  }
+
+  T* Get(u32 Idx)
+  {
+    Assert(Idx<MaxCount);
+    return Base+Idx;
+  }
+};
+
+template <class T>
+class hash_map
+{
+  struct pair
+  {
+    char Key[16];
+    T Val;
+  };
+
+  // djb2 from http://www.cse.yorku.ca/~oz/hash.html
+  u32 djb2_hash(const char* str)
+  {
+    u32 hash = 5381;
+    int c;
+
+    while (c = *str++)
+      hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+    return hash;
+  }
+
+  memory_arena* Arena;
+  u32 Size;
+  vector< list< pair > > Map;
+
+  public:
+    hash_map( ) : Map() {};
+    hash_map( memory_arena* aArena, u32 aSize ) : Arena(aArena),  Size(aSize), Map(aArena, aSize){};
+
+    void Insert( const char Key[], const T& Value)
+    {
+      // Check it's null terminated in less than 16 chars.
+      Assert( str::StringLength( Key ) < 16 );
+
+      u32 Hash = djb2_hash(Key);
+
+      pair Item;
+      for (u32 i = 0; i < 16; ++i)
+      {
+        Item.Key[i] = Key[i];
+      }
+      Item.Val = Value;
+
+      list<pair>* li = Map.Get(Hash % Size);
+
+      if(li->IsEmpty())
+      {
+        li->Initiate(Arena);
+      }
+
+      li->First();
+      li->InsertBefore(Item);
+
+    }
+
+    T Get( const char* Key)
+    {
+      // Check it's null terminated in less than 16 chars.
+      Assert( str::StringLength( Key ) < 16 );
+
+      u32 Hash = djb2_hash(Key);
+
+      list<pair>* li = Map.Get(Hash % Size);
+
+      for(li->First(); !li->IsEnd(); li->Next() )
+      {
+        pair p = li->Get();
+        if(str::Equals( p.Key, Key ))
+        {
+          return p.Val;
+        }
+      }
+
+      return 0;
+    }
 };
 
 
