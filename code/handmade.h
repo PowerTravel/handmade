@@ -3,12 +3,14 @@
 
 #include <stdio.h>
 
-#include "types.h"
-
-#include "bitmap.h"
-#include "platform_opengl.h"
 #include "platform.h"
+
+#include "vector_math.h"
+
 #include "memory.h"
+#include "data_containers.h"
+#include "bitmap.h"
+#include "entity_components.h"
 #include "render_push_buffer.h"
 #include "handmade_tile.h"
 

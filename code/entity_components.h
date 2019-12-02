@@ -1,10 +1,6 @@
 #ifndef ENTITY_COMPONENTS_H
 #define ENTITY_COMPONENTS_H
 
-#include "vector_math.h"
-#include "handmade_tile.h"
-#include "memory.h"
-
 static s32 EntityID = 0;
 
 #include "component_camera.h"

@@ -53,8 +53,7 @@ void CameraSystemUpdate( world* World )
 	{
 		entity* Entity = &World->Entities[Index];
 
-		if( ( Entity->Types & COMPONENT_TYPE_CAMERA ) &&
-			( Entity->Types & COMPONENT_TYPE_CONTROLLER )  )
+		if( ( Entity->Types & COMPONENT_TYPE_CAMERA ) )
 		{
 			UpdateViewMatrix( Entity->CameraComponent );
 		}

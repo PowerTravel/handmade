@@ -90,38 +90,27 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       Body->NM = Transpose(RigidInverse(Body->M));
     }
 
-    #if 0
-    if(Entity->Types & COMPONENT_TYPE_SPATIAL )
-    {
-      // TODO: Do Wirebox Rendering
-    }
-
-
     if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
     {
       push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-      Header->Type = render_type::SPRITE;
+      Header->Type = render_type::TILE;
 
       entry_type_sprite* Body = (entry_type_sprite*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_sprite));
 
       // Store only the sprite to be displayed for current frame
       Body->Bitmap = Entity->SpriteAnimationComponent->Bitmap;
-      Body->Coordinates = *Entity->SpriteAnimationComponent->ActiveSeries->ActiveFrame;
-
       Body->M = M4Identity();
-      m4 SpriteSize   = GetScaleMatrix( V4( Entity->SpriteAnimationComponent->Dimensions.W, Entity->SpriteAnimationComponent->Dimensions.H, 1, 0 ) );
-      m4 SpriteOffset = GetTranslationMatrix( V4( Entity->SpriteAnimationComponent->Dimensions.X, Entity->SpriteAnimationComponent->Dimensions.Y, 0, 0 ) );
+      Body->TM = Entity->SpriteAnimationComponent->ActiveSeries->Get();
       if( Entity->Types & COMPONENT_TYPE_SPATIAL )
       {
-        Body->M = Entity->SpatialComponent->ModelMatrix * SpriteOffset * SpriteSize;
+        Body->M = Entity->SpatialComponent->ModelMatrix;// * SpriteOffset * SpriteSize;
       }
     }
-        #endif
   }
 
   // Get Position from Entity->CameraComponent->V
-  u32 Width = 64;
-  u32 Height = 64;
+  u32 Width = 12;
+  u32 Height = 12;
 
   sprite_sheet Sprite = World->Assets->TileMapSpriteSheet;
   for(u32 i = 0; i < Height; ++i )

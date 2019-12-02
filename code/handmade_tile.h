@@ -1,8 +1,6 @@
 #ifndef HANDMADE_TILE_H
 #define HANDMADE_TILE_H
 
-#include "component_sprite_animation.h"
-
 struct tile_map_position{
 
   // Position within a tile

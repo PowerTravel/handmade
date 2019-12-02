@@ -2,6 +2,7 @@
 #include "render_push_buffer.h"
 #include "affine_transformations.h"
 #include "string.h"
+#include "bitmap.h"
 
 global_variable u32 TextureBindCount = 0;
 
@@ -558,6 +559,11 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
         }
 
         OpenGLDraw( MeshEntry->Mesh->VAO, MeshEntry->Mesh->Indeces.Count );
+
+      }break;
+
+      case render_type::SPRITE:
+      {
 
       }break;
 

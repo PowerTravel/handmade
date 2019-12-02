@@ -49,22 +49,14 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
   }
 }
 
-void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
+void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
 {
   game_state* GameState = Memory->GameState;
   memory_arena* AssetArena = &GameState->AssetArena;
+  memory_arena* TemporaryArena = &GameState->TemporaryArena;
 
   GameState->World = AllocateWorld(10000);
   world* World = GameState->World;
-
-  r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
-  r32 FieldOfView =  90;
-  entity* Camera = CreateCameraEntity(World, FieldOfView, AspectRatio);
-  LookAt(Camera->CameraComponent, V3(2,2,2), V3(0,0,0));
-
-  NewComponents( World, Camera, COMPONENT_TYPE_CONTROLLER );
-  Camera->ControllerComponent->Controller = GetController(Input, 1);
-  Camera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
 
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
@@ -75,19 +67,80 @@ void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_comm
   GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
   game_assets* Assets = GameState->World->Assets;
 
+  entity* Player = NewEntity( World );
+
+  NewComponents( World, Player, COMPONENT_TYPE_CONTROLLER |
+                                COMPONENT_TYPE_SPATIAL | COMPONENT_TYPE_COLLISION | COMPONENT_TYPE_DYNAMICS |
+                                COMPONENT_TYPE_SPRITE_ANIMATION |
+                                COMPONENT_TYPE_CAMERA);
+
+  r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
+  r32 FieldOfView =  90;
+  SetCameraComponent(Player->CameraComponent, FieldOfView, AspectRatio );
+  LookAt(Player->CameraComponent, 3*V3(0,0,1), V3(0,0,0));
+
+  Player->ControllerComponent->Controller = GetController(Input, 1);
+  Player->ControllerComponent->ControllerMappingFunction = HeroController;
+
+  Put( V3(0,3,0), Player->SpatialComponent );
+  Player->CollisionComponent->AABB = AABB3f( V3(0,0,0), V3(1,1,0) );
+
+  Player->DynamicsComponent->Velocity = V3(0,0,0);
+  Player->DynamicsComponent->Mass = 1;
+
+  component_sprite_animation* SpriteAnimation = Player->SpriteAnimationComponent;
+
+  Assets->HeroSpriteSheet.bitmap = LoadTGA( Thread, &GameState->AssetArena,
+         Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+         Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+        "..\\handmade\\data\\Platformer\\Adventurer\\adventurer-Sheet.tga" );
+  bitmap* HeroSpriteSheet = Assets->HeroSpriteSheet.bitmap;
+
+
+  hash_map<bitmap_coordinate> HeroCoordinates = LoadAdventurerSpriteSheetCoordinates( TemporaryArena );
+  SpriteAnimation->Bitmap = Assets->HeroSpriteSheet.bitmap;
+  SpriteAnimation->Animation = hash_map< list<m4> >(AssetArena,6);
+
+  list<m4> Idle1(AssetArena);
+  Idle1.First();
+  Idle1.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle1_01")));
+  Idle1.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle1_02")));
+  Idle1.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle1_03")));
+  Idle1.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle1_04")));
+  SpriteAnimation->Animation.Insert("idle1",  Idle1);
+
+  list<m4> Idle2(AssetArena);
+  Idle2.First();
+  Idle2.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle2_01")));
+  Idle2.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle2_02")));
+  Idle2.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle2_03")));
+  Idle2.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle2_04")));
+  SpriteAnimation->Animation.Insert("idle2",  Idle2);
+
+  list<m4> Run(AssetArena);
+  Run.First();
+  Run.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("run_01")));
+  Run.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("run_02")));
+  Run.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("run_03")));
+  Run.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("run_04")));
+  Run.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("run_05")));
+  Run.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("run_06")));
+  SpriteAnimation->Animation.Insert("run",  Run);
+
+  SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("run");
+
 
   Assets->TileMapSpriteSheet.bitmap = LoadTGA( Thread, &GameState->AssetArena,
          Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
          Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-        "..\\handmade\\data\\Platformer\\tiles_spritesheet.tga" );
+        "..\\handmade\\data\\Platformer\\tga\\tiles_spritesheet.tga" );
 
   bitmap* TileMap = LoadTGA( Thread, &GameState->AssetArena,
          Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
          Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-         "..\\handmade\\data\\Platformer\\TileMap.tga" );
+         "..\\handmade\\data\\Platformer\\tga\\TileMap.tga" );
 
-  u32* pixels = (u32*) PushStruct(AssetArena, u32);
-
+  hash_map<bitmap_coordinate> SpriteCoordinates = LoadTileSpriteSheetCoordinates(AssetArena);
   bitmap* SpriteSheet = Assets->TileMapSpriteSheet.bitmap;
   for (u32 X = 0; X < TileMap->Width; ++X)
   {
@@ -132,40 +185,40 @@ void Create3DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 
         if(ToLeft && ToRight)
         {
-          TileContents.TM = GetSpriteSheetTranslationMatrix(sprite_type_grassMid, SpriteSheet);
+          TileContents.TM = GetSpriteSheetTranslationMatrix(SpriteSheet, SpriteCoordinates.Get("grassMid"));
         }else if(ToLeft && !ToRight)
         {
-          TileContents.TM = GetSpriteSheetTranslationMatrix(sprite_type_grassLeft, SpriteSheet);
+          TileContents.TM = GetSpriteSheetTranslationMatrix(SpriteSheet, SpriteCoordinates.Get("grassLeft"));
         }else if(!ToLeft && ToRight)
         {
-          TileContents.TM = GetSpriteSheetTranslationMatrix(sprite_type_grassRight, SpriteSheet);
+          TileContents.TM = GetSpriteSheetTranslationMatrix(SpriteSheet, SpriteCoordinates.Get("grassRight"));
         }else if(!ToLeft && !ToRight)
         {
-          TileContents.TM = GetSpriteSheetTranslationMatrix(sprite_type_grass, SpriteSheet);
+          TileContents.TM = GetSpriteSheetTranslationMatrix(SpriteSheet, SpriteCoordinates.Get("grass"));
         }
         SetTileContentsAbs(&GameState->AssetArena, &World->TileMap, X, Y, 0, TileContents );
       }
         #if 0
-        sprite_type_grass,
-        sprite_type_grassCenter,
-        sprite_type_grassCenter_rounded,
-        sprite_type_grassCliffLeft,
-        sprite_type_grassCliffLeftAlt,
-        sprite_type_grassCliffRight,
-        sprite_type_grassCliffRightAlt,
-        sprite_type_grassHalf,
-        sprite_type_grassHalfLeft,
-        sprite_type_grassHalfMid,
-        sprite_type_grassHalfRight,
-        sprite_type_grassHillLeft,
-        sprite_type_grassHillLeft2,
-        sprite_type_grassHillRight,
-        sprite_type_grassHillRight2,
-        sprite_type_grassLedgeLeft,
-        sprite_type_grassLedgeRight,
-        sprite_type_grassLeft,
-        sprite_type_grassMid,
-        sprite_type_grassRight,
+        grass,
+        grassCenter,
+        grassCenter_rounded,
+        grassCliffLeft,
+        grassCliffLeftAlt,
+        grassCliffRight,
+        grassCliffRightAlt,
+        grassHalf,
+        grassHalfLeft,
+        grassHalfMid,
+        grassHalfRight,
+        grassHillLeft,
+        grassHillLeft2,
+        grassHillRight,
+        grassHillRight2,
+        grassLedgeLeft,
+        grassLedgeRight,
+        grassLeft,
+        grassMid,
+        grassRight,
         #endif
 
     }
@@ -180,7 +233,7 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
     Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
 
     //Create2DScene(Thread, Memory, RenderCommands, Input );
-    Create3DScene(Thread, Memory, RenderCommands, Input );
+    Create2DScene(Thread, Memory, RenderCommands, Input );
     for (s32 ControllerIndex = 0;
     ControllerIndex < ArrayCount(Input->Controllers);
       ++ControllerIndex)

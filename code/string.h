@@ -1,10 +1,8 @@
 #ifndef STRING_H
 #define STRING_H
 
-
 #define STR_MAX_LINE_LENGTH 512
 #define STR_MAX_WORD_LENGTH 64
-
 
 namespace str
 {

@@ -1,16 +1,16 @@
-//	NOTE: Stuff that gets refferenced in the platform layer as well as
-//			the game layer
+//  NOTE: Stuff that gets refferenced in the platform layer as well as
+//      the game layer
 
 /*
-	NOTE: 
-	 
-	HANDMADE_INTERNAL
-		0: build for public release 
-		1: build for developer only
+  NOTE:
 
-	HANDMADE_SLOW
-		0: no slow code allowed
-		1: slow code welcome
+  HANDMADE_INTERNAL
+    0: build for public release
+    1: build for developer only
+
+  HANDMADE_SLOW
+    0: no slow code allowed
+    1: slow code welcome
 */
 
 
@@ -21,11 +21,11 @@
 
 #ifndef COMPILER_MSVC
 #define COMPILER_MSVC 0
-#endif 
+#endif
 
 #ifndef COMPILER_LLVM
 #define COMPILER_LLVM 0
-#endif 
+#endif
 
 #if !COMPILER_MSVC && !COMPILER_LLVM
 
@@ -46,19 +46,21 @@
 
 #include <stddef.h> // size_t exists in this header on some platforms
 
+#include "types.h"
 #include "standalone_utility.h"
 #include "vector_math.h"
+#include "platform_opengl.h"
 
 struct thread_context
 {
-	s32 placeholder;
+  s32 placeholder;
 };
 
 #if HANDMADE_INTERNAL
 
 struct debug_read_file_result{
-	u32 ContentSize;
-	void* Contents;
+  u32 ContentSize;
+  void* Contents;
 };
 
 #define DEBUG_PLATFORM_FREE_FILE_MEMORY(name) void name( thread_context* Thread, void* Memory )
@@ -72,21 +74,21 @@ typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE( debug_platform_write_entire_file );
 
 #endif // HANDMADE_INTERNAL
 
-inline u32 
+inline u32
 SafeTruncateUInt64( u64 Value )
 {
-	Assert(Value <= 0xFFFFFFFF);
-	u32 Result = (u32)Value;
-	return Result;  
+  Assert(Value <= 0xFFFFFFFF);
+  u32 Result = (u32)Value;
+  return Result;
 }
 
-inline r32 
+inline r32
 SafeTruncateReal32( u32 Value )
 {
-	Assert(Value <= 0xFFFFFFFF);
-	Assert(Value >= 0xFFFFFFFF);
-	r32 Result = (r32) Value;
-	return Result;
+  Assert(Value <= 0xFFFFFFFF);
+  Assert(Value >= 0xFFFFFFFF);
+  r32 Result = (r32) Value;
+  return Result;
 }
 
 
@@ -96,114 +98,114 @@ SafeTruncateReal32( u32 Value )
 
 struct game_render_commands
 {
-	s32 Width;
-	s32 Height;
+  s32 Width;
+  s32 Height;
 
-	opengl_program2D RenderProgram2D;
-	opengl_program3D RenderProgram3D;
+  opengl_program2D RenderProgram2D;
+  opengl_program3D RenderProgram3D;
 
-	utils::push_buffer TemporaryMemory;     // Buffer used for temporary storage
-	utils::push_buffer RenderMemory;  // The Render Push Buffer
-	u32 RenderMemoryElementCount;
+  utils::push_buffer TemporaryMemory;     // Buffer used for temporary storage
+  utils::push_buffer RenderMemory;  // The Render Push Buffer
+  u32 RenderMemoryElementCount;
 };
 
 struct game_sound_output_buffer
 {
-	s32 SamplesPerSecond;
-	s32 SampleCount;
-	s32 channels;
-	s16* Samples;
+  s32 SamplesPerSecond;
+  s32 SampleCount;
+  s32 channels;
+  s16* Samples;
 };
 
 struct game_button_state
 {
-	s32 HalfTransitionCount;
-	b32 EndedDown;
+  s32 HalfTransitionCount;
+  b32 EndedDown;
 };
 
 struct game_controller_input
-{	
-	b32 IsAnalog;
-	b32 IsConnected;
+{
+  b32 IsAnalog;
+  b32 IsConnected;
 
-	union
-	{
-		r32 Averages[6];
-		struct
-		{
-			r32 LeftStickAverageX;
-			r32 LeftStickAverageY;
-			r32 RightStickAverageX;
-			r32 RightStickAverageY;
-			r32 LeftTriggerAverage;
-			r32 RightTriggerAverage;
-		};
-	};
+  union
+  {
+    r32 Averages[6];
+    struct
+    {
+      r32 LeftStickAverageX;
+      r32 LeftStickAverageY;
+      r32 RightStickAverageX;
+      r32 RightStickAverageY;
+      r32 LeftTriggerAverage;
+      r32 RightTriggerAverage;
+    };
+  };
 
-	union
-	{
-		game_button_state Button[24];
-		struct
-		{
-			game_button_state DPadUp;
-			game_button_state DPadDown;
-			game_button_state DPadLeft;
-			game_button_state DPadRight;
+  union
+  {
+    game_button_state Button[24];
+    struct
+    {
+      game_button_state DPadUp;
+      game_button_state DPadDown;
+      game_button_state DPadLeft;
+      game_button_state DPadRight;
 
-			game_button_state Start;
-			game_button_state Select;
+      game_button_state Start;
+      game_button_state Select;
 
-			game_button_state LeftShoulder;
-			game_button_state RightShoulder;
+      game_button_state LeftShoulder;
+      game_button_state RightShoulder;
 
-			game_button_state LeftTrigger;
-			game_button_state RightTrigger;
+      game_button_state LeftTrigger;
+      game_button_state RightTrigger;
 
-			game_button_state LeftStick;
-			game_button_state LeftStickUp;
-			game_button_state LeftStickDown;
-			game_button_state LeftStickLeft;
-			game_button_state LeftStickRight;
+      game_button_state LeftStick;
+      game_button_state LeftStickUp;
+      game_button_state LeftStickDown;
+      game_button_state LeftStickLeft;
+      game_button_state LeftStickRight;
 
-			game_button_state RightStick;
-			game_button_state RightStickUp;
-			game_button_state RightStickDown;
-			game_button_state RightStickLeft;
-			game_button_state RightStickRight;
+      game_button_state RightStick;
+      game_button_state RightStickUp;
+      game_button_state RightStickDown;
+      game_button_state RightStickLeft;
+      game_button_state RightStickRight;
 
-			game_button_state A;
-			game_button_state B;
-			game_button_state X;
-			game_button_state Y;
+      game_button_state A;
+      game_button_state B;
+      game_button_state X;
+      game_button_state Y;
 
 
-			// Note: Fake Button, All new buttons must be added above this one
-			game_button_state Terminator;
-		};
-	};
+      // Note: Fake Button, All new buttons must be added above this one
+      game_button_state Terminator;
+    };
+  };
 
 };
 
 struct game_input
-{	
-	// GameUpdateTime
-	r32 dt;
-	b32 ExecutableReloaded;
+{
+  // GameUpdateTime
+  r32 dt;
+  b32 ExecutableReloaded;
 
-	game_button_state MouseButton[5];
-	s32 MouseX, MouseY, MouseZ;
+  game_button_state MouseButton[5];
+  s32 MouseX, MouseY, MouseZ;
 
-	// Todo: handle keyboard like this? Use raw input?
-	//game_button_state KeyboardButton[104];
+  // Todo: handle keyboard like this? Use raw input?
+  //game_button_state KeyboardButton[104];
 
-	game_controller_input Controllers[5];
+  game_controller_input Controllers[5];
 };
 
 inline game_controller_input* GetController(game_input* Input, s32 ControllerIndex)
 {
-	Assert( ControllerIndex < ArrayCount( Input->Controllers ) );
-	game_controller_input* Result  = &Input->Controllers[ControllerIndex];
-	return Result;
+  Assert( ControllerIndex < ArrayCount( Input->Controllers ) );
+  game_controller_input* Result  = &Input->Controllers[ControllerIndex];
+  return Result;
 }
 
 struct platform_file_handle
@@ -232,7 +234,7 @@ enum platform_file_type
     PlatformFileType_SavedGameFile,
     PlatformFileType_PNG,
     PlatformFileType_WAV,
-    
+
     PlatformFileType_Count,
 };
 */
@@ -244,25 +246,25 @@ enum platform_memory_block_flags
 };
 
 /*
- *	Platform Memory Block (PMB)
- *			 01234567
- *	Base -> |xxxxxxxx|   0	  
- *			|xxxxxxxx|   1
- *			|xxxxxxxx|   2	  
- *			...
- *			|xxxxxxxx|   Used-1
- *	Used->	|--------|   Used
- *			...	  
- *			|--------|   Size-2	  
- *			|--------|   Size-1
- *			|--------|   Size
+ *  Platform Memory Block (PMB)
+ *       01234567
+ *  Base -> |xxxxxxxx|   0
+ *      |xxxxxxxx|   1
+ *      |xxxxxxxx|   2
+ *      ...
+ *      |xxxxxxxx|   Used-1
+ *  Used->  |--------|   Used
+ *      ...
+ *      |--------|   Size-2
+ *      |--------|   Size-1
+ *      |--------|   Size
  */
 struct platform_memory_block
 {
     u64 Flags;
     u64 Size;
-    u8* Base;						// Pointer to the beginning of the memory block
-    uintptr_t Used;						// Pointer to the end of the used data
+    u8* Base;           // Pointer to the beginning of the memory block
+    uintptr_t Used;           // Pointer to the end of the used data
     platform_memory_block *ArenaPrev;
 };
 
@@ -310,11 +312,11 @@ struct platform_api
 //     TODO(casey): Get rid of these eventually, make them just go through
 //     the OpenFile/ReadDataFromFile/WriteDataToFile/CloseFile API.
 //     {
-     	debug_platform_read_entire_file*  DEBUGPlatformReadEntireFile;
-		debug_platfrom_free_file_memory*  DEBUGPlatformFreeFileMemory;
-		debug_platform_write_entire_file* DEBUGPlatformWriteEntireFile;
+      debug_platform_read_entire_file*  DEBUGPlatformReadEntireFile;
+    debug_platfrom_free_file_memory*  DEBUGPlatformFreeFileMemory;
+    debug_platform_write_entire_file* DEBUGPlatformWriteEntireFile;
 //     }
-    
+
 //    debug_platform_execute_system_command *DEBUGExecuteSystemCommand;
 //    debug_platform_get_process_state *DEBUGGetProcessState;
 //    debug_platform_get_memory_stats *DEBUGGetMemoryStats;
@@ -326,8 +328,8 @@ extern platform_api Platform;
 
 struct game_memory
 {
-	struct game_state* GameState;
-	platform_api PlatformAPI;
+  struct game_state* GameState;
+  platform_api PlatformAPI;
 };
 
 #define GAME_UPDATE_AND_RENDER(name) void name(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )

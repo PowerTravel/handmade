@@ -1,5 +1,6 @@
-#ifndef DATA_CONTAINER_H
-#define DATA_CONTAINER_H
+#pragma once
+
+#include "memory.h"
 
 template <class T>
 class list
@@ -202,10 +203,27 @@ public:
     *Pos = Value;
   }
 
+  void InsertRange(u32 StartIdx, u32 EndIdx, T* Data)
+  {
+    Assert(EndIdx < MaxCount);
+    memory_index DataLen = sizeof(T) * (EndIdx - StartIdx);
+    util::Copy( DataLena, Data, Get(StartIdx));
+  }
+
   T* Get(u32 Idx)
   {
     Assert(Idx<MaxCount);
     return Base+Idx;
+  }
+
+  T* GetBuffer()
+  {
+    return Base;
+  }
+
+  u32 GetMaxCount()
+  {
+    return MaxCount;
   }
 };
 
@@ -214,7 +232,8 @@ class hash_map
 {
   struct pair
   {
-    char Key[16];
+    char* Key;
+    u32 KeyLength;
     T Val;
   };
 
@@ -222,7 +241,7 @@ class hash_map
   u32 djb2_hash(const char* str)
   {
     u32 hash = 5381;
-    int c;
+    u32 c;
 
     while (c = *str++)
       hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
@@ -232,7 +251,7 @@ class hash_map
 
   memory_arena* Arena;
   u32 Size;
-  vector< list< pair > > Map;
+  vector< list< pair* > > Map;
 
   public:
     hash_map( ) : Map() {};
@@ -240,51 +259,36 @@ class hash_map
 
     void Insert( const char Key[], const T& Value)
     {
-      // Check it's null terminated in less than 16 chars.
-      Assert( str::StringLength( Key ) < 16 );
-
       u32 Hash = djb2_hash(Key);
-
-      pair Item;
-      for (u32 i = 0; i < 16; ++i)
-      {
-        Item.Key[i] = Key[i];
-      }
-      Item.Val = Value;
-
-      list<pair>* li = Map.Get(Hash % Size);
-
+      list<pair*>* li = Map.Get(Hash % Size);
       if(li->IsEmpty())
       {
         li->Initiate(Arena);
       }
 
-      li->First();
-      li->InsertBefore(Item);
-
+      pair* Item = (pair*) PushStruct(Arena, pair);
+      Item->KeyLength = str::StringLength( Key );
+      Item->Key = (char*) PushCopy(Arena, Item->KeyLength*sizeof(char), (void*) Key);
+      Item->Val = Value;
+      li->Last();
+      li->InsertAfter(Item);
     }
 
-    T Get( const char* Key)
+    T* Get(const char* Key)
     {
-      // Check it's null terminated in less than 16 chars.
-      Assert( str::StringLength( Key ) < 16 );
-
       u32 Hash = djb2_hash(Key);
 
-      list<pair>* li = Map.Get(Hash % Size);
+      list<pair*>* li = Map.Get(Hash % Size);
 
       for(li->First(); !li->IsEnd(); li->Next() )
       {
-        pair p = li->Get();
-        if(str::Equals( p.Key, Key ))
+        pair* p = li->Get();
+        if(str::Equals( p->Key, Key ))
         {
-          return p.Val;
+          return &p->Val;
         }
       }
 
       return 0;
     }
 };
-
-
-#endif
