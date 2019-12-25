@@ -13,6 +13,7 @@
 #include "entity_components.h"
 #include "render_push_buffer.h"
 #include "handmade_tile.h"
+#include "gjk.h"
 
 struct game_assets
 {
