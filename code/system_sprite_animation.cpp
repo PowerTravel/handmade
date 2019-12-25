@@ -7,8 +7,6 @@ void SpriteAnimationSystemUpdate(world* World)
 
     if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
     {
-//      Assert(Entity->Types & COMPONENT_TYPE_DYNAMICS);
-
       component_sprite_animation* SpriteAnimation = Entity->SpriteAnimationComponent;
       Assert(  SpriteAnimation->ActiveSeries );
 
@@ -23,6 +21,31 @@ void SpriteAnimationSystemUpdate(world* World)
           ActiveSeries->First();
         }
       }
+
+      if(Entity->Types & COMPONENT_TYPE_DYNAMICS)
+      {
+        v3 Velocity = Entity->DynamicsComponent->Velocity;
+        if(Velocity.Y > 0)
+        {
+          SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("jump");
+        }else if(Velocity.Y <0){
+          SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("fall");
+        }else if( Abs(Velocity.X) <=0.1)
+        {
+          SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("idle1");
+        }else{
+          SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("run");
+        }
+
+        if( Velocity.X > 0.1)
+        {
+          SpriteAnimation->InvertX = false;
+        }else if(Velocity.X < -0.1)
+        {
+          SpriteAnimation->InvertX = true;
+        }
+      }
+
     }
   }
 }

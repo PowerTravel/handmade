@@ -101,6 +101,25 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       Body->Bitmap = Entity->SpriteAnimationComponent->Bitmap;
       Body->M = M4Identity();
       Body->TM = Entity->SpriteAnimationComponent->ActiveSeries->Get();
+
+      if(Entity->SpriteAnimationComponent->InvertX)
+      {
+        v4 Dim = Body->TM * ( V4(1,1,0,1) - V4(0,0,0,1));
+
+        m4 ScaleMat = GetScaleMatrix( V4(-1,1,1,0) );
+
+        m4 tto = M4(1,0,0,-Body->TM.E[3] - Dim.X/2,
+                    0,1,0,-Body->TM.E[7] - Dim.Y/2,
+                    0,0,1,0,
+                    0,0,0,1);
+
+        m4 bfo = M4(1,0,0, Body->TM.E[3] + Dim.X/2,
+                    0,1,0, Body->TM.E[7] + Dim.Y/2,
+                    0,0,1,0,
+                    0,0,0,1);
+
+        Body->TM =  bfo * ScaleMat * tto * Body->TM;
+      }
       if( Entity->Types & COMPONENT_TYPE_SPATIAL )
       {
         Body->M = Entity->SpatialComponent->ModelMatrix;// * SpriteOffset * SpriteSize;

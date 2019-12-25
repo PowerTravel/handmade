@@ -127,7 +127,20 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
   Run.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("run_06")));
   SpriteAnimation->Animation.Insert("run",  Run);
 
-  SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("run");
+  list<m4> Jump(AssetArena);
+  Jump.First();
+  Jump.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("jump_01")));
+  Jump.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("jump_02")));
+  Jump.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("jump_03")));
+  SpriteAnimation->Animation.Insert("jump",  Jump);
+
+  list<m4> Fall(AssetArena);
+  Fall.First();
+  Fall.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("fall_01")));
+  Fall.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("fall_02")));
+  SpriteAnimation->Animation.Insert("fall",  Fall);
+
+  SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("idle1");
 
 
   Assets->TileMapSpriteSheet.bitmap = LoadTGA( Thread, &GameState->AssetArena,
@@ -198,29 +211,6 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
         }
         SetTileContentsAbs(&GameState->AssetArena, &World->TileMap, X, Y, 0, TileContents );
       }
-        #if 0
-        grass,
-        grassCenter,
-        grassCenter_rounded,
-        grassCliffLeft,
-        grassCliffLeftAlt,
-        grassCliffRight,
-        grassCliffRightAlt,
-        grassHalf,
-        grassHalfLeft,
-        grassHalfMid,
-        grassHalfRight,
-        grassHillLeft,
-        grassHillLeft2,
-        grassHillRight,
-        grassHillRight2,
-        grassLedgeLeft,
-        grassLedgeRight,
-        grassLeft,
-        grassMid,
-        grassRight,
-        #endif
-
     }
   }
 

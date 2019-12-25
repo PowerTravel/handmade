@@ -54,6 +54,7 @@ struct component_sprite_animation
   bitmap* Bitmap;
   hash_map< list <m4> > Animation;
   list<m4>* ActiveSeries;
+  b32 InvertX;
 };
 
 

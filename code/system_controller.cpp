@@ -232,6 +232,7 @@ void HeroController( entity* HeroEntity )
   if( Controller->IsAnalog )
   {
     r32 ImpulseStrength = 20;
+    r32 JumpImpulse = 0;
     v2 StickAverage = V2(0,0);
 
     if(Controller->LeftStickLeft.EndedDown || Controller->LeftStickRight.EndedDown )
@@ -239,18 +240,18 @@ void HeroController( entity* HeroEntity )
       StickAverage.X = Controller->LeftStickAverageX;
     }
 
-    if(Controller->LeftStickUp.EndedDown || Controller->LeftStickDown.EndedDown)
+    if(Controller->A.EndedDown)
     {
-      StickAverage.Y = Controller->LeftStickAverageY;
+      JumpImpulse = 4;
     }
 
-    Dynamics->ExternalForce = ImpulseStrength * V3( StickAverage, 0) ;
+    Dynamics->ExternalForce = ImpulseStrength * (V3(StickAverage, 0) + V3(0,JumpImpulse,0));
 
     if(Controller->X.EndedDown)
     {
       Put(V3(0,1,0), Spatial);
       Dynamics->ExternalForce = V3(0,0,0);
-      Dynamics->Velocity = V3(0,0,0);
+      Dynamics->Velocity      = V3(0,0,0);
     }
 
     v3 to = GetPosition(Spatial);

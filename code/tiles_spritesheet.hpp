@@ -199,6 +199,14 @@ hash_map<bitmap_coordinate> LoadAdventurerSpriteSheetCoordinates(memory_arena* A
   Result.Insert( "run_04",     {4 * Width,   1 * Height, Width, Height});
   Result.Insert( "run_05",     {5 * Width,   1 * Height, Width, Height});
   Result.Insert( "run_06",     {6 * Width,   1 * Height, Width, Height});
+
+  Result.Insert( "jump_01",     {6 * Width,   9 * Height, Width, Height});
+  Result.Insert( "jump_02",     {0 * Width,   10 * Height, Width, Height});
+  Result.Insert( "jump_03",     {1 * Width,   10 * Height, Width, Height});
+
+  Result.Insert( "fall_01",     {1 * Width,   3 * Height, Width, Height});
+  Result.Insert( "fall_02",     {2 * Width,   3 * Height, Width, Height});
+
   return Result;
 };
 
