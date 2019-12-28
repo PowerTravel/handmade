@@ -6,30 +6,30 @@
 // See: http://www.allenchou.net/2013/12/game-physics-collision-detection-gjk/
 struct gjk_support
 {
-  v3 Support;
-  v3 SupportA;
-  v3 SupportB;
+  v3 S; // Combined Support
+  v3 A; // Support for A
+  v3 B; // Support for B
 };
 
-// Assumes ccw direction
-union gjk_triangle
+struct gjk_simplex
 {
-  struct
-  {
-    v3 P0,P1,P2;
-  };
-  v3 P[3];
+  u32 Dimension;
+  gjk_support SP[4];
 };
 
-union gjk_tetrahedron
+struct gjk_collision_result
 {
-  struct
-  {
-    v3 P0, P1, P2, P3;
-  };
-  v3 P[4];
+  gjk_simplex Simplex;
+  b32 ContainsOrigin;
 };
 
+struct gjk_partial_result
+{
+  v3  ClosestPoint;
+  r32 Distance;
+  gjk_simplex ReducedSimplex;
+  b32 Reduced;
+};
 
 gjk_support CsoSupportAABB( const m4* AModelMat, const m4* BModelMat, const v3 Direction )
 {
@@ -70,119 +70,131 @@ gjk_support CsoSupportAABB( const m4* AModelMat, const m4* BModelMat, const v3 D
     }
   }
 
-  Result.SupportA = V3(*AModelMat * SupportA);
-  Result.SupportB = V3(*BModelMat * SupportB);
+  Result.A = V3(*AModelMat * SupportA);
+  Result.B = V3(*BModelMat * SupportB);
 
-  Result.Support = Result.SupportA - Result.SupportB;
+  Result.S = Result.A - Result.B;
 
   return Result;
 
 }
 
-
-v3 VertexEdge(const v3& Vertex, const v3& EedgePointA, const v3& EdgePointB)
+internal gjk_partial_result
+VertexEdge(const v3& Vertex, gjk_simplex& Simplex, u32 Index0 = 0, u32 Index1 = 1)
 {
-  v3 o = EedgePointA;
-  v3 d = EdgePointB;
-  v3 u = Normalize(d-o);
-  r32 uNorm = Norm(d-o);
-  v3 v = Vertex;
+  gjk_partial_result Result = {};
 
-  r32 ProjectionScalar = (v-o)*u;
+  const v3 o = Simplex.SP[Index0].S;
+  const v3 d = Simplex.SP[Index1].S;
+  const v3 u = Normalize(d-o);
+  const r32 uNorm = Norm(d-o);
+  const v3 v = Vertex;
+
+  const r32 ProjectionScalar = (v-o)*u;
+
   v3 ClosestPointOnEdge = {};
   if(ProjectionScalar <= 0)
   {
     ClosestPointOnEdge = o;
+    Result.ReducedSimplex.SP[0] = Simplex.SP[Index0];
+    Result.ReducedSimplex.Dimension = 1;
+    Result.Reduced = true;
   }else if(ProjectionScalar >= uNorm )
   {
     ClosestPointOnEdge = d;
+    Result.ReducedSimplex.SP[0] = Simplex.SP[Index1];
+    Result.ReducedSimplex.Dimension = 1;
+    Result.Reduced = true;
   }else{
     ClosestPointOnEdge = o + ProjectionScalar * u;
   }
 
-  return ClosestPointOnEdge;
+  Result.ClosestPoint = ClosestPointOnEdge;
+  Result.Distance = Norm(Result.ClosestPoint);
+
+  return Result;
 }
 
-inline v3
-GetTriangleNormal(const gjk_triangle& Triangle)
+internal inline v3
+GetTriangleNormal(const v3 Triangle[])
 {
-  v3 v1 = Triangle.P[1] - Triangle.P[0];
-  v3 v2 = Triangle.P[2] - Triangle.P[1];
-  v3 Result = Normalize( CrossProduct(v1,v2) );
+  const v3 v1 = Triangle[1] - Triangle[0];
+  const v3 v2 = Triangle[2] - Triangle[1];
+  const v3 Result = Normalize( CrossProduct(v1,v2) );
   return Result;
 }
 
 // Checks if the Vertex can be projected onto the Triangle.
-b32 IsVertexInsideTriangle(const v3& Vertex, const v3& Normal, const gjk_triangle& Triangle)
+internal inline b32
+IsVertexInsideTriangle(const v3& Vertex, const v3& Normal, const v3 Triangle[])
 {
   for( u32 Index = 0;
            Index < 3;
          ++Index )
   {
-    v3 v = Vertex - Triangle.P[Index];
-    v3 e = Triangle.P[ (Index+1) % 3] - Triangle.P[Index];
-    v3 x = CrossProduct(e,v);
+    const v3 v = Vertex - Triangle[Index];
+    const v3 e = Triangle[ (Index+1) % 3] - Triangle[Index];
+    const v3 x = CrossProduct(e,v);
     if( (x * Normal) < 0 )
     {
       return false;
     }
   }
-
   return true;
 }
 
-v3 VertexTriangle( const v3& Vertex, const gjk_triangle& Triangle)
+internal gjk_partial_result
+VertexTriangle( const v3& Vertex, gjk_simplex& Simplex, const u32 Index0 = 0, const u32 Index1 = 1, const u32 Index2 = 2)
 {
-  v3 Normal = GetTriangleNormal(Triangle);
+  gjk_partial_result Result = {};
+
+  const v3  Triangle[3] = {Simplex.SP[Index0].S, Simplex.SP[Index1].S, Simplex.SP[Index2].S};
+  const v3  Normal = GetTriangleNormal(Triangle);
 
   // Project the Vertex onto the plane spanned by the triangle
-  v3 o = (Vertex - Triangle.P0);
-  v3 ProjectionToNormal = (o * Normal) * Normal;
-  v3 ProjectedPoint = Vertex - ProjectionToNormal;
+  const v3 o = (Vertex - Triangle[Index0]);
+  const v3 ProjectionToNormal = (o * Normal) * Normal;
+  const v3 ProjectedPoint = Vertex - ProjectionToNormal;
 
   if( IsVertexInsideTriangle( ProjectedPoint, Normal, Triangle) )
   {
-    return ProjectedPoint;
+    Result.ClosestPoint = ProjectedPoint;
+    Result.Distance = Norm(ProjectedPoint);
+    return Result;
   }
 
-  v3 ClosestPointOnTriangle = VertexEdge(Vertex, Triangle.P0, Triangle.P1);
-  r32 ShortestContactDistance = Norm( ClosestPointOnTriangle - Vertex );
-
-  for(u32 Index = 1; Index < 3; ++Index)
+  const u32 EdgeIndeces[6] = {Index0,Index1,
+                              Index1,Index2,
+                              Index2,Index0};
+  Result = VertexEdge( Vertex, Simplex,  EdgeIndeces[0], EdgeIndeces[1]);
+  for(u32 Index = 1; Index < 2; ++Index)
   {
-    v3 ClosestPointCandidate = VertexEdge(Vertex, Triangle.P[Index], Triangle.P[(Index+1)%3]);
-    r32 ContactDistance = Norm( ClosestPointCandidate - Vertex );
-    if( ContactDistance < ShortestContactDistance )
+    const u32 BaseIndex = Index*2;
+    const gjk_partial_result ResultCandidate = VertexEdge( Vertex, Simplex, EdgeIndeces[BaseIndex], EdgeIndeces[BaseIndex+1] );
+    if(ResultCandidate.Distance < Result.Distance)
     {
-      ShortestContactDistance = ContactDistance;
-      ClosestPointOnTriangle = ClosestPointCandidate;
+      Result = ResultCandidate;
     }
   }
 
-  return ClosestPointOnTriangle;
+  return Result;
 }
 
-
-inline void
-GetTriangles(const gjk_tetrahedron& Tetrahedron, gjk_triangle Triangles[])
+internal b32
+IsVertexInsideTetrahedron( const v3& Vertex, const v3 Tetrahedron[] )
 {
-  Assert(ArrayCount(Triangles) == 4);
-  Triangles[0] = {Tetrahedron.P0, Tetrahedron.P1, Tetrahedron.P2};
-  Triangles[1] = {Tetrahedron.P0, Tetrahedron.P1, Tetrahedron.P3};
-  Triangles[2] = {Tetrahedron.P1, Tetrahedron.P2, Tetrahedron.P3};
-  Triangles[3] = {Tetrahedron.P2, Tetrahedron.P0, Tetrahedron.P3};
-}
-
-b32 IsVertexInsideTetrahedron( const v3& Vertex, const gjk_tetrahedron& Tetrahedron )
-{
-  gjk_triangle Triangles[4] = {};
-  GetTriangles(Tetrahedron, Triangles);
+  const v3 Triangles[12] = {Tetrahedron[0], Tetrahedron[1], Tetrahedron[2],
+                            Tetrahedron[0], Tetrahedron[1], Tetrahedron[3],
+                            Tetrahedron[1], Tetrahedron[2], Tetrahedron[3],
+                            Tetrahedron[2], Tetrahedron[0], Tetrahedron[3]};
 
   for(u32 Index = 0; Index < 4; ++Index)
   {
-    const v3 Normal = GetTriangleNormal(Triangles[Index]);
-    v3 TrianglePoint = Triangles[Index].P0;
-    if(TrianglePoint*Normal > 0)
+    const u32 BaseIndex = Index*3;
+    const v3 Triangle[3] = {Triangles[BaseIndex],Triangles[BaseIndex + 1],Triangles[BaseIndex + 2]};
+    const v3 Normal = GetTriangleNormal(Triangle);
+    const v3 TriangleToVertex =  Vertex - Triangle[0];
+    if( TriangleToVertex*Normal > 0)
     {
       return false;
     }
@@ -190,130 +202,104 @@ b32 IsVertexInsideTetrahedron( const v3& Vertex, const gjk_tetrahedron& Tetrahed
   return true;
 }
 
-struct gjk_partial_collision_data
+internal gjk_partial_result
+VertexTetrahedron( const v3& Vertex, gjk_simplex& Simplex )
 {
-  b32 ContainsOrigin;
-  gjk_triangle Triangle;
-  v3 Direction;
-};
+  gjk_partial_result Result = {};
 
-b32 GJKCollisionDetectionAABB( const m4* AModelMat, const m4* BModelMat, gjk_partial_collision_data& Data )
-{
-  const v3 Origin = {};
-  gjk_triangle Triangle = Data.Triangle;
-  const v3 Direction          = Data.Direction;
+  const v3 Tetrahedron[4] = {Simplex.SP[0].S, Simplex.SP[1].S, Simplex.SP[2].S, Simplex.SP[3].S};
 
-  gjk_tetrahedron Tetrahedron = {};
-
-  gjk_support SupportPoints = CsoSupportAABB( AModelMat, BModelMat, Direction );
-  Tetrahedron.P0 = Triangle.P0;
-  Tetrahedron.P1 = Triangle.P1;
-  Tetrahedron.P2 = Triangle.P2;
-  Tetrahedron.P3 = SupportPoints.Support;
-
-  if(IsVertexInsideTetrahedron(Origin, Tetrahedron))
+  if( IsVertexInsideTetrahedron( Vertex, Tetrahedron) )
   {
-    Data.ContainsOrigin = true;
-    return true;
+    Result.ClosestPoint = Vertex;
+    Result.Distance = Norm(Vertex);
+    return Result;
   }
 
-  // Remove the point furthest from the origin
-  r32 Normal = 0;
-  u32 FurthestPointIndex  = 0;
-  for(u32 Index = 0; Index < 4; ++Index)
+  const u32 TriangleIndeces[12] = {0, 1, 2,
+                                  0, 1, 3,
+                                  1, 2, 3,
+                                  2, 0, 3};
+
+  Result = VertexTriangle( Vertex, Simplex, TriangleIndeces[0], TriangleIndeces[1], TriangleIndeces[2]);
+
+  for(u32 Index = 1; Index < 3; ++Index)
   {
-    r32 NewNormal = Norm(Tetrahedron.P[Index]);
-    if(NewNormal > Normal)
+    u32 BaseIndex = 3*Index;
+    const gjk_partial_result ResultCandidate =
+                            VertexTriangle( Vertex, Simplex,
+                            TriangleIndeces[BaseIndex],
+                            TriangleIndeces[BaseIndex+1],
+                            TriangleIndeces[BaseIndex+2]);
+
+    if(ResultCandidate.Distance < Result.Distance)
     {
-      Normal = NewNormal;
-      FurthestPointIndex = Index;
+      Result = ResultCandidate;
+    }
+  }
+  return Result;
+}
+
+// Assumes the AABB in model space is the cube going from V3(-1/2,-1/2,-1/2) to V3(1/2,1/2,1/2)
+gjk_collision_result GJKCollisionDetectionAABB( const m4* AModelMat, const m4* BModelMat)
+{
+  const v3 Origin = V3(0,0,0);
+  gjk_collision_result Result = {};
+  gjk_simplex& Simplex = Result.Simplex;
+
+  gjk_partial_result PartialResult = {};
+  PartialResult.ClosestPoint = V3(1,0,0);
+
+  while(true)
+  {
+    r32 PreviousDistance = PartialResult.Distance;
+    // Add a CSO to the simplex
+    gjk_support SupportPoint = CsoSupportAABB( AModelMat, BModelMat,  Origin-PartialResult.ClosestPoint );
+    Simplex.SP[Simplex.Dimension++] = SupportPoint;
+
+    switch(Simplex.Dimension)
+    {
+      case 1:
+      {
+        PartialResult.ClosestPoint = Simplex.SP[0].S;
+        PartialResult.Distance = Norm(PartialResult.ClosestPoint);
+        PreviousDistance = PartialResult.Distance+1;
+        PartialResult.ReducedSimplex = {};
+        PartialResult.Reduced = false;
+      }break;
+      case 2:
+      {
+        PartialResult = VertexEdge(Origin, Simplex);
+      }break;
+      case 3:
+      {
+        PartialResult = VertexTriangle(Origin, Simplex);
+      }break;
+      case 4:
+      {
+        PartialResult = VertexTetrahedron(Origin, Simplex);
+      }break;
+      default:
+      {
+        INVALID_CODE_PATH
+      }
+    }
+
+    if(PartialResult.Reduced)
+    {
+      Simplex = PartialResult.ReducedSimplex;
+    }
+
+    if( PartialResult.Distance < 10E-7 )
+    {
+      Result.ContainsOrigin = true;
+      return Result;
+    }else if( PartialResult.Distance >= PreviousDistance){
+      return Result;
     }
   }
 
-  Triangle.P0 = Tetrahedron.P[(FurthestPointIndex+1)%4];
-  Triangle.P1 = Tetrahedron.P[(FurthestPointIndex+2)%4];
-  Triangle.P2 = Tetrahedron.P[(FurthestPointIndex+3)%4];
-
-  // Get a new Direction
-  v3 PointOnTriangle = VertexTriangle(Origin, Triangle);
-  v3 NewDirection  = Origin - PointOnTriangle;
-  r32 NewDistance = Norm(NewDirection);
-
-  if( NewDistance < 10E-7 )
-  {
-    Data.ContainsOrigin = true;
-    return true;
-  }
-
-  if( NewDistance >= Norm(Direction) )
-  {
-    Data.ContainsOrigin = false;
-    return true;
-  }
-
-  Data.ContainsOrigin = false;
-  Data.Triangle       = Triangle;
-  Data.Direction      = NewDirection;
-
-  return false;
-}
-
-// Assumes the AABB in model space is the cube going from V3(-1/2,-1/2,0) to V3(1/2,1/2,0)
-b32 GJKCollisionDetectionAABB( const m4* AModelMat, const m4* BModelMat)
-{
-  const v3 Origin = V3(0,0,0);
-
-  gjk_triangle Triangle = {};
-
-  gjk_support SupportPoints = CsoSupportAABB( AModelMat, BModelMat, V3(1,0,0) );
-  Triangle.P0 = SupportPoints.Support;
-
-  v3 FirstDirection = Origin - Triangle.P0;
-  r32 FirstDistance = Norm(FirstDirection);
-  if( FirstDistance < 10E-7 )
-  {
-    return true;
-  }
-
-  SupportPoints = CsoSupportAABB( AModelMat, BModelMat, FirstDirection );
-  Triangle.P1 = SupportPoints.Support;
-
-  v3 PointOnEdge = VertexEdge(Origin, Triangle.P0, Triangle.P1);
-  v3 Direction  = Origin - PointOnEdge;
-  r32 Distance = Norm(Direction);
-
-  if( Distance < 10E-7 )
-  {
-    return true;
-  }else if(Distance >= FirstDistance){
-    return false;
-  }
-
-  FirstDirection = Direction;
-  FirstDistance = Distance;
-  SupportPoints = CsoSupportAABB( AModelMat, BModelMat, FirstDirection );
-  Triangle.P2 = SupportPoints.Support;
-
-  v3 PointOnTriangle = VertexTriangle(Origin, Triangle);
-  Direction  = Origin - PointOnTriangle;
-  Distance = Norm(Direction);
-
-  if( Distance < 10E-7 )
-  {
-    return true;
-  }else if(Distance >= FirstDistance){
-    return false;
-  }
-
-  gjk_partial_collision_data GJKData = {};
-  GJKData.Triangle  = Triangle;
-  GJKData.Direction = Direction;
-  b32 Stop = false;
-  while(!Stop)
-  {
-    Stop = GJKCollisionDetectionAABB( AModelMat, BModelMat, GJKData);
-  }
-
-  return GJKData.ContainsOrigin;
+  INVALID_CODE_PATH
+  return Result;
 }
 
