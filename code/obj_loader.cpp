@@ -182,44 +182,44 @@ type_string_pair GetOBJDataType( u32 StringLength, char* String )
 {
   local_persist obj_start_string TypeMap[38] =
   {
-    { OBJ_EMPTY,                1 , "#",      },
-    { OBJ_EMPTY,                2 , "\r\n"      },
-    { OBJ_EMPTY,                1 , "\n"      },
-    { OBJ_GEOMETRIC_VERTICES,           2 , "v "      },
-    { OBJ_TEXTURE_VERTICES,           3 , "vt "     },
-    { OBJ_VERTEX_NORMALS,             3 , "vn "     },
-    { OBJ_PARAMETER_SPACE_VERTICES,       3 , "vp "     },
-    { OBJ_CURVE_OR_SURFACE_TYPE,        7 , "cstype "   },
-    { OBJ_DEGREE,                 4 , "deg "      },
-    { OBJ_BASIS_MATRIX,             5 , "bmat "     },
-    { OBJ_STEP_SIZE,              5 , "step "     },
-    { OBJ_POINT,                2 , "p "      },
-    { OBJ_LINE,                 2 , "l "      },
-    { OBJ_FACE,                 2 , "f "      },
-    { OBJ_CURVE,                5 , "curv "     },
-    { OBJ_2D_CURVE,               6 , "curv2 "    },
-    { OBJ_SURFACE,                5 , "surf "     },
-    { OBJ_PARAMETER_VALUES,           5 , "parm "     },
-    { OBJ_OUTER_TRIMMING_LOOP,          5 , "trim "     },
-    { OBJ_INNER_TRIMMING_LOOP,          5 , "hole "     },
-    { OBJ_SPECIAL_CURVE,            5 , "scrv "     },
-    { OBJ_SPECIAL_POINT,            3 , "sp "     },
-    { OBJ_END_STATEMENT,            4 , "end "      },
-    { OBJ_CONNECT,                4 , "con "      },
-    { OBJ_GROUP_NAME,               2 , "g "      },
-    { OBJ_SMOOTHING_GROUP,            2 , "s "      },
-    { OBJ_MERGING_GROUP,            3 , "mg "     },
-    { OBJ_OBJECT_NAME,              2 , "o "      },
-    { OBJ_BEVEL_INTERPOLATION,          6 , "bevel "    },
-    { OBJ_COLOR_INTERPOLATION,          9 , "c_interp "   },
-    { OBJ_DISSOLVE_INTERPOLATION,         9 , "d_interp "   },
-    { OBJ_LEVEL_OF_DETAIL,            4 , "lod "      },
-    { OBJ_MATERIAL_NAME,            7 , "usemtl "   },
-    { OBJ_MATERIAL_LIBRARY,           7 , "mtllib "   },
-    { OBJ_SHADOW_CASTING,             11, "shadow_obj " },
-    { OBJ_RAY_TRACING,              10, "trace_obj "  },
-    { OBJ_CURVE_APPROXIMATION_TECHNIQUE,    6,  "ctech "    },
-    { OBJ_SURFACE_APPROXIMATION_TECHNIQUE,    6,  "stech "    }
+    { OBJ_EMPTY,                              1 , "#",          },
+    { OBJ_EMPTY,                              2 , "\r\n"        },
+    { OBJ_EMPTY,                              1 , "\n"          },
+    { OBJ_GEOMETRIC_VERTICES,                 2 , "v "          },
+    { OBJ_TEXTURE_VERTICES,                   3 , "vt "         },
+    { OBJ_VERTEX_NORMALS,                     3 , "vn "         },
+    { OBJ_PARAMETER_SPACE_VERTICES,           3 , "vp "         },
+    { OBJ_CURVE_OR_SURFACE_TYPE,              7 , "cstype "     },
+    { OBJ_DEGREE,                             4 , "deg "        },
+    { OBJ_BASIS_MATRIX,                       5 , "bmat "       },
+    { OBJ_STEP_SIZE,                          5 , "step "       },
+    { OBJ_POINT,                              2 , "p "          },
+    { OBJ_LINE,                               2 , "l "          },
+    { OBJ_FACE,                               2 , "f "          },
+    { OBJ_CURVE,                              5 , "curv "       },
+    { OBJ_2D_CURVE,                           6 , "curv2 "      },
+    { OBJ_SURFACE,                            5 , "surf "       },
+    { OBJ_PARAMETER_VALUES,                   5 , "parm "       },
+    { OBJ_OUTER_TRIMMING_LOOP,                5 , "trim "       },
+    { OBJ_INNER_TRIMMING_LOOP,                5 , "hole "       },
+    { OBJ_SPECIAL_CURVE,                      5 , "scrv "       },
+    { OBJ_SPECIAL_POINT,                      3 , "sp "         },
+    { OBJ_END_STATEMENT,                      4 , "end "        },
+    { OBJ_CONNECT,                            4 , "con "        },
+    { OBJ_GROUP_NAME,                         2 , "g "          },
+    { OBJ_SMOOTHING_GROUP,                    2 , "s "          },
+    { OBJ_MERGING_GROUP,                      3 , "mg "         },
+    { OBJ_OBJECT_NAME,                        2 , "o "          },
+    { OBJ_BEVEL_INTERPOLATION,                6 , "bevel "      },
+    { OBJ_COLOR_INTERPOLATION,                9 , "c_interp "   },
+    { OBJ_DISSOLVE_INTERPOLATION,             9 , "d_interp "   },
+    { OBJ_LEVEL_OF_DETAIL,                    4 , "lod "        },
+    { OBJ_MATERIAL_NAME,                      7 , "usemtl "     },
+    { OBJ_MATERIAL_LIBRARY,                   7 , "mtllib "     },
+    { OBJ_SHADOW_CASTING,                     11, "shadow_obj " },
+    { OBJ_RAY_TRACING,                        10, "trace_obj "  },
+    { OBJ_CURVE_APPROXIMATION_TECHNIQUE,      6,  "ctech "      },
+    { OBJ_SURFACE_APPROXIMATION_TECHNIQUE,    6,  "stech "      }
   };
 
   type_string_pair Result = {};
@@ -736,7 +736,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
         Assert( ! str::Contains( 3, "xyz", str::StringLength( DataType.String ), DataType.String ) );
         ActieveMaterial->Ka = (v4*) PushStruct( AssetArena, v4 );
         *ActieveMaterial->Ka = ParseNumbers(DataType.String);
-        ActieveMaterial->Ka->W = 0;
+        ActieveMaterial->Ka->W = 1;
       }break;
       case MTL_KD:
       {
@@ -744,7 +744,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
         Assert( ! str::Contains( 3, "xyz", str::StringLength( DataType.String ), DataType.String ) );
         ActieveMaterial->Kd = (v4*) PushStruct( AssetArena, v4 );
         *ActieveMaterial->Kd = ParseNumbers(DataType.String);
-        ActieveMaterial->Kd->W = 0;
+        ActieveMaterial->Kd->W = 1;
       }break;
       case MTL_KS:
       {
@@ -752,7 +752,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
         Assert( ! str::Contains( 3, "xyz", str::StringLength( DataType.String ), DataType.String ) );
         ActieveMaterial->Ks = (v4*) PushStruct( AssetArena, v4 );
         *ActieveMaterial->Ks = ParseNumbers(DataType.String);
-        ActieveMaterial->Ks->W = 0;
+        ActieveMaterial->Ks->W = 1;
       }break;
       case MTL_TF:
       {
@@ -760,7 +760,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
         Assert( ! str::Contains( 3, "xyz", str::StringLength( DataType.String ), DataType.String ) );
         ActieveMaterial->Tf = (v4*) PushStruct( AssetArena, v4 );
         *ActieveMaterial->Tf = ParseNumbers(DataType.String);
-        ActieveMaterial->Tf->W = 0;
+        ActieveMaterial->Tf->W = 1;
       }break;
       case MTL_ILLUMINATION:
       {
@@ -992,7 +992,7 @@ void SetCenterOfMassAndBoundingBoxToOBJFile( obj_loaded_file* OBJFile, memory_ar
     {
       u32 VertexIndex = Indeces->vi[Index];
 
-      if( ! IsVertexCounted[VertexIndex] )
+      if( !IsVertexCounted[VertexIndex] )
       {
         IsVertexCounted[VertexIndex] = true;
 
@@ -1023,31 +1023,28 @@ void ScaleObjectToUnitCube( obj_loaded_file* Obj )
 {
   mesh_data* MeshData = Obj->MeshData;
 
-  v3 MaxAxis = V3(0,0,0);
   r32 MaxDistance = 0;
+  v3 CM = {};
   for( u32 i = 0; i < MeshData->nv; ++i )
   {
     v3 Point = MeshData->v[i];
-
+    CM += Point;
     r32 Distance = Point.X;
     Distance = GetAbsoluteMax( Distance, Point.Y );
     Distance = GetAbsoluteMax( Distance, Point.Z );
 
     if( Distance > MaxDistance )
     {
-      MaxAxis = Point;
       MaxDistance = Distance;
     }
   }
 
-  if(MaxDistance > 0.001)
-  {
-    MaxDistance = 1/MaxDistance;
-  }
-
+  CM = CM / (r32)MeshData->nv;
+  Assert(MaxDistance>10E-5);
+  const r32 OneOverMaxDistance = 1/(2*MaxDistance);
   for( u32 i = 0; i < MeshData->nv; ++i )
   {
-    MeshData->v[i] = MeshData->v[i]*MaxDistance;
+    MeshData->v[i] = (MeshData->v[i] - CM)*OneOverMaxDistance;
   }
 }
 
@@ -1292,7 +1289,7 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
   }
 
   Assert( GroupToParse.IsEmpty() );
-  ScaleObjectToUnitCube(  Result );
+  ScaleObjectToUnitCube( Result );
   SetCenterOfMassAndBoundingBoxToOBJFile(Result, TempArena);
 
   EndTemporaryMemory(TempMem);

@@ -541,7 +541,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
           if(Material->DiffuseMap)
           {
             LoadTexture(Material->DiffuseMap);
-            AmbientColor + V4(0,0,0,0);
+            AmbientColor = V4(0,0,0,1);
           }else{
             local_persist bitmap EmptyBitmap = {};
             u8 WhitePixel[4] = {255,255,255,255};

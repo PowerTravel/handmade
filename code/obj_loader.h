@@ -9,7 +9,7 @@ struct mtl_material
   v4 *Kd;
   v4 *Ka;
   v4 *Tf;
-  v4 *Ks; 
+  v4 *Ks;
   r32 *Ni;
   r32 *Ns;
 
@@ -54,6 +54,7 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
          debug_platfrom_free_file_memory* FreeEntireFile,
          char* FileName);
 
+entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* MeshData );
 void CreateEntitiesFromOBJFile( world* World, obj_loaded_file* ObjFile );
 
 #endif OBJ_LOADER_H
