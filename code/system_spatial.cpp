@@ -315,7 +315,7 @@ v3 HeroForceEquation( v3& Position, v3& Velocity, v3& ExternalForce )
 
 v3 GravityForceEquation(v3& a,v3& b,v3& c)
 {
-  return V3(0,-1,0);
+  return V3(0,-10,0);
 }
 #if 1
 void SpatialSystemUpdate( world* World )

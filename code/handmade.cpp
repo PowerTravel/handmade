@@ -49,13 +49,56 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
   }
 }
 
+void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
+{
+  game_state* GameState = Memory->GameState;
+  memory_arena* AssetArena = &GameState->AssetArena;
+  memory_arena* TemporaryArena = &GameState->TemporaryArena;
+
+  GameState->World = AllocateWorld(100);
+  world* World = GameState->World;
+
+  entity* Light = NewEntity( World );
+  NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
+  Light->LightComponent->Color = V4(1,1,1,1);
+  Put( V3(3,3,3), Light->SpatialComponent );
+
+
+  GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
+  game_assets* Assets = GameState->World->Assets;
+
+  obj_loaded_file* cube = ReadOBJFile( Thread, GameState,
+         Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+         Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+         "..\\handmade\\data\\cube\\cube.obj");
+
+  entity* c1 = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
+  NewComponents( World, c1, COMPONENT_TYPE_DYNAMICS );
+  Put( V3(0,1,0),     c1->SpatialComponent );
+  c1->DynamicsComponent->Mass = 1;
+
+  entity* floor = CreateEntityFromOBJGroup( World, &cube->Objects[1], cube->MeshData );
+  Put( V3( 0,-1, 0),  floor->SpatialComponent );
+
+  entity* ControllableCamera = NewEntity( World );
+  NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
+
+  r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
+  r32 FieldOfView =  90;
+  SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
+  LookAt(ControllableCamera->CameraComponent, 3*V3(0,0,1), V3(0,0,0));
+
+  ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
+  ControllableCamera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
+}
+
 void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
 {
   game_state* GameState = Memory->GameState;
   memory_arena* AssetArena = &GameState->AssetArena;
   memory_arena* TemporaryArena = &GameState->TemporaryArena;
 
-  GameState->World = AllocateWorld(10000);
+  GameState->World = AllocateWorld(100);
   world* World = GameState->World;
 
   entity* Light = NewEntity( World );
@@ -223,7 +266,8 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
   {
     Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
 
-    Create2DScene(Thread, Memory, RenderCommands, Input );
+    //Create2DScene(Thread, Memory, RenderCommands, Input );
+    CreateCollisionTestScene(Thread, Memory, RenderCommands, Input );
     for (s32 ControllerIndex = 0;
     ControllerIndex < ArrayCount(Input->Controllers);
       ++ControllerIndex)
