@@ -496,8 +496,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 
   v4 LightColor    = V4(0,0,0,1);
 
-  // TODO: Create proper sorting of PushBuffer by shader program so we don't do unecessary looping
-  b32 first = false;
   // For each render group
   for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
   {
