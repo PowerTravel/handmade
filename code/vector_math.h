@@ -40,6 +40,12 @@ union m4
    r32 E[16];
 };
 
+inline b32
+Equals(const r32 A, const r32 B, const r32 Tol = 10E-7 )
+{
+  return Abs(A-B) < Tol;
+}
+
 // Supported operations:
 // v2 * v2 (dot)
 // r * v2,
@@ -176,7 +182,7 @@ operator-=( v2& A, const v2& B )
 inline b32
 operator==( const v2& A, const v2& B )
 {
-  return ( A.X == B.X ) && (A.Y == B.Y );
+  return Equals( A.X, B.X ) && Equals(A.Y, B.Y );
 }
 
 inline b32
@@ -198,8 +204,7 @@ Normalize( const v2& A )
 {
   v2 Result;
   r32 N = Norm(A);
-  Assert( N != 0 );
-  Result = A / N;
+  Result = ( Abs(N) > 10E-7 ) ? A / N : V2(0,0);
   return Result;
 }
 
@@ -370,8 +375,7 @@ Normalize( const v3& V )
 {
   v3 Result = {};
   r32 N = Norm(V);
-  Assert( N != 0 );
-  Result = V / N;
+  Result = ( Abs(N) > 10E-7 )? V / N : V3(0,0,0);
   return Result;
 }
 
@@ -404,7 +408,7 @@ Determinant( const v3& Row0, const v3& Row1, const v3& Row2 )
 inline b32
 operator==( const v3& A, const v3& B )
 {
-  return ( A.X == B.X ) && (A.Y == B.Y ) && (A.Z == B.Z);
+  return Equals(A.X, B.X) && Equals(A.Y, B.Y) && Equals(A.Z, B.Z);
 }
 
 inline b32
@@ -552,7 +556,7 @@ operator-( const v4& A)
 inline b32
 operator==( const v4& A, const v4& B )
 {
-  return ( A.X == B.X ) && (A.Y == B.Y ) && (A.Z == B.Z ) && (A.W == B.W );
+  return Equals(A.X, B.X) && Equals(A.Y, B.Y) && Equals(A.Z, B.Z) && Equals(A.W, B.W);
 }
 
 inline b32
@@ -582,8 +586,7 @@ Normalize( const v4& R )
 {
   v4 Result;
   r32 N = Norm(R);
-  Assert( N != 0 );
-  Result = R / N;
+  Result = ( Abs(N) > 10E-7 )? R / N : V4(0,0,0,0);
   return Result;
 }
 
