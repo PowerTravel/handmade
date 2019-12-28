@@ -1,7 +1,7 @@
 #pragma once
 
 #include "aabb.h"
-
+#include "data_containers.h"
 // Gilbert-Johnson-Keerthi (GJK) collision detection algorithm
 // See: http://www.allenchou.net/2013/12/game-physics-collision-detection-gjk/
 struct gjk_support
@@ -31,42 +31,36 @@ struct gjk_partial_result
   b32 Reduced;
 };
 
-gjk_support CsoSupportAABB( const m4* AModelMat, const m4* BModelMat, const v3 Direction )
+gjk_support CsoSupportAABB( const m4* AModelMat, const collider_mesh* AMesh,
+                            const m4* BModelMat, const collider_mesh* BMesh, const v3 Direction )
 {
   gjk_support Result = {};
 
-  m4 AModelMatInv = RigidInverse(*AModelMat);
-  m4 BModelMatInv = RigidInverse(*BModelMat);
-
-  v4 ADirLocalSpace =   AModelMatInv * V4(Direction,0);
-  v4 BDirLocalSpace = -(BModelMatInv * V4(Direction,0));
-
-  v3 P0 = V3(-0.5f,-0.5f, -0.5f);
-  v3 P1 = V3( 0.5f, 0.5f,  0.5f);
-  aabb3f UnitCube = AABB3f(P0,P1);
-
-  v3 UnitCubeVertices[8] = {};
-  GetAABBVertices( &UnitCube, UnitCubeVertices);
-
-  r32 AMaxValue = 0;
-  r32 BMaxValue = 0;
-  v4 SupportA = {};
-  v4 SupportB = {};
-  for(u32 i = 0; i < 8; ++i)
+  v4 ADirModelSpace = RigidInverse(*AModelMat) * V4(Direction,0);
+  r32 AMaxValue     = 0;
+  v4 SupportA       = {};
+  for(u32 i = 0; i < AMesh->nv; ++i)
   {
-    v4 Point =V4(UnitCubeVertices[i],1);
-    r32 sa = ADirLocalSpace * Point;
+    v4 ModelSpacePoint =V4(AMesh->v[i],1);
+    r32 sa = ADirModelSpace * ModelSpacePoint;
     if(sa > AMaxValue)
     {
       AMaxValue = sa;
-      SupportA = Point;
+      SupportA = ModelSpacePoint;
     }
+  }
 
-    r32 sb = BDirLocalSpace * Point;
+  v4 BDirModelSpace = (RigidInverse(*BModelMat) * V4(-Direction,0));
+  r32 BMaxValue     = 0;
+  v4 SupportB       = {};
+  for(u32 i = 0; i < BMesh->nv; ++i)
+  {
+    v4 ModelSpacePoint =V4(BMesh->v[i],1);
+    r32 sb = BDirModelSpace * ModelSpacePoint;
     if(sb > BMaxValue)
     {
       BMaxValue = sb;
-      SupportB = Point;
+      SupportB  = ModelSpacePoint;
     }
   }
 
@@ -163,18 +157,38 @@ VertexTriangle( const v3& Vertex, gjk_simplex& Simplex, const u32 Index0 = 0, co
     return Result;
   }
 
+  // Check the edges of the triangle. (Reduce)
   const u32 EdgeIndeces[6] = {Index0,Index1,
                               Index1,Index2,
                               Index2,Index0};
-  Result = VertexEdge( Vertex, Simplex,  EdgeIndeces[0], EdgeIndeces[1]);
-  for(u32 Index = 1; Index < 2; ++Index)
+  Result = VertexEdge( Vertex, Simplex, EdgeIndeces[0], EdgeIndeces[1]);
+  u32 EdgeIndex0 = EdgeIndeces[0];
+  u32 EdgeIndex1 = EdgeIndeces[1];
+  for(u32 Index = 1; Index < 3; ++Index)
   {
     const u32 BaseIndex = Index*2;
     const gjk_partial_result ResultCandidate = VertexEdge( Vertex, Simplex, EdgeIndeces[BaseIndex], EdgeIndeces[BaseIndex+1] );
+
     if(ResultCandidate.Distance < Result.Distance)
     {
+      EdgeIndex0 = EdgeIndeces[BaseIndex];
+      EdgeIndex1 = EdgeIndeces[BaseIndex+1];
       Result = ResultCandidate;
     }
+  }
+
+  if(!Result.Reduced)
+  {
+    // If we did not reduce to a Point in VertexEdge we reduce to a line here.
+    Result.Reduced = true;
+    Result.ReducedSimplex = {};
+    Result.ReducedSimplex.Dimension = 2;
+    Result.ReducedSimplex.SP[0] = Simplex.SP[EdgeIndex0];
+    Result.ReducedSimplex.SP[1] = Simplex.SP[EdgeIndex1];
+  }else{
+    // Make sure we reduced to a point
+    Assert(Result.Reduced);
+    Assert(Result.ReducedSimplex.Dimension == 1);
   }
 
   return Result;
@@ -217,12 +231,14 @@ VertexTetrahedron( const v3& Vertex, gjk_simplex& Simplex )
   }
 
   const u32 TriangleIndeces[12] = {0, 1, 2,
-                                  0, 1, 3,
-                                  1, 2, 3,
-                                  2, 0, 3};
+                                   0, 1, 3,
+                                   1, 2, 3,
+                                   2, 0, 3};
 
   Result = VertexTriangle( Vertex, Simplex, TriangleIndeces[0], TriangleIndeces[1], TriangleIndeces[2]);
-
+  u32 TriangleIndex0 = TriangleIndeces[0];
+  u32 TriangleIndex1 = TriangleIndeces[1];
+  u32 TriangleIndec2 = TriangleIndeces[2];
   for(u32 Index = 1; Index < 3; ++Index)
   {
     u32 BaseIndex = 3*Index;
@@ -234,14 +250,29 @@ VertexTetrahedron( const v3& Vertex, gjk_simplex& Simplex )
 
     if(ResultCandidate.Distance < Result.Distance)
     {
+      TriangleIndex0 = TriangleIndeces[BaseIndex];
+      TriangleIndex1 = TriangleIndeces[BaseIndex+1];
+      TriangleIndec2 = TriangleIndeces[BaseIndex+2];
       Result = ResultCandidate;
     }
   }
+  if(!Result.Reduced)
+  {
+    // If we did not reduce to a Line or Point in VertexTriangle we reduce to a Triangle here.
+    Result.Reduced = true;
+    Result.ReducedSimplex = {};
+    Result.ReducedSimplex.Dimension = 3;
+    Result.ReducedSimplex.SP[0] = Simplex.SP[TriangleIndex0];
+    Result.ReducedSimplex.SP[1] = Simplex.SP[TriangleIndex1];
+    Result.ReducedSimplex.SP[2] = Simplex.SP[TriangleIndex1];
+  }
+
   return Result;
 }
 
 // Assumes the AABB in model space is the cube going from V3(-1/2,-1/2,-1/2) to V3(1/2,1/2,1/2)
-gjk_collision_result GJKCollisionDetectionAABB( const m4* AModelMat, const m4* BModelMat)
+gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_mesh* AMesh,
+                                           const m4* BModelMat, const collider_mesh* BMesh )
 {
   const v3 Origin = V3(0,0,0);
   gjk_collision_result Result = {};
@@ -254,7 +285,20 @@ gjk_collision_result GJKCollisionDetectionAABB( const m4* AModelMat, const m4* B
   {
     r32 PreviousDistance = PartialResult.Distance;
     // Add a CSO to the simplex
-    gjk_support SupportPoint = CsoSupportAABB( AModelMat, BModelMat,  Origin-PartialResult.ClosestPoint );
+    gjk_support SupportPoint = CsoSupportAABB( AModelMat, AMesh, BModelMat, BMesh, Origin-PartialResult.ClosestPoint );
+
+    Assert(Simplex.Dimension <= 3);
+    for(u32 i = 0; i < Simplex.Dimension; ++i)
+    {
+      if(SupportPoint.S == Simplex.SP[i].S)
+      {
+        // If we start adding duplicate points
+        // we are not going to get closer to the origin.
+        // Thus we return the Simplex
+        return Result;
+      }
+    }
+
     Simplex.SP[Simplex.Dimension++] = SupportPoint;
 
     switch(Simplex.Dimension)

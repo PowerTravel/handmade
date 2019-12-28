@@ -256,17 +256,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   world* World = GameState->World;
   World->dtForFrame = Input->dt;
 
-  m4 A = M4(1,0,0,1,
-            0,1,0,1,
-            0,0,0,0,
-            0,0,0,1);
-  m4 B = M4(1,0,0,1.5,
-            0,1,0,1.5,
-            0,0,0,0,
-            0,0,0,1);
-
-  GJKCollisionDetectionAABB( &A, &B);
-
   ControllerSystemUpdate(GameState->World);
   SpatialSystemUpdate(GameState->World);
   CameraSystemUpdate(GameState->World);
