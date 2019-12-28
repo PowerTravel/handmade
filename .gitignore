@@ -1,4 +1,17 @@
 
+# Directories
+data/
+ctime/
+misc/
+shaders/
+tests/
+code/deprecated/
 
+
+#files
+tests.rar
+
+# File Types
+*.ctm
 *.swp
 *.svo
