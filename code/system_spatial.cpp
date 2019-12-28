@@ -441,52 +441,6 @@ void SpatialSystemUpdate( world* World )
 
 #else
 
-struct gjk_support
-{
-  v3 Support;
-  v3 SupportA;
-  v3 SupportB;
-};
-
-gjk_support CsoSupportAABB(aabb3f A, aabb3f B, v3 Direction )
-{
-  gjk_support Result = {};
-
-  aabb_feature_vertex Afv[8] = {};
-  GetAABBVertices( &A, Afv);
-  v3 ACenter = GetAABBCenter( A );
-
-  r32 AMaxValue = 0;
-  for(u32 i = 0; i < 8; ++i)
-  {
-    v3 VModelSpace = ACenter - Afv[i];
-    r32 s = Direction * VModelSpace;
-    if(s > AMaxValue)
-    {
-      AMaxValue = s;
-      Result.SupportA = Afv[i];
-    }
-  }
-
-  aabb_feature_vertex Bfv[8] = {};
-  GetAABBVertices(&B, Bfv);
-  v3 BCenter = GetAABBCenter( B );
-
-  r32 BMaxValue = 0;
-  for(u32 i = 0; i < 8; ++i)
-  {
-    v3 VModelSpace = BCenter - Bfv[i];
-    r32 s = -Direction * VModelSpace;
-    if(s > BMaxValue)
-    {
-      BMaxValue = s;
-      Result.SupportB = Bfv[i];
-    }
-  }
-
-  Result.Support = Result.SupportA - Result.SupportB;
-  return Result;
-}
 
 void SpatialSystemUpdate( world* World )
 {
