@@ -1,5 +1,4 @@
-#ifndef OBJ_LOADER_H
-#define OBJ_LOADER_H
+#pragma once
 
 struct mtl_material
 {
@@ -32,9 +31,7 @@ struct obj_group
 
   mesh_indeces Indeces;
 
-  v3 CenterOfMass;
-  v3 BoundingBoxMin;
-  v3 BoundingBoxMax;
+  aabb3f aabb;
 
   mtl_material* Material;
 };
@@ -56,5 +53,3 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 
 entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* MeshData );
 void CreateEntitiesFromOBJFile( world* World, obj_loaded_file* ObjFile );
-
-#endif OBJ_LOADER_H

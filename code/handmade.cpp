@@ -70,7 +70,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
   entity* Player = NewEntity( World );
 
   NewComponents( World, Player, COMPONENT_TYPE_CONTROLLER |
-                                COMPONENT_TYPE_SPATIAL | COMPONENT_TYPE_COLLISION | COMPONENT_TYPE_DYNAMICS |
+                                COMPONENT_TYPE_SPATIAL | COMPONENT_TYPE_COLLIDER | COMPONENT_TYPE_DYNAMICS |
                                 COMPONENT_TYPE_SPRITE_ANIMATION |
                                 COMPONENT_TYPE_CAMERA);
 
@@ -83,7 +83,8 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
   Player->ControllerComponent->ControllerMappingFunction = HeroController;
 
   Put( V3(0,3,0), Player->SpatialComponent );
-  Player->CollisionComponent->AABB = AABB3f( V3(0,0,0), V3(1,1,0) );
+  const aabb3f PlayerAABB = AABB3f( V3(-0.5,-0.5,0), V3(0.5,0.5,0) );
+  SetAABBTriangles( &World->Arena, &PlayerAABB, Player->ColliderComponent->Mesh);
 
   Player->DynamicsComponent->Velocity = V3(0,0,0);
   Player->DynamicsComponent->Mass = 1;

@@ -43,14 +43,14 @@ void NewComponents( world* World, entity* Entity, u32 EntityFlags )
 	{
 		Entity->SpatialComponent = (component_spatial*) PushStruct(&World->Arena, component_spatial);
 	}
-	if( EntityFlags & COMPONENT_TYPE_COLLISION )
+	if( EntityFlags & COMPONENT_TYPE_COLLIDER )
 	{
 		Assert(Entity->SpatialComponent); // Collision Requires Spatial
-		Entity->CollisionComponent = (component_collision*) PushStruct(&World->Arena, component_collision);
+		Entity->ColliderComponent = (component_collider*) PushStruct(&World->Arena, component_collider);
 	}
 	if( EntityFlags & COMPONENT_TYPE_DYNAMICS )
 	{
-		Assert(Entity->SpatialComponent && Entity->CollisionComponent); // Dynamics Requires Spatial and Collision
+		Assert(Entity->SpatialComponent && Entity->ColliderComponent); // Dynamics Requires Spatial and Collision
 		Entity->DynamicsComponent = (component_dynamics*) PushStruct(&World->Arena, component_dynamics);
 	}
 	if( EntityFlags & COMPONENT_TYPE_SURFACE )

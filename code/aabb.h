@@ -80,7 +80,7 @@ union aabb_feature_face
  *                                        v
  */
 
-v3 GetAABB2fEdgeNormal( u32 EdgeIndex )
+v3 GetAABB2fEdgeNormal( const u32 EdgeIndex )
 {
   switch(EdgeIndex)
   {
@@ -109,7 +109,7 @@ v3 GetAABB2fEdgeNormal( u32 EdgeIndex )
   return {};
 }
 
-void GetAABBVertices( aabb2f* AABB, aabb_feature_vertex* AABBVertices )
+void GetAABBVertices( const aabb2f* AABB, aabb_feature_vertex* AABBVertices )
 {
   AABBVertices[0] = V3( AABB->P0.X, AABB->P0.Y, 0 );
   AABBVertices[1] = V3( AABB->P1.X, AABB->P0.Y, 0 );
@@ -117,7 +117,7 @@ void GetAABBVertices( aabb2f* AABB, aabb_feature_vertex* AABBVertices )
   AABBVertices[3] = V3( AABB->P0.X, AABB->P1.Y, 0 );
 }
 
-list<aabb_feature_vertex> GetAABBVertices( memory_arena* Arena, aabb2f* AABB )
+list<aabb_feature_vertex> GetAABBVertices( memory_arena* Arena, const aabb2f* AABB )
 {
   aabb_feature_vertex Vertices[4] ={};
   GetAABBVertices( AABB, Vertices );
@@ -134,7 +134,7 @@ list<aabb_feature_vertex> GetAABBVertices( memory_arena* Arena, aabb2f* AABB )
 }
 
 
-list<aabb_feature_edge> GetAABBEdges( memory_arena* Arena, aabb2f* AABB )
+list<aabb_feature_edge> GetAABBEdges( memory_arena* Arena, const aabb2f* AABB )
 {
   aabb_feature_vertex Vertices[4] ={};
   GetAABBVertices( AABB, Vertices);
@@ -163,7 +163,7 @@ list<aabb_feature_edge> GetAABBEdges( memory_arena* Arena, aabb2f* AABB )
   return Result;
 }
 
-aabb_feature_face GetAABBFace( aabb2f* AABB )
+aabb_feature_face GetAABBFace( const aabb2f* AABB )
 {
   aabb_feature_vertex Vertices[8] ={};
   GetAABBVertices( AABB, Vertices);
@@ -218,54 +218,54 @@ aabb_feature_face GetAABBFace( aabb2f* AABB )
 // Going CCW in the x-y plane starting with Xmin, Ymin, Zmin
 // Then again with Xmin, Ymin, Zmax
 
-r32 GetWidth( aabb3f* AABB )
+r32 GetWidth( const aabb3f* AABB )
 {
   return Abs( AABB->P1.X - AABB->P0.X);
 }
 
-b32 HasWidth( aabb3f* AABB )
+b32 HasWidth( const aabb3f* AABB )
 {
   r32 Tol = 1E-5;
   b32 HasWidth  = GetWidth(AABB) > Tol;
   return HasWidth;
 }
-b32 LacksWidth( aabb3f* AABB )
+b32 LacksWidth( const aabb3f* AABB )
 {
   return ! HasWidth(AABB);
 }
 
-r32 GetHeight( aabb3f* AABB )
+r32 GetHeight( const aabb3f* AABB )
 {
   return Abs( AABB->P1.Y - AABB->P0.Y);
 }
 
-b32 HasHeight( aabb3f* AABB )
+b32 HasHeight( const aabb3f* AABB )
 {
   r32 Tol = 1E-5;
   b32 HasHeight = GetHeight(AABB) > Tol;
   return HasHeight;
 }
-b32 LacksHeight( aabb3f* AABB )
+b32 LacksHeight( const aabb3f* AABB )
 {
   return ! HasHeight(AABB);
 }
 
-r32 GetDepth( aabb3f* AABB )
+r32 GetDepth( const aabb3f* AABB )
 {
   return Abs( AABB->P1.Z - AABB->P0.Z);
 }
-b32 HasDepth( aabb3f* AABB )
+b32 HasDepth( const aabb3f* AABB )
 {
   r32 Tol = 1E-5;
   b32 HasDepth  = GetDepth(AABB) > Tol;
   return HasDepth;
 }
-b32 LacksDepth( aabb3f* AABB )
+b32 LacksDepth( const aabb3f* AABB )
 {
   return !HasDepth(AABB);
 }
 
-void GetAABBVertices(aabb3f* AABB, aabb_feature_vertex* AABBVertices)
+void GetAABBVertices(const aabb3f* AABB, aabb_feature_vertex* AABBVertices)
 {
   AABBVertices[0] = V3( AABB->P0.X, AABB->P0.Y, AABB->P0.Z);
   AABBVertices[1] = V3( AABB->P1.X, AABB->P0.Y, AABB->P0.Z);
@@ -442,7 +442,7 @@ list<aabb_feature_face> GetAABBFaces( memory_arena* Arena, aabb3f* AABB )
 }
 
 inline v3
-GetAABBCenter( const aabb3f AABB )
+GetAABBCenter( const aabb3f& AABB )
 {
   return (AABB.P0 + AABB.P1) * 0.5;
 }

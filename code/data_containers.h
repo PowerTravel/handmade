@@ -195,7 +195,7 @@ public:
     Base = (T*) PushArray(Arena, Size, T);
   }
 
-  void Insert(u32 Idx, T& Value )
+  void Insert(u32 Idx, const T& Value )
   {
     Assert(Idx<MaxCount);
 

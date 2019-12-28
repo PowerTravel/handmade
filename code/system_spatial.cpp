@@ -333,10 +333,11 @@ void SpatialSystemUpdate( world* World )
     if( E->Types & COMPONENT_TYPE_DYNAMICS )
     {
 
+#if 0
       temporary_memory TempMem = BeginTemporaryMemory( Arena );
 
       component_spatial*   S = E->SpatialComponent;
-      component_collision* C = E->CollisionComponent;
+      component_collider*  C = E->ColliderComponent;
       component_dynamics*  D = E->DynamicsComponent;
 
       v3  Position      = GetPosition(S);
@@ -379,12 +380,52 @@ void SpatialSystemUpdate( world* World )
       D->ExternalForce = {};
 
       EndTemporaryMemory(TempMem);
+#else
+
+
+      temporary_memory TempMem = BeginTemporaryMemory( Arena );
+      component_spatial*   S = E->SpatialComponent;
+      component_collider*  C = E->ColliderComponent;
+      component_dynamics*  D = E->DynamicsComponent;
+
+
+
+      for(u32 IndexB = 0;  IndexB < World->NrEntities; ++IndexB )
+      {
+        entity* Eb = &World->Entities[IndexB];
+        if( !( (E->id == 1 ) && (Eb->id== 2) ) )
+        {
+          continue;
+        }
+
+        component_spatial*   Sb = Eb->SpatialComponent;
+        component_collider*  Cb = Eb->ColliderComponent;
+        component_dynamics*  Db = Eb->DynamicsComponent;
+        gjk_collision_result cr = GJKCollisionDetection( &S->ModelMatrix,  C->Mesh, &Sb->ModelMatrix, Cb->Mesh);
+        if(cr.ContainsOrigin)
+        {
+          int a = 0;
+        }
+      }
+      v3  Position      = GetPosition(S);
+      v3  Velocity      = D->Velocity;
+      r32 Mass          = D->Mass;
+      v3  ExternalForce = D->ExternalForce + V3(0,-10,0);
+
+      timestep_progression TP = ForwardEuler(dt, Mass, Position, Velocity, ExternalForce, GravityForceEquation);
+
+      Put(TP.P1,S);
+      D->Velocity = TP.Velocity;
+      D->ExternalForce = {};
+
+      EndTemporaryMemory( TempMem );
+#endif
     }
 
 //    if( E->Types & COMPONENT_TYPE_DYNAMICS )
 //    {
 //      // Dynamics Requires Spatial and Collision
-//      Assert(E->SpatialComponent && E->CollisionComponent && E->DynamicsComponent);
+//      Assert(E->SpatialComponent && E->ColliderComponent && E->DynamicsComponent);
 //      v3 Position = V3(GetTranslationFromMatrix( E->SpatialComponent->ModelMatrix ));
 //      v3& Velocity = E->DynamicsComponent->Velocity;
 //      r32 Mass = E->DynamicsComponent->Mass;
@@ -456,7 +497,7 @@ void SpatialSystemUpdate( world* World )
   tile_map* TileMap = &World->TileMap;
 
   component_spatial*   S = 0;
-  component_collision* C = 0;
+  component_collider*  C = 0;
   component_dynamics*  D = 0;
 
   for(u32 Index = 0;  Index < World->NrEntities; ++Index )
@@ -466,7 +507,7 @@ void SpatialSystemUpdate( world* World )
     if( E->Types & COMPONENT_TYPE_DYNAMICS )
     {
       S = E->SpatialComponent;
-      C = E->CollisionComponent;
+      C = E->ColliderComponent;
       D = E->DynamicsComponent;
       break;
     }

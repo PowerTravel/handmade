@@ -1,5 +1,4 @@
-#ifndef COMPONENT_SPATIAL_H
-#define COMPONENT_SPATIAL_H
+#pragma once
 
 #include "affine_transformations.h"
 #include "aabb.h"
@@ -39,28 +38,3 @@ void Rotate( const r32 Angle, const v3 Axis, component_spatial* c )
   Assert(c);
   Rotate( Angle, V4(Axis,0), c->ModelMatrix );
 }
-
-// Requires location
-struct component_collision
-{
-  // Specifies extent
-  aabb3f AABB;
-};
-
-inline aabb3f
-GetBoundingBox( component_collision* CollisionComponent )
-{
-  return CollisionComponent->AABB;
-}
-
-
-// Requires spatial and collision primitive
-struct component_dynamics
-{
-  v3  Velocity;
-  v3  ExternalForce;
-  r32 Mass;
-};
-
-
-#endif // COMPONENT_SPATIAL_H

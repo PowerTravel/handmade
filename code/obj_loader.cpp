@@ -969,7 +969,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
   return Result;
 }
 
-void SetCenterOfMassAndBoundingBoxToOBJFile( obj_loaded_file* OBJFile, memory_arena* TemporaryArena )
+void SetBoundingBox( obj_loaded_file* OBJFile, memory_arena* TemporaryArena )
 {
   mesh_data* MeshData = OBJFile->MeshData;
   for( u32 GroupIndex = 0; GroupIndex < OBJFile->ObjectCount; ++GroupIndex )
@@ -979,15 +979,11 @@ void SetCenterOfMassAndBoundingBoxToOBJFile( obj_loaded_file* OBJFile, memory_ar
 
     obj_group& OBJGroup = OBJFile->Objects[GroupIndex];
 
-    v3 CenterOfMass = V3(0,0,0);
-    r32 VertexCount = 0;
     mesh_indeces* Indeces = &OBJGroup.Indeces;
 
-    u32 FirstVertexIndex = Indeces->vi[0];
-    v3  FirstVertexOfGroup = MeshData->v[FirstVertexIndex];
-    v3  Max = FirstVertexOfGroup;
-    v3  Min = FirstVertexOfGroup;
-
+    v3  Max = MeshData->v[Indeces->vi[0]];
+    v3  Min = MeshData->v[Indeces->vi[0]];
+    r32 VertexCount = 0;
     for( u32 Index=0; Index < Indeces->Count; ++Index )
     {
       u32 VertexIndex = Indeces->vi[Index];
@@ -1006,45 +1002,13 @@ void SetCenterOfMassAndBoundingBoxToOBJFile( obj_loaded_file* OBJFile, memory_ar
         Min.Y = Min.Y < Vertex.Y ? Min.Y : Vertex.Y;
         Min.Z = Min.Z < Vertex.Z ? Min.Z : Vertex.Z;
 
-        CenterOfMass += Vertex;
         ++VertexCount;
       }
     }
 
-    OBJGroup.CenterOfMass = CenterOfMass / VertexCount;
-    OBJGroup.BoundingBoxMin = Min - CenterOfMass;
-    OBJGroup.BoundingBoxMax = Max - CenterOfMass;
+    OBJGroup.aabb   = AABB3f(Min,Max);
 
     EndTemporaryMemory(TempMem);
-  }
-}
-
-void ScaleObjectToUnitCube( obj_loaded_file* Obj )
-{
-  mesh_data* MeshData = Obj->MeshData;
-
-  r32 MaxDistance = 0;
-  v3 CM = {};
-  for( u32 i = 0; i < MeshData->nv; ++i )
-  {
-    v3 Point = MeshData->v[i];
-    CM += Point;
-    r32 Distance = Point.X;
-    Distance = GetAbsoluteMax( Distance, Point.Y );
-    Distance = GetAbsoluteMax( Distance, Point.Z );
-
-    if( Distance > MaxDistance )
-    {
-      MaxDistance = Distance;
-    }
-  }
-
-  CM = CM / (r32)MeshData->nv;
-  Assert(MaxDistance>10E-5);
-  const r32 OneOverMaxDistance = 1/(2*MaxDistance);
-  for( u32 i = 0; i < MeshData->nv; ++i )
-  {
-    MeshData->v[i] = (MeshData->v[i] - CM)*OneOverMaxDistance;
   }
 }
 
@@ -1289,8 +1253,7 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
   }
 
   Assert( GroupToParse.IsEmpty() );
-  ScaleObjectToUnitCube( Result );
-  SetCenterOfMassAndBoundingBoxToOBJFile(Result, TempArena);
+  SetBoundingBox(Result, TempArena);
 
   EndTemporaryMemory(TempMem);
 
@@ -1314,21 +1277,24 @@ void SetMtlMaterialToSurfaceMaterial(mtl_material* MtlMaterial, material* SurfMa
   }
 }
 
+
 entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* MeshData )
 {
   entity* Entity = NewEntity( World );
-  NewComponents( World, Entity,  COMPONENT_TYPE_MESH      |
-                   COMPONENT_TYPE_SPATIAL   |
-                   COMPONENT_TYPE_COLLISION |
-                   COMPONENT_TYPE_SURFACE );
+  NewComponents( World, Entity,  COMPONENT_TYPE_MESH     |
+                                 COMPONENT_TYPE_SPATIAL  |
+                                 COMPONENT_TYPE_COLLIDER |
+                                 COMPONENT_TYPE_SURFACE );
 
   Entity->MeshComponent->Indeces = OBJGrp->Indeces;
   Entity->MeshComponent->Data = MeshData;
 
-  Translate( -OBJGrp->CenterOfMass, Entity->SpatialComponent );
-
   Entity->SpatialComponent->ModelMatrix = M4Identity();
-  Entity->CollisionComponent->AABB  = AABB3f(OBJGrp->BoundingBoxMin,OBJGrp->BoundingBoxMax);
+  Translate( -GetAABBCenter(OBJGrp->aabb), Entity->SpatialComponent );
+
+  collider_mesh* ColliderMesh = (collider_mesh*) PushStruct(&World->Arena, collider_mesh);
+  SetAABBTriangles( &World->Arena, &OBJGrp->aabb, ColliderMesh );
+  Entity->ColliderComponent->Mesh = ColliderMesh;
 
   Entity->SurfaceComponent->Material = PushStruct( &World->Arena, material);
   SetMtlMaterialToSurfaceMaterial( OBJGrp->Material, Entity->SurfaceComponent->Material);

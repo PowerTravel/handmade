@@ -15,9 +15,9 @@ struct mesh_data
 struct mesh_indeces
 {
   u32 Count;  // 3 times Nr Triangles
-  u32* vi;  // Vertex Indeces
+  u32* vi;    // Vertex Indeces
   u32* ti;    // Texture Indeces
-  u32* ni;  // Normal Indeces
+  u32* ni;    // Normal Indeces
 };
 
 struct component_mesh
