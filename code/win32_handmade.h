@@ -19,56 +19,56 @@ struct win32_offscreen_buffer
 };
 
 struct win32_window_dimension{
-	s32 Width;
-	s32 Height;
+  s32 Width;
+  s32 Height;
 };
 
 struct win32_sound_output
 {
 
-	LPDIRECTSOUNDBUFFER SecondaryBuffer;	
+  LPDIRECTSOUNDBUFFER SecondaryBuffer;
 
-	// NOTE: Orthogonal Values
-	s32 SamplesPerSecond;
-	s32 ChannelCount;
-	s32 BytesPerSample;
-	s32 BufferSizeInSeconds;
-	s32 TargetSecondsOfLatency;
+  // NOTE: Orthogonal Values
+  s32 SamplesPerSecond;
+  s32 ChannelCount;
+  s32 BytesPerSample;
+  s32 BufferSizeInSeconds;
+  s32 TargetSecondsOfLatency;
 
-	// Derived Values
-	s32 BytesPerSampleTotal; // = ChannelCount * BytesPerSample;
-	s32 BytesPerSecond;
-	DWORD BufferSizeInBytes; // = BufferSizeInSeconds * SamplesPerSecond * BytesPerSampleTotal;
-	DWORD BytesOfLatency;
+  // Derived Values
+  s32 BytesPerSampleTotal; // = ChannelCount * BytesPerSample;
+  s32 BytesPerSecond;
+  DWORD BufferSizeInBytes; // = BufferSizeInSeconds * SamplesPerSecond * BytesPerSampleTotal;
+  DWORD BytesOfLatency;
 
-	// Variable
-	u32 RunningSampleIndex;
+  // Variable
+  u32 RunningSampleIndex;
 };
 
 struct win32_debug_time_marker{
-	
-	DWORD OutputPlayCursor;
-	DWORD OutputWriteCursor;
 
-	DWORD OutputLocation;
-	DWORD OutputByteCount;
+  DWORD OutputPlayCursor;
+  DWORD OutputWriteCursor;
 
-	DWORD FlipPlayCursor;
-	DWORD FlipWriteCursor; 
+  DWORD OutputLocation;
+  DWORD OutputByteCount;
 
-	DWORD ExpectedFlipPlayCursor;
+  DWORD FlipPlayCursor;
+  DWORD FlipWriteCursor;
+
+  DWORD ExpectedFlipPlayCursor;
 };
 
 struct win32_game_code
 {
-	HMODULE GameCodeDLL;
-	FILETIME LastDLLWriteTime;
+  HMODULE GameCodeDLL;
+  FILETIME LastDLLWriteTime;
 
-	// IMPORTANT: Both functions can be 0; Must check before calling
-	game_update_and_render* UpdateAndRender;
-	game_get_sound_samples* GetSoundSamples;
+  // IMPORTANT: Both functions can be 0; Must check before calling
+  game_update_and_render* UpdateAndRender;
+  game_get_sound_samples* GetSoundSamples;
 
-	b32 IsValid;
+  b32 IsValid;
 };
 
 enum win32_memory_block_flag
@@ -90,36 +90,36 @@ struct win32_saved_memory_block
     u64 Size;
 };
 
-// Note:	Never use MAX_PATH in code that is user facing because it can be wrong
+// Note:  Never use MAX_PATH in code that is user facing because it can be wrong
 #define WIN32_STATE_FILE_NAME_COUNT MAX_PATH
 struct win32_replay_buffer
 {
-	HANDLE FileHandle;
-	HANDLE MemoryMap;
-	char FileName[WIN32_STATE_FILE_NAME_COUNT];
-	void* MemoryBlock;
+  HANDLE FileHandle;
+  HANDLE MemoryMap;
+  char FileName[WIN32_STATE_FILE_NAME_COUNT];
+  void* MemoryBlock;
 };
 
 struct win32_state
 {
     win32_memory_block MemorySentinel;
 
-	u64 TotalSize;
-	void* GameMemoryBlock;
-	//TODO, give support for more than 1 replaybuffer 
-	//		It works fine to add as many ass you want, however
-	// 		selecting specifik buffers to record to is not implemented.
-	// 		Also slow startup for some reason with many buffers. 
-	//		See ReplayBuffer loop initialization in win32_handmade.cpp
-	win32_replay_buffer ReplayBuffer[1];
+  u64 TotalSize;
+  void* GameMemoryBlock;
+  //TODO, give support for more than 1 replaybuffer
+  //    It works fine to add as many ass you want, however
+  //    selecting specifik buffers to record to is not implemented.
+  //    Also slow startup for some reason with many buffers.
+  //    See ReplayBuffer loop initialization in win32_handmade.cpp
+  win32_replay_buffer ReplayBuffer[1];
 
 
-	HANDLE RecordingHandle;
-	s32 PlayingIndex;
+  HANDLE RecordingHandle;
+  s32 PlayingIndex;
 
-	HANDLE PlaybackHandle;
-	s32 RecordingIndex;
+  HANDLE PlaybackHandle;
+  s32 RecordingIndex;
 
-	char EXEFileName[WIN32_STATE_FILE_NAME_COUNT];
-	char* OnePastLastSlashEXEFileName;
+  char EXEFileName[WIN32_STATE_FILE_NAME_COUNT];
+  char* OnePastLastSlashEXEFileName;
 };
