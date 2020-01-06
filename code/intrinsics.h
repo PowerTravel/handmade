@@ -14,120 +14,134 @@ SafeTruncateToU32( u64 Value )
     return(Result);
 }
 
-inline u32 
+inline u32
 RoundReal64ToUInt32( r32 Real64 )
 {
-	u64 tmp = (u64) round( Real64 );
-	u32 Result = SafeTruncateToU32( tmp );
-	return Result; 
+  u64 tmp = (u64) round( Real64 );
+  u32 Result = SafeTruncateToU32( tmp );
+  return Result;
 }
 
-inline u32 
+inline u32
 RoundReal32ToUInt32( r32 Real32 )
 {
-	u32 Result = (u32) roundf( Real32 );
-	return Result; 
+  u32 Result = (u32) roundf( Real32 );
+  return Result;
 }
 
-inline s32 
+inline s32
 RoundReal32ToInt32( r32 Real32 )
 {
-	// NOTE(Jakob): ROUNDF IS SLOW!! 
-	s32 Result = (s32) roundf( Real32 );
+  // NOTE(Jakob): ROUNDF IS SLOW!!
+  s32 Result = (s32) roundf( Real32 );
 
-	return Result; 
+  return Result;
 }
 
-inline s32 
+inline s32
 TruncateReal32ToInt32( r32 Real32 )
 {
-	s32 Result = (s32) Real32;
-	return Result;
+  s32 Result = (s32) Real32;
+  return Result;
 }
 
-inline s32 
+inline s32
 FloorReal32ToInt32( r32 Real32 )
 {
-	s32 Result = (s32) floorf( Real32 );
-	return Result;
+  s32 Result = (s32) floorf( Real32 );
+  return Result;
+}
+
+inline s32
+Roof( s32 Signed32 )
+{
+  s32 Result = (s32) ceil( (r64) Signed32 );
+  return Result;
+}
+
+inline s32
+Floor( s32 Signed32 )
+{
+  s32 Result = (s32) floor( (r64) Signed32 );
+  return Result;
 }
 
 inline r32
 Sin( r32 Angle )
 {
-	r32 Result = sinf( Angle );
-	return Result;
+  r32 Result = sinf( Angle );
+  return Result;
 }
 
 inline r32
 Cos( r32 Angle )
 {
-	r32 Result = cosf( Angle );
-	return Result;
+  r32 Result = cosf( Angle );
+  return Result;
 }
 
 inline r32
 ATan2( r32 Y, r32 X )
 {
-	r32 Result = atan2f( Y, X );
-	return Result;
+  r32 Result = atan2f( Y, X );
+  return Result;
 }
 
 inline r32
 Tan( r32 Angle )
 {
-	r32 Result = tanf( Angle );
-	return Result;
+  r32 Result = tanf( Angle );
+  return Result;
 }
 
 inline r32
 Sqrt( r32 A )
 {
-	r32 Result = sqrtf( A );
-	return Result;
+  r32 Result = sqrtf( A );
+  return Result;
 }
 
 inline r32
 Abs( r32 A )
 {
-	r32 Result = (r32) fabs( A );
-	return Result;
+  r32 Result = (r32) fabs( A );
+  return Result;
 }
 
 inline r32
 Pow( r32 Base, r32 Exponent )
 {
-	r32 Result = (r32) powf( Base, Exponent );
-	return Result;	
+  r32 Result = (r32) powf( Base, Exponent );
+  return Result;
 }
 
 struct bit_scan_result
 {
-	b32 Found;
-	u32 Index;
+  b32 Found;
+  u32 Index;
 };
 
 inline bit_scan_result
 FindLeastSignificantSetBit( u32 Value )
 {
-	bit_scan_result Result = {};
+  bit_scan_result Result = {};
 
 #if COMPILER_MSVC
-	Result.Found = _BitScanForward( (unsigned long*) &Result.Index, Value);
+  Result.Found = _BitScanForward( (unsigned long*) &Result.Index, Value);
 #else
-	for(u32 Test = 0; Test < 32; Test++)
-	{
-		u32 mask = (1 << Test);
-		if( (Value & mask ) != 0)
-		{
-			Result.Index = Test;
-			Result.Found = true;
-			break;
-		}
-	}
+  for(u32 Test = 0; Test < 32; Test++)
+  {
+    u32 mask = (1 << Test);
+    if( (Value & mask ) != 0)
+    {
+      Result.Index = Test;
+      Result.Found = true;
+      break;
+    }
+  }
 
 #endif
-	return Result;
+  return Result;
 }
 
 
