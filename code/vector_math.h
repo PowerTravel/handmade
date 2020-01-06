@@ -192,10 +192,18 @@ operator!=( const v2& A, const v2& B )
 }
 
 inline r32
+NormSq( const v2& A )
+{
+  r32 Result;
+  Result = A*A;
+  return Result;
+}
+
+inline r32
 Norm( const v2& A )
 {
    r32 Result;
-  Result =  ( r32) sqrt( A*A );
+  Result = Sqrt( A*A );
   return Result;
 }
 
@@ -360,6 +368,14 @@ operator-=( v3& A, const v3& B )
 {
   A = A-B;
   return A;
+}
+
+inline r32
+NormSq( const v3& A )
+{
+  r32 Result;
+  Result = A*A;
+  return Result;
 }
 
 inline r32
@@ -574,10 +590,18 @@ operator-=( v4& A, const v4& B )
 }
 
 inline r32
+NormSq( const v4& R )
+{
+  r32 Result;
+  Result = R*R;
+  return Result;
+}
+
+inline r32
 Norm( const v4& R )
 {
    r32 Result;
-  Result = ( r32) Sqrt(R.X*R.X + R.Y*R.Y + R.Z*R.Z + R.W*R.W);
+  Result =  Sqrt(R.X*R.X + R.Y*R.Y + R.Z*R.Z + R.W*R.W);
   return Result;
 }
 
