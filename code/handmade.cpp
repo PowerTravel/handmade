@@ -7,6 +7,7 @@
 #include "obj_loader.cpp"
 #include "tiles_spritesheet.hpp"
 
+#include "gjk.cpp"
 #include "render_push_buffer.cpp"
 #include "sprite_mapping.h"
 #include "system_camera.cpp"
@@ -55,13 +56,8 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   memory_arena* AssetArena = &GameState->AssetArena;
   memory_arena* TemporaryArena = &GameState->TemporaryArena;
 
-  GameState->World = AllocateWorld(100);
+  GameState->World = AllocateWorld(1000);
   world* World = GameState->World;
-
-  entity* Light = NewEntity( World );
-  NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
-  Light->LightComponent->Color = V4(1,1,1,1);
-  Put( V3(3,3,3), Light->SpatialComponent );
 
 
   GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
@@ -72,13 +68,33 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
          Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
          "..\\handmade\\data\\cube\\cube.obj");
 
-  entity* c1 = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
-  NewComponents( World, c1, COMPONENT_TYPE_DYNAMICS );
-  Put( V3(0,1,0),     c1->SpatialComponent );
-  c1->DynamicsComponent->Mass = 1;
+    entity* Light = NewEntity( World );
+    NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
+    Light->LightComponent->Color = V4(10,10,10,1);
+    Put( V3(3,3,3), 0, V3(0,1,0), Light->SpatialComponent );
+
+
+  for (s32 i = -0; i < 1; ++i)
+  {
+    for (s32 j = 0; j < 1; ++j)
+    {
+      for (s32 k = -0; k < 1; ++k)
+      {
+        entity* cubeEntity = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
+        NewComponents( World, cubeEntity, COMPONENT_TYPE_DYNAMICS );
+
+        Put( V3(2.1f*i, 2.f*j, 2.1f*k), 1*(Pi32/4), V3(0,1,0), cubeEntity->SpatialComponent );
+        cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
+        cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0,0);
+        cubeEntity->DynamicsComponent->Mass = 1;
+      }
+    }
+  }
 
   entity* floor = CreateEntityFromOBJGroup( World, &cube->Objects[1], cube->MeshData );
-  Put( V3( 0,-1, 0),  floor->SpatialComponent );
+
+  Put( V3( 0,-2, 0), 0, V3(0,1,0), floor->SpatialComponent );
+  //Scale( V3( 1, 1, 1),  floor->SpatialComponent );
 
   entity* ControllableCamera = NewEntity( World );
   NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
@@ -125,11 +141,12 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
   Player->ControllerComponent->Controller = GetController(Input, 1);
   Player->ControllerComponent->ControllerMappingFunction = HeroController;
 
-  Put( V3(0,3,0), Player->SpatialComponent );
-  const aabb3f PlayerAABB = AABB3f( V3(-0.5,-0.5,0), V3(0.5,0.5,0) );
-  SetAABBTriangles( &World->Arena, &PlayerAABB, Player->ColliderComponent->Mesh);
+  Put( V3(0,3,0), 0, V3(0,1,0), Player->SpatialComponent );
+  Player->ColliderComponent->AABB = AABB3f( V3(-0.5,-0.5,0), V3(0.5,0.5,0) );
+  SetColliderMeshFromAABB(&World->Arena, Player->ColliderComponent);
 
-  Player->DynamicsComponent->Velocity = V3(0,0,0);
+  Player->DynamicsComponent->LinearVelocity  = V3(0,0,0);
+  Player->DynamicsComponent->AngularVelocity = V3(0,0,0);
   Player->DynamicsComponent->Mass = 1;
 
   component_sprite_animation* SpriteAnimation = Player->SpriteAnimationComponent;
@@ -289,6 +306,11 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
 //                render_commands* RenderCommands,
 //                game_input* Input )
 
+s32 eqFun( const s32* A, const s32* B)
+{
+  return *A-*B;
+}
+
 platform_api Platform;
 
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
@@ -299,9 +321,10 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   game_state* GameState = Memory->GameState;
   world* World = GameState->World;
   World->dtForFrame = Input->dt;
+  World->GlobalTimeSec += Input->dt;
 
   ControllerSystemUpdate(GameState->World);
-  SpatialSystemUpdate(GameState->World);
+  SpatialSystemUpdate(GameState->World, &Memory->PlatformAPI);
   CameraSystemUpdate(GameState->World);
   SpriteAnimationSystemUpdate(GameState->World);
 

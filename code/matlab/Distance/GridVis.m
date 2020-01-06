@@ -14,7 +14,7 @@ for i=1:len
     if(gr(i,1)==0)
        w = [gridsize, gridsize, gridsize];
        draw_rect( gr( i, 2:4) , w, 'r', 1);
-        
+
     % sphere
     elseif(gr(i,1)==1)
         p = (gr(i,3:2:7) + gr(i,2:2:6))./2;
@@ -23,10 +23,10 @@ for i=1:len
         hold on
         surf(x, y, z,'FaceColor','c');
         hold off
-        
+
     % cylinder
     elseif(gr(i,1)==2 && show_cyl)
-     
+
         %p = [gr(i, 2), gr(i, 4), gr(i, 6)];
         %w = [gr(i, 3)-gr(i, 2), gr(i, 5)-gr(i, 4),...
             %gr(i, 7)-gr(i, 6)];

@@ -20,7 +20,7 @@ RecanonicalizeCoord(tile_map* TileMap, u32* Tile, r32* TilePos, r32 TileSideInMe
   //              to be undefined. A tile position AbsTile 1 and RelTile 0.5 would flip
   //              flop between AbsTile 2, RelTile -0.5 and AbsTile 1 and RelTile 0.5 by
   //              Successive calls to RecanonicalizeCoord;
-  s32 Offset = FloorReal32ToInt32(*TilePos / TileSideInMeters);
+  s32 Offset = (s32) Floor(*TilePos / TileSideInMeters);
 
   *Tile += Offset;
   *TilePos -= Offset*TileSideInMeters;
@@ -282,12 +282,12 @@ InitializeTileMap( tile_map* TileMap )
 
 void GetIntersectingTiles(tile_map* TileMap, list<tile_map_position>* OutputList, aabb3f* AABB )
 {
-  s32 MinXIdx = FloorReal32ToInt32(AABB->P0.X / TileMap->TileWidthInMeters);
-  s32 MinYIdx = FloorReal32ToInt32(AABB->P0.Y / TileMap->TileHeightInMeters);
-  s32 MinZIdx = FloorReal32ToInt32(AABB->P0.Z / TileMap->TileDepthInMeters);
-  s32 MaxXIdx = FloorReal32ToInt32(AABB->P1.X / TileMap->TileWidthInMeters);
-  s32 MaxYIdx = FloorReal32ToInt32(AABB->P1.Y / TileMap->TileHeightInMeters);
-  s32 MaxZIdx = FloorReal32ToInt32(AABB->P1.Z / TileMap->TileDepthInMeters);
+  s32 MinXIdx = (s32) Floor(AABB->P0.X / TileMap->TileWidthInMeters);
+  s32 MinYIdx = (s32) Floor(AABB->P0.Y / TileMap->TileHeightInMeters);
+  s32 MinZIdx = (s32) Floor(AABB->P0.Z / TileMap->TileDepthInMeters);
+  s32 MaxXIdx = (s32) Floor(AABB->P1.X / TileMap->TileWidthInMeters);
+  s32 MaxYIdx = (s32) Floor(AABB->P1.Y / TileMap->TileHeightInMeters);
+  s32 MaxZIdx = (s32) Floor(AABB->P1.Z / TileMap->TileDepthInMeters);
   OutputList->First();
   for( s32 IdxZ = MinZIdx; IdxZ <= MaxZIdx; ++IdxZ  )
   {

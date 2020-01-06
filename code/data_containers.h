@@ -397,7 +397,6 @@ class fifo_queue
     u32 GetSize(){ return List.GetSize(); };
 };
 
-
 template <class T>
 class filo_queue
 {

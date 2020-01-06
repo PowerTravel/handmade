@@ -2,7 +2,7 @@
 
 #include "vector_math.h"
 #include "data_containers.h"
-
+#include "string.h"
 struct aabb2f
 {
   v2 P0;
@@ -30,242 +30,68 @@ inline aabb3f AABB3f( v3 P0, v3 P1 )
 };
 
 
-typedef v3 aabb_feature_vertex;
-struct aabb_feature_edge
-{
-  aabb_feature_vertex P0;
-  aabb_feature_vertex P1;
+enum class aabb_metric{
+  X_LENGTH,
+  Y_LENGTH,
+  Z_LENGTH,
+  X_AREA,
+  Y_AREA,
+  Z_AREA,
+  VOLUME
 };
 
-union aabb_feature_face
+
+memory_index AABBToString(aabb3f* AABB, memory_index DestCount, char* const DestString)
 {
-  struct{
-    aabb_feature_vertex P0,P1,P2,P3;
-  };
-  aabb_feature_vertex P[4];
-};
+  char* Scanner = DestString;
+  memory_index Len = str::ToString( AABB->P0, 2, DestCount, Scanner);
+  Scanner+=Len;
+  *Scanner++ = ' ';
 
-//** aabb2f Feature Extraction Functions **//
+  Len = str::ToString( AABB->P1, 2, DestCount, Scanner);
+  Scanner+=Len;
+  *Scanner = '\0';
 
-// aabb2f has following features:
-//  1  [F]aces
-//  4  [E]dges
-//  4  [V]ertices
+  return Scanner - DestString;
+}
 
-/*
- *
- *                                        ^
- *                                        |
- *                                        |
- *                                        n2
- *
- *                                       E2
- *                V3_________________________________V2
- *                        |                               |
- *                        |                               |
- *                        |                               |
- *                        |                               |
- *                        |                               |
- *               <--n3 E3 |              F0               | E1  n1 -->
- *    Y                   |                               |
- *    |                   |                               |
- *    |                   |                               |
- *    |                   |                               |
- *    |                   |                               |
- *    |________ X       V0|_______________________________|V1
- *                                      E0
- *                                        n0
- *                                        |
- *                                        |
- *                                        v
- */
-
-v3 GetAABB2fEdgeNormal( const u32 EdgeIndex )
+r32 GetSize( const aabb3f* AABB, const aabb_metric Metric = aabb_metric::VOLUME )
 {
-  switch(EdgeIndex)
+  switch(Metric)
   {
-    case 0:
+    case aabb_metric::VOLUME:
     {
-      return V3(0,-1,0);
+      return Abs(AABB->P1.X - AABB->P0.X) * Abs(AABB->P1.Y - AABB->P0.Y) * Abs(AABB->P1.Z - AABB->P0.Z);
     }break;
-    case 1:
+    case aabb_metric::X_LENGTH:
     {
-      return V3(1,0,0);
+      return Abs(AABB->P1.X - AABB->P0.X);
     }break;
-    case 2:
+    case aabb_metric::Y_LENGTH:
     {
-      return V3(0,1,0);
+      return Abs(AABB->P1.Y - AABB->P0.Y);
     }break;
-    case 3:
+    case aabb_metric::Z_LENGTH:
     {
-      return V3(-1,0,0);
+      return Abs(AABB->P1.Z - AABB->P0.Z);
     }break;
-    default:
+    case aabb_metric::X_AREA:
     {
-      INVALID_CODE_PATH;
+      return Abs(AABB->P1.Y - AABB->P0.Y) * Abs(AABB->P1.Z - AABB->P0.Z);
+    }break;
+    case aabb_metric::Y_AREA:
+    {
+      return Abs(AABB->P1.X - AABB->P0.X) * Abs(AABB->P1.Z - AABB->P0.Z);
+    }break;
+    case aabb_metric::Z_AREA:
+    {
+      return Abs(AABB->P1.X - AABB->P0.X) * Abs(AABB->P1.Y - AABB->P0.Y);
     }break;
   }
-
-  return {};
+  return 0;
 }
 
-void GetAABBVertices( const aabb2f* AABB, aabb_feature_vertex* AABBVertices )
-{
-  AABBVertices[0] = V3( AABB->P0.X, AABB->P0.Y, 0 );
-  AABBVertices[1] = V3( AABB->P1.X, AABB->P0.Y, 0 );
-  AABBVertices[2] = V3( AABB->P1.X, AABB->P1.Y, 0 );
-  AABBVertices[3] = V3( AABB->P0.X, AABB->P1.Y, 0 );
-}
-
-list<aabb_feature_vertex> GetAABBVertices( memory_arena* Arena, const aabb2f* AABB )
-{
-  aabb_feature_vertex Vertices[4] ={};
-  GetAABBVertices( AABB, Vertices );
-
-  list<aabb_feature_vertex> Result = list<aabb_feature_vertex>(Arena);
-  Result.First();
-
-  Result.InsertAfter( Vertices[0] );
-  Result.InsertAfter( Vertices[1] );
-  Result.InsertAfter( Vertices[2] );
-  Result.InsertAfter( Vertices[3] );
-
-  return Result;
-}
-
-
-list<aabb_feature_edge> GetAABBEdges( memory_arena* Arena, const aabb2f* AABB )
-{
-  aabb_feature_vertex Vertices[4] ={};
-  GetAABBVertices( AABB, Vertices);
-
-  aabb_feature_edge Edges = {};
-  list<aabb_feature_edge> Result = list<aabb_feature_edge>(Arena);
-  Result.First();
-
-  // Z Negative (Back)
-  Edges.P0 = Vertices[0];
-  Edges.P1 = Vertices[1];
-  Result.InsertAfter(Edges);
-
-  Edges.P0 = Vertices[1];
-  Edges.P1 = Vertices[2];
-  Result.InsertAfter(Edges);
-
-  Edges.P0 = Vertices[2];
-  Edges.P1 = Vertices[3];
-  Result.InsertAfter(Edges);
-
-  Edges.P0 = Vertices[3];
-  Edges.P1 = Vertices[0];
-  Result.InsertAfter(Edges);
-
-  return Result;
-}
-
-aabb_feature_face GetAABBFace( const aabb2f* AABB )
-{
-  aabb_feature_vertex Vertices[8] ={};
-  GetAABBVertices( AABB, Vertices);
-
-  aabb_feature_face Result = {};
-  Result.P[0] = Vertices[0];
-  Result.P[1] = Vertices[1];
-  Result.P[2] = Vertices[2];
-  Result.P[3] = Vertices[3];
-  return Result;
-}
-
-
-
-//** AABB3 Feature Extraction Functions **//
-
-// AABB3f has following features:
-//  6  [F]aces
-//  12 [E]dges
-//  8  [V]ertices
-
-/*
- *
- *
- *                              V3______________E2________________V2
- *                               /|                              /|
- *                              / |                             / |
- *                             /  |                            /  |
- *                         E11/   |         F3             E10/   |
- *                           /    |E3                        /    |--------F4
- *                          /     |                         /     |
- *                       V7/_______________________________/      | E1
- *                        |       |     E6                |V6     |
- *     Y                  |       |                       |    ------------F1
- *     |          F0 -----|       |                       |       |
- *     |                  |       |                       |       |
- *     |_____X            |    V0 |____________E0_________|_______| V1
- *    /                 E7|      /                        |      /
- *   /                    |     /       F5                |E5   /
- *  Z                     |    /                          |    /
- *                        | E8/                           |   /E9
- *                        |  /                            |  /
- *                        | /                             | /
- *                        |/______________________________|/
- *                       V4             E4 |               V5
- *                                         |
- *                                         F2
- *
- *
- */
-
-// Going CCW in the x-y plane starting with Xmin, Ymin, Zmin
-// Then again with Xmin, Ymin, Zmax
-
-r32 GetWidth( const aabb3f* AABB )
-{
-  return Abs( AABB->P1.X - AABB->P0.X);
-}
-
-b32 HasWidth( const aabb3f* AABB )
-{
-  r32 Tol = 1E-5;
-  b32 HasWidth  = GetWidth(AABB) > Tol;
-  return HasWidth;
-}
-b32 LacksWidth( const aabb3f* AABB )
-{
-  return ! HasWidth(AABB);
-}
-
-r32 GetHeight( const aabb3f* AABB )
-{
-  return Abs( AABB->P1.Y - AABB->P0.Y);
-}
-
-b32 HasHeight( const aabb3f* AABB )
-{
-  r32 Tol = 1E-5;
-  b32 HasHeight = GetHeight(AABB) > Tol;
-  return HasHeight;
-}
-b32 LacksHeight( const aabb3f* AABB )
-{
-  return ! HasHeight(AABB);
-}
-
-r32 GetDepth( const aabb3f* AABB )
-{
-  return Abs( AABB->P1.Z - AABB->P0.Z);
-}
-b32 HasDepth( const aabb3f* AABB )
-{
-  r32 Tol = 1E-5;
-  b32 HasDepth  = GetDepth(AABB) > Tol;
-  return HasDepth;
-}
-b32 LacksDepth( const aabb3f* AABB )
-{
-  return !HasDepth(AABB);
-}
-
-void GetAABBVertices(const aabb3f* AABB, aabb_feature_vertex* AABBVertices)
+void GetAABBVertices(const aabb3f* AABB, v3* AABBVertices, u32* VerticeIndeces )
 {
   AABBVertices[0] = V3( AABB->P0.X, AABB->P0.Y, AABB->P0.Z);
   AABBVertices[1] = V3( AABB->P1.X, AABB->P0.Y, AABB->P0.Z);
@@ -275,200 +101,70 @@ void GetAABBVertices(const aabb3f* AABB, aabb_feature_vertex* AABBVertices)
   AABBVertices[5] = V3( AABB->P1.X, AABB->P0.Y, AABB->P1.Z);
   AABBVertices[6] = V3( AABB->P1.X, AABB->P1.Y, AABB->P1.Z);
   AABBVertices[7] = V3( AABB->P0.X, AABB->P1.Y, AABB->P1.Z);
-}
 
+ if(VerticeIndeces)
+ {
+    // Z Negative
+    VerticeIndeces[0] = 1;
+    VerticeIndeces[1] = 0;
+    VerticeIndeces[2] = 3;
 
-list<aabb_feature_vertex> GetAABBVertices( memory_arena* Arena, aabb3f* AABB )
-{
-  aabb_feature_vertex Vertices[8] ={};
-  GetAABBVertices( AABB, Vertices );
-
-  list<aabb_feature_vertex> Result = list<aabb_feature_vertex>(Arena);
-  Result.First();
-
-  Result.InsertAfter( Vertices[0] );
-  Result.InsertAfter( Vertices[1] );
-  Result.InsertAfter( Vertices[2] );
-  Result.InsertAfter( Vertices[3] );
-
-  if(  HasDepth( AABB ) )
-  {
-    Result.InsertAfter( Vertices[4] );
-    Result.InsertAfter( Vertices[5] );
-    Result.InsertAfter( Vertices[6] );
-    Result.InsertAfter( Vertices[7] );
-  }
-  return Result;
-}
-
-
-list<aabb_feature_edge> GetAABBEdges( memory_arena* Arena, aabb3f* AABB )
-{
-  aabb_feature_vertex Vertices[8] ={};
-  GetAABBVertices( AABB, Vertices);
-
-  aabb_feature_edge Edges = {};
-  list<aabb_feature_edge> Result = list<aabb_feature_edge>(Arena);
-  Result.First();
-
-  // Z Negative (Back)
-  Edges.P0 = Vertices[0];
-  Edges.P1 = Vertices[1];
-  Result.InsertAfter(Edges);
-
-  Edges.P0 = Vertices[1];
-  Edges.P1 = Vertices[2];
-  Result.InsertAfter(Edges);
-
-  Edges.P0 = Vertices[2];
-  Edges.P1 = Vertices[3];
-  Result.InsertAfter(Edges);
-
-  Edges.P0 = Vertices[3];
-  Edges.P1 = Vertices[0];
-  Result.InsertAfter(Edges);
-
-  if( HasDepth(AABB) )
-  {
-    // Z Positive (Front)
-    Edges.P0 = Vertices[4];
-    Edges.P1 = Vertices[5];
-    Result.InsertAfter(Edges);
-
-    Edges.P0 = Vertices[5];
-    Edges.P1 = Vertices[6];
-    Result.InsertAfter(Edges);
-
-    Edges.P0 = Vertices[6];
-    Edges.P1 = Vertices[7];
-    Result.InsertAfter(Edges);
-
-    Edges.P0 = Vertices[7];
-    Edges.P1 = Vertices[4];
-    Result.InsertAfter(Edges);
-
-    // Linking Back To Front
-    Edges.P0 = Vertices[0];
-    Edges.P1 = Vertices[4];
-    Result.InsertAfter(Edges);
-
-    Edges.P0 = Vertices[1];
-    Edges.P1 = Vertices[5];
-    Result.InsertAfter(Edges);
-
-    Edges.P0 = Vertices[2];
-    Edges.P1 = Vertices[6];
-    Result.InsertAfter(Edges);
-
-    Edges.P0 = Vertices[3];
-    Edges.P1 = Vertices[7];
-    Result.InsertAfter(Edges);
-  }
-
-  return Result;
-}
-
-v3 GetFaceNormal( aabb_feature_face* Face )
-{
-  v3 Edge0 = Face->P1-Face->P0;
-  v3 Edge1 = Face->P2-Face->P1;
-  v3 Result = Normalize( CrossProduct( Edge0, Edge1 ) );
-
-  return Result;
-}
-
-
-list<aabb_feature_face> GetAABBFaces( memory_arena* Arena, aabb3f* AABB )
-{
-  aabb_feature_vertex Vertices[8] = {};
-  GetAABBVertices( AABB, Vertices );
-
-  list<aabb_feature_face> Faces = list< aabb_feature_face >(Arena);
-
-  aabb_feature_face Face = {};
-
-  // Z Negative
-  Face.P[0] = Vertices[1];
-  Face.P[1] = Vertices[0];
-  Face.P[2] = Vertices[3];
-  Face.P[3] = Vertices[2];
-  Faces.InsertAfter(Face);
-  Assert( (GetFaceNormal( &Face ) * V3(0,0,-1) - 1 ) < 10E-4 );
-
-  if( HasDepth(AABB) )
-  {
-    // X Negative
-    Face.P[0] = Vertices[0];
-    Face.P[1] = Vertices[4];
-    Face.P[2] = Vertices[7];
-    Face.P[3] = Vertices[3];
-    Faces.InsertAfter(Face);
-    Assert( (GetFaceNormal( &Face ) * V3(-1,0,0) - 1 ) < 10E-4 );
-
-    // X Positive
-    Face.P[0] = Vertices[5];
-    Face.P[1] = Vertices[1];
-    Face.P[2] = Vertices[2];
-    Face.P[3] = Vertices[6];
-    Faces.InsertAfter(Face);
-    Assert( (GetFaceNormal( &Face ) * V3(1,0,0) - 1 ) < 10E-4 );
-
-    // Y Negative
-    Face.P[0] = Vertices[0];
-    Face.P[1] = Vertices[1];
-    Face.P[2] = Vertices[5];
-    Face.P[3] = Vertices[4];
-    Faces.InsertAfter(Face);
-    Assert( (GetFaceNormal( &Face ) * V3(0,-1,0) - 1 ) < 10E-4 );
-
-    // Y Positive
-    Face.P[0] = Vertices[7];
-    Face.P[1] = Vertices[6];
-    Face.P[2] = Vertices[2];
-    Face.P[3] = Vertices[3];
-    Faces.InsertAfter(Face);
-    Assert( (GetFaceNormal( &Face ) * V3(0,1,0) - 1 ) < 10E-4 );
+    VerticeIndeces[3] = 1;
+    VerticeIndeces[4] = 3;
+    VerticeIndeces[5] = 2;
 
     // Z Positive
-    Face.P[0] = Vertices[4];
-    Face.P[1] = Vertices[5];
-    Face.P[2] = Vertices[6];
-    Face.P[3] = Vertices[7];
-    Faces.InsertAfter(Face);
-    Assert( (GetFaceNormal( &Face ) * V3(0,0,1) - 1 ) < 10E-4 );
-  }
+    VerticeIndeces[6] = 4;
+    VerticeIndeces[7] = 5;
+    VerticeIndeces[8] = 6;
 
-  return Faces;
+    VerticeIndeces[9] = 4;
+    VerticeIndeces[10] = 6;
+    VerticeIndeces[11] = 7;
+
+    // X Negative
+    VerticeIndeces[12] = 0;
+    VerticeIndeces[13] = 4;
+    VerticeIndeces[14] = 7;
+
+    VerticeIndeces[15] = 0;
+    VerticeIndeces[16] = 7;
+    VerticeIndeces[17] = 3;
+
+    // X Positive
+    VerticeIndeces[18] = 5;
+    VerticeIndeces[19] = 1;
+    VerticeIndeces[20] = 2;
+
+    VerticeIndeces[21] = 5;
+    VerticeIndeces[22] = 2;
+    VerticeIndeces[23] = 6;
+
+    // Y Negative
+    VerticeIndeces[24] = 0;
+    VerticeIndeces[25] = 1;
+    VerticeIndeces[26] = 5;
+
+    VerticeIndeces[27] = 0;
+    VerticeIndeces[28] = 5;
+    VerticeIndeces[29] = 4;
+
+    // Y Positive
+    VerticeIndeces[30] = 7;
+    VerticeIndeces[31] = 6;
+    VerticeIndeces[32] = 2;
+
+    VerticeIndeces[33] = 7;
+    VerticeIndeces[34] = 2;
+    VerticeIndeces[35] = 3;
+
+  }
 }
 
 inline v3
 GetAABBCenter( const aabb3f& AABB )
 {
   return (AABB.P0 + AABB.P1) * 0.5;
-}
-
-inline v3
-GetHalfSideLength( const aabb3f& AABB, const v3& CollisionEnvelope = {} )
-{
-  return (AABB.P1 - AABB.P0 + CollisionEnvelope) * 0.5;
-}
-
-inline v3
-GetPenetrationDepth( const aabb3f& A, const aabb3f& B )
-{
-  v3 ACenter = GetAABBCenter(A);
-  v3 ASide   = GetHalfSideLength(A);
-
-  v3 BCenter = GetAABBCenter(B);
-  v3 BSide   = GetHalfSideLength(B);
-
-  v3 ContactSeparation = ASide + BSide;
-
-  v3 ABSeparation = Abs( BCenter - ACenter);
-
-  v3 PenetrationDepth = ContactSeparation - ABSeparation;
-
-  return PenetrationDepth;
 }
 
 inline aabb3f
@@ -487,71 +183,27 @@ MergeAABB( const aabb3f& A, const aabb3f& B, v3 Envelope = {})
   return Result;
 }
 
-
-enum aabb_contact_type
+b32 AABBIntersects( const v3* P, const aabb3f* A)
 {
-  AABB_CONTACT_TYPE_SEPARATE,
-  AABB_CONTACT_TYPE_RESTING,
-  AABB_CONTACT_TYPE_PENETRATION
-};
-
-struct aabb_contact
-{
-  aabb_contact_type Type;
-  v3 CollisionNormal;
-  v3 PenetrationDepth;
-};
-
-aabb_contact AABBContact( aabb3f& A, aabb3f& B, v3 ContactTolerance = V3(1E-7, 1E-7, 1E-7) )
-{
-  aabb_contact Result = {};
-  Result.PenetrationDepth  = GetPenetrationDepth( A, B );
-
-  if( ( Result.PenetrationDepth.X < -ContactTolerance.X ) ||
-    ( Result.PenetrationDepth.Y < -ContactTolerance.Y ) ||
-    ( Result.PenetrationDepth.Z < -ContactTolerance.Z ) )
+  if( (P->X < A->P0.X) || (P->X > A->P1.X) ||
+      (P->Y < A->P0.Y) || (P->Y > A->P1.Y) ||
+      (P->Z < A->P0.Z) || (P->Z > A->P1.Z) )
   {
-    Result.Type = AABB_CONTACT_TYPE_SEPARATE;
-    return Result;
+    return false;
   }
-
-  if( ( Result.PenetrationDepth.X <= ContactTolerance.X ) &&
-      ( Result.PenetrationDepth.Y <= ContactTolerance.Y ) &&
-      ( Result.PenetrationDepth.Z <= ContactTolerance.Z ) )
-  {
-    Result.Type = AABB_CONTACT_TYPE_RESTING;
-    return Result;
-  }
-
-  Result.Type = AABB_CONTACT_TYPE_PENETRATION;
-
-  return Result;
+  return true;
 }
 
-bool AABBRestingContact(aabb3f& A, aabb3f& B, v3 ContactTolerance = V3(1E-7,1E-7,1E-7) )
+b32 AABBIntersects( const aabb3f* A, const aabb3f* B)
 {
-  v3 ACenter = GetAABBCenter(A);
-  v3 ASide   = GetHalfSideLength(A);
-
-  v3 BCenter = GetAABBCenter(B);
-  v3 BSide   = GetHalfSideLength(B);
-
-  v3 ContactSeparation = ASide + BSide;
-
-  v3 ABSeparation = Abs( BCenter - ACenter);
-
-  v3 PenetrationDepth = ABSeparation - ContactSeparation;
-
-  if( ( PenetrationDepth.X >= 0 ) && ( PenetrationDepth.X <= ContactTolerance.X ) &&
-    ( PenetrationDepth.Y >= 0 ) && ( PenetrationDepth.Y <= ContactTolerance.Y ) &&
-    ( PenetrationDepth.Z >= 0 ) && ( PenetrationDepth.Z <= ContactTolerance.Z ) )
+  if( (A->P1.X < B->P0.X) || (A->P0.X > B->P1.X) ||
+      (A->P1.Y < B->P0.Y) || (A->P0.Y > B->P1.Y) ||
+      (A->P1.Z < B->P0.Z) || (A->P0.Z > B->P1.Z) )
   {
-    return true;
+    return false;
   }
-
-  return false;
+  return true;
 }
-
 
 // Sweep a in the direction of v against b, returns true & info if there was a hit
 // ===================================================================

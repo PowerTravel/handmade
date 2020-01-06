@@ -1,68 +1,44 @@
-
 #ifndef HANDMADE_INTRINSIC_H
 #define HANDMADE_INTRINSIC_H
 
 // TODO: Replace math.h with cpu specific instructions
 #include <math.h>
+#include "types.h"
 
 inline u32
 SafeTruncateToU32( u64 Value )
 {
-    // TODO(casey): Defines for maximum values
-    Assert(Value <= 0xFFFFFFFF);
-    u32 Result = (u32)Value;
+    Assert(Value <= UINT32_MAX);
+    u32 Result = (u32) Value;
     return(Result);
 }
 
-inline u32
-RoundReal64ToUInt32( r32 Real64 )
+inline r64
+Round( r64 Real64 )
 {
-  u64 tmp = (u64) round( Real64 );
-  u32 Result = SafeTruncateToU32( tmp );
+  r64 Result = round( Real64 );
   return Result;
 }
 
-inline u32
-RoundReal32ToUInt32( r32 Real32 )
-{
-  u32 Result = (u32) roundf( Real32 );
-  return Result;
-}
-
-inline s32
-RoundReal32ToInt32( r32 Real32 )
+inline r32
+Round( r32 Real32 )
 {
   // NOTE(Jakob): ROUNDF IS SLOW!!
-  s32 Result = (s32) roundf( Real32 );
-
+  r32 Result = roundf( Real32 );
   return Result;
 }
 
-inline s32
-TruncateReal32ToInt32( r32 Real32 )
+inline r32
+Roof( r32 Real32 )
 {
-  s32 Result = (s32) Real32;
+  r32 Result = ceilf( Real32 );
   return Result;
 }
 
-inline s32
-FloorReal32ToInt32( r32 Real32 )
+inline r32
+Floor( r32 Real32 )
 {
-  s32 Result = (s32) floorf( Real32 );
-  return Result;
-}
-
-inline s32
-Roof( s32 Signed32 )
-{
-  s32 Result = (s32) ceil( (r64) Signed32 );
-  return Result;
-}
-
-inline s32
-Floor( s32 Signed32 )
-{
-  s32 Result = (s32) floor( (r64) Signed32 );
+  r32 Result = floorf( Real32 );
   return Result;
 }
 

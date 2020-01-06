@@ -13,7 +13,6 @@
 #include "entity_components.h"
 #include "render_push_buffer.h"
 #include "handmade_tile.h"
-#include "gjk.h"
 
 struct game_assets
 {
@@ -39,8 +38,6 @@ struct game_state
 {
 	memory_arena AssetArena;
 	memory_arena TemporaryArena;
-
-	r32 t;
 
 	world* World;
 

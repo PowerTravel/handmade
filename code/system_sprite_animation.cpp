@@ -24,7 +24,7 @@ void SpriteAnimationSystemUpdate(world* World)
 
       if(Entity->Types & COMPONENT_TYPE_DYNAMICS)
       {
-        v3 Velocity = Entity->DynamicsComponent->Velocity;
+        v3 Velocity = Entity->DynamicsComponent->LinearVelocity;
         if(Velocity.Y > 0)
         {
           SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("jump");

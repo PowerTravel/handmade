@@ -1,6 +1,16 @@
 
 #include "entity_components.h"
 
+#include "component_camera.h"
+#include "component_controller.h"
+#include "component_light.h"
+#include "component_mesh.h"
+#include "component_spatial.h"
+#include "component_collider.h"
+#include "component_dynamics.h"
+#include "component_surface.h"
+#include "component_sprite_animation.h"
+
 #include "utility_macros.h"
 
 world* AllocateWorld( u32 NrMaxEntities )

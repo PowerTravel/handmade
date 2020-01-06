@@ -10,10 +10,11 @@ struct component_spatial
   m4 ModelMatrix;
 };
 
-void Put( const v3 dr, component_spatial* c )
+void Put( const v3 position, const r32 angle, const v3 axis, component_spatial* c )
 {
   c->ModelMatrix = M4Identity();
-  Translate(V4(dr,1), c->ModelMatrix);
+  Translate(V4(position,1), c->ModelMatrix);
+  Rotate(angle, V4(axis,0.f), c->ModelMatrix);
 }
 
 v3 GetPosition(component_spatial* c)
@@ -33,8 +34,8 @@ void Scale( const v3 ds, component_spatial* c )
   Scale( V4(ds,0), c->ModelMatrix );
 }
 
-void Rotate( const r32 Angle, const v3 Axis, component_spatial* c )
+void Rotate( const r32 da, const v3 Axis, component_spatial* c )
 {
   Assert(c);
-  Rotate( Angle, V4(Axis,0), c->ModelMatrix );
+  Rotate( da, V4(Axis,0), c->ModelMatrix );
 }

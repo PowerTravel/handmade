@@ -27,6 +27,18 @@ union v4
   r32 E[4];
 };
 
+union m3
+{
+//  Row Dominant indexing
+//   0,  1,  2,
+//   3,  4,  5,
+//   6,  7,  8,
+  struct{
+    v3 r0, r1, r2;
+  };
+   r32 E[9];
+};
+
 union m4
 {
 //  Row Dominant indexing
@@ -654,11 +666,146 @@ AssertIdentity( const m4& I, const r32 epsilon = 0.00001)
   Assert( Abs( I.E[15] -1 ) < epsilon );
 }
 
+inline m3
+M3(  const r32 a11, const r32 a12, const r32 a13,
+     const r32 a21, const r32 a22, const r32 a23,
+     const r32 a31, const r32 a32, const r32 a33)
+{
+  m3 Result = {
+    a11, a12, a13,
+    a21, a22, a23,
+    a31, a32, a33 };
+
+  return(Result);
+};
+
+inline m3
+M3( const v3& R0, const v3& R1, const v3& R2 )
+{
+  m3 Result = {R0, R1, R2};
+
+  return(Result);
+};
+
+inline m3
+operator*( const r32 a, const m3& M )
+{
+  m3 Result =  M3( M.r0 * a,
+                   M.r1 * a,
+                   M.r2 * a);
+  return Result;
+}
+
+inline m3
+operator*( const m3& M, r32& a )
+{
+  m3 Result = a*M;
+  return Result;
+}
+
+inline m3
+Transpose( const m3& A )
+{
+  m3 Result;
+
+  Result = M3( V3( A.E[0], A.E[ 3], A.E[ 6]),
+               V3( A.E[1], A.E[ 4], A.E[ 7]),
+               V3( A.E[2], A.E[ 5], A.E[ 8]));
+
+  return Result;
+}
+
+inline m3
+operator*( const m3& A, const m3& B )
+{
+  m3 BT = Transpose(B);
+  m3 Result = M3( A.r0 * BT.r0, A.r0 * BT.r1, A.r0 * BT.r2,
+                  A.r1 * BT.r0, A.r1 * BT.r1, A.r1 * BT.r2,
+                  A.r2 * BT.r0, A.r2 * BT.r1, A.r2 * BT.r2);
+  return Result;
+}
+
+inline m3
+operator-( const m3& A,  const m3& B)
+{
+  m3 Result;
+  Result.r0 = A.r0 - B.r0;
+  Result.r1 = A.r1 - B.r1;
+  Result.r2 = A.r2 - B.r2;
+  return Result;
+}
+
+inline v3
+operator*( const m3& M, const v3& b )
+{
+  v3 Result =  V3( M.r0 * b,
+                   M.r1 * b,
+                   M.r2 * b);
+  return Result;
+}
+
+
+/*
+inline v4
+Column( const m3& M, const u32 Column )
+{
+  Assert(Column < 4);
+  v4 Result = V4(M.E[ Column ], M.E[4+Column], M.E[8+Column], M.E[12+Column]);
+  return Result;
+}
+
+inline void
+Column( m3& M, const u32 Column, const v4& ColumnValue )
+{
+  Assert(Column < 4);
+  M.E[ Column ] = ColumnValue.E[0];
+  M.E[4+Column] = ColumnValue.E[1];
+  M.E[8+Column] = ColumnValue.E[2];
+  M.E[12+Column]= ColumnValue.E[3];
+}
+
+inline v3
+Row( const m3& M, const u32 Row )
+{
+  Assert(Row < 3);
+  u32 Base = 3*Row;
+  v3 Result = V3(M.E[Base], M.E[Base+1], M.E[Base+2], M.E[Base+3]);
+  return Result;
+}
+
+inline void
+Row( m3& M, const u32 Row, const v3& RowValue )
+{
+  Assert(Row < 3);
+  u32 Base = 3*Row;
+  M.E[ Base  ] = RowValue.E[0];
+  M.E[ Base+1] = RowValue.E[1];
+  M.E[ Base+2] = RowValue.E[2];
+}
+
+inline r32
+Index( const m3& M, const u32 Row, const u32 Column )
+{
+  Assert(Row < 3);
+  Assert(Column < 3);
+  r32 Result = M.E[3*Row+Column];
+  return Result;
+}
+
+inline void
+Index( m3& M, const u32 Row, const u32 Column, const r32 Value )
+{
+  Assert(Row < 3);
+  Assert(Column < 3);
+  M.E[3*Row+Column] = Value;
+}
+*/
+
 inline m4
 M4( const r32 a11, const r32 a12, const r32 a13, const r32 a14,
-     const r32 a21, const r32 a22, const r32 a23, const r32 a24,
-     const r32 a31, const r32 a32, const r32 a33, const r32 a34,
-     const r32 a41, const r32 a42, const r32 a43, const r32 a44)
+    const r32 a21, const r32 a22, const r32 a23, const r32 a24,
+    const r32 a31, const r32 a32, const r32 a33, const r32 a34,
+    const r32 a41, const r32 a42, const r32 a43, const r32 a44)
 {
   m4 Result = {
     a11, a12, a13, a14,
@@ -739,7 +886,6 @@ operator*( const m4& M, const v4& b )
              M.r3 * b);
   return Result;
 }
-
 
 inline v4
 Column( const m4& M, const u32 Column )

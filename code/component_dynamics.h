@@ -5,7 +5,8 @@
 // Requires spatial and collision primitive
 struct component_dynamics
 {
-  v3  Velocity;
+  v3  LinearVelocity;
+  v3  AngularVelocity;
   v3  ExternalForce;
   r32 Mass;
 };

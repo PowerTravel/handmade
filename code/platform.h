@@ -72,6 +72,9 @@ typedef DEBUG_PLATFORM_READ_ENTIRE_FILE( debug_platform_read_entire_file );
 #define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) b32 name( thread_context* Thread, char* Filename, u32 MemorySize, void* Memory )
 typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE( debug_platform_write_entire_file );
 
+#define DEBUG_PLATFORM_APPEND_TO_FILE(name) b32 name( thread_context* Thread, char* Filename, u32 MemorySize, void* Memory )
+typedef DEBUG_PLATFORM_APPEND_TO_FILE( debug_platform_append_to_file );
+
 #endif // HANDMADE_INTERNAL
 
 inline u32
@@ -305,7 +308,7 @@ struct platform_api
 //    platform_file_error *FileError;
 //    platform_close_file *CloseFile;
 
-    platform_allocate_memory* AllocateMemory;
+    platform_allocate_memory*   AllocateMemory;
     platform_deallocate_memory* DeallocateMemory;
 
 #if HANDMADE_INTERNAL
@@ -313,8 +316,10 @@ struct platform_api
 //     the OpenFile/ReadDataFromFile/WriteDataToFile/CloseFile API.
 //     {
       debug_platform_read_entire_file*  DEBUGPlatformReadEntireFile;
-    debug_platfrom_free_file_memory*  DEBUGPlatformFreeFileMemory;
-    debug_platform_write_entire_file* DEBUGPlatformWriteEntireFile;
+      debug_platfrom_free_file_memory*  DEBUGPlatformFreeFileMemory;
+      debug_platform_write_entire_file* DEBUGPlatformWriteEntireFile;
+      debug_platform_append_to_file*    DEBUGPlatformAppendToFile;
+
 //     }
 
 //    debug_platform_execute_system_command *DEBUGExecuteSystemCommand;

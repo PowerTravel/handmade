@@ -4,6 +4,10 @@
 #define STR_MAX_LINE_LENGTH 512
 #define STR_MAX_WORD_LENGTH 64
 
+#include "vector_math.h"
+#include "types.h"
+#include "intrinsics.h"
+
 namespace str
 {
 
@@ -21,14 +25,14 @@ StringLength( const char* String )
 }
 
 internal bool
-BeginsWith( size_t LookForLength, const char* LookForString, size_t SearchInLength, const char* SearchInString )
+BeginsWith( memory_index LookForLength, const char* LookForString, memory_index SearchInLength, const char* SearchInString )
 {
   if( LookForLength > SearchInLength )
   {
     return false;
   }
 
-  size_t idx = 0;
+  memory_index idx = 0;
   while(idx < LookForLength)
   {
     if(SearchInString[idx] != LookForString[idx])
@@ -43,18 +47,18 @@ BeginsWith( size_t LookForLength, const char* LookForString, size_t SearchInLeng
 
 
 char*
-Contains( size_t LookForLength, char* LookForString, size_t SearchInLength, char* SearchInString )
+Contains( memory_index LookForLength, char* LookForString, memory_index SearchInLength, char* SearchInString )
 {
   if(SearchInLength<LookForLength  )
   {
     return 0;
   }
 
-  size_t SearchMargin = SearchInLength - LookForLength;
-  size_t ScanIdx = 0;
+  memory_index SearchMargin = SearchInLength - LookForLength;
+  memory_index ScanIdx = 0;
   while(ScanIdx <= SearchMargin)
   {
-    size_t LeftOverLength = SearchInLength - SearchMargin;
+    memory_index LeftOverLength = SearchInLength - SearchMargin;
     char* LeftOverString =  &SearchInString[ScanIdx];
     if( ( *LeftOverString == *LookForString ) &&
       BeginsWith( LookForLength, LookForString, LeftOverLength, LeftOverString) )
@@ -237,7 +241,6 @@ GetWordCount( char* String )
   return wc;
 }
 
-
 r64 StringToReal64( char* String )
 {
   char* wcp = String;
@@ -275,9 +278,8 @@ r64 StringToReal64( char* String )
   return Value / Fact;
 }
 
-internal void
-CopyStrings(  size_t SourceCount, char* Source,
-        size_t DestCount,  char* Dest )
+void CopyStrings(  memory_index SourceCount, char* Source,
+        memory_index DestCount,  char* Dest )
 {
   Assert(SourceCount <= DestCount);
   for( s32 Index = 0; Index < SourceCount; ++Index)
@@ -288,10 +290,9 @@ CopyStrings(  size_t SourceCount, char* Source,
   *Dest ='\0';
 }
 
-internal void
-CatStrings( const size_t SourceACount, const char* SourceA,
-      const size_t SourceBCount, const char* SourceB,
-      size_t DestCount,  char* Dest )
+void CatStrings( const memory_index SourceACount, const char* SourceA,
+      const memory_index SourceBCount, const char* SourceB,
+      memory_index DestCount,  char* Dest )
 {
   for( s32 Index = 0; Index < SourceACount; ++Index)
   {
@@ -307,6 +308,120 @@ CatStrings( const size_t SourceACount, const char* SourceA,
   *Dest ='\0';
 }
 
+
+// C program for implementation of ftoa()  from
+// https://www.geeksforgeeks.org/convert-floating-point-number-string/
+
+// Reverses a string 'str' of length 'len'
+internal void
+reverse(char* str, s32 len)
+{
+  s32 i = 0;
+  s32 j = len - 1;
+  char temp;
+  while (i < j)
+  {
+    temp   = str[i];
+    str[i] = str[j];
+    str[j] = temp;
+    i++;
+    j--;
+  }
 }
+
+// Converts a given integer x to string str[].
+// d is the number of digits required in the output.
+// If d is more than the number of digits in x,
+// then 0s are added at the beginning.
+internal s32
+intToStr(s32 x, char str[], s32 d)
+{
+  Assert(x>=0);
+  s32 i = 0;
+  while(x)
+  {
+    str[i++] = (x % 10) + '0';
+    x = x / 10;
+  }
+
+  // If number of digits required is more, then
+  // add 0s at the beginning
+  while(i < d)
+  {
+    str[i++] = '0';
+  }
+
+  reverse(str, i);
+  str[i] = '\0';
+  return i;
+}
+
+memory_index itoa(s32 Integer, memory_index StringCount, char* DestString)
+{
+  memory_index Pos = 0;
+  char* Scanner = DestString;
+  if(Integer < 0)
+  {
+    *Scanner++ = '-';
+    Integer = -Integer;
+    Pos = 1;
+  }
+
+  Scanner += intToStr(Integer, Scanner, 1);
+  Assert(Scanner < (DestString + StringCount) );
+  return Scanner - DestString;
+}
+
+// Converts a floating-point/double number to a string.
+memory_index ftoa(r32 RealNumber, s32 DecimalPrecision, memory_index StringCount, char* DestString)
+{
+  char* Scanner = DestString;
+  if(RealNumber < 0)
+  {
+    *Scanner++ = '-';
+    RealNumber = -RealNumber;
+  }
+
+  // Extract integer part
+  s32 ipart = (s32)RealNumber;
+
+  // Extract floating part
+  r32 fpart = RealNumber - (r32)ipart;
+
+  // convert integer part to string
+  Scanner += intToStr(ipart, Scanner, 1);
+  // check for display option after point
+  if(DecimalPrecision != 0)
+  {
+    *Scanner++ = '.'; // add dot
+
+    // Get the value of fraction part upto given no.
+    // of points after dot. The third parameter
+    // is needed to handle cases like 233.007
+    fpart = Round( fpart * Pow(10.f,  (r32) DecimalPrecision));
+
+    Scanner += intToStr((s32)fpart, Scanner, DecimalPrecision);
+  }
+
+  Assert(Scanner < (DestString + StringCount) );
+  return Scanner - DestString;
+}
+
+
+memory_index ToString( const v3 Vector, const u32 DecimalPrecision, const memory_index DestCount, char* const DestString )
+{
+  char* Scanner = DestString;
+  for (int i = 0; i < 3; ++i)
+  {
+    memory_index Len = ftoa( Vector.E[i], DecimalPrecision, DestCount, Scanner);
+    Scanner += Len;
+    Assert( Scanner < (DestCount + DestString - 1) );
+    *Scanner++ = ' ';
+  }
+  *(--Scanner) = '\0';
+  return (Scanner - DestString);
+}
+
+} // Namespace str
 
 #endif

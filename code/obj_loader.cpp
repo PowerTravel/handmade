@@ -1006,7 +1006,7 @@ void SetBoundingBox( obj_loaded_file* OBJFile, memory_arena* TemporaryArena )
       }
     }
 
-    OBJGroup.aabb   = AABB3f(Min,Max);
+    OBJGroup.aabb = AABB3f(Min,Max);
 
     EndTemporaryMemory(TempMem);
   }
@@ -1292,9 +1292,9 @@ entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* Me
   Entity->SpatialComponent->ModelMatrix = M4Identity();
   Translate( -GetAABBCenter(OBJGrp->aabb), Entity->SpatialComponent );
 
-  collider_mesh* ColliderMesh = (collider_mesh*) PushStruct(&World->Arena, collider_mesh);
-  SetAABBTriangles( &World->Arena, &OBJGrp->aabb, ColliderMesh );
-  Entity->ColliderComponent->Mesh = ColliderMesh;
+  Entity->ColliderComponent->AABB = OBJGrp->aabb;
+  Entity->ColliderComponent->Mesh = (collider_mesh*) PushStruct(&World->Arena, collider_mesh);
+  SetColliderMeshFromAABB( &World->Arena, Entity->ColliderComponent );
 
   Entity->SurfaceComponent->Material = PushStruct( &World->Arena, material);
   SetMtlMaterialToSurfaceMaterial( OBJGrp->Material, Entity->SurfaceComponent->Material);

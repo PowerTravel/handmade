@@ -249,9 +249,9 @@ void HeroController( entity* HeroEntity )
 
     if(Controller->X.EndedDown)
     {
-      Put(V3(0,1,0), Spatial);
-      Dynamics->ExternalForce = V3(0,0,0);
-      Dynamics->Velocity      = V3(0,0,0);
+      Put(V3(0,1,0), 0, V3(0,1,0), Spatial);
+      Dynamics->ExternalForce  = V3(0,0,0);
+      Dynamics->LinearVelocity = V3(0,0,0);
     }
 
     v3 to = GetPosition(Spatial);
