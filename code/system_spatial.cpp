@@ -231,7 +231,7 @@ void SpatialSystemUpdate( world* World, platform_api* API)
                        MInv[2] * J[2],
                        MInv[3] * J[3]};
 
-        r32 Restitution = 1.f * ((V[0] + V[1] + V[2] + V[3]) * n);
+        r32 Restitution = 0.1f * ((V[0] + V[1] + V[2] + V[3]) * n);
         //Baumgarte term:
         r32 Baumgarte = - (0.5f / dt) * ((pb-pa) * (-n));
 

@@ -13,7 +13,7 @@ CsoSupportAABB( const m4* AModelMat, const collider_mesh* AMesh,
   {
     v4 ModelSpacePoint =V4(AMesh->v[i],1);
     r32 sa = ADirModelSpace * ModelSpacePoint;
-    if(sa >= AMaxValue)
+    if(sa > AMaxValue)
     {
       AMaxValue = sa;
       SupportA = ModelSpacePoint;
@@ -27,7 +27,7 @@ CsoSupportAABB( const m4* AModelMat, const collider_mesh* AMesh,
   {
     v4 ModelSpacePoint =V4(BMesh->v[i],1);
     r32 sb = BDirModelSpace * ModelSpacePoint;
-    if(sb >= BMaxValue)
+    if(sb > BMaxValue)
     {
       BMaxValue = sb;
       SupportB  = ModelSpacePoint;
@@ -279,21 +279,32 @@ PaddWithZeros(u32 Count, char* Scanner)
   for (u32 i = 0; i < Count; ++i)
   {
     Scanner += str::itoa(0, 16, Scanner);
-    *Scanner++ = ' ';
+    if(i+1 < Count)
+      *Scanner++ = ' ';
   }
-
   return Scanner;
 }
 
-internal void DebugPrintPolytype(memory_arena* Arena, list<gjk_face> FaceList, list<gjk_vertex> VerticeList, b32 Append, platform_api* API )
+internal void DebugPrintPolytype(memory_arena* Arena, list<gjk_face> FaceList,  list<u32> RemovedFaceList,
+                         list<gjk_vertex> VerticeList, u32 NewVertexIndex, b32 Append, platform_api* API )
 {
   if(!API) return;
-  Append = false;
   char FilePath[] = "..\\handmade\\code\\matlab\\data\\EPAPolytypeSeries.m";
 
   temporary_memory TempMem = BeginTemporaryMemory(Arena);
   char* DebugString = (char*) PushArray(Arena, (FaceList.GetSize() + VerticeList.GetSize()+2)*64, char);
   char* Scanner = DebugString;
+
+  // 1 means vertex data
+  Scanner += str::itoa(1, 64, Scanner);
+  *Scanner++ = ' ';
+  Scanner += str::itoa(VerticeList.GetSize(), 64, Scanner);
+  *Scanner++ = ' ';
+  Scanner += str::itoa(NewVertexIndex, 64, Scanner); // Vertex used to remove faces
+  *Scanner++ = ' ';
+  Scanner += str::itoa(0, 64, Scanner); // Padding
+  *Scanner++ = '\n';
+
   for(VerticeList.First(); !VerticeList.IsEnd(); VerticeList.Next())
   {
     gjk_vertex V = VerticeList.Get();
@@ -303,9 +314,12 @@ internal void DebugPrintPolytype(memory_arena* Arena, list<gjk_face> FaceList, l
     *Scanner++ = '\n';
   }
 
-  Scanner += str::itoa(-1, 64, Scanner);
+  // 2 means face index data
+  Scanner += str::itoa(2, 64, Scanner);
   *Scanner++ = ' ';
-  Scanner = PaddWithZeros(3,Scanner);
+  Scanner += str::itoa(FaceList.GetSize(), 64, Scanner);
+  *Scanner++ = ' ';
+  Scanner = PaddWithZeros(2,Scanner); // Padding
   *Scanner++ = '\n';
 
   u32 FaceIndex = 1;
@@ -322,10 +336,27 @@ internal void DebugPrintPolytype(memory_arena* Arena, list<gjk_face> FaceList, l
     *Scanner++ = '\n';
   }
 
-  Scanner += str::itoa(-1, 64, Scanner);
-  *Scanner++ = ' ';
-  Scanner = PaddWithZeros(3,Scanner);
-  *Scanner++ = '\n';
+  if(RemovedFaceList.GetSize())
+  {
+    // 3 means removed face  data
+    Scanner += str::itoa(3, 64, Scanner);
+    *Scanner++ = ' ';
+    Scanner += str::itoa(RemovedFaceList.GetSize(), 64, Scanner);
+    *Scanner++ = ' ';
+    Scanner = PaddWithZeros(2,Scanner); // Padding
+    *Scanner++ = '\n';
+
+
+    FaceIndex = 1;
+    for(RemovedFaceList.First(); !RemovedFaceList.IsEnd(); RemovedFaceList.Next())
+    {
+      gjk_face F = FaceList.Get();
+      Scanner += str::itoa(RemovedFaceList.Get(), 64, Scanner);
+      *Scanner++ = ' ';
+      Scanner = PaddWithZeros(3,Scanner); // Padding
+      *Scanner++ = '\n';
+    }
+  }
 
   thread_context Thread = {};
   if(Append)
@@ -337,7 +368,6 @@ internal void DebugPrintPolytype(memory_arena* Arena, list<gjk_face> FaceList, l
 
   EndTemporaryMemory(TempMem);
 }
-
 
 struct closest_face_result
 {
@@ -524,6 +554,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
   V[3]->P = Simplex.SP[3];
   V[3]->Idx = VertexIDX++;
 
+
   list<gjk_face> FaceList(TemporaryArena);
   FaceList.InsertAfter(CreateFace(TemporaryArena, V[TriangleIndeces[0]] ,V[TriangleIndeces[1]], V[TriangleIndeces[2]]));
   FaceList.InsertAfter(CreateFace(TemporaryArena, V[TriangleIndeces[3]] ,V[TriangleIndeces[4]], V[TriangleIndeces[5]]));
@@ -569,7 +600,8 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
   JoinFaces(F[2], F[3]);
 
 
-  DebugPrintPolytype( TemporaryArena, FaceList, VerticeList, false, API );
+  list<u32> DebugRemovedFaceIndexList(TemporaryArena);
+  DebugPrintPolytype( TemporaryArena, FaceList, DebugRemovedFaceIndexList,  VerticeList, 0, false, API );
   // Get the first new point
   closest_face_result ClosestFace = GetCLosestFace( TemporaryArena, &FaceList, &VerticeList );
 
@@ -577,36 +609,42 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
   r32 PreviousShortestNormalDistance = ShortestNormalDistance + 100;
 
   u32 Tries = 0;
-  while(Tries++ < 2)
+  u32 MaxTries = 2;
+  u32 NewVertexIdx = 0;
+  while(Tries++ < MaxTries)
   {
     if(Abs(ShortestNormalDistance - PreviousShortestNormalDistance) > 10E-4)
     {
       Tries = 0;
     }
-    gjk_vertex* NewVertex = VerticeList.InsertAfter({});
-    NewVertex->Idx = VertexIDX++;
-    NewVertex->P = CsoSupportAABB( AModelMat, AMesh,
+    gjk_vertex* NewVertex = 0;
+    gjk_vertex  TempVertex = {};
+    TempVertex.P = CsoSupportAABB( AModelMat, AMesh,
                                    BModelMat, BMesh,
                                    ClosestFace.Normal);
 
     b32 NewVertexIsDuplicate = false;
+    NewVertexIdx = 0;
     for(VerticeList.First(); !VerticeList.IsEnd(); VerticeList.Next())
     {
+      ++NewVertex;
       gjk_vertex VertInList = VerticeList.Get();
-      if(Equals(&VertInList, NewVertex))
+      if(Equals(&VertInList, &TempVertex))
       {
         // If we find a duplicate point, I would assume thats because we have found the edge to the
         // simplex. I am not 100% certain we can brake here so make sure to check this spot if
         // we run into other bugs. Symptoms can be bad penetration depth and misaligned contact normals.
         NewVertexIsDuplicate = true;
+        NewVertex = VerticeList.GetRef();
         break;
       }
     }
-    if(NewVertexIsDuplicate)
+    if(!NewVertexIsDuplicate)
     {
-//      break;
+      NewVertex = VerticeList.InsertAfter({});
+      NewVertex->Idx = VertexIDX++;
     }
-    DebugPrintPolytype( TemporaryArena, FaceList, VerticeList, true, API );
+    DebugPrintPolytype( TemporaryArena, FaceList, DebugRemovedFaceIndexList,  VerticeList, NewVertexIdx, true, API );
   /*
     How to remove a Face properly:
 
@@ -644,9 +682,11 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
     list<gjk_halfedge*> AffectedEdges(TemporaryArena);
     list<gjk_face>      FacesToRemove(TemporaryArena);
     list<gjk_face>      NewFaceList(TemporaryArena);  // Hacky solution. Remove cannot be used this way
+    u32 DebugFaceIndex = 0;
     for(FaceList.First(); !FaceList.IsEnd(); FaceList.Next())
     {
       gjk_face Face = FaceList.Get();
+      DebugFaceIndex++;
       v3 FaceNormal = GetFaceNormal(Face);
       r32 Nerm = (FaceNormal*NewVertex->P.S); // Check if this is greate than 0 according to the guide
       v3 FaceToVert = (NewVertex->P.S - Face.Edge->TargetVertex->P.S);
@@ -658,6 +698,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
           Assert(0);
         }
         FacesToRemove.InsertAfter(Face);
+        DebugRemovedFaceIndexList.InsertAfter(DebugFaceIndex);
         // If remove is called on the first entry the second entry  becomes the first
         // The list is then pointing to the new first enty. When it goes to the top of the
         // for-loop Next is called and then points to the second entry which used to be the third.
@@ -674,8 +715,9 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
         NewFaceList.InsertAfter(Face);
       }
     }
+    DebugPrintPolytype( TemporaryArena, FaceList, DebugRemovedFaceIndexList, VerticeList, NewVertexIdx, true, API );
+    DebugRemovedFaceIndexList = list<u32>(TemporaryArena);
     FaceList = NewFaceList;
-
     if(FacesToRemove.GetSize()==0)
     {
       break;
@@ -741,6 +783,11 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
 
     // Go throug each affected vertex and see if it should be removed
     // (if all incident edges should be removed)
+
+    // Note (Jakob) There may be a bug somewhere when removing a vertex. For some
+    //              cases that don't converge I ended up with a WEIRD looking polytyoe
+    //              that shouldn't happen. I think it may be here because all other pieces
+    //              of this code is fairly tested.
     for(AffectedVertices.First(); !AffectedVertices.IsEnd(); AffectedVertices.Next())
     {
       gjk_vertex* Vert = AffectedVertices.Get();
@@ -798,7 +845,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
 
 
 
-    DebugPrintPolytype( TemporaryArena, FaceList, VerticeList, true, API );
+    DebugPrintPolytype( TemporaryArena, FaceList, DebugRemovedFaceIndexList, VerticeList, NewVertexIdx, true, API );
     // Connect new triangles between each border edge and the new point to create faces
     FaceList.Last();
     gjk_vertex* A = FE->OppositeEdge->TargetVertex;
@@ -829,7 +876,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
     }
     JoinFaces(*PreviousFace, *FirstNewFace);
 
-    DebugPrintPolytype( TemporaryArena, FaceList, VerticeList, true, API );
+    DebugPrintPolytype( TemporaryArena, FaceList, DebugRemovedFaceIndexList, VerticeList, NewVertexIdx, true, API );
 
     ClosestFace = GetCLosestFace( TemporaryArena, &FaceList, &VerticeList );
     PreviousShortestNormalDistance = ShortestNormalDistance;
@@ -837,7 +884,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
   }
 
 
-  DebugPrintPolytype( TemporaryArena, FaceList, VerticeList, true, API );
+  DebugPrintPolytype( TemporaryArena, FaceList, DebugRemovedFaceIndexList, VerticeList, 0, true, API );
   gjk_support A = ClosestFace.F.Edge->TargetVertex->P;
   gjk_support B = ClosestFace.F.Edge->NextEdge->TargetVertex->P;
   gjk_support C = ClosestFace.F.Edge->NextEdge->NextEdge->TargetVertex->P;

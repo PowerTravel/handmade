@@ -85,7 +85,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
 
         Put( V3(2.1f*i, 2.f*j, 2.1f*k), 1*(Pi32/4), V3(0,1,0), cubeEntity->SpatialComponent );
         cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
-        cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0,0);
+        cubeEntity->DynamicsComponent->AngularVelocity = V3(0,1,0);
         cubeEntity->DynamicsComponent->Mass = 1;
       }
     }
@@ -94,7 +94,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   entity* floor = CreateEntityFromOBJGroup( World, &cube->Objects[1], cube->MeshData );
 
   Put( V3( 0,-2, 0), 0, V3(0,1,0), floor->SpatialComponent );
-  //Scale( V3( 1, 1, 1),  floor->SpatialComponent );
+  Scale( V3( 8, 1, 8),  floor->SpatialComponent );
 
   entity* ControllableCamera = NewEntity( World );
   NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
