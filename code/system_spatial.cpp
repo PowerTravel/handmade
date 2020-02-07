@@ -3,6 +3,8 @@
 #include "utility_macros.h"
 #include "aabb.h"
 #include "dynamic_aabb_tree.h"
+#include "gjk_narrow_phase.h"
+#include "epa_collision_data.h"
 
 list< aabb3f > GetOverlappingWallTiles(memory_arena* Arena, tile_map* TileMap, aabb3f* BoundingBox, v3 CollisionEnvelope = {} )
 {
@@ -30,24 +32,6 @@ list< aabb3f > GetOverlappingWallTiles(memory_arena* Arena, tile_map* TileMap, a
 
   return IntersectingWallTiles;
 }
-
-aabb3f GetAABBWorldSpace( entity* E )
-{
-  Assert(E->SpatialComponent);
-  Assert(E->ColliderComponent);
-  component_spatial*  S = E->SpatialComponent;
-  component_collider* C = E->ColliderComponent;
-
-  m4 M = S->ModelMatrix;
-  aabb3f AABB = C->AABB;
-
-  aabb3f Result = {};
-  Result.P0 =   V3( M * V4(AABB.P0,1));
-  Result.P1 =   V3( M * V4(AABB.P1,1));
-
-  return Result;
-}
-
 
 v3 GravityForceEquation(v3& a,v3& b,v3& c)
 {
@@ -79,9 +63,7 @@ void SpatialSystemUpdate( world* World, platform_api* API)
       component_collider*  C = E->ColliderComponent;
       component_dynamics*  D = E->DynamicsComponent;
 
-      v3  Position      = GetPosition(S);
-      // TODO: We should try and calculate collisions BEFORE doing euler and bake Velocity into here
-      //       Maybe it fixes the positional drift.
+      v3  Position        = GetPosition(S);
       v3  LinearVelocity  = D->LinearVelocity;
       v3  AngularVelocity = D->AngularVelocity;
       r32 Mass            = D->Mass;
@@ -100,7 +82,8 @@ void SpatialSystemUpdate( world* World, platform_api* API)
     }
     if( E->Types & COMPONENT_TYPE_COLLIDER )
     {
-      aabb3f AABBWorldSpace = GetAABBWorldSpace(E);
+      aabb3f AABBWorldSpace = {};
+      GetTransformedAABBFromColliderMesh( E->ColliderComponent, E->SpatialComponent->ModelMatrix, &AABBWorldSpace );
       AABBTreeInsert( Arena, &BroadPhaseTree, E, AABBWorldSpace );
 
       s64 RemainingSize = DebugPrintMemorySize + DebugPrintMemory - Scanner;
@@ -113,7 +96,7 @@ void SpatialSystemUpdate( world* World, platform_api* API)
       *Scanner++ = '\n';
     }
   }
-  local_persist b32 printed = false;
+  b32 printed = false;
   if(API && !printed)
   {
     printed = true;
@@ -146,7 +129,7 @@ void SpatialSystemUpdate( world* World, platform_api* API)
       {
         contact_data ContactData = EPACollisionResolution(&World->Arena,  &SA->ModelMatrix, CA->Mesh,
                                                                           &SB->ModelMatrix, CB->Mesh,
-                                                                          NarrowPhaseResult.Simplex,
+                                                                          NarrowPhaseResult.Simplex,//0);
                                                                           API);
         // Positional Constraint: Pa - Pb >= 0
         // Velocity   Constraint: JV + T = 0
@@ -231,9 +214,9 @@ void SpatialSystemUpdate( world* World, platform_api* API)
                        MInv[2] * J[2],
                        MInv[3] * J[3]};
 
-        r32 Restitution = 0.1f * ((V[0] + V[1] + V[2] + V[3]) * n);
+        r32 Restitution = 0.01f * ((V[0] + V[1] + V[2] + V[3]) * n);
         //Baumgarte term:
-        r32 Baumgarte = - (0.5f / dt) * ((pb-pa) * (-n));
+        r32 Baumgarte = - (0.8f / dt) * ((pb-pa) * (-n));
 
         r32 Bias = Baumgarte + Restitution;
 
@@ -245,10 +228,13 @@ void SpatialSystemUpdate( world* World, platform_api* API)
         r32 Lambda = Numerator / Denominator;
 
         v3 DeltaV[4] = {(MInvJ[0])*Lambda, (MInvJ[1])*Lambda, (MInvJ[2])*Lambda, (MInvJ[3])*Lambda};
-
          if(A->Types & COMPONENT_TYPE_DYNAMICS)
          {
            DA->LinearVelocity += DeltaV[0];
+           if(DA->LinearVelocity.Y < -0.1)
+           {
+            int a = 10;
+           }
            //DA->AngularVelocity += DeltaV[1];
            //Translate(-ContactData.ContactNormal * ContactData.PenetrationDepth,SA);
          }
@@ -256,11 +242,16 @@ void SpatialSystemUpdate( world* World, platform_api* API)
          if(B->Types & COMPONENT_TYPE_DYNAMICS)
          {
             DB->LinearVelocity += DeltaV[2];
+            if(DB->LinearVelocity.Y < -0.01)
+            {
+             int a = 10;
+            }
             //DB->AngularVelocity += DeltaV[3];
             //DB->AngularVelocity = ContactData.ContactNormal*Norm(DB->LinearVelocity);
            //Translate(ContactData.ContactNormal * ContactData.PenetrationDepth,SB);
          }
-
+      }else{
+        int cc =10;
       }
       EndTemporaryMemory( TempMem2 );
     }

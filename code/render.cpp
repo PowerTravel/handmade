@@ -355,7 +355,6 @@ void DrawTriangle(  bitmap* OffscreenBuffer, bitmap* DepthBuffer,
 	{
 		for(s32 X = RoundReal32ToInt32( RasterBB->min.X ); X < RasterBB->max.X; ++X)
 		{
-		
 			v2 p = V2( (r32) X, (r32) Y);
 			r32 PixelInRange0 = EdgeFunction( &PointsInScreenSpace[0], &PointsInScreenSpace[1], &p);
 			r32 PixelInRange1 = EdgeFunction( &PointsInScreenSpace[1], &PointsInScreenSpace[2], &p);

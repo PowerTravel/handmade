@@ -1,8 +1,7 @@
-#include "gjk.h"
-#include "halfedge_mesh.h"
+#include "gjk_narrow_phase.h"
+#include "epa_collision_data.h"
 
-internal gjk_support
-CsoSupportAABB( const m4* AModelMat, const collider_mesh* AMesh,
+gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
             const m4* BModelMat, const collider_mesh* BMesh, const v3 Direction )
 {
   gjk_support Result = {};
@@ -54,49 +53,8 @@ CsoSupportAABB( const m4* AModelMat, const collider_mesh* AMesh,
  * If Dot( p3-p0 , Normal ) == 0 Our p3 lies on the plane of the bottom triangle and
  * we need another point to  be p3.
  */
-bool FixWindingCCW(gjk_simplex* Simplex)
-{
-  // Fix Winding so that all triangles go ccw
-  v3 v01 = Simplex->SP[1].S - Simplex->SP[0].S;
-  v3 v02 = Simplex->SP[2].S - Simplex->SP[0].S;
-  v3 v03 = Simplex->SP[3].S - Simplex->SP[0].S;
-  const r32 Determinant = v03 * CrossProduct(v01,v02);
-  if(Determinant > 0.f)
-  {
-    gjk_support Tmp = Simplex->SP[0];
-    Simplex->SP[0]   = Simplex->SP[3];
-    Simplex->SP[3]   = Tmp;
-  }else if (Abs(Determinant)< 10E-7){
-    // Determinant is 0
-    return false;
-  }
 
-  return true;
-}
-
-// Makes Simplex CCW
-internal void
-SetPointsAndIndecesForCCWTetrahedron( gjk_simplex* Simplex, u32 TriangleIndeces[])
-{
-  Assert(Simplex->Dimension == 4);
-  b32 ZeroDet = !FixWindingCCW(Simplex);
-  Assert(!ZeroDet);
-  u32 TI[12] = {0, 1, 2,   // n =  (p1 - p0) x (p2 - p0)
-                1, 3, 2,   // n = -(p2 - p1) x (p3 - p1) = (p3 - p1) x (p2 - p1)
-                2, 3, 0,   // n =  (p3 - p2) x (p0 - p2)
-                3, 1, 0};  // n = -(p0 - p3) x (p1 - p3) = (p1 - p3) x (p0 - p3)
-  u32* TO    = TriangleIndeces;
-  u32* TIptr = TI;
-  for(u32 i = 0; i < ArrayCount(TI); ++i)
-  {
-    *TO = *TIptr;
-    TO++;
-    TIptr++;
-  }
-}
-
-internal void
-BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
+void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
                     const m4* BModelMat, const collider_mesh* BMesh,
                     gjk_simplex& Simplex)
 {
@@ -112,7 +70,7 @@ BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
 
       for (int i = 0; i < 6; ++i)
       {
-        gjk_support Support = CsoSupportAABB( AModelMat, AMesh,
+        gjk_support Support = CsoSupportFunction( AModelMat, AMesh,
                                               BModelMat, BMesh,
                                               SearchDirections[i] );
         if(Norm(Support.S - Simplex.SP[0].S) >= 10E-4)
@@ -152,7 +110,7 @@ BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
 
       for(u32 i = 0; i < 6; ++i)
       {
-        gjk_support Support = CsoSupportAABB( AModelMat, AMesh,
+        gjk_support Support = CsoSupportFunction( AModelMat, AMesh,
                                               BModelMat, BMesh,
                                               SearchDirection );
         if(Norm(Support.S) >= 10E-4)
@@ -171,12 +129,12 @@ BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
       const v3 v1 = Simplex.SP[2].S - Simplex.SP[0].S;
       const v3 SearchDirection = CrossProduct(v0,v1);
 
-      gjk_support Support = CsoSupportAABB( AModelMat, AMesh,
+      gjk_support Support = CsoSupportFunction( AModelMat, AMesh,
                                             BModelMat, BMesh,
                                             SearchDirection );
       if(Norm(Support.S) <= 10E-4)
       {
-        Support = CsoSupportAABB( AModelMat, AMesh,
+        Support = CsoSupportFunction( AModelMat, AMesh,
                                   BModelMat, BMesh,
                                  -SearchDirection );
       }
@@ -187,136 +145,13 @@ BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
   }
 }
 
-contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AModelMat, const collider_mesh* AMesh,
-                                    const m4* BModelMat, const collider_mesh* BMesh,
-                                    gjk_simplex& Simplex,
-                                    platform_api* API )
+struct gjk_partial_result
 {
-  temporary_memory TempMem = BeginTemporaryMemory(TemporaryArena);
-
-  BlowUpSimplex(AModelMat, AMesh,
-                BModelMat, BMesh,
-                Simplex);
-
-
-  gjk_mesh* Mesh = CreateSimplexMesh(TemporaryArena, &Simplex);
-
-  // Get the first new point
-  r32 DistanceClosestToFace = 0;
-  gjk_face* ClosestFace = GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
-  Assert(ClosestFace);
-
-  r32 PreviousDistanceClosestToFace = DistanceClosestToFace + 100;
-  gjk_face* PreviousClosestFace = ClosestFace;
-  u32 Tries = 0;
-  // Note (Jakob): Somethimes the EPA does not converge on ONE solution and instead
-  //               start to cycle between different points with some period.
-  //               If that happens we want to exit out at the closest result
-  //               within that period.
-  //               TriesUntilGivingUp can be tweaked, lower number gives faster result,
-  //               higher number gives more precise result (If the period is longer than
-  //               TriesUntilGivingUp we may not find the closest point).
-  //               However usually the EPA converges and if not has a period of 2.
-  const u32 TriesUntilGivingUp = 2;
-
-
-  while(Tries++ < TriesUntilGivingUp)
-  {
-
-    gjk_support SupportPoint = CsoSupportAABB( AModelMat, AMesh,
-                                               BModelMat, BMesh,
-                                               ClosestFace->Normal);
-
-    if(IsPointInMesh(Mesh,SupportPoint.S))
-    {
-      // If a point gets repeated we use the previous closest face.
-      // I can't be sure this always works so chekc here if we get
-      // weird EPA results.
-      ClosestFace = PreviousClosestFace;
-      break;
-    }
-
-    gjk_halfedge* BorderEdge = RemoveFacesSeenByPoint(Mesh, SupportPoint.S);
-    if(!BorderEdge)
-    {
-      // If BorderEdge is NULL it means the new SupportPoint must be on the border
-      // of the CSO.
-      // It could also be inside the Polytype but I don't think so.
-      // If it's inside it means that there is a point further away in that direction.
-      // But the the Support function should have returned that point instead.
-      // The point SHOULD therefore be on the face of ClosestFace since that was the
-      // direction we were las looking in.
-      // So exit with closest face.
-      break;
-    }
-    FillHole( Mesh, BorderEdge, &SupportPoint);
-
-    PreviousDistanceClosestToFace = DistanceClosestToFace;
-    PreviousClosestFace = ClosestFace;
-    ClosestFace = GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
-
-    if(Abs(DistanceClosestToFace - PreviousDistanceClosestToFace) > 10E-4)
-    {
-      Tries = 0;
-    }
-  }
-
-  gjk_support A = ClosestFace->Edge->TargetVertex->P;
-  gjk_support B = ClosestFace->Edge->NextEdge->TargetVertex->P;
-  gjk_support C = ClosestFace->Edge->NextEdge->NextEdge->TargetVertex->P;
-  v3 P = ClosestFace->Normal * DistanceClosestToFace;
-
-  // The Length of the cross product between vectors A and B gives the area of the
-  // paralellogram with sides by A and B.
-  r32 FaceArea = 0.5f * Norm( CrossProduct( B.S - A.S, C.S - A.S) );
-  r32 SubAreaA = 0.5f * Norm( CrossProduct( C.S - B.S,   P - B.S) );
-  r32 SubAreaB = 0.5f * Norm( CrossProduct( A.S - C.S,   P - C.S) );
-  r32 SubAreaC = 0.5f * Norm( CrossProduct( B.S - A.S,   P - A.S) );
-
-  // The Baryocentric coordinates
-  r32 LambdaA = SubAreaA / FaceArea;
-  r32 LambdaB = SubAreaB / FaceArea;
-  r32 LambdaC = SubAreaC / FaceArea;
-
-  // Check that some baryocentric coordinate conditions hold.
-  // IE that P is within triangle ABC;
-  r32 LambdaSum = LambdaA + LambdaB + LambdaC;
-  if((Abs( LambdaSum - 1) > 10E-7)       ||
-     !( (LambdaA >= 0) && (LambdaA <= 1)) ||
-     !( (LambdaB >= 0) && (LambdaB <= 1)) ||
-     !( (LambdaC >= 0) && (LambdaC <= 1)))
-  {
-    DebugPrintEdges(TemporaryArena, Mesh, false, API );
-    Assert(0);
-  }
-
-  gjk_support InterpolatedSupport = {};
-  InterpolatedSupport.S = P;
-  InterpolatedSupport.A = LambdaA * A.A + LambdaB * B.A + LambdaC * C.A;
-  InterpolatedSupport.B = LambdaA * A.B + LambdaB * B.B + LambdaC * C.B;
-
-  EndTemporaryMemory(TempMem);
-
-  contact_data ContactData = {};
-
-  v3 Tangent1 = V3(0.0f, ClosestFace->Normal.Z, -ClosestFace->Normal.Y);
-  if ( ClosestFace->Normal.X >= 0.57735f)
-  {
-    Tangent1 = V3(ClosestFace->Normal.Y, -ClosestFace->Normal.X, 0.0f);
-  }
-  Normalize(Tangent1);
-
-  ContactData.A_ContactWorldSpace = V3(*AModelMat * V4(InterpolatedSupport.A,1));
-  ContactData.B_ContactWorldSpace = V3(*BModelMat * V4(InterpolatedSupport.B,1));
-  ContactData.A_ContactModelSpace = InterpolatedSupport.A;
-  ContactData.B_ContactModelSpace = InterpolatedSupport.B;
-  ContactData.ContactNormal       = ClosestFace->Normal;
-  ContactData.TangentNormalOne    = Tangent1;
-  ContactData.TangentNormalTwo    = CrossProduct(ClosestFace->Normal, Tangent1);
-  ContactData.PenetrationDepth    = DistanceClosestToFace;
-  return ContactData;
-
-}
+  v3  ClosestPoint;
+  r32 Distance;
+  gjk_simplex ReducedSimplex;
+  b32 Reduced;
+};
 
 internal gjk_partial_result
 VertexEdge(const v3& Vertex, gjk_simplex& Simplex, u32 Index0 = 0, u32 Index1 = 1)
@@ -448,6 +283,46 @@ IsVertexInsideTetrahedron( const v3& Vertex, const u32 TriangleIndeces[], const 
   return true;
 }
 
+bool FixWindingCCW(gjk_simplex* Simplex)
+{
+  // Fix Winding so that all triangles go ccw
+  v3 v01 = Simplex->SP[1].S - Simplex->SP[0].S;
+  v3 v02 = Simplex->SP[2].S - Simplex->SP[0].S;
+  v3 v03 = Simplex->SP[3].S - Simplex->SP[0].S;
+  const r32 Determinant = v03 * CrossProduct(v01,v02);
+  if(Determinant > 0.f)
+  {
+    gjk_support Tmp = Simplex->SP[0];
+    Simplex->SP[0]   = Simplex->SP[3];
+    Simplex->SP[3]   = Tmp;
+  }else if (Abs(Determinant)< 10E-7){
+    // Determinant is 0
+    return false;
+  }
+
+  return true;
+}
+
+// Makes Simplex CCW
+internal void
+SetPointsAndIndecesForCCWTetrahedron( gjk_simplex* Simplex, u32 TriangleIndeces[])
+{
+  Assert(Simplex->Dimension == 4);
+  b32 ZeroDet = !FixWindingCCW(Simplex);
+  Assert(!ZeroDet);
+  u32 TI[12] = {0, 1, 2,   // n =  (p1 - p0) x (p2 - p0)
+                1, 3, 2,   // n = -(p2 - p1) x (p3 - p1) = (p3 - p1) x (p2 - p1)
+                2, 3, 0,   // n =  (p3 - p2) x (p0 - p2)
+                3, 1, 0};  // n = -(p0 - p3) x (p1 - p3) = (p1 - p3) x (p0 - p3)
+  u32* TO    = TriangleIndeces;
+  u32* TIptr = TI;
+  for(u32 i = 0; i < ArrayCount(TI); ++i)
+  {
+    *TO = *TIptr;
+    TO++;
+    TIptr++;
+  }
+}
 
 internal gjk_partial_result
 VertexTetrahedron( const v3& Vertex, gjk_simplex& Simplex )
@@ -539,6 +414,7 @@ void DEBUG_GJKCollisionDetectionSequenceToFile(gjk_simplex& Simplex, b32 append,
   EndTemporaryMemory(TempMem);
 }
 
+
 gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_mesh* AMesh,
                                            const m4* BModelMat, const collider_mesh* BMesh,
                                            memory_arena* TemporaryArena, platform_api* API )
@@ -554,7 +430,7 @@ gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_m
   {
     r32 PreviousDistance = PartialResult.Distance;
     // Add a CSO to the simplex
-    gjk_support SupportPoint = CsoSupportAABB( AModelMat, AMesh, BModelMat, BMesh, Origin-PartialResult.ClosestPoint );
+    gjk_support SupportPoint = CsoSupportFunction( AModelMat, AMesh, BModelMat, BMesh, Origin-PartialResult.ClosestPoint );
     Assert(Simplex.Dimension <= 3);
     for(u32 i = 0; i < Simplex.Dimension; ++i)
     {

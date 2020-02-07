@@ -24,30 +24,14 @@ struct gjk_collision_result
   b32 ContainsOrigin;
 };
 
-struct gjk_partial_result
-{
-  v3  ClosestPoint;
-  r32 Distance;
-  gjk_simplex ReducedSimplex;
-  b32 Reduced;
-};
 
-struct contact_data
-{
-  v3 A_ContactWorldSpace;
-  v3 B_ContactWorldSpace;
-  v3 A_ContactModelSpace;
-  v3 B_ContactModelSpace;
-  v3 ContactNormal;
-  v3 TangentNormalOne;
-  v3 TangentNormalTwo;
-  r32 PenetrationDepth;
-};
+gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
+                                const m4* BModelMat, const collider_mesh* BMesh, const v3 Direction );
+
+void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
+                    const m4* BModelMat, const collider_mesh* BMesh,
+                    gjk_simplex& Simplex);
 
 gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_mesh* AMesh,
                                            const m4* BModelMat, const collider_mesh* BMesh,
                                           memory_arena* TemporaryArena = 0, platform_api* API = 0);
-
-contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AModelMat, const collider_mesh* AMesh,
-                                    const m4* BModelMat, const collider_mesh* BMesh, gjk_simplex& Simplex,
-                                    platform_api* API = 0 );

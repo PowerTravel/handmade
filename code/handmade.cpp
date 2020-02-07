@@ -7,8 +7,8 @@
 #include "obj_loader.cpp"
 #include "tiles_spritesheet.hpp"
 
-#include "halfedge_mesh.cpp"
-#include "gjk.cpp"
+#include "epa_collision_data.cpp"
+#include "gjk_narrow_phase.cpp"
 #include "render_push_buffer.cpp"
 #include "sprite_mapping.h"
 #include "system_camera.cpp"
@@ -84,7 +84,10 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
         entity* cubeEntity = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
         NewComponents( World, cubeEntity, COMPONENT_TYPE_DYNAMICS );
 
-        Put( V3(2.1f*i, 2.f*j, 2.1f*k), 3.2*(Pi32/4), V3(0,1,0), cubeEntity->SpatialComponent );
+        // Uncomment this and set j < 1 in the for loop to reproduce a bug where
+        // GJK perodically does not find a collision.
+        Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,1,1), cubeEntity->SpatialComponent );
+        //Put( V3(2.1f*i-0.5f, 2.f*j, 2.1f*k-0.5f), 0, V3(0,0,0), cubeEntity->SpatialComponent );
         cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
         cubeEntity->DynamicsComponent->AngularVelocity = V3(0,1,0);
         cubeEntity->DynamicsComponent->Mass = 1;
