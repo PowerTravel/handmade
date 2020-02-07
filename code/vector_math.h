@@ -942,5 +942,23 @@ Index( m4& M, const u32 Row, const u32 Column, const r32 Value )
   M.E[4*Row+Column] = Value;
 }
 
+inline v3
+GetPlaneNormal(const v3& A, const v3& B, const v3& C)
+{
+  const v3 ab = B - A;
+  const v3 ac = C - A;
+  const v3 Result = Normalize( CrossProduct(ab,ac) );
+  return Result;
+}
+
+inline v3
+ProjectPointOntoPlane( const v3& PointToProject, const v3& PointOnPlane, const v3& PlaneNormal )
+{
+  const v3 o = (PointToProject - PointOnPlane);
+  const v3 ProjectionToNormal = (o * PlaneNormal) * PlaneNormal;
+  const v3 ProjectedPoint = PointToProject - ProjectionToNormal;
+  return ProjectedPoint;
+}
+
 
 #endif

@@ -44,30 +44,6 @@ struct contact_data
   r32 PenetrationDepth;
 };
 
-struct gjk_halfedge;
-struct gjk_face;
-
-struct gjk_vertex
-{
-  gjk_support P;
-  u32 Idx;
-  gjk_halfedge* OutgoingEdge;
-};
-
-struct gjk_halfedge
-{
-  gjk_vertex*   TargetVertex;
-  gjk_face*     LeftFace;
-  gjk_halfedge* NextEdge;
-  gjk_halfedge* PreviousEdge;
-  gjk_halfedge* OppositeEdge;
-};
-
-struct gjk_face
-{
-  gjk_halfedge* Edge;
-};
-
 gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_mesh* AMesh,
                                            const m4* BModelMat, const collider_mesh* BMesh,
                                           memory_arena* TemporaryArena = 0, platform_api* API = 0);

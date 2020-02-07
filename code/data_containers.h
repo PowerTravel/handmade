@@ -4,6 +4,7 @@
 
 // Todo: Make all lists return Pointers, not copies.
 // Todo: Move list to use Iterators instead of first(), Last(), Next() Etc
+//       I do NOT like that the list has an internal state
 
 template <class T>
 class list
@@ -316,6 +317,21 @@ class list
       return true;
     }
 
+    //TODO: This function is unsafe to use in a for-loop. Remove;
+    //      The list was written so one could do the follwoing:
+    //        while( !List.IsEmpty() ){ List.Remove() }; Which is fine.
+    //      And
+    //        for( List.First(); !List.IsEmpty(); List.Next() ){ Do Something }; Also fine
+    //      However combining them turned out to be dangerous.
+    //        for( List.First(); !List.IsEmpty(); List.Next() ){ if(Condition){ List.Remove(); } }; Not fine!
+    /// But using 'for' and 'remove' this way can cause the following:
+    //      If remove is called on the first entry the second entry becomes the first
+    //      The list is then pointing to the new first enty. When it goes to the top of the
+    //      for-loop Next is called and then points to the second entry which used to be the third.
+    //      The second entry is thus scipped.
+    //      However IF remove is NOT called on the first entry all items are looped through and it
+    //      works as intended. A thing that works 99 percent of the time is way more dangerous than
+    //      something that always fails.
     void Remove()
     {
       if(IsEnd()){ return; }
