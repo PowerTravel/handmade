@@ -147,6 +147,7 @@ out vec2  texCoord;\n\
 void main()\n\
 {\n\
 \n\
+  gl_PointSize = 10.0;\n\
 // Variable Descriptions:\n\
 // N [Normal Vector], Object Space\n\
 // L [Light Vector] Unit vector of vertex to light in world space;\n\
@@ -390,7 +391,7 @@ void LoadTexture( bitmap* RenderTarget )
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST ); // Just take nearest
 
   // Wrapping textures, (Mirror. Repeat border color, clamp, repeat etc... )
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
 }
 
@@ -403,7 +404,37 @@ v4 Blend(v4* A, v4* B)
   return Result;
 }
 
-void PushGeometryToOpenGL( game_render_commands* Commands, component_mesh* Mesh)
+void PushColliderMeshToOpenGL( game_render_commands* Commands, collider_mesh* Mesh)
+{
+  u32 NrIndeces  = Mesh->nvi;
+
+  Assert(Commands->TemporaryMemory.IsEmpty());
+
+  u32 MemoryNeeded = NrIndeces * (sizeof(opengl_vertex) + sizeof(u32));
+
+  Assert( MemoryNeeded <= Commands->TemporaryMemory.Remaining() );
+
+  u8* const VertexMemory =  Commands->TemporaryMemory.GetTail();
+  for( u32 Index = 0; Index < NrIndeces; ++Index )
+  {
+    opengl_vertex* VertexData = (opengl_vertex*) Commands->TemporaryMemory.GetMemory(sizeof(opengl_vertex));
+    u32 VecIndex  = Mesh->vi[Index];
+    VertexData->v = Mesh->v[VecIndex];
+  }
+
+  u8* const IndexMemory =  Commands->TemporaryMemory.GetTail();
+  for( u32 Index = 0; Index < NrIndeces; ++Index )
+  {
+    u32* IndexData = (u32*) Commands->TemporaryMemory.GetMemory(sizeof(u32));
+    *IndexData = Index;
+  }
+
+  OpenGLSendMeshToGPU(  &Mesh->VAO, NrIndeces, (u32*) IndexMemory, (opengl_vertex*) VertexMemory );
+
+  Commands->TemporaryMemory.Clear();
+}
+
+void PushMeshToOpenGL( game_render_commands* Commands, component_mesh* Mesh)
 {
   mesh_data* MeshData  = Mesh->Data;
   mesh_indeces Indeces = Mesh->Indeces;
@@ -449,9 +480,24 @@ void PushGeometryToOpenGL( game_render_commands* Commands, component_mesh* Mesh)
   Commands->TemporaryMemory.Clear();
 }
 
+bitmap GetEmptyBitmap()
+{
+  local_persist bitmap EmptyBitmap = {};
+  u8 WhitePixel[4] = {255,255,255,255};
+  EmptyBitmap.Width  = 1;
+  EmptyBitmap.Height = 1;
+  EmptyBitmap.Pixels = (void*) WhitePixel;
+  return EmptyBitmap;
+}
 internal void
 OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 WindowHeight )
 {
+  local_persist bitmap EmptyBitmap = {};
+  u8 WhitePixel[4] = {255,255,255,255};
+  EmptyBitmap.Width  = 1;
+  EmptyBitmap.Height = 1;
+  EmptyBitmap.Pixels = (void*) WhitePixel;
+
   render_push_buffer* RenderPushBuffer = (render_push_buffer*) Commands->RenderMemory.GetBase();
 
   if(!Commands->RenderProgram3D.Program)
@@ -466,6 +512,8 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
   glEnable(GL_TEXTURE_2D);
   // Cull triangles which normal is not towards the camera
   glEnable(GL_CULL_FACE);
+  // Activates the gl_PointSize = 10.0; variable in the shader
+  glEnable(GL_PROGRAM_POINT_SIZE);
 
   // Accept fragment if it closer to the camera than the former one
   glDepthFunc(GL_LESS);
@@ -519,11 +567,9 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
         glUniformMatrix4fv(Prog->M,  1, GL_TRUE, MeshEntry->M.E);
         glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, MeshEntry->NM.E);;
 
-        glDisable( GL_TEXTURE_2D );
-
         if(!MeshEntry->Mesh->VAO)
         {
-          PushGeometryToOpenGL(Commands, MeshEntry->Mesh);
+          PushMeshToOpenGL(Commands, MeshEntry->Mesh);
         }
 
         if( MeshEntry->Surface )
@@ -541,12 +587,8 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
             LoadTexture(Material->DiffuseMap);
             AmbientColor = V4(0,0,0,1);
           }else{
-            local_persist bitmap EmptyBitmap = {};
-            u8 WhitePixel[4] = {255,255,255,255};
-            EmptyBitmap.Width  = 1;
-            EmptyBitmap.Height = 1;
-            EmptyBitmap.Pixels = (void*) WhitePixel;
-            LoadTexture(&EmptyBitmap);
+            bitmap Bitmap = GetEmptyBitmap();
+            LoadTexture(&Bitmap);
           }
 
           glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
@@ -598,23 +640,83 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 
           OpenGLSendMeshToGPU(  &TileVAO, NrIndeces, idx, v );
         }
+
         LoadTexture(Tile->Bitmap);
         glUniformMatrix4fv(Prog->M,  1, GL_TRUE, Tile->M.E);
         glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, M4Identity().E);
         glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, Tile->TM.E);
-        glUniform4fv( Prog->ambientProduct,  1, V4(0,0,0,1).E);
+        glUniform4fv( Prog->ambientProduct,  1, V4(1,1,1,1).E);
         glUniform4fv( Prog->diffuseProduct,  1, V4(1,1,1,1).E);
         glUniform4fv( Prog->specularProduct, 1, V4(1,1,1,1).E);
         glUniform1f(  Prog->shininess, 1);
 
         OpenGLDraw( TileVAO, 6 );
       }break;
+      case render_type::WIREBOX:
+      {
+        entry_type_wirebox* WireBox = (entry_type_wirebox*) Body;
+        if(!WireBox->Mesh->VAO)
+        {
+          PushColliderMeshToOpenGL( Commands, WireBox->Mesh );
+        }
+        LoadTexture(&EmptyBitmap);
+        glUniformMatrix4fv(Prog->M,  1, GL_TRUE, WireBox->M.E);
+        glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, M4Identity().E);
+        glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, M4Identity().E);
+        glUniform4fv( Prog->ambientProduct,  1, V4(1,1,1,1).E);
+        glUniform4fv( Prog->diffuseProduct,  1, V4(1,1,1,1).E);
+        glUniform4fv( Prog->specularProduct, 1, V4(1,1,1,1).E);
+        glUniform1f(  Prog->shininess, 1);
+
+        glBindVertexArray( WireBox->Mesh->VAO );
+        glDrawElements( GL_LINES, WireBox->Mesh->nvi, GL_UNSIGNED_INT, (void*)0);
+        glBindVertexArray(0);
+        break;
+      }
+    }
+  }
+
+  // Here we do overlays so clear GL_DEPTH_BUFFER_BIT
+  glClear(GL_DEPTH_BUFFER_BIT);
+  for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
+  {
+    u8* Head = (u8*) Entry;
+    u8* Body = Head + sizeof(push_buffer_header);
+    switch(Entry->Type)
+    {
+
+      case render_type::POINT:
+      {
+        entry_type_point* Point = (entry_type_point*) Body;
+        local_persist u32 PointVao = 0;
+        if(!PointVao)
+        {
+          u32 NrIndeces = 1;
+          u32 idx = 0;
+          opengl_vertex v = {};
+          r32 length = 0.5;
+          v.v = V3(0,0,0);
+          v.vn = V3(0,0,1);
+          v.vt = V2(0,0);
+          OpenGLSendMeshToGPU(&PointVao, NrIndeces, &idx, &v );
+        }
+        LoadTexture(&EmptyBitmap);
+        glUniformMatrix4fv(Prog->M,  1, GL_TRUE, Point->M.E);
+        glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, M4Identity().E);
+        glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, M4Identity().E);
+        glUniform4fv( Prog->ambientProduct,  1, V4(1,1,1,1).E);
+        glUniform4fv( Prog->diffuseProduct,  1, V4(1,1,1,1).E);
+        glUniform4fv( Prog->specularProduct, 1, V4(1,1,1,1).E);
+        glUniform1f(  Prog->shininess, 1);
+
+        //glClear(GL_DEPTH_BUFFER_BIT);
+        glBindVertexArray( PointVao );
+        glDrawElements( GL_POINTS, 1, GL_UNSIGNED_INT, (void*)0);
+        glBindVertexArray(0);
+      }break;
     }
   }
 }
-
-
-
 #if 1
 
 internal void DisplayBitmapViaOpenGL( u32 Width, u32 Height, void* Memory )

@@ -6,6 +6,8 @@
 
 struct collider_mesh
 {
+  u32 VAO;
+
   u32 nv;   // Nr Vertices
   u32 nvi;  // 3 times nr Vertice Indeces (CCW Triangles)
 
@@ -18,6 +20,8 @@ struct component_collider
   // Always in Model Space
   collider_mesh* Mesh;
   aabb3f AABB;
+  b32 IsColliding;
+  v3 CollisionPoint;
 };
 
 void SetAABBFromColliderMesh( component_collider* Collider )

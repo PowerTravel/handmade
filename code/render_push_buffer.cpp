@@ -125,6 +125,27 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         Body->M = Entity->SpatialComponent->ModelMatrix;// * SpriteOffset * SpriteSize;
       }
     }
+
+    if( Entity->Types & COMPONENT_TYPE_COLLIDER  )
+    {
+      {
+        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+        Header->Type = render_type::WIREBOX;
+
+        entry_type_wirebox* Body = (entry_type_wirebox*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_wirebox));
+        Body->M = Entity->SpatialComponent->ModelMatrix;
+        Body->Mesh = Entity->ColliderComponent->Mesh;
+      }
+      if(Entity->ColliderComponent->IsColliding)
+      {
+        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+        Header->Type = render_type::POINT;
+
+        entry_type_point* Body = (entry_type_point*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_point));
+        Body->M = Entity->SpatialComponent->ModelMatrix * GetTranslationMatrix( V4(Entity->ColliderComponent->CollisionPoint,1));
+      }
+    }
+
   }
 
   // Get Position from Entity->CameraComponent->V

@@ -5,8 +5,19 @@ gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
             const m4* BModelMat, const collider_mesh* BMesh, const v3 Direction )
 {
   gjk_support Result = {};
+  v3 NormalizedDirection = Normalize(Direction);
 
-  v4 ADirModelSpace = RigidInverse(*AModelMat) * V4(Direction,0);
+#if 0
+  v4 ADirModelSpace =  RigidInverse(*AModelMat) * V4( NormalizedDirection, 0);
+  v4 BDirModelSpace = (RigidInverse(*BModelMat) * V4(-NormalizedDirection, 0));
+#else
+
+  // This is needed when transforming covectors, Do we need it here?
+  // Since what we pass into here is normals to planes and lines I think we need the transpose.
+  v4 ADirModelSpace = RigidInverse(Transpose(RigidInverse(*AModelMat))) * V4( NormalizedDirection,0);
+  v4 BDirModelSpace = RigidInverse(Transpose(RigidInverse(*BModelMat))) * V4(-NormalizedDirection,0);
+#endif
+
   r32 AMaxValue     = 0;
   v4 SupportA       = {};
   for(u32 i = 0; i < AMesh->nv; ++i)
@@ -20,7 +31,6 @@ gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
     }
   }
 
-  v4 BDirModelSpace = (RigidInverse(*BModelMat) * V4(-Direction,0));
   r32 BMaxValue     = 0;
   v4 SupportB       = {};
   for(u32 i = 0; i < BMesh->nv; ++i)
@@ -36,23 +46,11 @@ gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
 
   Result.A = V3(SupportA);
   Result.B = V3(SupportB);
-
   Result.S =  V3(*AModelMat * SupportA) - V3(*BModelMat * SupportB);
 
   return Result;
 
 }
-
-
-/* A Tetrahedron is made up of 4 Points assembling into 4 Triangles.
- * The normals of the triangles should point outwards.
- * This function Fixes the winding of the tetrahedron such that
- * Dot( v03, Cross( v01, v02 )) < 0; (Tripple Product)
- * Or in words: Define the bottom triangle to be {p0,p1,p2} with Normal : (p1-p0) x (p2-p0).
- * The Tetrahedron is then considered wound CCW if Dot( p3-p0 , Normal ) < 0.
- * If Dot( p3-p0 , Normal ) == 0 Our p3 lies on the plane of the bottom triangle and
- * we need another point to  be p3.
- */
 
 void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
                     const m4* BModelMat, const collider_mesh* BMesh,
@@ -90,7 +88,7 @@ void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
 
       const v3 LineVector = Simplex.SP[1].S - Simplex.SP[0].S;
 
-      // Find leas significant axis
+      // Find least significant axis
       r32 LineVecPart = Abs(LineVector.X);
       u32 LineVecAxis = 0;
       if(LineVecPart > Abs(LineVector.Y))
@@ -125,14 +123,17 @@ void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
     }
     case 3:
     {
-      const v3 v0 = Simplex.SP[1].S - Simplex.SP[0].S;
-      const v3 v1 = Simplex.SP[2].S - Simplex.SP[0].S;
-      const v3 SearchDirection = CrossProduct(v0,v1);
+      const v3 p0 = Simplex.SP[1].S - Simplex.SP[0].S;
+      const v3 p1 = Simplex.SP[2].S - Simplex.SP[0].S;
+      const v3 SearchDirection = CrossProduct(p0,p1);
 
       gjk_support Support = CsoSupportFunction( AModelMat, AMesh,
                                             BModelMat, BMesh,
                                             SearchDirection );
-      if(Norm(Support.S) <= 10E-4)
+      const v3 p2 = Support.S - Simplex.SP[0].S;
+
+      r32 Det = p2 * CrossProduct(p0,p1);
+      if(Det <= 10E-4)
       {
         Support = CsoSupportFunction( AModelMat, AMesh,
                                   BModelMat, BMesh,
@@ -283,6 +284,17 @@ IsVertexInsideTetrahedron( const v3& Vertex, const u32 TriangleIndeces[], const 
   return true;
 }
 
+
+/* A Tetrahedron is made up of 4 Points assembling into 4 Triangles.
+ * The normals of the triangles should point outwards.
+ * This function Fixes the winding of the tetrahedron such that
+ * Dot( v03, Cross( v01, v02 )) < 0; (Tripple Product)
+ * Or in words: Define the bottom triangle to be {p0,p1,p2} with Normal : (p1-p0) x (p2-p0).
+ * The Tetrahedron is then considered wound CCW if Dot( p3-p0 , Normal ) < 0.
+ * If Dot( p3-p0 , Normal ) == 0 Our p3 lies on the plane of the bottom triangle and
+ * we need another point to  be p3.
+ */
+
 bool FixWindingCCW(gjk_simplex* Simplex)
 {
   // Fix Winding so that all triangles go ccw
@@ -344,7 +356,7 @@ VertexTetrahedron( const v3& Vertex, gjk_simplex& Simplex )
   u32 TriangleIndex0 = TriangleIndeces[0];
   u32 TriangleIndex1 = TriangleIndeces[1];
   u32 TriangleIndex2 = TriangleIndeces[2];
-  for(u32 Index = 1; Index < 3; ++Index)
+  for(u32 Index = 1; Index < 4; ++Index)
   {
     u32 BaseIndex = 3*Index;
     const gjk_partial_result ResultCandidate =
@@ -375,7 +387,44 @@ VertexTetrahedron( const v3& Vertex, gjk_simplex& Simplex )
   return Result;
 }
 
-void DEBUG_GJKCollisionDetectionSequenceToFile(gjk_simplex& Simplex, b32 append,
+
+internal b32
+IsPointOnSimplexSurface(const gjk_simplex& Simplex, const v3& Point)
+{
+  r32 Tol = 10E-7;
+  switch(Simplex.Dimension)
+  {
+    case 1:
+    {
+      // Check if new point is the same as old point
+      return Point == Simplex.SP[0].S;
+    }break;
+    case 2:
+    {
+      // Check if new point lies on the line
+      const v3& v0 = Simplex.SP[1].S - Simplex.SP[0].S;
+      const v3& v1 = Point - Simplex.SP[0].S;
+      const v3& cross = CrossProduct(v0,v1);
+      const r32 lenSq = (cross.X*cross.X + cross.Y*cross.Y + cross.Z*cross.X);
+      return Abs(lenSq) < Tol;
+    }break;
+    case 3:
+    {
+      // Check if new point lies on face
+      const v3& v0 = Simplex.SP[1].S - Simplex.SP[0].S;
+      const v3& v1 = Simplex.SP[2].S - Simplex.SP[0].S;
+      const v3& v2 = Point - Simplex.SP[0].S;
+      const r32 det = v2 * CrossProduct(v0,v1);
+      return Abs(det) < Tol;
+    }break;
+  }
+
+  return false;
+}
+
+void DEBUG_GJKCollisionDetectionSequenceToFile(gjk_simplex& Simplex,
+                                               gjk_partial_result* Partial,
+                                               b32 append,
                                                memory_arena* TemporaryArena,
                                                platform_api* API)
 {
@@ -395,17 +444,27 @@ void DEBUG_GJKCollisionDetectionSequenceToFile(gjk_simplex& Simplex, b32 append,
     *Scanner++ = '\n';
   }
 
-  if(Simplex.Dimension)
+  if(Partial)
   {
-    Scanner += str::itoa(-1, 64, Scanner);
+    Scanner += str::itoa(Simplex.Dimension+1, 64, Scanner);
     *Scanner++ = ' ';
-    Scanner = PaddWithZeros(3, Scanner);
-    *Scanner++ = '\n';
+    Scanner += str::ToString(Partial->ClosestPoint, 4, 64, Scanner);
+  }else{
+    Scanner += str::itoa(Simplex.Dimension+1, 64, Scanner);
+    *Scanner++ = ' ';
+    Scanner += str::ToString(V3(0,0,0), 4, 64, Scanner);
   }
 
   thread_context Thread = {};
   if(append)
   {
+    if(Simplex.Dimension)
+    {
+      Scanner += str::itoa(-1, 64, Scanner);
+      *Scanner++ = ' ';
+      Scanner = PaddWithZeros(3, Scanner);
+      *Scanner++ = '\n';
+    }
     API->DEBUGPlatformAppendToFile(&Thread, FilePath, str::StringLength(DebugString), (void*)DebugString);
   }else{
     API->DEBUGPlatformWriteEntireFile(&Thread, FilePath, str::StringLength(DebugString), (void*)DebugString);
@@ -419,32 +478,31 @@ gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_m
                                            const m4* BModelMat, const collider_mesh* BMesh,
                                            memory_arena* TemporaryArena, platform_api* API )
 {
+  //API = 0;
   const v3 Origin = V3(0,0,0);
   gjk_collision_result Result = {};
   gjk_simplex& Simplex = Result.Simplex;
 
   gjk_partial_result PartialResult = {};
   PartialResult.ClosestPoint = V3(1,0,0);
-  DEBUG_GJKCollisionDetectionSequenceToFile(Simplex, false, TemporaryArena, API);
+  //DEBUG_GJKCollisionDetectionSequenceToFile(Simplex, PartialResult, false, TemporaryArena, API);
   while(true)
   {
     r32 PreviousDistance = PartialResult.Distance;
     // Add a CSO to the simplex
     gjk_support SupportPoint = CsoSupportFunction( AModelMat, AMesh, BModelMat, BMesh, Origin-PartialResult.ClosestPoint );
     Assert(Simplex.Dimension <= 3);
-    for(u32 i = 0; i < Simplex.Dimension; ++i)
+    if(IsPointOnSimplexSurface(Simplex, SupportPoint.S))
     {
-      if(SupportPoint.S == Simplex.SP[i].S)
-      {
-        // If we start adding duplicate points
-        // we are not going to get closer to the origin.
-        // Thus we return the Simplex
-        return Result;
-      }
+      // If we start adding degenerate points
+      // we are not going to get closer to the origin.
+      // Thus we return the Simplex
+      return Result;
     }
 
+    DEBUG_GJKCollisionDetectionSequenceToFile(Simplex, 0, false, TemporaryArena, API);
     Simplex.SP[Simplex.Dimension++] = SupportPoint;
-    DEBUG_GJKCollisionDetectionSequenceToFile(Simplex, true, TemporaryArena, API);
+    DEBUG_GJKCollisionDetectionSequenceToFile(Simplex, 0, false, TemporaryArena, API);
     switch(Simplex.Dimension)
     {
       case 1:
@@ -472,6 +530,8 @@ gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_m
         INVALID_CODE_PATH
       }
     }
+
+    DEBUG_GJKCollisionDetectionSequenceToFile(Simplex, &PartialResult, false, TemporaryArena, API);
 
     if(PartialResult.Reduced)
     {

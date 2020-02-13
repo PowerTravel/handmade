@@ -35,31 +35,14 @@ while idx < nRow
 	maxVal = max(max(vertices)) + border;
 	axis([minVal, maxVal, minVal, maxVal, minVal, maxVal]);
 
-	fh = polytype(idx,:)
+	fh = polytype(idx,:);
 	fstart = idx+1;
 	fstop  = fstart+fh(2)-1;
 	idx = fstop+1;
 
-	faces = polytype(fstart:fstop, 2:nCol)
+	faces = polytype(fstart:fstop, 2:nCol);
 
 	draw_simplex(vertices,faces, 'cyan');
-%	if (idx < nRow)
-%		if (polytype(idx,1) == 3)
-%			rfh = polytype(idx,:)
-%			rfhstart = idx+1;
-%			rfhstop = rfhstart + rfh(2) - 1;
-%			rfidx = polytype(rfhstart:rfhstop, 1)
-%			removedFaces = faces(rfidx,:)
-%			faces(rfidx,:) = []
-%			draw_simplex(vertices,removedFaces, 'red');
-%			draw_simplex(vertices,faces, 'cyan');
-%			idx = rfhstop + 1;
-%		else
-%			draw_simplex(vertices,faces, 'cyan');
-%		end
-%	end
-
-
 
 	if(newvidx~=0)
 

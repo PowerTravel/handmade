@@ -82,6 +82,8 @@
 #define GL_DYNAMIC_READ                   0x88E9
 #define GL_DYNAMIC_COPY                   0x88EA
 
+#define GL_PROGRAM_POINT_SIZE             0x8642
+
 #include "vector_math.h"
 
 struct opengl_vertex

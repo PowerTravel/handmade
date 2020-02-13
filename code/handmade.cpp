@@ -86,10 +86,10 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
 
         // Uncomment this and set j < 1 in the for loop to reproduce a bug where
         // GJK perodically does not find a collision.
-        Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,1,1), cubeEntity->SpatialComponent );
-        //Put( V3(2.1f*i-0.5f, 2.f*j, 2.1f*k-0.5f), 0, V3(0,0,0), cubeEntity->SpatialComponent );
+        Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,2,1), cubeEntity->SpatialComponent );
+        //Put( V3(2.1f*i-0.1f, 2.f*j, 2.1f*k-0.1f), Pi32/4.f, V3(0,1,0), cubeEntity->SpatialComponent );
         cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
-        cubeEntity->DynamicsComponent->AngularVelocity = V3(0,1,0);
+        cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0.5,0);
         cubeEntity->DynamicsComponent->Mass = 1;
       }
     }

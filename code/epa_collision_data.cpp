@@ -12,7 +12,7 @@ struct epa_vertex
   u32 Idx;
   gjk_support P;
   epa_halfedge* OutgoingEdge;
-  epa_vertex* Previous;
+  epa_vertex* Next;
 };
 
 struct epa_halfedge
@@ -28,7 +28,7 @@ struct epa_face
   u32 Idx;
   v3 Normal;
   epa_halfedge* Edge;
-  epa_face* Previous;
+  epa_face* Next;
 };
 
 struct epa_mesh
@@ -145,7 +145,7 @@ internal void DebugPrintEdges(memory_arena* Arena, epa_mesh* Mesh, b32 Append, p
   while(Face)
   {
     ++FaceCount;
-    Face = Face->Previous;
+    Face = Face->Next;
   }
 
   temporary_memory TempMem = BeginTemporaryMemory(Arena);
@@ -172,7 +172,7 @@ internal void DebugPrintEdges(memory_arena* Arena, epa_mesh* Mesh, b32 Append, p
       Scanner += str::ToString(To, 4, 64, Scanner);
       *Scanner++ = '\n';
     }
-    Face = Face->Previous;
+    Face = Face->Next;
   }
 
   thread_context Thread = {};
@@ -219,7 +219,7 @@ PushVertex(epa_mesh* Mesh)
 {
   epa_vertex* NewVertex = (epa_vertex*) PushStruct(Mesh->Arena, epa_vertex );
   NewVertex->Idx =  Mesh->VerticeIdxCounter++;
-  NewVertex->Previous = Mesh->Vertices;
+  NewVertex->Next = Mesh->Vertices;
   Mesh->Vertices = NewVertex;
   return NewVertex;
 }
@@ -229,7 +229,7 @@ PushFace(epa_mesh* Mesh)
 {
   epa_face* NewFace = (epa_face*) PushStruct(Mesh->Arena, epa_face );
   NewFace->Idx =  Mesh->FaceIdxCounter++;
-  NewFace->Previous = Mesh->Faces;
+  NewFace->Next = Mesh->Faces;
   Mesh->Faces = NewFace;
   return NewFace;
 }
@@ -317,7 +317,7 @@ CalculateFaceNormals(epa_mesh* Mesh)
   while(Face)
   {
     Face->Normal = GetFaceNormal(Face);
-    Face = Face->Previous;
+    Face = Face->Next;
   }
 }
 
@@ -486,12 +486,12 @@ RemoveFacesSeenByPoint(epa_mesh* Mesh, const v3& Point)
     if( (DotProduct > 0) )//|| PointOnTriangle )
     {
       // Face is now removed from Mesh Face List
-      *FaceListEntry = Face->Previous;
+      *FaceListEntry = Face->Next;
       // And added to the dissconnect list
-      Face->Previous = FacesToDissconnect;
+      Face->Next = FacesToDissconnect;
       FacesToDissconnect = Face;
     }else{
-      FaceListEntry = &(*FaceListEntry)->Previous;
+      FaceListEntry = &(*FaceListEntry)->Next;
     }
   }
 
@@ -533,7 +533,7 @@ RemoveFacesSeenByPoint(epa_mesh* Mesh, const v3& Point)
         DissconectEdge(Edge);
       }
     }
-    FacesToDissconnect = FacesToDissconnect->Previous;
+    FacesToDissconnect = FacesToDissconnect->Next;
   }
 
   epa_vertex** VertexListEntry = &Mesh->Vertices;
@@ -546,13 +546,13 @@ RemoveFacesSeenByPoint(epa_mesh* Mesh, const v3& Point)
     if( Vertex->OutgoingEdge == Vertex->OutgoingEdge->OppositeEdge->NextEdge)
     {
       Assert(!Vertex->OutgoingEdge->LeftFace && !Vertex->OutgoingEdge->OppositeEdge->LeftFace);
-      *VertexListEntry = Vertex->Previous;
+      *VertexListEntry = Vertex->Next;
     }else{
       if(!BorderEdge && IsBorderEdge(Vertex->OutgoingEdge))
       {
         BorderEdge = Vertex->OutgoingEdge;
       }
-      VertexListEntry = &(*VertexListEntry)->Previous;
+      VertexListEntry = &(*VertexListEntry)->Next;
     }
   }
   return BorderEdge;
@@ -595,7 +595,7 @@ IsPointOnMeshSurface(epa_mesh* Mesh, const v3& Point)
         return true;
       }
     }
-    Face = Face->Previous;
+    Face = Face->Next;
   }
   return false;
 }
@@ -629,7 +629,7 @@ GetCLosestFaceToOrigin(epa_mesh* Mesh, r32* ResultDistance )
       *ResultDistance = DistanceToFace;
       ResultFace = Face;
     }
-    Face = Face->Previous;
+    Face = Face->Next;
   }
   return ResultFace;
 }

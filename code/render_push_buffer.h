@@ -12,7 +12,8 @@ enum class render_type
   MESH,
   SPRITE,
   TILE,
-  WIREBOX
+  WIREBOX,
+  POINT
 };
 
 struct entry_type_light
@@ -29,6 +30,11 @@ struct entry_type_mesh
   m4 NM;
 };
 
+struct entry_type_point
+{
+  m4 M;
+};
+
 struct entry_type_sprite
 {
   bitmap* Bitmap;
@@ -40,7 +46,8 @@ typedef entry_type_sprite entry_type_map_tile;
 
 struct entry_type_wirebox
 {
-  rect2f Rect;
+  m4 M;
+  collider_mesh* Mesh;
 };
 
 struct push_buffer_header
