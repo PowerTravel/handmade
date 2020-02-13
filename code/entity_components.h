@@ -1,8 +1,7 @@
-#ifndef ENTITY_COMPONENTS_H
-#define ENTITY_COMPONENTS_H
+#pragma once
 
 static s32 EntityID = 0;
-
+#if 1
 #include "component_camera.h"
 #include "component_controller.h"
 #include "component_light.h"
@@ -12,6 +11,20 @@ static s32 EntityID = 0;
 #include "component_dynamics.h"
 #include "component_surface.h"
 #include "component_sprite_animation.h"
+
+#include "component_gjk_epa_visualizer.h"
+#else
+struct component_camera;
+struct component_controller;
+struct component_light;
+struct component_mesh;
+struct component_spatial;
+struct component_collider;
+struct component_dynamics;
+struct component_surface;
+struct component_sprite_animation;
+struct component_gjk_epa_visualizer;
+#endif
 
 struct entity
 {
@@ -28,6 +41,7 @@ struct entity
   component_surface*          SurfaceComponent;
   component_sprite_animation* SpriteAnimationComponent;
 
+  component_gjk_epa_visualizer*   GjkEpaVisualizerComponent;
 };
 
 enum component_types
@@ -42,8 +56,6 @@ enum component_types
   COMPONENT_TYPE_DYNAMICS           = 0x0040,
   COMPONENT_TYPE_SURFACE            = 0x0080,
   COMPONENT_TYPE_SPRITE_ANIMATION   = 0x0100,
-  COMPONENT_TYPE_FINAL              = 0x0200
+  COMPONENT_TYPE_GJK_EPA_VISUALIZER = 0x0200,
+  COMPONENT_TYPE_FINAL              = 0x0400
 };
-
-
-#endif // ENTITY_COMPONENT_H

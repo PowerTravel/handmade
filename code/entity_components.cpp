@@ -1,15 +1,4 @@
-
 #include "entity_components.h"
-
-#include "component_camera.h"
-#include "component_controller.h"
-#include "component_light.h"
-#include "component_mesh.h"
-#include "component_spatial.h"
-#include "component_collider.h"
-#include "component_dynamics.h"
-#include "component_surface.h"
-#include "component_sprite_animation.h"
 
 #include "utility_macros.h"
 
@@ -70,6 +59,10 @@ void NewComponents( world* World, entity* Entity, u32 EntityFlags )
 	if( EntityFlags & COMPONENT_TYPE_SPRITE_ANIMATION )
 	{
 		Entity->SpriteAnimationComponent = (component_sprite_animation*) PushStruct(&World->Arena, component_sprite_animation);
+	}
+	if( EntityFlags & COMPONENT_TYPE_GJK_EPA_VISUALIZER )
+	{
+		Entity->GjkEpaVisualizerComponent = (component_gjk_epa_visualizer*) PushStruct(&World->Arena, component_gjk_epa_visualizer);
 	}
 }
 
