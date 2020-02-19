@@ -2,21 +2,27 @@
 
 #include "intrinsics.h"
 
+#define DoubleLinkListInitiate( Sentinel ) \
+{                                          \
+  Sentinel->Previous = Sentinel;           \
+  Sentinel->Next = Sentinel;               \
+}
+
 #define DoubleLinkListInsertAfter( Sentinel, Element ) \
-(                                        \
+{                                        \
   Element->Previous = Sentinel;          \
-  Element->Next = Sentinel->Next;        \
   Element->Previous->Next = Element;     \
+  Element->Next = Sentinel->Next;        \
   Element->Next->Previous = Element;     \
-)
+}
 
 #define DoubleLinkListInsertBefore( Sentinel, Element ) \
-(                                         \
+{                                         \
   Element->Previous = Sentinel->Previous; \
-  Element->Next = Sentinel;               \
   Element->Previous->Next = Element;      \
+  Element->Next = Sentinel;               \
   Element->Next->Previous = Element;      \
-)
+}
 
 #define GetAbsoluteMax(a,b) ( Abs(a) > Abs(b) ) ? Abs(a) : Abs(b);
 #define GetAbsoluteMin(a,b) ( Abs(a) < Abs(b) ) ? Abs(a) : Abs(b);

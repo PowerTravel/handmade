@@ -1,5 +1,4 @@
-#ifndef COMPONENT_RENDER_H
-#define COMPONENT_RENDER_H
+#pragma once
 
 struct mesh_data
 {
@@ -26,5 +25,3 @@ struct component_mesh
   mesh_data* Data;
   mesh_indeces Indeces;
 };
-
-#endif // COMPONENT_RENDER_MESH_HPP

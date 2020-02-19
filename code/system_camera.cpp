@@ -31,6 +31,7 @@ void UpdateViewMatrix(  component_camera* Camera )
 	Camera->DeltaPos = V3( 0, 0, 0 );
 }
 
+// This is a broken function
 void UpdateViewMatrixAngularMovement(  component_camera* Camera )
 {
 	m4 CamToWorld = RigidInverse( Camera->V );

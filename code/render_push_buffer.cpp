@@ -1,6 +1,9 @@
 #include "render_push_buffer.h"
 
-//#define GetRenderCommandsTail( RenderCommands ) ( RenderCommands->PushBuffer + RenderCommands->PushBufferSize )
+#include "component_camera.h"
+#include "component_surface.h"
+#include "component_light.h"
+#include "component_collider.h"
 
 push_buffer_header* PushNewHeader(game_render_commands* RenderCommands, push_buffer_header** PreviousEntry)
 {
@@ -44,7 +47,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
   // TODO: Make a proper entity library so we can extracl for example ALL Lights efficiently
   //       So we don't have to loop over ALL entitis several times
 
-  // First push camera
+  // Then push all the lights and camera
   for(u32 Index = 0; Index <  World->NrEntities; ++Index )
   {
     entity* Entity = &World->Entities[Index];
@@ -55,12 +58,6 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       PushBuffer->ViewMatrix       = Entity->CameraComponent->V;
       break;
     }
-  }
-
-  // Then push all the lights
-  for(u32 Index = 0; Index <  World->NrEntities; ++Index )
-  {
-    entity* Entity = &World->Entities[Index];
 
     if( (Entity->Types & COMPONENT_TYPE_LIGHT) &&
       (Entity->Types & COMPONENT_TYPE_SPATIAL) )
@@ -79,27 +76,32 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
     entity* Entity = &World->Entities[Index];
 
     if( (Entity->Types & COMPONENT_TYPE_MESH ) &&
-      (Entity->Types & COMPONENT_TYPE_SPATIAL) )
+        (Entity->Types & COMPONENT_TYPE_SPATIAL) )
     {
       push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-      Header->Type = render_type::MESH;
-      entry_type_mesh* Body = (entry_type_mesh*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_mesh));
+      Header->Type = render_type::TRIANGLE_BUFFER;
+      Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
+      entry_type_triangle_buffer* Body = (entry_type_triangle_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_triangle_buffer));
       Body->Mesh    = Entity->MeshComponent;
       Body->Surface = Entity->SurfaceComponent;
-      Body->M  = Entity->SpatialComponent->ModelMatrix;
-      Body->NM = Transpose(RigidInverse(Body->M));
+      Body->M       = Entity->SpatialComponent->ModelMatrix;
+      Body->NM      = Transpose(RigidInverse(Body->M));
     }
 
     if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
     {
       push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-      Header->Type = render_type::TILE;
+      Header->Type = render_type::QUAD;
+      Header->RenderState = RENDER_STATE_FILL;
 
-      entry_type_sprite* Body = (entry_type_sprite*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_sprite));
+      entry_type_quad* Body      = (entry_type_quad*)   RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_quad));
+      component_surface* Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+      Surface->Material          = (material*)          RenderCommands->RenderMemory.GetMemory(sizeof(material));
+      SetMaterial(Surface->Material, MATERIAL_WHITE);
+      Surface->Material->DiffuseMap = Entity->SpriteAnimationComponent->Bitmap;
+      Body->Surface        = Surface;
 
-      // Store only the sprite to be displayed for current frame
-      Body->Bitmap = Entity->SpriteAnimationComponent->Bitmap;
-      Body->M = M4Identity();
+      Body->M  = M4Identity();
       Body->TM = Entity->SpriteAnimationComponent->ActiveSeries->Get();
 
       if(Entity->SpriteAnimationComponent->InvertX)
@@ -122,32 +124,69 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       }
       if( Entity->Types & COMPONENT_TYPE_SPATIAL )
       {
-        Body->M = Entity->SpatialComponent->ModelMatrix;// * SpriteOffset * SpriteSize;
+        Body->M = Entity->SpatialComponent->ModelMatrix;
       }
     }
 
+    // Here we wanna do a wire frame and collision points
     if( Entity->Types & COMPONENT_TYPE_COLLIDER  )
     {
       {
         push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-        Header->Type = render_type::WIREBOX;
+        Header->Type = render_type::TRIANGLE_BUFFER;
+        Header->RenderState = RENDER_STATE_WIREFRAME;
+        entry_type_triangle_buffer* Body = (entry_type_triangle_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_triangle_buffer));
+        Body->ColliderMesh  = Entity->ColliderComponent->Mesh;
 
-        entry_type_wirebox* Body = (entry_type_wirebox*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_wirebox));
+        component_surface* Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+        Surface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+        SetMaterial(Surface->Material, MATERIAL_JADE);
+        Body->Surface = Surface;
         Body->M = Entity->SpatialComponent->ModelMatrix;
-        Body->Mesh = Entity->ColliderComponent->Mesh;
+        Body->NM = Transpose(RigidInverse(Body->M));
       }
-      if(Entity->ColliderComponent->IsColliding)
-      {
-        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-        Header->Type = render_type::POINT;
-
-        entry_type_point* Body = (entry_type_point*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_point));
-        Body->M = Entity->SpatialComponent->ModelMatrix * GetTranslationMatrix( V4(Entity->ColliderComponent->CollisionPoint,1));
-      }
+//      if(Entity->ColliderComponent->IsColliding)
+//      {
+//        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+//        Header->Type = render_type::POINT;
+//        entry_type_point* Body = (entry_type_point*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_point));
+//        Body->M = Entity->SpatialComponent->ModelMatrix * GetTranslationMatrix( V4(Entity->ColliderComponent->CollisionPoint,1));
+//      }
     }
 
+    if( Entity->Types & COMPONENT_TYPE_GJK_EPA_VISUALIZER  )
+    {
+//      component_gjk_epa_visualizer* Vis = Entity->GjkEpaVisualizerComponent;
+//      if(Vis->Playback && Vis->ActiveSimplexFrame)
+//      {
+//        // TODO: Come up with a better way to hanle drawing of points/lines/wire frames.
+//        //       Geometry shader?
+//        //       Render States
+//        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+//
+//        if(Vis->ActiveSimplexFrame->Mesh.nv == 1)
+//        {
+//          Header->Type = render_type::POINT;
+//          entry_type_point* Body = (entry_type_point*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_point));
+//          // Translate a point from 0 to pos
+//          Body->M = GetTranslationMatrix(  &Vis->ActiveSimplexFrame->Mesh->v[0], 1 );
+//        }else if(Vis->ActiveSimplexFrame->Mesh.nv == 2)
+//        {
+//          Header->Type = render_type::LINE;
+//          v3 p0 = Vis->ActiveSimplexFrame->Mesh->v[0];
+//          v3 p1 = Vis->ActiveSimplexFrame->Mesh->v[1];
+//          Body->M = Body->M = M4Identity();
+//        }else{
+//          Header->Type = render_type::WIREBOX;
+//          entry_type_wirebox* Body = (entry_type_wirebox*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_wirebox));
+//          Body->M = M4Identity();
+//          Body->Mesh = &Vis->ActiveSimplexFrame->Mesh;
+//          Body->CullFace = true;
+//        }
+//      }
+    }
   }
-
+#if 0
   // Get Position from Entity->CameraComponent->V
   u32 Width = 12;
   u32 Height = 12;
@@ -179,4 +218,5 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       }
     }
   }
+#endif
 }

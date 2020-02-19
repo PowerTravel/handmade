@@ -175,6 +175,7 @@ void SpatialSystemUpdate( world* World, platform_api* API)
 
       if(API)
       {
+        // Print Tree
         s64 RemainingSize = DebugPrintMemorySize + DebugPrintMemory - Scanner;
         Scanner += GetPrintableTree( Arena, &BroadPhaseTree, RemainingSize, Scanner);
         RemainingSize = DebugPrintMemorySize + DebugPrintMemory - Scanner;
@@ -184,15 +185,22 @@ void SpatialSystemUpdate( world* World, platform_api* API)
         Scanner += AABBToString(&zero, 64, Scanner);
         *Scanner++ = '\n';
       }
-
     }
-  }
-  local_persist b32 printed = false;
-  if(API && !printed)
-  {
-    printed = true;
-    thread_context Thread = {};
-    API->DEBUGPlatformWriteEntireFile(&Thread, "..\\handmade\\Tree.m", str::StringLength(DebugPrintMemory), (void*)DebugPrintMemory);
+
+    if( E->Types & COMPONENT_TYPE_GJK_EPA_VISUALIZER)
+    {
+      component_gjk_epa_visualizer* Vis = E->GjkEpaVisualizerComponent;
+      Assert(Vis->A);
+      Assert(Vis->B);
+      Assert(Vis->A->Types & COMPONENT_TYPE_COLLIDER);
+      Assert(Vis->B->Types & COMPONENT_TYPE_COLLIDER);
+      gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
+          &Vis->A->SpatialComponent->ModelMatrix,
+          Vis->A->ColliderComponent->Mesh,
+          &Vis->B->SpatialComponent->ModelMatrix,
+          Vis->B->ColliderComponent->Mesh,
+          Vis);
+    }
   }
 
   broad_phase_result_stack* const BroadPhaseResult = GetCollisionPairs( Arena, &BroadPhaseTree );
@@ -216,16 +224,14 @@ void SpatialSystemUpdate( world* World, platform_api* API)
 
       gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
           &SA->ModelMatrix, CA->Mesh,
-          &SB->ModelMatrix, CB->Mesh, Arena, //API);
-          0);
+          &SB->ModelMatrix, CB->Mesh);
       if(NarrowPhaseResult.ContainsOrigin)
       {
         constraint_data* ConstraintData = (constraint_data*) PushStruct(Arena, constraint_data);
 
         ConstraintData->ContactData = EPACollisionResolution(&World->Arena,  &SA->ModelMatrix, CA->Mesh,
                                                                              &SB->ModelMatrix, CB->Mesh,
-                                                                             NarrowPhaseResult.Simplex,0);
-                                                                             //API);
+                                                                             NarrowPhaseResult.Simplex);
         ConstraintData->AccumulatedLambda = 0;
         ConstraintData->A = A;
         ConstraintData->B = B;

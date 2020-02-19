@@ -25,13 +25,17 @@ struct gjk_collision_result
 };
 
 
+//struct component_gjk_epa_visualizer;
+//void RecordGJKFrame( component_gjk_epa_visualizer* Vis, gjk_simplex* Simplex, const v3& ClosestPointOnSurface );
+
 gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
                                 const m4* BModelMat, const collider_mesh* BMesh, const v3 Direction );
 
+void SetPointsAndIndecesForCCWTetrahedron( gjk_simplex* Simplex, u32 TriangleIndeces[]);
 void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
                     const m4* BModelMat, const collider_mesh* BMesh,
                     gjk_simplex& Simplex);
 
 gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_mesh* AMesh,
                                            const m4* BModelMat, const collider_mesh* BMesh,
-                                          memory_arena* TemporaryArena = 0, platform_api* API = 0);
+                                           component_gjk_epa_visualizer* Vis = 0);

@@ -6,6 +6,7 @@
 #include "entity_components.cpp"
 #include "obj_loader.cpp"
 #include "tiles_spritesheet.hpp"
+//#include "primitive_meshes.cpp"
 
 #include "epa_collision_data.cpp"
 #include "gjk_narrow_phase.cpp"
@@ -51,6 +52,59 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
   }
 }
 
+
+void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
+{
+  game_state* GameState = Memory->GameState;
+  memory_arena* AssetArena = &GameState->AssetArena;
+  memory_arena* TemporaryArena = &GameState->TemporaryArena;
+
+  GameState->World = AllocateWorld(20);
+  world* World = GameState->World;
+
+  GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
+  game_assets* Assets = GameState->World->Assets;
+
+
+  entity* Light = NewEntity( World );
+  NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
+  Light->LightComponent->Color = V4(5,5,5,1);
+  Put( V3(0,3,3), 0, V3(0,1,0), Light->SpatialComponent );
+
+  obj_loaded_file* cube = ReadOBJFile( Thread, GameState,
+         Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
+         Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+         "..\\handmade\\data\\cube\\cube.obj");
+
+  entity* CubeA = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
+  SetMaterial(CubeA->SurfaceComponent->Material, MATERIAL_RED_RUBBER);
+  Put( V3( 3,0,0), 0, V3(0,0,0), CubeA->SpatialComponent );
+  Scale( V3(2, 2, 2),  CubeA->SpatialComponent );
+
+  entity* CubeB = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
+  SetMaterial(CubeB->SurfaceComponent->Material, MATERIAL_BLUE_RUBBER);
+  Put( V3( 3,0,1), 0, V3(0,0,0), CubeB->SpatialComponent );
+  Scale( V3(1, 1, 1),  CubeB->SpatialComponent );
+
+  entity* CsoObject = NewEntity( World );
+  NewComponents( World, CsoObject, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
+  CsoObject->GjkEpaVisualizerComponent->A = CubeA;
+  CsoObject->GjkEpaVisualizerComponent->B = CubeB;
+  CsoObject->GjkEpaVisualizerComponent->Arena = AssetArena;
+  CsoObject->ControllerComponent->Controller = GetController(Input, 1);
+  CsoObject->ControllerComponent->ControllerMappingFunction = EpaGjkVisualizerController;
+
+  entity* ControllableCamera = NewEntity( World );
+  NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
+
+  r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
+  r32 FieldOfView =  90;
+  SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
+  LookAt(ControllableCamera->CameraComponent, 3*V3(0,0,1), V3(0,0,0));
+  ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
+  ControllableCamera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
+}
+
 void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
 {
   game_state* GameState = Memory->GameState;
@@ -69,10 +123,10 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
          Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
          "..\\handmade\\data\\cube\\cube.obj");
 
-    entity* Light = NewEntity( World );
-    NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
-    Light->LightComponent->Color = V4(10,10,10,1);
-    Put( V3(3,3,3), 0, V3(0,1,0), Light->SpatialComponent );
+  entity* Light = NewEntity( World );
+  NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
+  Light->LightComponent->Color = V4(10,10,10,1);
+  Put( V3(3,3,3), 0, V3(0,1,0), Light->SpatialComponent );
 
 
   for (s32 i = -0; i < 1; ++i)
@@ -288,7 +342,8 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
     Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
 
     //Create2DScene(Thread, Memory, RenderCommands, Input );
-    CreateCollisionTestScene(Thread, Memory, RenderCommands, Input );
+    //CreateCollisionTestScene(Thread, Memory, RenderCommands, Input );
+    CreateEpaVisualizerTestScene(Thread, Memory, RenderCommands, Input );
     for (s32 ControllerIndex = 0;
     ControllerIndex < ArrayCount(Input->Controllers);
       ++ControllerIndex)

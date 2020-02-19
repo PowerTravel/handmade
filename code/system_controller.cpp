@@ -97,33 +97,6 @@ void FlyingCameraController( entity* CameraEntity )
     r32 dr = 0.05;
     r32 da = 0.05;
     r32 Length = 3;
-    local_persist b32 AngularMovement = false;
-    local_persist r32 algular_distance = 0;
-    local_persist s32 BufferFrameCount = 0;
-
-    if(Controller->Start.EndedDown)
-    {
-      if(BufferFrameCount == 0)
-      {
-        if(!AngularMovement )
-        {
-          m4 CtoW = RigidInverse(Camera->V);
-          v3 P = V3( Transpose(CtoW).r3 );
-          algular_distance = Norm(P);
-          AngularMovement = true;
-        }else{
-          AngularMovement = false;
-        }
-        BufferFrameCount = 1;
-      }else{
-        ++BufferFrameCount;
-      }
-
-      if(BufferFrameCount > 20)
-      {
-        BufferFrameCount = 0;
-      }
-    }
     if(Controller->LeftStickLeft.EndedDown)
     {
       TranslateCamera( Camera, V3(-dr,0,0));
@@ -207,12 +180,7 @@ void FlyingCameraController( entity* CameraEntity )
 
     if(hasMoved)
     {
-      if(AngularMovement)
-      {
-        UpdateViewMatrixAngularMovement(Camera);
-      }else{
-        UpdateViewMatrix(  Camera );
-      }
+      UpdateViewMatrix(  Camera );
     }
   }
 }

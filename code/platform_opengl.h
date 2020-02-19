@@ -125,7 +125,6 @@ struct opengl_program3D
 	s32 shininess;
 };
 
-
 struct opengl_program2D
 {
 	u32 Program;
@@ -140,7 +139,6 @@ struct opengl_program2D
 struct opengl_buffer_object
 {
 	u32 VertexArrayObject;
-
 	u32 VertexBuffer;
 	u32 UVBuffer;
 	u32 NormalBuffer;

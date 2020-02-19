@@ -1,19 +1,7 @@
 #pragma once
 
 static s32 EntityID = 0;
-#if 1
-#include "component_camera.h"
-#include "component_controller.h"
-#include "component_light.h"
-#include "component_mesh.h"
-#include "component_spatial.h"
-#include "component_collider.h"
-#include "component_dynamics.h"
-#include "component_surface.h"
-#include "component_sprite_animation.h"
 
-#include "component_gjk_epa_visualizer.h"
-#else
 struct component_camera;
 struct component_controller;
 struct component_light;
@@ -24,7 +12,6 @@ struct component_dynamics;
 struct component_surface;
 struct component_sprite_animation;
 struct component_gjk_epa_visualizer;
-#endif
 
 struct entity
 {

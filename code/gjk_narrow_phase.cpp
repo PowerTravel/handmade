@@ -1,5 +1,7 @@
 #include "gjk_narrow_phase.h"
 #include "epa_collision_data.h"
+//#include "component_gjk_epa_visualizer.h"
+#include "utility_macros.h"
 
 gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
             const m4* BModelMat, const collider_mesh* BMesh, const v3 Direction )
@@ -316,8 +318,7 @@ bool FixWindingCCW(gjk_simplex* Simplex)
 }
 
 // Makes Simplex CCW
-internal void
-SetPointsAndIndecesForCCWTetrahedron( gjk_simplex* Simplex, u32 TriangleIndeces[])
+void SetPointsAndIndecesForCCWTetrahedron( gjk_simplex* Simplex, u32 TriangleIndeces[])
 {
   Assert(Simplex->Dimension == 4);
   b32 ZeroDet = !FixWindingCCW(Simplex);
@@ -473,19 +474,84 @@ void DEBUG_GJKCollisionDetectionSequenceToFile(gjk_simplex& Simplex,
   EndTemporaryMemory(TempMem);
 }
 
+void RecordGJKFrame( component_gjk_epa_visualizer* Vis, gjk_simplex* Simplex, const v3& ClosestPointOnSurface )
+{
+  if(!Vis || !Vis->TriggerRecord) return;
+
+  simplex_list* SimplexFrame = (simplex_list*) PushStruct(Vis->Arena, simplex_list);
+  SimplexFrame->ClosestPointOnSurface = ClosestPointOnSurface;
+
+  switch(Simplex->Dimension)
+  {
+    case 1:
+    {
+      SimplexFrame->Mesh.nv  = 1;
+      SimplexFrame->Mesh.nvi = 1;
+      SimplexFrame->Mesh.v   = (v3*)  PushArray(Vis->Arena, SimplexFrame->Mesh.nv, v3);
+      SimplexFrame->Mesh.vi  = (u32*) PushArray(Vis->Arena, SimplexFrame->Mesh.nvi, u32);
+      SimplexFrame->Mesh.v[0]   = Simplex->SP[0].S;
+      SimplexFrame->Mesh.vi[0]  = 0;
+    }break;
+    case 2:
+    {
+      SimplexFrame->Mesh.nv     = 2;
+      SimplexFrame->Mesh.nvi    = 2;
+      SimplexFrame->Mesh.v      = (v3*)  PushArray(Vis->Arena, SimplexFrame->Mesh.nv, v3);
+      SimplexFrame->Mesh.vi     = (u32*) PushArray(Vis->Arena, SimplexFrame->Mesh.nvi, u32);
+      SimplexFrame->Mesh.v[0]   = Simplex->SP[0].S;
+      SimplexFrame->Mesh.v[1]   = Simplex->SP[1].S;
+      SimplexFrame->Mesh.vi[0]  = 0;
+      SimplexFrame->Mesh.vi[1]  = 1;
+    }break;
+    case 3:
+    {
+      SimplexFrame->Mesh.nv  = 3;
+      SimplexFrame->Mesh.nvi = 3;
+      SimplexFrame->Mesh.v   = (v3*)  PushArray(Vis->Arena, SimplexFrame->Mesh.nv, v3);
+      SimplexFrame->Mesh.vi  = (u32*) PushArray(Vis->Arena, SimplexFrame->Mesh.nvi, u32);
+      SimplexFrame->Mesh.v[0]   = Simplex->SP[0].S;
+      SimplexFrame->Mesh.v[1]   = Simplex->SP[1].S;
+      SimplexFrame->Mesh.v[2]   = Simplex->SP[2].S;
+      SimplexFrame->Mesh.vi[0]  = 0;
+      SimplexFrame->Mesh.vi[1]  = 1;
+      SimplexFrame->Mesh.vi[2]  = 2;
+    }break;
+    case 4:
+    {
+      SimplexFrame->Mesh.nv  = 4;
+      SimplexFrame->Mesh.nvi = 12;
+      SimplexFrame->Mesh.v   = (v3*)  PushArray(Vis->Arena, SimplexFrame->Mesh.nv, v3);
+      SimplexFrame->Mesh.vi  = (u32*) PushArray(Vis->Arena, SimplexFrame->Mesh.nvi, u32);
+      SimplexFrame->Mesh.v[0]   = Simplex->SP[0].S;
+      SimplexFrame->Mesh.v[1]   = Simplex->SP[1].S;
+      SimplexFrame->Mesh.v[2]   = Simplex->SP[2].S;
+      SimplexFrame->Mesh.v[3]   = Simplex->SP[3].S;
+      gjk_simplex SimplexCopy = *Simplex;
+      SetPointsAndIndecesForCCWTetrahedron(&SimplexCopy, SimplexFrame->Mesh.vi);
+    }break;
+  }
+
+  if(!Vis->GJKSimplexSeries)
+  {
+    DoubleLinkListInitiate(SimplexFrame);
+    Vis->GJKSimplexSeries = SimplexFrame;
+    Vis->ActiveSimplexFrame = Vis->GJKSimplexSeries;
+  }else{
+    DoubleLinkListInsertBefore(Vis->GJKSimplexSeries, SimplexFrame);
+  }
+}
 
 gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_mesh* AMesh,
                                            const m4* BModelMat, const collider_mesh* BMesh,
-                                           memory_arena* TemporaryArena, platform_api* API )
+                                           component_gjk_epa_visualizer* Vis)
 {
-  //API = 0;
+  b32 ShouldRecord = Vis && Vis->TriggerRecord;
   const v3 Origin = V3(0,0,0);
   gjk_collision_result Result = {};
   gjk_simplex& Simplex = Result.Simplex;
 
   gjk_partial_result PartialResult = {};
   PartialResult.ClosestPoint = V3(1,0,0);
-  //DEBUG_GJKCollisionDetectionSequenceToFile(Simplex, PartialResult, false, TemporaryArena, API);
   while(true)
   {
     r32 PreviousDistance = PartialResult.Distance;
@@ -499,10 +565,7 @@ gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_m
       // Thus we return the Simplex
       return Result;
     }
-
-    DEBUG_GJKCollisionDetectionSequenceToFile(Simplex, 0, false, TemporaryArena, API);
     Simplex.SP[Simplex.Dimension++] = SupportPoint;
-    DEBUG_GJKCollisionDetectionSequenceToFile(Simplex, 0, false, TemporaryArena, API);
     switch(Simplex.Dimension)
     {
       case 1:
@@ -531,18 +594,24 @@ gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_m
       }
     }
 
-    DEBUG_GJKCollisionDetectionSequenceToFile(Simplex, &PartialResult, false, TemporaryArena, API);
+    if(ShouldRecord)
+    {
+      RecordGJKFrame(Vis, &Simplex, PartialResult.ClosestPoint);
+    }
 
     if(PartialResult.Reduced)
     {
       Simplex = PartialResult.ReducedSimplex;
     }
 
-    if( PartialResult.Distance < 10E-7 )
+    Result.ContainsOrigin = (PartialResult.Distance < 10E-7);
+
+    if( Result.ContainsOrigin || (PartialResult.Distance >= PreviousDistance))
     {
-      Result.ContainsOrigin = true;
-      return Result;
-    }else if( PartialResult.Distance >= PreviousDistance){
+      if(Vis)
+      {
+        Vis->TriggerRecord = false;
+      }
       return Result;
     }
   }

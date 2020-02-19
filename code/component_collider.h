@@ -71,11 +71,11 @@ void GetTransformedAABBFromColliderMesh( component_collider* Collider, const m4&
 void
 SetColliderMeshFromAABB( memory_arena* Arena, component_collider* Collider )
 {
-  collider_mesh* ColliderMesh = Collider->Mesh;
-  ColliderMesh->nv  = 8;
-  ColliderMesh->nvi = 36;
-  ColliderMesh->v  = (v3*)  PushArray(Arena,  ColliderMesh->nv, v3);
-  ColliderMesh->vi = (u32*) PushArray(Arena, ColliderMesh->nvi, u32);
+  Collider->Mesh = (collider_mesh*) PushStruct(Arena, collider_mesh);
+  Collider->Mesh->nv  = 8;
+  Collider->Mesh->nvi = 36;
+  Collider->Mesh->v  = (v3*)  PushArray(Arena,  Collider->Mesh->nv, v3);
+  Collider->Mesh->vi = (u32*) PushArray(Arena, Collider->Mesh->nvi, u32);
 
-  GetAABBVertices( &Collider->AABB, ColliderMesh->v, ColliderMesh->vi);
+  GetAABBVertices( &Collider->AABB, Collider->Mesh->v, Collider->Mesh->vi);
 }

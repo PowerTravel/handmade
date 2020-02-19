@@ -1,6 +1,10 @@
 
 #include "render_push_buffer.h"
 #include "affine_transformations.h"
+#include "component_mesh.h"
+#include "component_surface.h"
+#include "component_collider.h"
+#include "component_camera.h"
 #include "string.h"
 #include "bitmap.h"
 
@@ -208,7 +212,7 @@ void main() \n\
 }
 
 void OpenGLSendMeshToGPU( u32* VAO,
-   const u32 NrIndeces, const u32* IndexData, const opengl_vertex* VertexData)
+   const u32 NrIndeces, const u32* IndexData, const u32 NrVertecies, const opengl_vertex* VertexData)
 {
   Assert(VertexData);
   Assert(IndexData);
@@ -226,7 +230,7 @@ void OpenGLSendMeshToGPU( u32* VAO,
   glBindBuffer( GL_ARRAY_BUFFER, DataBuffer);
 
   // Send data to it
-  glBufferData( GL_ARRAY_BUFFER, NrIndeces * sizeof(opengl_vertex), (GLvoid*) VertexData, GL_STATIC_DRAW);
+  glBufferData( GL_ARRAY_BUFFER, NrVertecies * sizeof(opengl_vertex), (GLvoid*) VertexData, GL_STATIC_DRAW);
 
   // Say how to interpret the buffer data
   glEnableVertexAttribArray(0);
@@ -244,6 +248,41 @@ void OpenGLSendMeshToGPU( u32* VAO,
 
   glBindVertexArray(0);
 }
+
+
+void OpenGLSendLineSegmetsToGPU( u32* VAO,
+   const u32 NrLines, const u32* LineData, const u32 NrVertecies, const opengl_vertex* VertexData)
+{
+  Assert(VertexData);
+  Assert(LineData);
+
+  // Generate vao
+  glGenVertexArrays(1, VAO);
+
+  // set it as current one
+  glBindVertexArray(*VAO);
+
+  // Generate a generic buffer
+  GLuint DataBuffer;
+  glGenBuffers(1, &DataBuffer);
+  // Bind the buffer ot the GL_ARRAY_BUFFER slot
+  glBindBuffer( GL_ARRAY_BUFFER, DataBuffer);
+
+  // Send data to it
+  glBufferData( GL_ARRAY_BUFFER, NrVertecies * sizeof(opengl_vertex), (GLvoid*) VertexData, GL_STATIC_DRAW);
+
+  // Say how to interpret the buffer data
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) NULL);
+
+  GLuint LineBuffer;
+  glGenBuffers(1, &LineBuffer);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, LineBuffer);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, NrLines * sizeof(u32), LineData, GL_STATIC_DRAW);
+
+  glBindVertexArray(0);
+}
+
 
 void OpenGLDraw( u32 VertexArrayObject, u32 nrVertecies )
 {
@@ -404,80 +443,144 @@ v4 Blend(v4* A, v4* B)
   return Result;
 }
 
-void PushColliderMeshToOpenGL( game_render_commands* Commands, collider_mesh* Mesh)
+b32 CompareU32Triplet(u8* DataA, u8* DataB)
 {
-  u32 NrIndeces  = Mesh->nvi;
+  u32* U32A = (u32*) DataA;
+  const u32 A1 = *(U32A+0);
+  const u32 A2 = *(U32A+1);
+  const u32 A3 = *(U32A+2);
 
-  Assert(Commands->TemporaryMemory.IsEmpty());
+  u32* U32B = (u32*) DataB;
+  const u32 B1 = *(U32B+0);
+  const u32 B2 = *(U32B+1);
+  const u32 B3 = *(U32B+2);
 
-  u32 MemoryNeeded = NrIndeces * (sizeof(opengl_vertex) + sizeof(u32));
+  return (A1 == B1) && (A2 == B2) && (A3 == B3);
+}
+b32 CompareU32(u8* DataA, u8* DataB)
+{
+  const u32 U32A = *( (u32*) DataA);
+  const u32 U32B = *( (u32*) DataB);
+  return (U32A == U32B);
+}
 
+u32 PushUnique( u8* Array, const u32 ElementCount, const u32 ElementByteSize,
+  u8* NewElement, b32 (*CompareFunction)(u8* DataA, u8* DataB))
+{
+  for( u32 i = 0; i < ElementCount; ++i )
+  {
+    if( CompareFunction(NewElement, Array) )
+    {
+      return i;
+    }
+    Array += ElementByteSize;
+  }
+
+  // If we didn't find the element we push it to the end
+  utils::Copy(ElementByteSize, NewElement, Array);
+
+  return ElementCount;
+}
+
+void PushMeshDataToOpenGL( game_render_commands* Commands, u32* VAO,
+  const u32 IndexSize, const u32* VerticeIndeces, const u32* TextureIndeces, const u32* NormalIndeces,
+  const u32 VerticeDataSize, const v3* VerticeData,
+  const u32 TextureDataSize, const v2* TextureData,
+  const u32 NormalDataSize,  const v3* NormalData)
+{
+  Assert(VerticeIndeces && VerticeDataSize && VerticeData);
+  u32 MemoryNeeded = IndexSize * (sizeof(opengl_vertex) + 4*sizeof(u32));
   Assert( MemoryNeeded <= Commands->TemporaryMemory.Remaining() );
 
-  u8* const VertexMemory =  Commands->TemporaryMemory.GetTail();
-  for( u32 Index = 0; Index < NrIndeces; ++Index )
+  u32* GLVerticeIndexArray = (u32*) Commands->TemporaryMemory.GetMemory(3*IndexSize*sizeof(u32));
+  u32* GLIndexArray        = (u32*) Commands->TemporaryMemory.GetMemory(  IndexSize*sizeof(u32));
+
+  u32 VerticeArrayCount = 0;
+  for( u32 i = 0; i < IndexSize; ++i )
   {
-    opengl_vertex* VertexData = (opengl_vertex*) Commands->TemporaryMemory.GetMemory(sizeof(opengl_vertex));
-    u32 VecIndex  = Mesh->vi[Index];
-    VertexData->v = Mesh->v[VecIndex];
+    const u32 vidx = VerticeIndeces[i];
+    const u32 tidx = TextureIndeces ? TextureIndeces[i] : 0;
+    const u32 nidx = NormalIndeces  ? NormalIndeces[i]  : 0;
+    u32 NewElement[3] = {vidx, tidx, nidx};
+    u32 Index = PushUnique((u8*)GLVerticeIndexArray, VerticeArrayCount, sizeof(NewElement), (u8*) NewElement, CompareU32Triplet);
+    if(Index == VerticeArrayCount)
+    {
+      VerticeArrayCount++;
+    }
+
+  	GLIndexArray[i] = Index;
   }
 
-  u8* const IndexMemory =  Commands->TemporaryMemory.GetTail();
-  for( u32 Index = 0; Index < NrIndeces; ++Index )
+  opengl_vertex* VertexData = (opengl_vertex*) Commands->TemporaryMemory.GetMemory(VerticeArrayCount * sizeof(opengl_vertex));
+  opengl_vertex* Vertice = VertexData;
+  for( u32 i = 0; i < VerticeArrayCount; ++i )
   {
-    u32* IndexData = (u32*) Commands->TemporaryMemory.GetMemory(sizeof(u32));
-    *IndexData = Index;
+    const u32 vidx = *(GLVerticeIndexArray + 3 * i + 0);
+    const u32 tidx = *(GLVerticeIndexArray + 3 * i + 1);
+    const u32 nidx = *(GLVerticeIndexArray + 3 * i + 2);
+    Vertice->v  = VerticeData[vidx];
+    Vertice->vt = TextureData ? TextureData[tidx] : V2(0,0);
+    Vertice->vn = NormalData  ? NormalData[nidx]  : V3(0,0,0);
+    ++Vertice;
   }
-
-  OpenGLSendMeshToGPU(  &Mesh->VAO, NrIndeces, (u32*) IndexMemory, (opengl_vertex*) VertexMemory );
-
+  OpenGLSendMeshToGPU(  VAO, IndexSize, GLIndexArray, VerticeArrayCount, VertexData );
   Commands->TemporaryMemory.Clear();
 }
 
-void PushMeshToOpenGL( game_render_commands* Commands, component_mesh* Mesh)
+
+/*
+void PushLineSegmentsToOpenGL(game_render_commands* Commands, collider_mesh* Mesh)
 {
-  mesh_data* MeshData  = Mesh->Data;
-  mesh_indeces Indeces = Mesh->Indeces;
-
-  u32 NrIndeces  = Indeces.Count;
-
-  Assert(Commands->TemporaryMemory.IsEmpty());
-
-  u32 MemoryNeeded = NrIndeces * (sizeof(opengl_vertex) + sizeof(u32));
-
+  u32 MemoryNeeded = IndexSize * (sizeof(opengl_vertex) + 2*sizeof(u32));
   Assert( MemoryNeeded <= Commands->TemporaryMemory.Remaining() );
 
-  u8* VertexMemory =  Commands->TemporaryMemory.GetTail();
-  for( u32 Index = 0; Index < NrIndeces; ++Index )
+  u32* GLVerticeIndexArray = (u32*) Commands->TemporaryMemory.GetMemory(IndexSize*sizeof(u32));
+  u32* GLIndexArray        = (u32*) Commands->TemporaryMemory.GetMemory(IndexSize*sizeof(u32));
+
+  u32 VerticeArrayCount = 0;
+  for( u32 i = 0; i < IndexSize; ++i )
   {
-    opengl_vertex* VertexData = (opengl_vertex*) Commands->TemporaryMemory.GetMemory(sizeof(opengl_vertex));
-    if(Indeces.vi)
+    const u32 NewElement = VerticeIndeces[i];
+    u32 Index = PushUnique( (u8*) GLVerticeIndexArray, VerticeArrayCount, sizeof(NewElement), (u8*) NewElement, CompareU32);
+    if(Index == VerticeArrayCount)
     {
-      u32 VecIndex  = Indeces.vi[Index];
-      VertexData->v  = MeshData->v[VecIndex];
+      VerticeArrayCount++;
     }
-    if(Indeces.ni)
-    {
-      u32 NormIndex  = Indeces.ni[Index];
-      VertexData->vn = MeshData->vn[NormIndex];
-    }
-    if(Indeces.ti)
-    {
-      u32 TexIndex = Indeces.ti[Index];
-      VertexData->vt = MeshData->vt[TexIndex];
-    }
+
+    GLIndexArray[i] = Index;
   }
 
-  u8* IndexMemory =  Commands->TemporaryMemory.GetTail();
-  for( u32 Index = 0; Index < NrIndeces; ++Index )
+  opengl_vertex* VertexData = (opengl_vertex*) Commands->TemporaryMemory.GetMemory(VerticeArrayCount * sizeof(opengl_vertex));
+  opengl_vertex* Vertice = VertexData;
+  for( u32 i = 0; i < VerticeArrayCount; ++i )
   {
-    u32* IndexData = (u32*) Commands->TemporaryMemory.GetMemory(sizeof(u32));
-    *IndexData = Index;
+    const u32 vidx = *(GLVerticeIndexArray + 3 * i + 0);
+    const u32 tidx = *(GLVerticeIndexArray + 3 * i + 1);
+    const u32 nidx = *(GLVerticeIndexArray + 3 * i + 2);
+    Vertice->v  = VerticeData[vidx];
+    Vertice->vt = TextureData ? TextureData[tidx] : V2(0,0);
+    Vertice->vn = NormalData  ? NormalData[nidx]  : V3(0,0,0);
+    ++Vertice;
   }
-
-  OpenGLSendMeshToGPU(  &Mesh->VAO, NrIndeces, (u32*) IndexMemory, (opengl_vertex*) VertexMemory );
-
+  OpenGLSendMeshToGPU(  VAO, IndexSize, GLIndexArray, VerticeArrayCount, VertexData );
   Commands->TemporaryMemory.Clear();
+}
+*/
+void PushColliderMeshToOpenGL( game_render_commands* Commands, collider_mesh* Mesh)
+{
+  PushMeshDataToOpenGL(Commands, &Mesh->VAO,
+    Mesh->nvi, Mesh->vi, 0, 0,
+    Mesh->nv,  Mesh->v,
+    0,0,0,0);
+}
+
+void PushMeshToOpenGL(game_render_commands* Commands, component_mesh* Mesh)
+{
+  PushMeshDataToOpenGL(Commands, &Mesh->VAO,
+    Mesh->Indeces.Count, Mesh->Indeces.vi, Mesh->Indeces.ti, Mesh->Indeces.ni,
+    Mesh->Data->nv,  Mesh->Data->v,
+    Mesh->Data->nvt, Mesh->Data->vt,
+    Mesh->Data->nvn, Mesh->Data->vn);
 }
 
 bitmap GetEmptyBitmap()
@@ -489,9 +592,34 @@ bitmap GetEmptyBitmap()
   EmptyBitmap.Pixels = (void*) WhitePixel;
   return EmptyBitmap;
 }
+
+internal void setOpenGLState(u32 State)
+{
+  if(State & RENDER_STATE_CULL_BACK)
+  {
+    glEnable(GL_CULL_FACE);
+  }else{
+    glDisable(GL_CULL_FACE);
+  }
+
+  // TODO: We would like to be able to draw a filled mesh with wireframe ontop
+  //       At the moment its not supported
+  if(State & RENDER_STATE_POINTS)
+  {
+    glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+  }else if(State & RENDER_STATE_WIREFRAME)
+  {
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  }else if(State & RENDER_STATE_FILL)
+  {
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+  }
+}
+
 internal void
 OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 WindowHeight )
 {
+  Assert(Commands->TemporaryMemory.IsEmpty());
   local_persist bitmap EmptyBitmap = {};
   u8 WhitePixel[4] = {255,255,255,255};
   EmptyBitmap.Width  = 1;
@@ -510,11 +638,8 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
   glEnable(GL_DEPTH_TEST);
   // Enable Textures
   glEnable(GL_TEXTURE_2D);
-  // Cull triangles which normal is not towards the camera
-  glEnable(GL_CULL_FACE);
   // Activates the gl_PointSize = 10.0; variable in the shader
   glEnable(GL_PROGRAM_POINT_SIZE);
-
   // Accept fragment if it closer to the camera than the former one
   glDepthFunc(GL_LESS);
 
@@ -541,7 +666,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
   glUniformMatrix4fv(Prog->V,  1, GL_TRUE, V.E);
   glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, Identity.E);
   glUniform4fv( Prog->cameraPosition, 1, GetCameraPosition(&V).E);
-
   v4 LightColor    = V4(0,0,0,1);
 
   // For each render group
@@ -549,6 +673,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
   {
     u8* Head = (u8*) Entry;
     u8* Body = Head + sizeof(push_buffer_header);
+    setOpenGLState(Entry->RenderState);
     switch(Entry->Type)
     {
       case render_type::LIGHT:
@@ -560,56 +685,55 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
         LightColor    = Light->Color;
       }break;
 
-      case render_type::MESH:
+      case render_type::TRIANGLE_BUFFER:
       {
-        entry_type_mesh* MeshEntry = (entry_type_mesh*) Body;
+        entry_type_triangle_buffer* MeshEntry = (entry_type_triangle_buffer*) Body;
 
         glUniformMatrix4fv(Prog->M,  1, GL_TRUE, MeshEntry->M.E);
         glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, MeshEntry->NM.E);;
 
-        if(!MeshEntry->Mesh->VAO)
+        Assert(MeshEntry->Mesh || MeshEntry->ColliderMesh);
+        Assert(MeshEntry->Surface);
+        if(MeshEntry->Mesh && !MeshEntry->Mesh->VAO)
         {
           PushMeshToOpenGL(Commands, MeshEntry->Mesh);
-        }
-
-        if( MeshEntry->Surface )
+        }else if(MeshEntry->ColliderMesh && !MeshEntry->ColliderMesh->VAO)
         {
-          component_surface* Surface = MeshEntry->Surface;
-                    material* Material =  Surface->Material;
-
-          u32 SurfaceSmoothnes = 3;
-          v4 AmbientColor   = Blend(&LightColor, &Material->AmbientColor);
-          v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
-          v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
-
-          if(Material->DiffuseMap)
-          {
-            LoadTexture(Material->DiffuseMap);
-            AmbientColor = V4(0,0,0,1);
-          }else{
-            bitmap Bitmap = GetEmptyBitmap();
-            LoadTexture(&Bitmap);
-          }
-
-          glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
-          glUniform4fv( Prog->diffuseProduct,  1, DiffuseColor.E);
-          glUniform4fv( Prog->specularProduct, 1, SpecularColor.E);
-          glUniform1f( Prog->shininess, Material->Shininess);
-
+          PushColliderMeshToOpenGL( Commands, MeshEntry->ColliderMesh );
         }
 
-        OpenGLDraw( MeshEntry->Mesh->VAO, MeshEntry->Mesh->Indeces.Count );
+        component_surface* Surface = MeshEntry->Surface;
+        material* Material =  Surface->Material;
+        u32 SurfaceSmoothnes = 3;
+        v4 AmbientColor   = Blend(&LightColor, &Material->AmbientColor);
+        v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
+        v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
+        if(Material->DiffuseMap)
+        {
+          LoadTexture(Material->DiffuseMap);
+          AmbientColor = V4(0,0,0,1);
+        }else{
+          LoadTexture(&EmptyBitmap);
+        }
+        glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
+        glUniform4fv( Prog->diffuseProduct,  1, DiffuseColor.E);
+        glUniform4fv( Prog->specularProduct, 1, SpecularColor.E);
+        glUniform1f(  Prog->shininess, Material->Shininess);
+
+        if(MeshEntry->Mesh)
+        {
+          OpenGLDraw( MeshEntry->Mesh->VAO, MeshEntry->Mesh->Indeces.Count );
+        }else
+        {
+          OpenGLDraw( MeshEntry->ColliderMesh->VAO, MeshEntry->ColliderMesh->nvi );
+        }
+
 
       }break;
 
-      case render_type::SPRITE:
+      case render_type::QUAD:
       {
-
-      }break;
-
-      case render_type::TILE:
-      {
-        entry_type_map_tile* Tile = (entry_type_map_tile*) Body;
+        entry_type_quad* Tile = (entry_type_quad*) Body;
         local_persist u32 TileVAO = 0;
         if(!TileVAO)
         {
@@ -638,23 +762,81 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
           v[4].vt = V2(1, 0);
           v[5].vt = V2(1, 1);
 
-          OpenGLSendMeshToGPU(  &TileVAO, NrIndeces, idx, v );
+          OpenGLSendMeshToGPU(  &TileVAO, NrIndeces, idx, NrIndeces, v );
         }
 
-        LoadTexture(Tile->Bitmap);
         glUniformMatrix4fv(Prog->M,  1, GL_TRUE, Tile->M.E);
         glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, M4Identity().E);
         glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, Tile->TM.E);
+
+        component_surface* Surface = Tile->Surface;
+        material* Material =  Surface->Material;
+        u32 SurfaceSmoothnes = 3;
+        v4 AmbientColor   = Blend(&LightColor, &Material->AmbientColor);
+        v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
+        v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
+        if(Material->DiffuseMap)
+        {
+          LoadTexture(Material->DiffuseMap);
+          AmbientColor = V4(0,0,0,1);
+        }else{
+          LoadTexture(&EmptyBitmap);
+        }
+        glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
+        glUniform4fv( Prog->diffuseProduct,  1, DiffuseColor.E);
+        glUniform4fv( Prog->specularProduct, 1, SpecularColor.E);
+        glUniform1f(  Prog->shininess, Material->Shininess);
+
+        OpenGLDraw( TileVAO, 6 );
+      }break;
+    }
+  }
+
+#if 0
+  // Here we do overlays so clear GL_DEPTH_BUFFER_BIT
+  glClear(GL_DEPTH_BUFFER_BIT);
+  for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
+  {
+    u8* Head = (u8*) Entry;
+    u8* Body = Head + sizeof(push_buffer_header);
+    switch(Entry->Type)
+    {
+      case render_type::POINT:
+      {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
+        entry_type_point* Point = (entry_type_point*) Body;
+        local_persist u32 PointVao = 0;
+        if(!PointVao)
+        {
+          u32 idx = 0;
+          opengl_vertex v = {};
+          r32 length = 0.5;
+          v.v = V3(0,0,0);
+          v.vn = V3(0,0,1);
+          v.vt = V2(0,0);
+          OpenGLSendMeshToGPU(&PointVao, 1, &idx, 1, &v );
+        }
+        LoadTexture(&EmptyBitmap);
+        glUniformMatrix4fv(Prog->M,  1, GL_TRUE, Point->M.E);
+        glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, M4Identity().E);
+        glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, M4Identity().E);
         glUniform4fv( Prog->ambientProduct,  1, V4(1,1,1,1).E);
         glUniform4fv( Prog->diffuseProduct,  1, V4(1,1,1,1).E);
         glUniform4fv( Prog->specularProduct, 1, V4(1,1,1,1).E);
         glUniform1f(  Prog->shininess, 1);
 
-        OpenGLDraw( TileVAO, 6 );
+        OpenGLDraw( PointVao, 6 );
       }break;
       case render_type::WIREBOX:
       {
         entry_type_wirebox* WireBox = (entry_type_wirebox*) Body;
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        if(WireBox->CullFace)
+        {
+          glEnable(GL_CULL_FACE);
+        }else{
+          glDisable(GL_CULL_FACE);
+        }
         if(!WireBox->Mesh->VAO)
         {
           PushColliderMeshToOpenGL( Commands, WireBox->Mesh );
@@ -668,54 +850,14 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
         glUniform4fv( Prog->specularProduct, 1, V4(1,1,1,1).E);
         glUniform1f(  Prog->shininess, 1);
 
-        glBindVertexArray( WireBox->Mesh->VAO );
-        glDrawElements( GL_LINES, WireBox->Mesh->nvi, GL_UNSIGNED_INT, (void*)0);
-        glBindVertexArray(0);
+        OpenGLDraw( WireBox->Mesh->VAO, 6 );
         break;
       }
     }
+
   }
-
-  // Here we do overlays so clear GL_DEPTH_BUFFER_BIT
-  glClear(GL_DEPTH_BUFFER_BIT);
-  for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
-  {
-    u8* Head = (u8*) Entry;
-    u8* Body = Head + sizeof(push_buffer_header);
-    switch(Entry->Type)
-    {
-
-      case render_type::POINT:
-      {
-        entry_type_point* Point = (entry_type_point*) Body;
-        local_persist u32 PointVao = 0;
-        if(!PointVao)
-        {
-          u32 NrIndeces = 1;
-          u32 idx = 0;
-          opengl_vertex v = {};
-          r32 length = 0.5;
-          v.v = V3(0,0,0);
-          v.vn = V3(0,0,1);
-          v.vt = V2(0,0);
-          OpenGLSendMeshToGPU(&PointVao, NrIndeces, &idx, &v );
-        }
-        LoadTexture(&EmptyBitmap);
-        glUniformMatrix4fv(Prog->M,  1, GL_TRUE, Point->M.E);
-        glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, M4Identity().E);
-        glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, M4Identity().E);
-        glUniform4fv( Prog->ambientProduct,  1, V4(1,1,1,1).E);
-        glUniform4fv( Prog->diffuseProduct,  1, V4(1,1,1,1).E);
-        glUniform4fv( Prog->specularProduct, 1, V4(1,1,1,1).E);
-        glUniform1f(  Prog->shininess, 1);
-
-        //glClear(GL_DEPTH_BUFFER_BIT);
-        glBindVertexArray( PointVao );
-        glDrawElements( GL_POINTS, 1, GL_UNSIGNED_INT, (void*)0);
-        glBindVertexArray(0);
-      }break;
-    }
-  }
+#endif
+  Assert(Commands->TemporaryMemory.IsEmpty());
 }
 #if 1
 
