@@ -79,28 +79,42 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         (Entity->Types & COMPONENT_TYPE_SPATIAL) )
     {
       push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-      Header->Type = render_type::TRIANGLE_BUFFER;
+      Header->Type = render_type::INDEXED_BUFFER;
       Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
-      entry_type_triangle_buffer* Body = (entry_type_triangle_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_triangle_buffer));
-      Body->Mesh    = Entity->MeshComponent;
+      entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_indexed_buffer));
+      Body->BufferType = BUFFER_TYPE_TRIANGLE;
+      Body->VAO  = &Entity->MeshComponent->VAO;
+      Body->nvi = Entity->MeshComponent->Indeces.Count;
+      Body->nv  = Entity->MeshComponent->Data->nv;
+      Body->nvn = Entity->MeshComponent->Data->nvn;
+      Body->nvt = Entity->MeshComponent->Data->nvt;
+      Body->v   = Entity->MeshComponent->Data->v;
+      Body->vn  = Entity->MeshComponent->Data->vn;
+      Body->vt  = Entity->MeshComponent->Data->vt;
+      Body->vi  = Entity->MeshComponent->Indeces.vi;
+      Body->ti  = Entity->MeshComponent->Indeces.ti;
+      Body->ni  = Entity->MeshComponent->Indeces.ni;
       Body->Surface = Entity->SurfaceComponent;
       Body->M       = Entity->SpatialComponent->ModelMatrix;
       Body->NM      = Transpose(RigidInverse(Body->M));
+
+      Body->ElementStart  = 0;
+      Body->ElementLength = Body->nvi;
     }
 
     if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
     {
       push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-      Header->Type = render_type::QUAD;
+      Header->Type = render_type::PRIMITIVE;
       Header->RenderState = RENDER_STATE_FILL;
 
-      entry_type_quad* Body      = (entry_type_quad*)   RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_quad));
+      entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
       component_surface* Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
       Surface->Material          = (material*)          RenderCommands->RenderMemory.GetMemory(sizeof(material));
       SetMaterial(Surface->Material, MATERIAL_WHITE);
       Surface->Material->DiffuseMap = Entity->SpriteAnimationComponent->Bitmap;
-      Body->Surface        = Surface;
-
+      Body->Surface = Surface;
+      Body->PrimitiveType = primitive_type::QUAD;
       Body->M  = M4Identity();
       Body->TM = Entity->SpriteAnimationComponent->ActiveSeries->Get();
 
@@ -133,57 +147,100 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
     {
       {
         push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-        Header->Type = render_type::TRIANGLE_BUFFER;
+        Header->Type = render_type::INDEXED_BUFFER;
         Header->RenderState = RENDER_STATE_WIREFRAME;
-        entry_type_triangle_buffer* Body = (entry_type_triangle_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_triangle_buffer));
-        Body->ColliderMesh  = Entity->ColliderComponent->Mesh;
-
+        entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_indexed_buffer));
+        Body->VAO = &Entity->ColliderComponent->Mesh->VAO;
+        Body->BufferType = BUFFER_TYPE_TRIANGLE;
+        Body->nvi =  Entity->ColliderComponent->Mesh->nvi;
+        Body->nv  =  Entity->ColliderComponent->Mesh->nv;
+        Body->v   =  Entity->ColliderComponent->Mesh->v;
+        Body->vi  =  Entity->ColliderComponent->Mesh->vi;
         component_surface* Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
         Surface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
         SetMaterial(Surface->Material, MATERIAL_JADE);
         Body->Surface = Surface;
         Body->M = Entity->SpatialComponent->ModelMatrix;
         Body->NM = Transpose(RigidInverse(Body->M));
+
+        Body->ElementStart  = 0;
+        Body->ElementLength = Body->nvi;
       }
-//      if(Entity->ColliderComponent->IsColliding)
-//      {
-//        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-//        Header->Type = render_type::POINT;
-//        entry_type_point* Body = (entry_type_point*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_point));
-//        Body->M = Entity->SpatialComponent->ModelMatrix * GetTranslationMatrix( V4(Entity->ColliderComponent->CollisionPoint,1));
-//      }
+      if(Entity->ColliderComponent->IsColliding)
+      {
+        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+        Header->Type = render_type::PRIMITIVE;
+        Header->RenderState = RENDER_STATE_POINTS;
+        entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
+        Body->M = Entity->SpatialComponent->ModelMatrix * GetTranslationMatrix( V4(Entity->ColliderComponent->CollisionPoint,1));
+        Body->TM = M4Identity();
+        Body->PrimitiveType = primitive_type::POINT;
+      }
     }
 
     if( Entity->Types & COMPONENT_TYPE_GJK_EPA_VISUALIZER  )
     {
-//      component_gjk_epa_visualizer* Vis = Entity->GjkEpaVisualizerComponent;
-//      if(Vis->Playback && Vis->ActiveSimplexFrame)
-//      {
-//        // TODO: Come up with a better way to hanle drawing of points/lines/wire frames.
-//        //       Geometry shader?
-//        //       Render States
-//        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-//
-//        if(Vis->ActiveSimplexFrame->Mesh.nv == 1)
-//        {
-//          Header->Type = render_type::POINT;
-//          entry_type_point* Body = (entry_type_point*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_point));
-//          // Translate a point from 0 to pos
-//          Body->M = GetTranslationMatrix(  &Vis->ActiveSimplexFrame->Mesh->v[0], 1 );
-//        }else if(Vis->ActiveSimplexFrame->Mesh.nv == 2)
-//        {
-//          Header->Type = render_type::LINE;
-//          v3 p0 = Vis->ActiveSimplexFrame->Mesh->v[0];
-//          v3 p1 = Vis->ActiveSimplexFrame->Mesh->v[1];
-//          Body->M = Body->M = M4Identity();
-//        }else{
-//          Header->Type = render_type::WIREBOX;
-//          entry_type_wirebox* Body = (entry_type_wirebox*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_wirebox));
-//          Body->M = M4Identity();
-//          Body->Mesh = &Vis->ActiveSimplexFrame->Mesh;
-//          Body->CullFace = true;
-//        }
-//      }
+      component_gjk_epa_visualizer* Vis = Entity->GjkEpaVisualizerComponent;
+      if(Vis->Playback)
+      {
+        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+        Header->RenderState = RENDER_STATE_WIREFRAME;
+        Header->Type = render_type::INDEXED_BUFFER;
+        entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_indexed_buffer));
+        Body->VAO = &Entity->GjkEpaVisualizerComponent->VAO;
+        Body->nvi = Entity->GjkEpaVisualizerComponent->IndexCount;
+        Body->vi  = Entity->GjkEpaVisualizerComponent->Indeces;
+        Body->nv  = Entity->GjkEpaVisualizerComponent->VertexCount;
+        Body->v   = Entity->GjkEpaVisualizerComponent->Vertices;
+
+        component_surface* Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+        Surface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+        SetMaterial(Surface->Material, MATERIAL_JADE);
+        Body->Surface = Surface;
+        Body->M  = M4Identity();
+        Body->NM = M4Identity();
+
+        simplex_index* SI = &Vis->Simplex[Vis->ActiveSimplexFrame];
+        Body->ElementStart  = SI->Offset;
+        Body->ElementLength = SI->Length;
+
+        switch(SI->Length)
+        {
+          case 1: Body->BufferType = BUFFER_TYPE_POINT;    break;
+          case 2: Body->BufferType = BUFFER_TYPE_LINE;     break;
+          case 3: Body->BufferType = BUFFER_TYPE_TRIANGLE; break;
+          case 4: Body->BufferType = BUFFER_TYPE_TRIANGLE; break;
+        }
+
+        Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+        Header->Type = render_type::PRIMITIVE;
+        Header->RenderState = RENDER_STATE_POINTS;
+        entry_type_primitive* PointBody = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
+
+        Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+        Surface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+        SetMaterial(Surface->Material, MATERIAL_RUBY);
+        PointBody->Surface = Surface;
+
+        PointBody->M = GetTranslationMatrix( V4(SI->ClosestPoint,1));
+        PointBody->TM = M4Identity();
+        PointBody->PrimitiveType = primitive_type::POINT;
+
+
+        Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+        Header->Type = render_type::PRIMITIVE;
+        Header->RenderState = RENDER_STATE_POINTS;
+        PointBody = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
+
+        Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+        Surface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+        SetMaterial(Surface->Material, MATERIAL_WHITE_RUBBER);
+        PointBody->Surface = Surface;
+
+        PointBody->M = GetTranslationMatrix( V4(0,0,0,1));
+        PointBody->TM = M4Identity();
+        PointBody->PrimitiveType = primitive_type::POINT;
+      }
     }
   }
 #if 0

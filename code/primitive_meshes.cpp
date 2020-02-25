@@ -11,18 +11,59 @@ internal void PushGLVertex( u32 Idx, v3 v, v3 n, opengl_vertex* Data )
   Vert->vn = n;
 }
 
-internal void GetSquare( opengl_vertex* Data )
+// Need 6 indeces, 4 vertices
+internal void GetQuad( u32* Indeces, opengl_vertex* Data )
 {
-  PushGLVertex(0, V3(-0.5,  0.5, 0), V3( 0, 0,-1), Data);
-  PushGLVertex(1, V3( 0.5,  0.5, 0), V3( 0, 0,-1), Data);
-  PushGLVertex(2, V3(-0.5, -0.5, 0), V3( 0, 0,-1), Data);
-  PushGLVertex(3, V3(-0.5, -0.5, 0), V3( 0, 0,-1), Data);
-  PushGLVertex(4, V3( 0.5,  0.5, 0), V3( 0, 0,-1), Data);
-  PushGLVertex(5, V3( 0.5, -0.5, 0), V3( 0, 0,-1), Data);
+  Indeces[0] = 0;
+  Indeces[1] = 1;
+  Indeces[2] = 2;
+  Indeces[3] = 0;
+  Indeces[4] = 2;
+  Indeces[5] = 3;
+  PushGLVertex(0, V3(-0.5, -0.5, 0), V3( 0, 0, 1), Data);
+  PushGLVertex(1, V3( 0.5, -0.5, 0), V3( 0, 0, 1), Data);
+  PushGLVertex(2, V3( 0.5,  0.5, 0), V3( 0, 0, 1), Data);
+  PushGLVertex(3, V3(-0.5,  0.5, 0), V3( 0, 0, 1), Data);
 }
 
-internal void GetBox( opengl_vertex* Data )
+internal void GetVoxel( u32* Indeces, opengl_vertex* Data )
 {
+  Indeces[ 0] = 0;
+  Indeces[ 1] = 1;
+  Indeces[ 2] = 2;
+  Indeces[ 3] = 3;
+  Indeces[ 4] = 4;
+  Indeces[ 5] = 5;
+  Indeces[ 6] = 6;
+  Indeces[ 7] = 7;
+  Indeces[ 8] = 8;
+  Indeces[ 9] = 9;
+  Indeces[10] =10;
+  Indeces[11] =11;
+  Indeces[12] =12;
+  Indeces[13] =13;
+  Indeces[14] =14;
+  Indeces[15] =15;
+  Indeces[16] =16;
+  Indeces[17] =17;
+  Indeces[18] =18;
+  Indeces[19] =19;
+  Indeces[20] =20;
+  Indeces[21] =21;
+  Indeces[22] =22;
+  Indeces[23] =23;
+  Indeces[24] =24;
+  Indeces[25] =25;
+  Indeces[26] =26;
+  Indeces[27] =27;
+  Indeces[28] =28;
+  Indeces[29] =29;
+  Indeces[30] =30;
+  Indeces[31] =31;
+  Indeces[32] =32;
+  Indeces[33] =33;
+  Indeces[34] =34;
+  Indeces[35] =35;
   PushGLVertex( 0, V3(-0.5, -0.5,  0.5), V3( 0, 0, 1), Data); /*1*/
   PushGLVertex( 1, V3( 0.5, -0.5,  0.5), V3( 0, 0, 1), Data); /*2*/
   PushGLVertex( 2, V3(-0.5,  0.5,  0.5), V3( 0, 0, 1), Data); /*3*/
@@ -98,11 +139,11 @@ f 5/13/6 1/6/6 3/14/6
 */
 }
 
-void getPrimitive( primitive_type Type, opengl_vertex* GLData )
+void getPrimitive( primitive_type Type, u32* Indeces, opengl_vertex* GLData )
 {
   switch(Type)
   {
-    case primitive_type::SQUARE: GetSquare( GLData ); return;
-    case primitive_type::BOX:    GetBox( GLData );    return;
+    case primitive_type::QUAD:  GetQuad(Indeces, GLData );  return;
+    case primitive_type::VOXEL: GetVoxel(Indeces, GLData ); return;
   }
 }

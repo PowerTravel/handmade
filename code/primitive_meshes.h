@@ -3,8 +3,9 @@
 // TODO: Add sphere and cylinder
 enum class primitive_type
 {
-  SQUARE,
-  BOX
+  POINT,
+  QUAD,
+  VOXEL
 };
 
 struct opengl_vertex;

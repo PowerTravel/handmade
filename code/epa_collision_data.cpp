@@ -209,8 +209,8 @@ void FixWindingCCW(gjk_support Support[4])
   {
   	// Swap first and third Support
     gjk_support Tmp = Support[0];
-    Support[0]   = Support[3];
-    Support[3]   = Tmp;
+    Support[0] = Support[3];
+    Support[3] = Tmp;
   }
 }
 

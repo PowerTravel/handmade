@@ -1,29 +1,14 @@
 #pragma once
 
 #include "component_collider.h"
-struct simplex_list
+#include "vector_math.h"
+struct simplex_index
 {
-  v3 ClosestPointOnSurface;
-  collider_mesh Mesh;
-  simplex_list* Next;
-  simplex_list* Previous;
+  u32  Offset;
+  u32  Length;
+  v3   ClosestPoint;
 };
 
-struct polytype_edge
-{
-  v3 P0;
-  v3 P1;
-  b32 IsBorder;
-};
-/*
-struct polytype_face_list
-{
-  u32 PolytypeEdgeCount;
-  polytype_edge* Edges;
-  polytype_list* Next;
-  polytype_list* Previous;
-};
-*/
 struct memory_arena;
 struct component_gjk_epa_visualizer
 {
@@ -32,8 +17,15 @@ struct component_gjk_epa_visualizer
   entity* A;
   entity* B;
 
-  simplex_list* GJKSimplexSeries;
-  simplex_list* ActiveSimplexFrame;
+  //simplex_vertice_list* CSOVertices;
+  u32 VAO;
+  u32 IndexCount;
+  u32 Indeces[512];
+  u32 VertexCount;
+  v3 Vertices[64];
+  u32 NrFrames;
+  simplex_index Simplex[12];
+  u32 ActiveSimplexFrame;
 
   b32 Playback;
   b32 TriggerRecord;
@@ -43,8 +35,6 @@ struct component_gjk_epa_visualizer
   b32 PreviousSelectButtonState;
   b32 PreviousLeftButtonState;
   b32 PreviousRightButtonState;
-//  simplex_list* EPAPolytypeSeries;
-//  simplex_list* ActivePolytypeFrame;
 };
 
 void EpaGjkVisualizerController( entity* Entity )
@@ -58,14 +48,13 @@ void EpaGjkVisualizerController( entity* Entity )
   {
     if(Controller->DPadLeft.EndedDown && !Vis->PreviousLeftButtonState)
     {
-      Vis->ActiveSimplexFrame = Vis->ActiveSimplexFrame->Previous;
+      Vis->ActiveSimplexFrame = (--Vis->ActiveSimplexFrame % Vis->NrFrames);
     }else if(Controller->DPadRight.EndedDown && !Vis->PreviousRightButtonState)
     {
-      Vis->ActiveSimplexFrame = Vis->ActiveSimplexFrame->Next;
+      Vis->ActiveSimplexFrame = (++Vis->ActiveSimplexFrame % Vis->NrFrames);
     }else if(Controller->Start.EndedDown && !Vis->PreviousStartButtonState)
     {
       Vis->Playback = false;
-      Vis->GJKSimplexSeries = 0;
       Vis->ActiveSimplexFrame = 0;
     }else if(Controller->Select.EndedDown && !Vis->PreviousSelectButtonState)
     {

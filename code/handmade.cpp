@@ -77,12 +77,12 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
          "..\\handmade\\data\\cube\\cube.obj");
 
   entity* CubeA = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
-  SetMaterial(CubeA->SurfaceComponent->Material, MATERIAL_RED_RUBBER);
+//  SetMaterial(CubeA->SurfaceComponent->Material, MATERIAL_RED_RUBBER);
   Put( V3( 3,0,0), 0, V3(0,0,0), CubeA->SpatialComponent );
   Scale( V3(2, 2, 2),  CubeA->SpatialComponent );
 
   entity* CubeB = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
-  SetMaterial(CubeB->SurfaceComponent->Material, MATERIAL_BLUE_RUBBER);
+//  SetMaterial(CubeB->SurfaceComponent->Material, MATERIAL_BLUE_RUBBER);
   Put( V3( 3,0,1), 0, V3(0,0,0), CubeB->SpatialComponent );
   Scale( V3(1, 1, 1),  CubeB->SpatialComponent );
 

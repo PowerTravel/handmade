@@ -477,68 +477,81 @@ void DEBUG_GJKCollisionDetectionSequenceToFile(gjk_simplex& Simplex,
 void RecordGJKFrame( component_gjk_epa_visualizer* Vis, gjk_simplex* Simplex, const v3& ClosestPointOnSurface )
 {
   if(!Vis || !Vis->TriggerRecord) return;
+  Assert(Vis->IndexCount < ArrayCount(Vis->Indeces));
+  Assert(Vis->VertexCount < ArrayCount(Vis->Vertices));
 
-  simplex_list* SimplexFrame = (simplex_list*) PushStruct(Vis->Arena, simplex_list);
-  SimplexFrame->ClosestPointOnSurface = ClosestPointOnSurface;
-
-  switch(Simplex->Dimension)
+  simplex_index* SI = &Vis->Simplex[Vis->NrFrames++];
+  SI->ClosestPoint = ClosestPointOnSurface;
+  SI->Offset = Vis->IndexCount;
+  SI->Length = Simplex->Dimension;
+  for (u32 i = 0; i < SI->Length; ++i)
   {
-    case 1:
+    v3& Vertex = Simplex->SP[i].S;
+    b32 Unique = true;
+    u32 VerticeIndex = 0;
+    while(VerticeIndex < Vis->VertexCount)
     {
-      SimplexFrame->Mesh.nv  = 1;
-      SimplexFrame->Mesh.nvi = 1;
-      SimplexFrame->Mesh.v   = (v3*)  PushArray(Vis->Arena, SimplexFrame->Mesh.nv, v3);
-      SimplexFrame->Mesh.vi  = (u32*) PushArray(Vis->Arena, SimplexFrame->Mesh.nvi, u32);
-      SimplexFrame->Mesh.v[0]   = Simplex->SP[0].S;
-      SimplexFrame->Mesh.vi[0]  = 0;
-    }break;
-    case 2:
+      if(Vertex == Vis->Vertices[VerticeIndex])
+      {
+        Unique = false;
+        break;
+      }
+      VerticeIndex++;
+    }
+
+    if(Unique)
     {
-      SimplexFrame->Mesh.nv     = 2;
-      SimplexFrame->Mesh.nvi    = 2;
-      SimplexFrame->Mesh.v      = (v3*)  PushArray(Vis->Arena, SimplexFrame->Mesh.nv, v3);
-      SimplexFrame->Mesh.vi     = (u32*) PushArray(Vis->Arena, SimplexFrame->Mesh.nvi, u32);
-      SimplexFrame->Mesh.v[0]   = Simplex->SP[0].S;
-      SimplexFrame->Mesh.v[1]   = Simplex->SP[1].S;
-      SimplexFrame->Mesh.vi[0]  = 0;
-      SimplexFrame->Mesh.vi[1]  = 1;
-    }break;
-    case 3:
-    {
-      SimplexFrame->Mesh.nv  = 3;
-      SimplexFrame->Mesh.nvi = 3;
-      SimplexFrame->Mesh.v   = (v3*)  PushArray(Vis->Arena, SimplexFrame->Mesh.nv, v3);
-      SimplexFrame->Mesh.vi  = (u32*) PushArray(Vis->Arena, SimplexFrame->Mesh.nvi, u32);
-      SimplexFrame->Mesh.v[0]   = Simplex->SP[0].S;
-      SimplexFrame->Mesh.v[1]   = Simplex->SP[1].S;
-      SimplexFrame->Mesh.v[2]   = Simplex->SP[2].S;
-      SimplexFrame->Mesh.vi[0]  = 0;
-      SimplexFrame->Mesh.vi[1]  = 1;
-      SimplexFrame->Mesh.vi[2]  = 2;
-    }break;
-    case 4:
-    {
-      SimplexFrame->Mesh.nv  = 4;
-      SimplexFrame->Mesh.nvi = 12;
-      SimplexFrame->Mesh.v   = (v3*)  PushArray(Vis->Arena, SimplexFrame->Mesh.nv, v3);
-      SimplexFrame->Mesh.vi  = (u32*) PushArray(Vis->Arena, SimplexFrame->Mesh.nvi, u32);
-      SimplexFrame->Mesh.v[0]   = Simplex->SP[0].S;
-      SimplexFrame->Mesh.v[1]   = Simplex->SP[1].S;
-      SimplexFrame->Mesh.v[2]   = Simplex->SP[2].S;
-      SimplexFrame->Mesh.v[3]   = Simplex->SP[3].S;
-      gjk_simplex SimplexCopy = *Simplex;
-      SetPointsAndIndecesForCCWTetrahedron(&SimplexCopy, SimplexFrame->Mesh.vi);
-    }break;
+      Assert(ArrayCount(Vis->Vertices) > VerticeIndex);
+      Vis->Vertices[Vis->VertexCount++] = Vertex;
+    }
+    Vis->Indeces[SI->Offset+i] = VerticeIndex;
   }
 
-  if(!Vis->GJKSimplexSeries)
+  // Expand the 4 vertices to 4 triangles
+  if(SI->Length==4)
   {
-    DoubleLinkListInitiate(SimplexFrame);
-    Vis->GJKSimplexSeries = SimplexFrame;
-    Vis->ActiveSimplexFrame = Vis->GJKSimplexSeries;
-  }else{
-    DoubleLinkListInsertBefore(Vis->GJKSimplexSeries, SimplexFrame);
+    u32 VerticeIdx[4] = {};
+    utils::Copy(sizeof(VerticeIdx), &Vis->Indeces[SI->Offset], VerticeIdx);
+
+    // Fix Winding so that all triangles go ccw
+    v3 v01 = Vis->Vertices[VerticeIdx[1]] - Vis->Vertices[VerticeIdx[0]];
+    v3 v02 = Vis->Vertices[VerticeIdx[2]] - Vis->Vertices[VerticeIdx[0]];
+    v3 v03 = Vis->Vertices[VerticeIdx[3]] - Vis->Vertices[VerticeIdx[0]];
+    const r32 Determinant = v03 * CrossProduct(v01,v02);
+    Assert(Abs(Determinant) > 10E-7);
+    if(Determinant > 0.f)
+    {
+      // Swap first and third Support
+      u32 Tmp = VerticeIdx[0];
+      VerticeIdx[0] = VerticeIdx[3];
+      VerticeIdx[3] = Tmp;
+    }
+
+    u32 CCWSimplexIdx[12] = {};
+    // 0,1,2 is a outwards facing triangle
+    CCWSimplexIdx[ 0] = VerticeIdx[0];
+    CCWSimplexIdx[ 1] = VerticeIdx[1];
+    CCWSimplexIdx[ 2] = VerticeIdx[2];
+
+    // All the other triangles must go around the
+    // first triangle with 3rd index in the middle
+    CCWSimplexIdx[ 3] = VerticeIdx[0];
+    CCWSimplexIdx[ 4] = VerticeIdx[3];
+    CCWSimplexIdx[ 5] = VerticeIdx[1];
+
+    CCWSimplexIdx[ 6] = VerticeIdx[1];
+    CCWSimplexIdx[ 7] = VerticeIdx[3];
+    CCWSimplexIdx[ 8] = VerticeIdx[2];
+
+    CCWSimplexIdx[ 9] = VerticeIdx[2];
+    CCWSimplexIdx[10] = VerticeIdx[3];
+    CCWSimplexIdx[11] = VerticeIdx[0];
+
+    utils::Copy(sizeof(CCWSimplexIdx), CCWSimplexIdx, &Vis->Indeces[SI->Offset]);
+    SI->Length=12;
   }
+
+  Vis->IndexCount = SI->Offset + SI->Length;
 }
 
 gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_mesh* AMesh,
