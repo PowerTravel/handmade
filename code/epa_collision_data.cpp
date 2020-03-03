@@ -634,11 +634,48 @@ GetCLosestFaceToOrigin(epa_mesh* Mesh, r32* ResultDistance )
   return ResultFace;
 }
 
+void RecordFrame(epa_mesh*, component_gjk_epa_visualizer* Vis)
+{
+  /*
+  struct epa_vertex
+{
+  u32 Idx;
+  gjk_support P;
+  epa_halfedge* OutgoingEdge;
+  epa_vertex* Next;
+};
+
+struct epa_halfedge
+{
+  epa_vertex*   TargetVertex;
+  epa_face*     LeftFace;
+  epa_halfedge* NextEdge;
+  epa_halfedge* OppositeEdge;
+};
+
+struct epa_face
+{
+  u32 Idx;
+  v3 Normal;
+  epa_halfedge* Edge;
+  epa_face* Next;
+};
+
+struct epa_mesh
+{
+  u32 VerticeIdxCounter;
+  u32 FaceIdxCounter;
+  memory_arena* Arena;
+  epa_vertex* Vertices;
+  epa_face* Faces;
+};
+*/
+
+}
 
 contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AModelMat, const collider_mesh* AMesh,
                                     const m4* BModelMat, const collider_mesh* BMesh,
-                                    gjk_simplex& Simplex,
-                                    platform_api* API )
+                                    gjk_simplex& Simplex, component_gjk_epa_visualizer* Vis)
 {
   temporary_memory TempMem = BeginTemporaryMemory(TemporaryArena);
 
@@ -654,7 +691,10 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
   epa_face* ClosestFace = GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
   Assert(ClosestFace);
 
-  DebugPrintEdges(TemporaryArena, Mesh, false, API );
+  // DebugPrintEdges(TemporaryArena, Mesh, false, API );
+
+  RecordFrame(Mesh, Vis);
+
   r32 PreviousDistanceClosestToFace = DistanceClosestToFace + 100;
   epa_face* PreviousClosestFace = ClosestFace;
   u32 Tries = 0;
@@ -680,12 +720,12 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
     {
       // If a new point falls on an face in the polytype we return the
       // ClosestFace.
-      DebugPrintEdges(TemporaryArena, Mesh, false, API );
+      // DebugPrintEdges(TemporaryArena, Mesh, false, API );
       break;
     }
 
     epa_halfedge* BorderEdge = RemoveFacesSeenByPoint(Mesh, SupportPoint.S);
-    DebugPrintEdges(TemporaryArena, Mesh, false, API );
+    // DebugPrintEdges(TemporaryArena, Mesh, false, API );
     if(!BorderEdge)
     {
       // If BorderEdge is NULL it means the new SupportPoint must be on the border
@@ -696,11 +736,11 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
       // The point SHOULD therefore be on the face of ClosestFace since that was the
       // direction we were las looking in.
       // So exit with closest face.
-      DebugPrintEdges(TemporaryArena, Mesh, false, API );
+      // DebugPrintEdges(TemporaryArena, Mesh, false, API );
       break;
     }
     FillHole( Mesh, BorderEdge, &SupportPoint);
-    DebugPrintEdges(TemporaryArena, Mesh, false, API );
+    // DebugPrintEdges(TemporaryArena, Mesh, false, API );
     PreviousDistanceClosestToFace = DistanceClosestToFace;
     PreviousClosestFace = ClosestFace;
     ClosestFace = GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
@@ -723,7 +763,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
       !(Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
       !(Coords.E[2] >= 0) && (Coords.E[2] <= 1))
   {
-    DebugPrintEdges(TemporaryArena, Mesh, false, API );
+    // DebugPrintEdges(TemporaryArena, Mesh, false, API );
     // Assert(0)
   }
 

@@ -15,4 +15,4 @@ struct contact_data
 
 contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AModelMat, const collider_mesh* AMesh,
                                     const m4* BModelMat, const collider_mesh* BMesh, gjk_simplex& Simplex,
-                                    platform_api* API = 0 );
+                                    component_gjk_epa_visualizer* Vis = 0 );

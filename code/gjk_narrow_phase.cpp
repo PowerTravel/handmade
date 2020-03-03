@@ -1,6 +1,6 @@
 #include "gjk_narrow_phase.h"
 #include "epa_collision_data.h"
-//#include "component_gjk_epa_visualizer.h"
+#include "component_gjk_epa_visualizer.h"
 #include "utility_macros.h"
 
 gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
@@ -476,11 +476,63 @@ void DEBUG_GJKCollisionDetectionSequenceToFile(gjk_simplex& Simplex,
 
 void RecordGJKFrame( component_gjk_epa_visualizer* Vis, gjk_simplex* Simplex, const v3& ClosestPointOnSurface )
 {
-  if(!Vis || !Vis->TriggerRecord) return;
+  if(!Vis->TriggerRecord)
+  {
+    Vis->UpdateVBO = false;
+    return;
+  }
+
+  if(!Vis->CSOMeshLength)
+  {
+    aabb3f A = Vis->A->ColliderComponent->AABB;
+    v3 Ap[8] = {};
+    m4 ModelMatrixA = Vis->A->SpatialComponent->ModelMatrix;
+    GetAABBVertices(&A, Ap, NULL);
+
+    aabb3f B = Vis->A->ColliderComponent->AABB;
+    v3 Bp[8] = {};
+    m4 ModelMatrixB = Vis->B->SpatialComponent->ModelMatrix;
+    GetAABBVertices(&B, Bp, NULL);
+
+    v3 CSO[64] = {};
+    u32 CSOCount = 0;
+    for(u32 i = 0; i < ArrayCount(Ap); ++i)
+    {
+      for(u32 j = 0; j < ArrayCount(Bp); ++j)
+      {
+        v3 cso = V3( ModelMatrixA * V4(Ap[i],1) - ModelMatrixB * V4(Bp[j],1));
+        b32 UniqueCSO = true;
+        for(u32 k = 0; k < CSOCount; ++k)
+        {
+          if(cso == CSO[k])
+          {
+            UniqueCSO = false;
+            break;
+          }
+        }
+
+        if(UniqueCSO)
+        {
+          CSO[CSOCount++] = cso;
+        }
+      }
+    }
+    Vis->VertexCount = CSOCount;
+    utils::Copy(Vis->VertexCount*sizeof(v3), CSO, &Vis->Vertices);
+    Vis->CSOMeshOffset = 0;
+    Vis->CSOMeshLength = CSOCount;
+    for(u32 i = 0; i < CSOCount; ++i)
+    {
+      Vis->Indeces[i] = i;
+    }
+    Vis->IndexCount = CSOCount;
+  }
+
+  Vis->UpdateVBO = true;
   Assert(Vis->IndexCount < ArrayCount(Vis->Indeces));
   Assert(Vis->VertexCount < ArrayCount(Vis->Vertices));
 
-  simplex_index* SI = &Vis->Simplex[Vis->NrFrames++];
+  simplex_index* SI = &Vis->Simplex[Vis->SimplexCount++];
   SI->ClosestPoint = ClosestPointOnSurface;
   SI->Offset = Vis->IndexCount;
   SI->Length = Simplex->Dimension;
@@ -552,13 +604,20 @@ void RecordGJKFrame( component_gjk_epa_visualizer* Vis, gjk_simplex* Simplex, co
   }
 
   Vis->IndexCount = SI->Offset + SI->Length;
+
+  u32 IndexCount = 0;
+  Assert(ArrayCount(Vis->Indeces)  > Vis->IndexCount);
+  Assert(ArrayCount(Vis->Vertices) > Vis->VertexCount);
+  Assert(ArrayCount(Vis->Simplex)  > Vis->SimplexCount);
+
+  u32 SimplexCount = 0;
+  u32 ActiveSimplexFrame = 0;
 }
 
 gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_mesh* AMesh,
                                            const m4* BModelMat, const collider_mesh* BMesh,
                                            component_gjk_epa_visualizer* Vis)
 {
-  b32 ShouldRecord = Vis && Vis->TriggerRecord;
   const v3 Origin = V3(0,0,0);
   gjk_collision_result Result = {};
   gjk_simplex& Simplex = Result.Simplex;
@@ -607,10 +666,7 @@ gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_m
       }
     }
 
-    if(ShouldRecord)
-    {
-      RecordGJKFrame(Vis, &Simplex, PartialResult.ClosestPoint);
-    }
+    if(Vis) RecordGJKFrame(Vis, &Simplex, PartialResult.ClosestPoint);
 
     if(PartialResult.Reduced)
     {

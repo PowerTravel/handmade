@@ -82,7 +82,9 @@
 #define GL_DYNAMIC_READ                   0x88E9
 #define GL_DYNAMIC_COPY                   0x88EA
 
+#define GL_UNIFORM_BUFFER_BINDING         0x8A28
 #define GL_PROGRAM_POINT_SIZE             0x8642
+#define GL_ELEMENT_ARRAY_BUFFER_BINDING   0x8895
 
 #include "vector_math.h"
 

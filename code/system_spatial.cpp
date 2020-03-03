@@ -200,6 +200,13 @@ void SpatialSystemUpdate( world* World, platform_api* API)
           &Vis->B->SpatialComponent->ModelMatrix,
           Vis->B->ColliderComponent->Mesh,
           Vis);
+
+      EPACollisionResolution(&World->Arena,
+        &Vis->A->SpatialComponent->ModelMatrix,
+        Vis->A->ColliderComponent->Mesh,
+        &Vis->B->SpatialComponent->ModelMatrix,
+        Vis->B->ColliderComponent->Mesh,
+        NarrowPhaseResult.Simplex);
     }
   }
 

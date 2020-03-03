@@ -7,6 +7,7 @@
 struct collider_mesh
 {
   u32 VAO;
+  u32 VBO;
 
   u32 nv;   // Nr Vertices
   u32 nvi;  // 3 times nr Vertice Indeces (CCW Triangles)

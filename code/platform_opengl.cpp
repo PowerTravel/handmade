@@ -211,28 +211,32 @@ void main() \n\
   return  Result;
 }
 
-u32 OpenGLSendMeshToGPU( const u32 NrIndeces, const u32* IndexData, const u32 NrVertecies, const opengl_vertex* VertexData)
+void OpenGLSendMeshToGPU( u32* VAO, u32* VBO, const u32 NrIndeces, const u32* IndexData, const u32 NrVertecies, const opengl_vertex* VertexData)
 {
   Assert(VertexData);
   Assert(IndexData);
 
-  u32 VAO = 0;
-  // Generate vao
-  glGenVertexArrays(1, &VAO);
+  if(*VAO==0)
+  {
+    Assert(*VBO == 0);
+    // Generate vao
+    glGenVertexArrays(1, VAO);
 
-  // set it as current one
-  glBindVertexArray(VAO);
+    // Generate a generic buffer
+    glGenBuffers(1, VBO);
+  }
 
-  // Generate a generic buffer
-  GLuint DataBuffer;
-  glGenBuffers(1, &DataBuffer);
-  // Bind the buffer ot the GL_ARRAY_BUFFER slot
-  glBindBuffer( GL_ARRAY_BUFFER, DataBuffer);
+  // Bind the VBO to the current glState
+  glBindVertexArray(*VAO);
 
-  // Send data to it
+  // Bind the VBO to the GL_ARRAY_BUFFER slot
+  glBindBuffer( GL_ARRAY_BUFFER, *VBO);
+
+  // Send data to it, if VBO already existed it gets reallocated
   glBufferData( GL_ARRAY_BUFFER, NrVertecies * sizeof(opengl_vertex), (GLvoid*) VertexData, GL_STATIC_DRAW);
 
-  // Say how to interpret the buffer data
+  // Say how to interpret the data in the VBO
+  // The currently bound VBO is implicitly attached to the VAO at the glVertexAttribPointer call
   glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) NULL);           // Vertecis
   glEnableVertexAttribArray(1);
@@ -241,14 +245,17 @@ u32 OpenGLSendMeshToGPU( const u32 NrIndeces, const u32* IndexData, const u32 Nr
   glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) (2*sizeof(v3))); // Textures
 
 
-  GLuint IndexBuffer;
-  glGenBuffers(1, &IndexBuffer);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, IndexBuffer);
+  // TODO: Have a proper buffer object state containing VAO,VBO and EBO so we don't 'have' to query it
+  GLuint EBO;
+  glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, (GLint*) &EBO );
+  if(!EBO)
+  {
+    glGenBuffers(1, &EBO);
+  }
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, NrIndeces * sizeof(u32), IndexData, GL_STATIC_DRAW);
 
   glBindVertexArray(0);
-
-  return VAO;
 }
 
 void OpenGLDraw( u32 VertexArrayObject, u32 ElementType, u32 nrVertecies, u32 Offset)
@@ -531,16 +538,19 @@ gl_vertex_buffer CreateGLVertexBuffer( game_render_commands* Commands,
 
 void OpenGLPushBufferData(game_render_commands* Commands, entry_type_indexed_buffer* Buffer)
 {
-  if(*Buffer->VAO)
+  if(!Buffer->FillVBO)
   {
     return;
   }
-  // Later we wanna split here between the different type of buffers (LINE, TRIANGLE, POINT)
+
   gl_vertex_buffer GLBuffer =  CreateGLVertexBuffer(Commands,
     Buffer->nvi, Buffer->vi, Buffer->ti, Buffer->ni,
     Buffer->v, Buffer->vt, Buffer->vn);
 
-  *Buffer->VAO = OpenGLSendMeshToGPU( GLBuffer.IndexCount, GLBuffer.Indeces, GLBuffer.VertexCount, GLBuffer.VertexData);
+  u32* VAO = Buffer->VAO;
+  u32* VBO = Buffer->VBO;
+  OpenGLSendMeshToGPU(VAO, VBO, GLBuffer.IndexCount, GLBuffer.Indeces, GLBuffer.VertexCount, GLBuffer.VertexData);
+
   Commands->TemporaryMemory.Clear();
 }
 
@@ -622,7 +632,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
     setOpenGLState(Entry->RenderState);
     switch(Entry->Type)
     {
-      case render_type::LIGHT:
+      case render_buffer_entry_type::LIGHT:
       {
         r32 Attenuation = 1;
         glUniform1f(  Prog->attenuation, Attenuation);
@@ -631,7 +641,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
         LightColor    = Light->Color;
       }break;
 
-      case render_type::INDEXED_BUFFER:
+      case render_buffer_entry_type::INDEXED_BUFFER:
       {
         entry_type_indexed_buffer* IndexedBuffer = (entry_type_indexed_buffer*) Body;
 
@@ -658,7 +668,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 
       }break;
 
-      case render_type::PRIMITIVE:
+      case render_buffer_entry_type::PRIMITIVE:
       {
         entry_type_primitive* Primitive = (entry_type_primitive*) Body;
         u32 VAO = 0;
@@ -668,6 +678,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
         {
           glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
           local_persist u32 PointVao = 0;
+          local_persist u32 PointVbo = 0;
           if(!PointVao)
           {
             u32 idx = 0;
@@ -676,7 +687,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
             v.v = V3(0,0,0);
             v.vn = V3(0,0,1);
             v.vt = V2(0,0);
-            PointVao = OpenGLSendMeshToGPU(1, &idx, 1, &v );
+            OpenGLSendMeshToGPU(&PointVao, &PointVbo, 1, &idx, 1, &v );
           }
 
           VAO = PointVao;
@@ -687,19 +698,31 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
         }else if(Primitive->PrimitiveType == primitive_type::QUAD)
         {
           local_persist u32 QuadVAO = 0;
+          local_persist u32 QuadVBO = 0;
           if(!QuadVAO)
           {
             opengl_vertex Vertex[4] = {};
             u32 Index[6] = {};
             GetQuad(Index, Vertex);
-            QuadVAO = OpenGLSendMeshToGPU( 6, Index, 4, Vertex );
+            OpenGLSendMeshToGPU(&QuadVAO, &QuadVBO, 6, Index, 4, Vertex );
           }
           VAO = QuadVAO;
           NrIndeces = 6;
           ElementType = BUFFER_TYPE_TRIANGLE;
         }else if(Primitive->PrimitiveType == primitive_type::VOXEL)
         {
-
+          local_persist u32 VoxelVAO = 0;
+          local_persist u32 VoxelVBO = 0;
+          if(!VoxelVAO)
+          {
+            opengl_vertex Vertex[36] = {};
+            u32 Index[36] = {};
+            GetVoxel(Index, Vertex);
+            OpenGLSendMeshToGPU(&VoxelVAO, &VoxelVBO, 36, Index, 36, Vertex );
+          }
+          VAO = VoxelVAO;
+          NrIndeces = 36;
+          ElementType = BUFFER_TYPE_TRIANGLE;
         }
 
         glUniformMatrix4fv(Prog->M,  1, GL_TRUE, Primitive->M.E);
@@ -732,7 +755,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
     u8* Body = Head + sizeof(push_buffer_header);
     switch(Entry->Type)
     {
-      case render_type::POINT:
+      case render_buffer_entry_type::POINT:
       {
         glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
         entry_type_point* Point = (entry_type_point*) Body;
@@ -758,7 +781,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 
         OpenGLDraw( PointVao, 6 );
       }break;
-      case render_type::WIREBOX:
+      case render_buffer_entry_type::WIREBOX:
       {
         entry_type_wirebox* WireBox = (entry_type_wirebox*) Body;
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

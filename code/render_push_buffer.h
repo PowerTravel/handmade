@@ -7,7 +7,7 @@ struct component_mesh;
 struct component_surface;
 struct collider_mesh;
 
-enum class render_type
+enum class render_buffer_entry_type
 {
   INDEXED_BUFFER,
   PRIMITIVE,
@@ -35,15 +35,11 @@ struct entry_type_light
   m4 M;
 };
 
-//  TODO: Separate the sending of data to the gpu and the building of
-//        Push Buffers.
-//        The push buffer should only contain the vao's vbo's used in the rendering
-//        as well as any index buffer interval to be drawn
-
-
 struct entry_type_indexed_buffer
 {
   u32* VAO;
+  u32* VBO;
+  b32 FillVBO;
   u32 nvi;   // Nr Indeces
   u32 nv;    // Nr Verices
   u32 nvn;   // Nr Vertice Normals
@@ -75,7 +71,7 @@ struct entry_type_primitive
 
 struct push_buffer_header
 {
-  render_type Type;
+  render_buffer_entry_type Type;
   u32 RenderState;
   u32 SortKey;
   push_buffer_header* Next;

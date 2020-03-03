@@ -17,6 +17,8 @@ typedef HGLRC WINAPI wgl_create_context_attrib_arb(HDC hDC, HGLRC hSharedContext
 typedef void WINAPI gl_blend_equation_separate( GLenum modeRGB, GLenum modeAlpha );
 global_variable gl_blend_equation_separate* glBlendEquationSeparate;
 
+typedef uint64_t GLuint64;
+typedef int64_t GLint64;
 typedef ptrdiff_t GLsizeiptr;
 typedef ptrdiff_t GLintptr;
 typedef char GLchar;
@@ -56,7 +58,7 @@ global_variable gl_get_shader_info_log* glGetShaderInfoLog;
 
 // Vertex Array Object
 // Generate
-typedef void WINAPI  gl_gen_vertex_arrays(GLsizei n, GLuint *array);
+typedef void WINAPI gl_gen_vertex_arrays(GLsizei n, GLuint *array);
 typedef void WINAPI gl_bind_vertex_array(GLuint array);
 typedef void WINAPI gl_delete_vertex_arrys(GLsizei n, GLuint *array);
 typedef GLboolean WINAPI gl_is_vertex_array(GLuint array);
@@ -181,16 +183,16 @@ global_variable gl_uniform_matrix_4x3fv* glUniformMatrix4x3fv;
 
 void* _GetOpenGLFunction( char* name )
 {
-	void* GLProgram = wglGetProcAddress(name);
-	if( (GLProgram == NULL) || 
-		(GLProgram == (void*) 0x1) ||
-		(GLProgram == (void*) 0x2) ||
-		(GLProgram == (void*) 0x3) || 
-		(GLProgram == (void*)  -1) )
-	{
-		INVALID_CODE_PATH
-	}
-	return GLProgram;
+  void* GLProgram = wglGetProcAddress(name);
+  if( (GLProgram == NULL) ||
+    (GLProgram == (void*) 0x1) ||
+    (GLProgram == (void*) 0x2) ||
+    (GLProgram == (void*) 0x3) ||
+    (GLProgram == (void*)  -1) )
+  {
+    INVALID_CODE_PATH
+  }
+  return GLProgram;
 }
 
 #define GetOpenGLFunction( type, name ) ( (type*) _GetOpenGLFunction( name ))
@@ -198,153 +200,149 @@ void* _GetOpenGLFunction( char* name )
 internal void
 Win32InitOpenGL(HWND Window)
 {
-	HDC  WindowDC = GetDC(Window);
+  HDC  WindowDC = GetDC(Window);
 
-	PIXELFORMATDESCRIPTOR DesiredPixelFormat = {};
-  	DesiredPixelFormat.nSize = sizeof(PIXELFORMATDESCRIPTOR);
-  	DesiredPixelFormat.nVersion = 1;
-  	DesiredPixelFormat.dwFlags  = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
-  	DesiredPixelFormat.iPixelType;
-  	DesiredPixelFormat.cColorBits = 32;
-  	DesiredPixelFormat.cAlphaBits = 8;
-  	DesiredPixelFormat.iLayerType = PFD_MAIN_PLANE;
+  PIXELFORMATDESCRIPTOR DesiredPixelFormat = {};
+    DesiredPixelFormat.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+    DesiredPixelFormat.nVersion = 1;
+    DesiredPixelFormat.dwFlags  = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
+    DesiredPixelFormat.iPixelType;
+    DesiredPixelFormat.cColorBits = 32;
+    DesiredPixelFormat.cAlphaBits = 8;
+    DesiredPixelFormat.iLayerType = PFD_MAIN_PLANE;
 
-  	s32 SuggestedPixelFormatIndex = ChoosePixelFormat(WindowDC, &DesiredPixelFormat);
-  	PIXELFORMATDESCRIPTOR SuggestedPixelFormat;
-  	DescribePixelFormat(WindowDC, SuggestedPixelFormatIndex, 
-  						sizeof( SuggestedPixelFormat ),   &SuggestedPixelFormat );
-  	SetPixelFormat( WindowDC, SuggestedPixelFormatIndex, &SuggestedPixelFormat );
+    s32 SuggestedPixelFormatIndex = ChoosePixelFormat(WindowDC, &DesiredPixelFormat);
+    PIXELFORMATDESCRIPTOR SuggestedPixelFormat;
+    DescribePixelFormat(WindowDC, SuggestedPixelFormatIndex,
+              sizeof( SuggestedPixelFormat ),   &SuggestedPixelFormat );
+    SetPixelFormat( WindowDC, SuggestedPixelFormatIndex, &SuggestedPixelFormat );
 
-	
-	HGLRC OpenGLRC = wglCreateContext(WindowDC);
-	if( wglMakeCurrent(WindowDC, OpenGLRC) )
-	{
-		wgl_create_context_attrib_arb* wglCreateContextAttribsARB = (wgl_create_context_attrib_arb* ) wglGetProcAddress("wglCreateContextAttribsARB");
-		if(wglCreateContextAttribsARB)
-		{
-			// Note(Jakob): This is a modern version of OpenGL
-			s32 Attribs[] = 
-			{
-				WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
-				WGL_CONTEXT_MINOR_VERSION_ARB, 0,
-				WGL_CONTEXT_FLAGS_ARB, 0 // WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
-#if HANDMADE_INTERNAL				
-				| WGL_CONTEXT_DEBUG_BIT_ARB
+
+  HGLRC OpenGLRC = wglCreateContext(WindowDC);
+  if( wglMakeCurrent(WindowDC, OpenGLRC) )
+  {
+    wgl_create_context_attrib_arb* wglCreateContextAttribsARB = (wgl_create_context_attrib_arb* ) wglGetProcAddress("wglCreateContextAttribsARB");
+    if(wglCreateContextAttribsARB)
+    {
+      // Note(Jakob): This is a modern version of OpenGL
+      s32 Attribs[] =
+      {
+        WGL_CONTEXT_MAJOR_VERSION_ARB, 3,
+        WGL_CONTEXT_MINOR_VERSION_ARB, 0,
+        WGL_CONTEXT_FLAGS_ARB, 0 // WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+#if HANDMADE_INTERNAL
+        | WGL_CONTEXT_DEBUG_BIT_ARB
 #endif
-				,
-				WGL_CONTEXT_PROFILE_MASK_ARB,
-				WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-   				0,
+        ,
+        WGL_CONTEXT_PROFILE_MASK_ARB,
+        WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+          0,
 
-			};
+      };
 
-			HGLRC SharedContext = 0;
-			HGLRC ModernGLRC = wglCreateContextAttribsARB(WindowDC, SharedContext, Attribs);
+      HGLRC SharedContext = 0;
+      HGLRC ModernGLRC = wglCreateContextAttribsARB(WindowDC, SharedContext, Attribs);
 
-			if(ModernGLRC)
-			{
-				if( wglMakeCurrent(WindowDC, ModernGLRC))
-				{
-					wglDeleteContext(OpenGLRC);
-					OpenGLRC = ModernGLRC;	
-				}else{
-					INVALID_CODE_PATH
-				}
-			}else{
-				INVALID_CODE_PATH
-			}
+      if(ModernGLRC)
+      {
+        if( wglMakeCurrent(WindowDC, ModernGLRC))
+        {
+          wglDeleteContext(OpenGLRC);
+          OpenGLRC = ModernGLRC;
+        }else{
+          INVALID_CODE_PATH
+        }
+      }else{
+        INVALID_CODE_PATH
+      }
 
-		}else{
-			// Note(Jakob): This is a antiquated version of OpenGL.
-			INVALID_CODE_PATH
-		}
+    }else{
+      // Note(Jakob): This is a antiquated version of OpenGL.
+      INVALID_CODE_PATH
+    }
 
-		OpenGLInitExtensions();
+    OpenGLInitExtensions();
 
-		wglSwapInterval = GetOpenGLFunction( wgl_swap_interval_ext, "wglSwapIntervalEXT");
-		// Sets the VSync on
-		if(wglSwapInterval)
-		{
-			wglSwapInterval(1);
-		}
+    wglSwapInterval = GetOpenGLFunction( wgl_swap_interval_ext, "wglSwapIntervalEXT");
+    // Sets the VSync on
+    if(wglSwapInterval)
+    {
+      wglSwapInterval(1);
+    }
 
-		glBlendEquationSeparate 	= GetOpenGLFunction( gl_blend_equation_separate, 	 "glBlendEquationSeparate");
-
- 		glCreateProgram 			= GetOpenGLFunction( gl_create_program,      		 "glCreateProgram");
- 		glLinkProgram   			= GetOpenGLFunction( gl_link_program,        		 "glLinkProgram");
- 		glUseProgram 				= GetOpenGLFunction( gl_use_program, 				 "glUseProgram");
-		glGetProgramiv      		= GetOpenGLFunction( gl_get_program_iv,      		 "glGetProgramiv");
-		glGetProgramInfoLog 		= GetOpenGLFunction( gl_get_program_info_log,		 "glGetProgramInfoLog");
-		glCreateShader  			= GetOpenGLFunction( gl_create_shader,       		 "glCreateShader");
-		glDeleteShader  			= GetOpenGLFunction( gl_delete_shader,       		 "glDeleteShader");
- 		glAttachShader  			= GetOpenGLFunction( gl_attach_shader,       		 "glAttachShader");
- 		glDetachShader  			= GetOpenGLFunction( gl_detach_shader,       		 "glDetachShader");
- 		glShaderSource  			= GetOpenGLFunction( gl_shader_source,       		 "glShaderSource");
- 		glCompileShader 			= GetOpenGLFunction( gl_compile_shader,      		 "glCompileShader");
- 		glGetShaderiv   			= GetOpenGLFunction( gl_get_shader_iv,       		 "glGetShaderiv");
- 		glGetShaderInfoLog  		= GetOpenGLFunction( gl_get_shader_info_log, 		 "glGetShaderInfoLog");
-		glGenVertexArrays 			= GetOpenGLFunction( gl_gen_vertex_arrays, 			 "glGenVertexArrays");
-		glBindVertexArray 			= GetOpenGLFunction( gl_bind_vertex_array,			 "glBindVertexArray");
-		glDeleteVertexArrays 		= GetOpenGLFunction( gl_delete_vertex_arrys, 		 "glDeleteVertexArrays");
-		glIsVertexArray 			= GetOpenGLFunction( gl_is_vertex_array, 			 "glIsVertexArray");
-		glVertexAttribPointer 		= GetOpenGLFunction( gl_vertex_attrib_pointer, 		 "glVertexAttribPointer");
-		glVertexAttribIPointer 		= GetOpenGLFunction( gl_vertex_attrib_i_pointer, 	 "glVertexAttribIPointer");
-		glVertexAttribLPointer 		= GetOpenGLFunction( gl_vertex_attrib_l_pointer, 	 "glVertexAttribLPointer");
-		glVertexAttribPointer 		= GetOpenGLFunction( gl_vertex_attrib_pointer, 		 "glVertexAttribPointer");
-		glVertexAttribIPointer 		= GetOpenGLFunction( gl_vertex_attrib_i_pointer, 	 "glVertexAttribIPointer");
-		glVertexAttribLPointer 		= GetOpenGLFunction( gl_vertex_attrib_l_pointer, 	 "glVertexAttribLPointer");
-		glEnableVertexAttribArray 	= GetOpenGLFunction( gl_enable_vertex_attrib_array,  "glEnableVertexAttribArray");
-		glDisableVertexAttribArray 	= GetOpenGLFunction( gl_disable_vertex_attrib_array, "glDisableVertexAttribArray");
-		glEnableVertexArrayAttrib 	= GetOpenGLFunction( gl_enable_vertex_array_attrib,  "glEnableVertexArrayAttrib");
-		glDisableVertexArrayAttrib 	= GetOpenGLFunction( gl_disable_vertex_array_attrib, "glDisableVertexArrayAttrib");
- 		glGenBuffers 				= GetOpenGLFunction( gl_gen_buffers, 				 "glGenBuffers");
- 		glBindBuffer 				= GetOpenGLFunction( gl_bind_buffer, 				 "glBindBuffer");
- 		glBufferData 				= GetOpenGLFunction( gl_buffer_data, 				 "glBufferData");
- 		glNamedBufferData 			= GetOpenGLFunction( gl_named_buffer_data, 			 "glNamedBufferData");
- 		glIsBuffer 					= GetOpenGLFunction( gl_is_buffer, 					 "glIsBuffer");
- 		glDeleteBuffers 			= GetOpenGLFunction( gl_delete_buffer, 				 "glDeleteBuffers");
- 		glDrawElementsA   		  	= GetOpenGLFunction( gl_draw_elements,  			 "glDrawElements");
-		glDrawElementsBaseVertex  	= GetOpenGLFunction( gl_draw_elements_base_vertex, 	 "glDrawElementsBaseVertex" );
-
-		glGetUniformLocation		= GetOpenGLFunction( gl_get_uniform_location, 		 "glGetUniformLocation");
-		glUniform1f					= GetOpenGLFunction( gl_uniform_1f, 				 "glUniform1f");
-		glUniform2f					= GetOpenGLFunction( gl_uniform_2f, 				 "glUniform2f");
-		glUniform3f					= GetOpenGLFunction( gl_uniform_3f, 				 "glUniform3f");
-		glUniform4f					= GetOpenGLFunction( gl_uniform_4f, 				 "glUniform4f");
-		glUniform1i					= GetOpenGLFunction( gl_uniform_1i, 				 "glUniform1i");
-		glUniform2i					= GetOpenGLFunction( gl_uniform_2i, 				 "glUniform2i");
-		glUniform3i					= GetOpenGLFunction( gl_uniform_3i, 				 "glUniform3i");
-		glUniform4i					= GetOpenGLFunction( gl_uniform_4i, 				 "glUniform4i");
-		glUniform1ui				= GetOpenGLFunction( gl_uniform_u1, 				 "glUniform1ui");
-		glUniform2ui				= GetOpenGLFunction( gl_uniform_u2, 				 "glUniform2ui");
-		glUniform3ui				= GetOpenGLFunction( gl_uniform_u3, 				 "glUniform3ui");
-		glUniform4ui				= GetOpenGLFunction( gl_uniform_u4, 				 "glUniform4ui");
-		glUniform1fv				= GetOpenGLFunction( gl_uniform_1fv,  				 "glUniform1fv");
-		glUniform2fv				= GetOpenGLFunction( gl_uniform_2fv,  				 "glUniform2fv");
-		glUniform3fv				= GetOpenGLFunction( gl_uniform_3fv,  				 "glUniform3fv");
-		glUniform4fv				= GetOpenGLFunction( gl_uniform_4fv,  				 "glUniform4fv");
-		glUniform1iv				= GetOpenGLFunction( gl_uniform_1iv,  				 "glUniform1iv");
-		glUniform2iv				= GetOpenGLFunction( gl_uniform_2iv,  				 "glUniform2iv");
-		glUniform3iv				= GetOpenGLFunction( gl_uniform_3iv,  				 "glUniform3iv");
-		glUniform4iv				= GetOpenGLFunction( gl_uniform_4iv,  				 "glUniform4iv");
-		glUniform1uiv				= GetOpenGLFunction( gl_uniform_1uiv, 				 "glUniform1uiv");
-		glUniform2uiv				= GetOpenGLFunction( gl_uniform_2uiv, 				 "glUniform2uiv");
-		glUniform3uiv				= GetOpenGLFunction( gl_uniform_3uiv, 				 "glUniform3uiv");
-		glUniform4uiv				= GetOpenGLFunction( gl_uniform_4uiv, 				 "glUniform4uiv");
-		glUniformMatrix2fv			= GetOpenGLFunction( gl_uniform_matrix_2fv, 		 "glUniformMatrix2fv");
-		glUniformMatrix3fv			= GetOpenGLFunction( gl_uniform_matrix_3fv, 		 "glUniformMatrix3fv");
-		glUniformMatrix4fv			= GetOpenGLFunction( gl_uniform_matrix_4fv, 		 "glUniformMatrix4fv");
-		glUniformMatrix2x3fv		= GetOpenGLFunction( gl_uniform_matrix_2x3fv, 		 "glUniformMatrix2x3fv");
-		glUniformMatrix3x2fv		= GetOpenGLFunction( gl_uniform_matrix_3x2fv, 		 "glUniformMatrix3x2fv");
-		glUniformMatrix2x4fv		= GetOpenGLFunction( gl_uniform_matrix_2x4fv, 		 "glUniformMatrix2x4fv");
-		glUniformMatrix4x2fv		= GetOpenGLFunction( gl_uniform_matrix_4x2fv, 		 "glUniformMatrix4x2fv");
-		glUniformMatrix3x4fv		= GetOpenGLFunction( gl_uniform_matrix_3x4fv, 		 "glUniformMatrix3x4fv");
-		glUniformMatrix4x3fv		= GetOpenGLFunction( gl_uniform_matrix_4x3fv, 		 "glUniformMatrix4x3fv");
-
-
-	}else{
-		INVALID_CODE_PATH
-	}
-	ReleaseDC(Window, WindowDC);
+    glBlendEquationSeparate     = GetOpenGLFunction( gl_blend_equation_separate,     "glBlendEquationSeparate");
+    glCreateProgram             = GetOpenGLFunction( gl_create_program,              "glCreateProgram");
+    glLinkProgram               = GetOpenGLFunction( gl_link_program,                "glLinkProgram");
+    glUseProgram                = GetOpenGLFunction( gl_use_program,                 "glUseProgram");
+    glGetProgramiv              = GetOpenGLFunction( gl_get_program_iv,              "glGetProgramiv");
+    glGetProgramInfoLog         = GetOpenGLFunction( gl_get_program_info_log,        "glGetProgramInfoLog");
+    glCreateShader              = GetOpenGLFunction( gl_create_shader,               "glCreateShader");
+    glDeleteShader              = GetOpenGLFunction( gl_delete_shader,               "glDeleteShader");
+    glAttachShader              = GetOpenGLFunction( gl_attach_shader,               "glAttachShader");
+    glDetachShader              = GetOpenGLFunction( gl_detach_shader,               "glDetachShader");
+    glShaderSource              = GetOpenGLFunction( gl_shader_source,               "glShaderSource");
+    glCompileShader             = GetOpenGLFunction( gl_compile_shader,              "glCompileShader");
+    glGetShaderiv               = GetOpenGLFunction( gl_get_shader_iv,               "glGetShaderiv");
+    glGetShaderInfoLog          = GetOpenGLFunction( gl_get_shader_info_log,         "glGetShaderInfoLog");
+    glGenVertexArrays           = GetOpenGLFunction( gl_gen_vertex_arrays,           "glGenVertexArrays");
+    glBindVertexArray           = GetOpenGLFunction( gl_bind_vertex_array,           "glBindVertexArray");
+    glDeleteVertexArrays        = GetOpenGLFunction( gl_delete_vertex_arrys,         "glDeleteVertexArrays");
+    glIsVertexArray             = GetOpenGLFunction( gl_is_vertex_array,             "glIsVertexArray");
+    glVertexAttribPointer       = GetOpenGLFunction( gl_vertex_attrib_pointer,       "glVertexAttribPointer");
+    glVertexAttribIPointer      = GetOpenGLFunction( gl_vertex_attrib_i_pointer,     "glVertexAttribIPointer");
+    glVertexAttribLPointer      = GetOpenGLFunction( gl_vertex_attrib_l_pointer,     "glVertexAttribLPointer");
+    glVertexAttribPointer       = GetOpenGLFunction( gl_vertex_attrib_pointer,       "glVertexAttribPointer");
+    glVertexAttribIPointer      = GetOpenGLFunction( gl_vertex_attrib_i_pointer,     "glVertexAttribIPointer");
+    glVertexAttribLPointer      = GetOpenGLFunction( gl_vertex_attrib_l_pointer,     "glVertexAttribLPointer");
+    glEnableVertexAttribArray   = GetOpenGLFunction( gl_enable_vertex_attrib_array,  "glEnableVertexAttribArray");
+    glDisableVertexAttribArray  = GetOpenGLFunction( gl_disable_vertex_attrib_array, "glDisableVertexAttribArray");
+    glEnableVertexArrayAttrib   = GetOpenGLFunction( gl_enable_vertex_array_attrib,  "glEnableVertexArrayAttrib");
+    glDisableVertexArrayAttrib  = GetOpenGLFunction( gl_disable_vertex_array_attrib, "glDisableVertexArrayAttrib");
+    glGenBuffers                = GetOpenGLFunction( gl_gen_buffers,                 "glGenBuffers");
+    glBindBuffer                = GetOpenGLFunction( gl_bind_buffer,                 "glBindBuffer");
+    glBufferData                = GetOpenGLFunction( gl_buffer_data,                 "glBufferData");
+    glNamedBufferData           = GetOpenGLFunction( gl_named_buffer_data,           "glNamedBufferData");
+    glIsBuffer                  = GetOpenGLFunction( gl_is_buffer,                   "glIsBuffer");
+    glDeleteBuffers             = GetOpenGLFunction( gl_delete_buffer,               "glDeleteBuffers");
+    glDrawElementsA             = GetOpenGLFunction( gl_draw_elements,               "glDrawElements");
+    glDrawElementsBaseVertex    = GetOpenGLFunction( gl_draw_elements_base_vertex,   "glDrawElementsBaseVertex" );
+    glGetUniformLocation        = GetOpenGLFunction( gl_get_uniform_location,        "glGetUniformLocation");
+    glUniform1f                 = GetOpenGLFunction( gl_uniform_1f,                  "glUniform1f");
+    glUniform2f                 = GetOpenGLFunction( gl_uniform_2f,                  "glUniform2f");
+    glUniform3f                 = GetOpenGLFunction( gl_uniform_3f,                  "glUniform3f");
+    glUniform4f                 = GetOpenGLFunction( gl_uniform_4f,                  "glUniform4f");
+    glUniform1i                 = GetOpenGLFunction( gl_uniform_1i,                  "glUniform1i");
+    glUniform2i                 = GetOpenGLFunction( gl_uniform_2i,                  "glUniform2i");
+    glUniform3i                 = GetOpenGLFunction( gl_uniform_3i,                  "glUniform3i");
+    glUniform4i                 = GetOpenGLFunction( gl_uniform_4i,                  "glUniform4i");
+    glUniform1ui                = GetOpenGLFunction( gl_uniform_u1,                  "glUniform1ui");
+    glUniform2ui                = GetOpenGLFunction( gl_uniform_u2,                  "glUniform2ui");
+    glUniform3ui                = GetOpenGLFunction( gl_uniform_u3,                  "glUniform3ui");
+    glUniform4ui                = GetOpenGLFunction( gl_uniform_u4,                  "glUniform4ui");
+    glUniform1fv                = GetOpenGLFunction( gl_uniform_1fv,                 "glUniform1fv");
+    glUniform2fv                = GetOpenGLFunction( gl_uniform_2fv,                 "glUniform2fv");
+    glUniform3fv                = GetOpenGLFunction( gl_uniform_3fv,                 "glUniform3fv");
+    glUniform4fv                = GetOpenGLFunction( gl_uniform_4fv,                 "glUniform4fv");
+    glUniform1iv                = GetOpenGLFunction( gl_uniform_1iv,                 "glUniform1iv");
+    glUniform2iv                = GetOpenGLFunction( gl_uniform_2iv,                 "glUniform2iv");
+    glUniform3iv                = GetOpenGLFunction( gl_uniform_3iv,                 "glUniform3iv");
+    glUniform4iv                = GetOpenGLFunction( gl_uniform_4iv,                 "glUniform4iv");
+    glUniform1uiv               = GetOpenGLFunction( gl_uniform_1uiv,                "glUniform1uiv");
+    glUniform2uiv               = GetOpenGLFunction( gl_uniform_2uiv,                "glUniform2uiv");
+    glUniform3uiv               = GetOpenGLFunction( gl_uniform_3uiv,                "glUniform3uiv");
+    glUniform4uiv               = GetOpenGLFunction( gl_uniform_4uiv,                "glUniform4uiv");
+    glUniformMatrix2fv          = GetOpenGLFunction( gl_uniform_matrix_2fv,          "glUniformMatrix2fv");
+    glUniformMatrix3fv          = GetOpenGLFunction( gl_uniform_matrix_3fv,          "glUniformMatrix3fv");
+    glUniformMatrix4fv          = GetOpenGLFunction( gl_uniform_matrix_4fv,          "glUniformMatrix4fv");
+    glUniformMatrix2x3fv        = GetOpenGLFunction( gl_uniform_matrix_2x3fv,        "glUniformMatrix2x3fv");
+    glUniformMatrix3x2fv        = GetOpenGLFunction( gl_uniform_matrix_3x2fv,        "glUniformMatrix3x2fv");
+    glUniformMatrix2x4fv        = GetOpenGLFunction( gl_uniform_matrix_2x4fv,        "glUniformMatrix2x4fv");
+    glUniformMatrix4x2fv        = GetOpenGLFunction( gl_uniform_matrix_4x2fv,        "glUniformMatrix4x2fv");
+    glUniformMatrix3x4fv        = GetOpenGLFunction( gl_uniform_matrix_3x4fv,        "glUniformMatrix3x4fv");
+    glUniformMatrix4x3fv        = GetOpenGLFunction( gl_uniform_matrix_4x3fv,        "glUniformMatrix4x3fv");
+  }else{
+    INVALID_CODE_PATH
+  }
+  ReleaseDC(Window, WindowDC);
 
 }

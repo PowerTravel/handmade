@@ -5,6 +5,9 @@ struct bitmap;
 enum MATERIAL_TYPE
 {
 	MATERIAL_WHITE,
+	MATERIAL_RED,
+	MATERIAL_GREEN,
+	MATERIAL_BLUE,
 	MATERIAL_EMERALD,
 	MATERIAL_JADE,
 	MATERIAL_OBSIDIAN,
@@ -49,9 +52,12 @@ struct component_surface
 
 void SetMaterial(material* Material, u32 MaterialType)
 {
-	local_persist material mtl[27] =
+	local_persist material mtl[30] =
 	{
-		{ V4(1,        1,        1,        1), V4( 1,        1,          1,          1), V4( 1    ,      1,          1,          1), 1          }, // WHITE
+		{ V4(1,        1,        1,        1), V4( 1,        1,          1,          1), V4( 1,          1,          1,          1), 1          }, // WHITE
+		{ V4(1,        0,        0,        1), V4( 1,        0,          0,          1), V4( 1,          0,          0,          1), 1          }, // RED
+		{ V4(0,        1,        0,        1), V4( 0,        1,          0,          1), V4( 0,          1,          0,          1), 1          }, // GREEN
+		{ V4(0,        0,        1,        1), V4( 0,        0,          1,          1), V4( 0,          0,          1,          1), 1          }, // Blue
 	  { V4(0.0215,   0.1745,   0.0215,   1), V4( 0.07568,  0.61424,    0.07568,    1), V4( 0.633,      0.727811,   0.633,      1), 0.6        }, // emerald
 	  { V4(0.135,    0.2225,   0.1575,   1), V4( 0.54,     0.89,       0.63,       1), V4( 0.316228,   0.316228,   0.316228,   1), 0.1        }, // jade
 	  { V4(0.05375,  0.05,     0.06625,  1), V4( 0.18275,  0.17,       0.22525,    1), V4( 0.332741,   0.328634,   0.346435,   1), 0.3        }, // obsidian
@@ -83,32 +89,35 @@ void SetMaterial(material* Material, u32 MaterialType)
 	switch(MaterialType)
 	{
 		case MATERIAL_WHITE:          *Material = mtl[0 ]; break;
-		case MATERIAL_EMERALD:        *Material = mtl[1 ]; break;
-		case MATERIAL_JADE:           *Material = mtl[2 ]; break;
-		case MATERIAL_OBSIDIAN:       *Material = mtl[3 ]; break;
-		case MATERIAL_PEARL:          *Material = mtl[4 ]; break;
-		case MATERIAL_RUBY:           *Material = mtl[5 ]; break;
-		case MATERIAL_TURQUOISE:      *Material = mtl[6 ]; break;
-		case MATERIAL_BRASS:          *Material = mtl[7 ]; break;
-		case MATERIAL_BRONZE:         *Material = mtl[8 ]; break;
-		case MATERIAL_CHROME:         *Material = mtl[9 ]; break;
-		case MATERIAL_COMPPER:        *Material = mtl[10]; break;
-		case MATERIAL_GOLD:           *Material = mtl[11]; break;
-		case MATERIAL_SILVER:         *Material = mtl[12]; break;
-		case MATERIAL_BLACK_PLASTIC:  *Material = mtl[13]; break;
-		case MATERIAL_CYAN_PLASTIC:   *Material = mtl[14]; break;
-		case MATERIAL_GREEN_PLASTIC:  *Material = mtl[15]; break;
-		case MATERIAL_RED_PLASTIC:    *Material = mtl[16]; break;
-		case MATERIAL_BLUE_PLASTIC:   *Material = mtl[17]; break;
-		case MATERIAL_WHITE_PLASTIC:  *Material = mtl[18]; break;
-		case MATERIAL_YELLOW_PLASTIC: *Material = mtl[19]; break;
-		case MATERIAL_BLACK_RUBBER:   *Material = mtl[20]; break;
-		case MATERIAL_CYAN_RUBBER:    *Material = mtl[21]; break;
-		case MATERIAL_GREEN_RUBBER:   *Material = mtl[22]; break;
-		case MATERIAL_RED_RUBBER:     *Material = mtl[23]; break;
-		case MATERIAL_BLUE_RUBBER:    *Material = mtl[24]; break;
-		case MATERIAL_WHITE_RUBBER:   *Material = mtl[25]; break;
-		case MATERIAL_YELLOW_RUBBER:  *Material = mtl[26]; break;
+		case MATERIAL_RED:            *Material = mtl[1 ]; break;
+		case MATERIAL_GREEN:          *Material = mtl[2 ]; break;
+		case MATERIAL_BLUE:           *Material = mtl[3 ]; break;
+		case MATERIAL_EMERALD:        *Material = mtl[4 ]; break;
+		case MATERIAL_JADE:           *Material = mtl[5 ]; break;
+		case MATERIAL_OBSIDIAN:       *Material = mtl[6 ]; break;
+		case MATERIAL_PEARL:          *Material = mtl[7 ]; break;
+		case MATERIAL_RUBY:           *Material = mtl[8 ]; break;
+		case MATERIAL_TURQUOISE:      *Material = mtl[9 ]; break;
+		case MATERIAL_BRASS:          *Material = mtl[10]; break;
+		case MATERIAL_BRONZE:         *Material = mtl[11]; break;
+		case MATERIAL_CHROME:         *Material = mtl[12]; break;
+		case MATERIAL_COMPPER:        *Material = mtl[13]; break;
+		case MATERIAL_GOLD:           *Material = mtl[14]; break;
+		case MATERIAL_SILVER:         *Material = mtl[15]; break;
+		case MATERIAL_BLACK_PLASTIC:  *Material = mtl[16]; break;
+		case MATERIAL_CYAN_PLASTIC:   *Material = mtl[17]; break;
+		case MATERIAL_GREEN_PLASTIC:  *Material = mtl[18]; break;
+		case MATERIAL_RED_PLASTIC:    *Material = mtl[19]; break;
+		case MATERIAL_BLUE_PLASTIC:   *Material = mtl[20]; break;
+		case MATERIAL_WHITE_PLASTIC:  *Material = mtl[21]; break;
+		case MATERIAL_YELLOW_PLASTIC: *Material = mtl[22]; break;
+		case MATERIAL_BLACK_RUBBER:   *Material = mtl[23]; break;
+		case MATERIAL_CYAN_RUBBER:    *Material = mtl[24]; break;
+		case MATERIAL_GREEN_RUBBER:   *Material = mtl[25]; break;
+		case MATERIAL_RED_RUBBER:     *Material = mtl[26]; break;
+		case MATERIAL_BLUE_RUBBER:    *Material = mtl[27]; break;
+		case MATERIAL_WHITE_RUBBER:   *Material = mtl[28]; break;
+		case MATERIAL_YELLOW_RUBBER:  *Material = mtl[29]; break;
 		default: Assert(0) break;
 	}
 }

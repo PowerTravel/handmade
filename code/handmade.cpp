@@ -6,7 +6,6 @@
 #include "entity_components.cpp"
 #include "obj_loader.cpp"
 #include "tiles_spritesheet.hpp"
-//#include "primitive_meshes.cpp"
 
 #include "epa_collision_data.cpp"
 #include "gjk_narrow_phase.cpp"
@@ -77,20 +76,19 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
          "..\\handmade\\data\\cube\\cube.obj");
 
   entity* CubeA = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
-//  SetMaterial(CubeA->SurfaceComponent->Material, MATERIAL_RED_RUBBER);
+  SetMaterial(CubeA->SurfaceComponent->Material, MATERIAL_RED_RUBBER);
   Put( V3( 3,0,0), 0, V3(0,0,0), CubeA->SpatialComponent );
   Scale( V3(2, 2, 2),  CubeA->SpatialComponent );
 
   entity* CubeB = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
-//  SetMaterial(CubeB->SurfaceComponent->Material, MATERIAL_BLUE_RUBBER);
-  Put( V3( 3,0,1), 0, V3(0,0,0), CubeB->SpatialComponent );
+  SetMaterial(CubeB->SurfaceComponent->Material, MATERIAL_BLUE_RUBBER);
+  Put( V3( 3,0,1), Pi32/4, V3(1,1,1), CubeB->SpatialComponent );
   Scale( V3(1, 1, 1),  CubeB->SpatialComponent );
 
   entity* CsoObject = NewEntity( World );
   NewComponents( World, CsoObject, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
   CsoObject->GjkEpaVisualizerComponent->A = CubeA;
   CsoObject->GjkEpaVisualizerComponent->B = CubeB;
-  CsoObject->GjkEpaVisualizerComponent->Arena = AssetArena;
   CsoObject->ControllerComponent->Controller = GetController(Input, 1);
   CsoObject->ControllerComponent->ControllerMappingFunction = EpaGjkVisualizerController;
 
