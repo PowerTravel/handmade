@@ -186,28 +186,6 @@ void SpatialSystemUpdate( world* World, platform_api* API)
         *Scanner++ = '\n';
       }
     }
-
-    if( E->Types & COMPONENT_TYPE_GJK_EPA_VISUALIZER)
-    {
-      component_gjk_epa_visualizer* Vis = E->GjkEpaVisualizerComponent;
-      Assert(Vis->A);
-      Assert(Vis->B);
-      Assert(Vis->A->Types & COMPONENT_TYPE_COLLIDER);
-      Assert(Vis->B->Types & COMPONENT_TYPE_COLLIDER);
-      gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
-          &Vis->A->SpatialComponent->ModelMatrix,
-          Vis->A->ColliderComponent->Mesh,
-          &Vis->B->SpatialComponent->ModelMatrix,
-          Vis->B->ColliderComponent->Mesh,
-          Vis);
-
-      EPACollisionResolution(&World->Arena,
-        &Vis->A->SpatialComponent->ModelMatrix,
-        Vis->A->ColliderComponent->Mesh,
-        &Vis->B->SpatialComponent->ModelMatrix,
-        Vis->B->ColliderComponent->Mesh,
-        NarrowPhaseResult.Simplex);
-    }
   }
 
   broad_phase_result_stack* const BroadPhaseResult = GetCollisionPairs( Arena, &BroadPhaseTree );
@@ -218,8 +196,10 @@ void SpatialSystemUpdate( world* World, platform_api* API)
     entity* A = ColliderPair->A;
     entity* B = ColliderPair->B;
 
-    if( (A->Types & COMPONENT_TYPE_DYNAMICS)  ||
-        (B->Types & COMPONENT_TYPE_DYNAMICS))
+    if( (A->Types & COMPONENT_TYPE_DYNAMICS) ||
+        (B->Types & COMPONENT_TYPE_DYNAMICS) ||
+        (A->GjkEpaVisualizerComponent) ||
+        (B->GjkEpaVisualizerComponent) )
     {
       component_spatial*   SA = A->SpatialComponent;
       component_collider*  CA = A->ColliderComponent;
@@ -229,16 +209,21 @@ void SpatialSystemUpdate( world* World, platform_api* API)
       component_collider*  CB = B->ColliderComponent;
       component_dynamics*  DB = B->DynamicsComponent;
 
+      component_gjk_epa_visualizer* Vis = A->GjkEpaVisualizerComponent;
+      Vis = Vis ? Vis : B->GjkEpaVisualizerComponent;
+
       gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
           &SA->ModelMatrix, CA->Mesh,
-          &SB->ModelMatrix, CB->Mesh);
+          &SB->ModelMatrix, CB->Mesh,
+          Vis);
       if(NarrowPhaseResult.ContainsOrigin)
       {
         constraint_data* ConstraintData = (constraint_data*) PushStruct(Arena, constraint_data);
 
         ConstraintData->ContactData = EPACollisionResolution(&World->Arena,  &SA->ModelMatrix, CA->Mesh,
                                                                              &SB->ModelMatrix, CB->Mesh,
-                                                                             NarrowPhaseResult.Simplex);
+                                                                             NarrowPhaseResult.Simplex,
+                                                                             Vis);
         ConstraintData->AccumulatedLambda = 0;
         ConstraintData->A = A;
         ConstraintData->B = B;
@@ -283,10 +268,10 @@ void SpatialSystemUpdate( world* World, platform_api* API)
         GetAABBInverseMassMatrix( &CA->AABB, ma, &InvM[0], &InvM[1]);
         GetAABBInverseMassMatrix( &CB->AABB, mb, &InvM[2], &InvM[3]);
         MultiplyDiagonalM12V12(InvM, ConstraintData->J, ConstraintData->InvMJ);
-
-      }else{
-        // Breakpoint Spot
-        int cc =10;
+      }
+      if( A->GjkEpaVisualizerComponent)
+      {
+        A->GjkEpaVisualizerComponent->TriggerRecord = false;
       }
     }
     ColliderPair = ColliderPair->Previous;

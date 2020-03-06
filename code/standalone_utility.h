@@ -58,6 +58,11 @@ namespace utils
         if(MemoryCount >= Remaining()) {return 0;}
         u8* Result = Tail;
         Tail += MemoryCount;
+        u8* Scanner = Result;
+        while(Scanner < Tail)
+        {
+          *Scanner++ = 0;
+        }
         return Result;
       };
 

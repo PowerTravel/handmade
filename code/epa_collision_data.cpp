@@ -122,7 +122,6 @@ Equals(const epa_halfedge* A, const epa_halfedge* B)
          ( TargetA == TargetB   ) && (OutgoingA == OutgoingB );
 }
 
-
 internal char*
 PaddWithZeros(u32 Count, char* Scanner)
 {
@@ -483,7 +482,7 @@ RemoveFacesSeenByPoint(epa_mesh* Mesh, const v3& Point)
 
     const v3 FaceToPoint = (Point - Face->Edge->TargetVertex->P.S);
     const r32 DotProduct = Face->Normal*FaceToPoint;
-    if( (DotProduct > 0) )//|| PointOnTriangle )
+    if(DotProduct >= 0)
     {
       // Face is now removed from Mesh Face List
       *FaceListEntry = Face->Next;
@@ -558,20 +557,6 @@ RemoveFacesSeenByPoint(epa_mesh* Mesh, const v3& Point)
   return BorderEdge;
 }
 
-internal v3 GetBaryocentricCoordinates(const v3& p0, const v3& p1, const v3& p2, const v3& Point)
-{
-  r32 OneOverFaceArea = 1.f/Norm( CrossProduct( p1 - p0, p2 - p0) );
-  r32 SubAreaA = Norm( CrossProduct( p2 - p1, Point - p1) );
-  r32 SubAreaB = Norm( CrossProduct( p0 - p2, Point - p2) );
-  //r32 SubAreaC = Norm( CrossProduct( p1 - p0, Point - p0) );
-  r32 LambdaA = SubAreaA * OneOverFaceArea;
-  r32 LambdaB = SubAreaB * OneOverFaceArea;
-  r32 LambdaC = 1.f-(LambdaA + LambdaB);//SubAreaC / FaceArea;
-
-  v3 Result = V3(LambdaA, LambdaB, LambdaC);
-  return Result;
-}
-
 internal b32
 IsPointOnMeshSurface(epa_mesh* Mesh, const v3& Point)
 {
@@ -586,7 +571,7 @@ IsPointOnMeshSurface(epa_mesh* Mesh, const v3& Point)
     if( Abs(Determinant) <= 10E-4 )
     {
       // Point is in the plane of the face
-      v3 Coords = GetBaryocentricCoordinates( p0, p1, p2, Point);
+      v3 Coords = GetBaryocentricCoordinates( p0, p1, p2, Face->Normal, Point);
       if( (Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
           (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
           (Coords.E[2] >= 0) && (Coords.E[2] <= 1))
@@ -622,9 +607,16 @@ GetCLosestFaceToOrigin(epa_mesh* Mesh, r32* ResultDistance )
   epa_face* Face = Mesh->Faces;
   while(Face)
   {
-    const v3 Projection = ProjectPointOntoPlane( V3(0,0,0), Face->Edge->TargetVertex->P.S, Face->Normal );
+    v3 p0,p1,p2;
+    getFacePoints(Face, &p0, &p1, &p2);
+    const v3 Projection = ProjectPointOntoPlane( V3(0,0,0), p0, Face->Normal );
     const r32 DistanceToFace = Norm(Projection);
-    if( DistanceToFace < *ResultDistance )
+    const v3 Coords = GetBaryocentricCoordinates( p0, p1, p2, Face->Normal, Projection);
+    const b32 InsideTriangle = (Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
+                               (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
+                               (Coords.E[2] >= 0) && (Coords.E[2] <= 1);
+
+    if( InsideTriangle && (DistanceToFace < *ResultDistance))
     {
       *ResultDistance = DistanceToFace;
       ResultFace = Face;
@@ -634,43 +626,70 @@ GetCLosestFaceToOrigin(epa_mesh* Mesh, r32* ResultDistance )
   return ResultFace;
 }
 
-void RecordFrame(epa_mesh*, component_gjk_epa_visualizer* Vis)
+void RecordFrame(epa_mesh* Mesh, component_gjk_epa_visualizer* Vis, epa_face* ClosestFaceToOrigin, v3 SupportPoint = V3(0,0,0), b32 RenderFilled = false)
 {
-  /*
-  struct epa_vertex
-{
-  u32 Idx;
-  gjk_support P;
-  epa_halfedge* OutgoingEdge;
-  epa_vertex* Next;
-};
+  if(!Vis) return;
+  if(!Vis->TriggerRecord)
+  {
+    Vis->UpdateVBO = false;
+    return;
+  }
 
-struct epa_halfedge
-{
-  epa_vertex*   TargetVertex;
-  epa_face*     LeftFace;
-  epa_halfedge* NextEdge;
-  epa_halfedge* OppositeEdge;
-};
+  epa_index* EPA = &Vis->EPA[Vis->EPACount++];
+  EPA->FillMesh = RenderFilled;
+  EPA->ClosestPointOnFace = ProjectPointOntoPlane(
+    V3(0,0,0), ClosestFaceToOrigin->Edge->TargetVertex->P.S, ClosestFaceToOrigin->Normal );
 
-struct epa_face
-{
-  u32 Idx;
-  v3 Normal;
-  epa_halfedge* Edge;
-  epa_face* Next;
-};
+  EPA->SupportPoint = SupportPoint;
 
-struct epa_mesh
-{
-  u32 VerticeIdxCounter;
-  u32 FaceIdxCounter;
-  memory_arena* Arena;
-  epa_vertex* Vertices;
-  epa_face* Faces;
-};
-*/
+  Vis->NormalIndexCount = Vis->IndexCount;
+  Vis->NormalCount = Vis->VertexCount;
 
+  EPA->ClosestFace = Vis->IndexCount;
+  epa_halfedge* ce0 = ClosestFaceToOrigin->Edge;
+  epa_halfedge* ce1 = ce0->NextEdge;
+  epa_halfedge* ce2 = ce1->NextEdge;
+  Vis->Indeces[ Vis->IndexCount++] = Vis->VertexCount;
+  Vis->Vertices[Vis->VertexCount++] = ce0->TargetVertex->P.S;
+  Vis->Indeces[ Vis->IndexCount++] = Vis->VertexCount;
+  Vis->Vertices[Vis->VertexCount++] = ce1->TargetVertex->P.S;
+  Vis->Indeces[ Vis->IndexCount++] = Vis->VertexCount;
+  Vis->Vertices[Vis->VertexCount++] = ce2->TargetVertex->P.S;
+
+  Vis->NormalIndeces[ Vis->NormalIndexCount++] = Vis->NormalCount;
+  Vis->Normals[Vis->NormalCount++] = ClosestFaceToOrigin->Normal;
+  Vis->NormalIndeces[ Vis->NormalIndexCount++] = Vis->NormalCount;
+  Vis->Normals[Vis->NormalCount++] = ClosestFaceToOrigin->Normal;
+  Vis->NormalIndeces[ Vis->NormalIndexCount++] = Vis->NormalCount;
+  Vis->Normals[Vis->NormalCount++] = ClosestFaceToOrigin->Normal;
+
+  EPA->MeshOffset = Vis->IndexCount;
+  EPA->NormalOffset = Vis->NormalCount;
+  epa_face* Face = Mesh->Faces;
+  while(Face)
+  {
+    epa_halfedge* e0 = Face->Edge;
+    epa_halfedge* e1 = e0->NextEdge;
+    epa_halfedge* e2 = e1->NextEdge;
+
+    Vis->NormalIndeces[ Vis->NormalIndexCount++] = Vis->NormalCount;
+    Vis->Normals[Vis->NormalCount++] = Face->Normal;
+    Vis->NormalIndeces[ Vis->NormalIndexCount++] = Vis->NormalCount;
+    Vis->Normals[Vis->NormalCount++] = Face->Normal;
+    Vis->NormalIndeces[ Vis->NormalIndexCount++] = Vis->NormalCount;
+    Vis->Normals[Vis->NormalCount++] = Face->Normal;
+
+    Vis->Indeces[ Vis->IndexCount++] = Vis->VertexCount;
+    Vis->Vertices[Vis->VertexCount++] = e0->TargetVertex->P.S;
+    Vis->Indeces[ Vis->IndexCount++] = Vis->VertexCount;
+    Vis->Vertices[Vis->VertexCount++] = e1->TargetVertex->P.S;
+    Vis->Indeces[ Vis->IndexCount++] = Vis->VertexCount;
+    Vis->Vertices[Vis->VertexCount++] = e2->TargetVertex->P.S;
+
+    Face = Face->Next;
+  }
+  EPA->MeshLength = Vis->IndexCount - EPA->MeshOffset;
+  EPA->NormalLength = Vis->NormalIndexCount - EPA->NormalOffset;
 }
 
 contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AModelMat, const collider_mesh* AMesh,
@@ -691,10 +710,6 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
   epa_face* ClosestFace = GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
   Assert(ClosestFace);
 
-  // DebugPrintEdges(TemporaryArena, Mesh, false, API );
-
-  RecordFrame(Mesh, Vis);
-
   r32 PreviousDistanceClosestToFace = DistanceClosestToFace + 100;
   epa_face* PreviousClosestFace = ClosestFace;
   u32 Tries = 0;
@@ -711,21 +726,18 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
 
   while(Tries++ < TriesUntilGivingUp)
   {
-
     gjk_support SupportPoint = CsoSupportFunction( AModelMat, AMesh,
                                                    BModelMat, BMesh,
                                                    ClosestFace->Normal);
-
+    RecordFrame(Mesh, Vis, ClosestFace, SupportPoint.S);
     if(IsPointOnMeshSurface(Mesh,SupportPoint.S))
     {
       // If a new point falls on an face in the polytype we return the
       // ClosestFace.
-      // DebugPrintEdges(TemporaryArena, Mesh, false, API );
       break;
     }
 
     epa_halfedge* BorderEdge = RemoveFacesSeenByPoint(Mesh, SupportPoint.S);
-    // DebugPrintEdges(TemporaryArena, Mesh, false, API );
     if(!BorderEdge)
     {
       // If BorderEdge is NULL it means the new SupportPoint must be on the border
@@ -736,27 +748,28 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
       // The point SHOULD therefore be on the face of ClosestFace since that was the
       // direction we were las looking in.
       // So exit with closest face.
-      // DebugPrintEdges(TemporaryArena, Mesh, false, API );
       break;
     }
+    //RecordFrame(Mesh, Vis, ClosestFace, SupportPoint.S, true);
     FillHole( Mesh, BorderEdge, &SupportPoint);
-    // DebugPrintEdges(TemporaryArena, Mesh, false, API );
+
     PreviousDistanceClosestToFace = DistanceClosestToFace;
     PreviousClosestFace = ClosestFace;
     ClosestFace = GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
-
     if(Abs(DistanceClosestToFace - PreviousDistanceClosestToFace) > 10E-4)
     {
       Tries = 0;
     }
   }
 
+  ClosestFace = GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
+
   gjk_support A = ClosestFace->Edge->TargetVertex->P;
   gjk_support B = ClosestFace->Edge->NextEdge->TargetVertex->P;
   gjk_support C = ClosestFace->Edge->NextEdge->NextEdge->TargetVertex->P;
   v3 P = ClosestFace->Normal * DistanceClosestToFace;
 
-  v3 Coords = GetBaryocentricCoordinates(A.S,B.S,C.S,P);
+  v3 Coords = GetBaryocentricCoordinates(A.S,B.S,C.S,ClosestFace->Normal,P);
 
   // Point Outside the triangle
   if( !(Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
@@ -764,7 +777,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
       !(Coords.E[2] >= 0) && (Coords.E[2] <= 1))
   {
     // DebugPrintEdges(TemporaryArena, Mesh, false, API );
-    // Assert(0)
+    Assert(0)
   }
 
   v3 InterpolatedSupportA = Coords.E[0] * A.A + Coords.E[1] * B.A + Coords.E[2] * C.A;
@@ -787,6 +800,8 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
   ContactData.TangentNormalTwo    = CrossProduct(ClosestFace->Normal, Tangent1);
   ContactData.PenetrationDepth    = DistanceClosestToFace;
   EndTemporaryMemory(TempMem);
+
+  RecordFrame(Mesh, Vis, ClosestFace);
   return ContactData;
 
 }

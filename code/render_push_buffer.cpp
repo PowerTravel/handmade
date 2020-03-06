@@ -78,42 +78,47 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
     if( (Entity->Types & COMPONENT_TYPE_MESH ) &&
         (Entity->Types & COMPONENT_TYPE_SPATIAL) )
     {
+      render_buffer* Buffer = (render_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(render_buffer));
+      Buffer->VAO  = &Entity->MeshComponent->VAO;
+      Buffer->VBO  = &Entity->MeshComponent->VBO;
+      Buffer->Fill = *Buffer->VAO==0;
+      Buffer->nvi  = Entity->MeshComponent->Indeces.Count;
+      Buffer->nv   = Entity->MeshComponent->Data->nv;
+      Buffer->nvn  = Entity->MeshComponent->Data->nvn;
+      Buffer->nvt  = Entity->MeshComponent->Data->nvt;
+      Buffer->v    = Entity->MeshComponent->Data->v;
+      Buffer->vn   = Entity->MeshComponent->Data->vn;
+      Buffer->vt   = Entity->MeshComponent->Data->vt;
+      Buffer->vi   = Entity->MeshComponent->Indeces.vi;
+      Buffer->ti   = Entity->MeshComponent->Indeces.ti;
+      Buffer->ni   = Entity->MeshComponent->Indeces.ni;
+
       push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
       Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
       Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
-      entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_indexed_buffer));
-      Body->BufferType = BUFFER_TYPE_TRIANGLE;
-      Body->VAO = &Entity->MeshComponent->VAO;
-      Body->VBO = &Entity->MeshComponent->VBO;
-      Body->FillVBO = Entity->ColliderComponent->Mesh->VAO==0;
-      Body->nvi = Entity->MeshComponent->Indeces.Count;
-      Body->nv  = Entity->MeshComponent->Data->nv;
-      Body->nvn = Entity->MeshComponent->Data->nvn;
-      Body->nvt = Entity->MeshComponent->Data->nvt;
-      Body->v   = Entity->MeshComponent->Data->v;
-      Body->vn  = Entity->MeshComponent->Data->vn;
-      Body->vt  = Entity->MeshComponent->Data->vt;
-      Body->vi  = Entity->MeshComponent->Indeces.vi;
-      Body->ti  = Entity->MeshComponent->Indeces.ti;
-      Body->ni  = Entity->MeshComponent->Indeces.ni;
-      Body->Surface = Entity->SurfaceComponent;
-      Body->M       = Entity->SpatialComponent->ModelMatrix;
-      Body->NM      = Transpose(RigidInverse(Body->M));
 
+      entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_indexed_buffer));
+      Body->Buffer   = Buffer;
+      Body->DataType = DATA_TYPE_TRIANGLE;
+      Body->Surface  = Entity->SurfaceComponent;
+      Body->M        = Entity->SpatialComponent->ModelMatrix;
+      Body->NM       = Transpose(RigidInverse(Body->M));
       Body->ElementStart  = 0;
-      Body->ElementLength = Body->nvi;
+      Body->ElementLength = Buffer->nvi;
     }
 
     if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
     {
+      component_surface* WhiteSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+      WhiteSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+      SetMaterial(WhiteSurface->Material, MATERIAL_WHITE);
+
       push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
       Header->Type = render_buffer_entry_type::PRIMITIVE;
       Header->RenderState = RENDER_STATE_FILL;
 
       entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
-      Body->Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
-      Body->Surface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
-      SetMaterial(Body->Surface->Material, MATERIAL_WHITE);
+      Body->Surface = WhiteSurface;
       Body->Surface->Material->DiffuseMap = Entity->SpriteAnimationComponent->Bitmap;
       Body->PrimitiveType = primitive_type::QUAD;
       Body->M  = M4Identity();
@@ -146,27 +151,37 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
     // Here we wanna do a wire frame and collision points
     if( Entity->Types & COMPONENT_TYPE_COLLIDER  )
     {
+      render_buffer* Buffer = (render_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(render_buffer));
+      Buffer->VAO  = &Entity->ColliderComponent->Mesh->VAO;
+      Buffer->VBO  = &Entity->ColliderComponent->Mesh->VBO;
+      Buffer->Fill =  *Buffer->VAO==0;
+      Buffer->nvi  =  Entity->ColliderComponent->Mesh->nvi;
+      Buffer->nv   =  Entity->ColliderComponent->Mesh->nv;
+      Buffer->v    =  Entity->ColliderComponent->Mesh->v;
+      Buffer->vi   =  Entity->ColliderComponent->Mesh->vi;
+
+      component_surface* JadeSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+      JadeSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+      SetMaterial(JadeSurface->Material, MATERIAL_JADE);
+
+      component_surface* GreenSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+      GreenSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+      SetMaterial(GreenSurface->Material, MATERIAL_GREEN);
+
       {
         push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
         Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
         Header->RenderState = RENDER_STATE_WIREFRAME;
+
         entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_indexed_buffer));
-        Body->VAO = &Entity->ColliderComponent->Mesh->VAO;
-        Body->VBO = &Entity->ColliderComponent->Mesh->VBO;
-        Body->FillVBO = Entity->ColliderComponent->Mesh->VAO==0;
-        Body->BufferType = BUFFER_TYPE_TRIANGLE;
-        Body->nvi =  Entity->ColliderComponent->Mesh->nvi;
-        Body->nv  =  Entity->ColliderComponent->Mesh->nv;
-        Body->v   =  Entity->ColliderComponent->Mesh->v;
-        Body->vi  =  Entity->ColliderComponent->Mesh->vi;
-        Body->Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
-        Body->Surface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
-        SetMaterial(Body->Surface->Material, MATERIAL_JADE);
+        Body->Buffer = Buffer;
+        Body->DataType = DATA_TYPE_TRIANGLE;
+        Body->Surface = JadeSurface;
         Body->M = Entity->SpatialComponent->ModelMatrix;
         Body->NM = Transpose(RigidInverse(Body->M));
 
         Body->ElementStart  = 0;
-        Body->ElementLength = Body->nvi;
+        Body->ElementLength = Buffer->nvi;
       }
       if(Entity->ColliderComponent->IsColliding)
       {
@@ -177,21 +192,70 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         Body->M = Entity->SpatialComponent->ModelMatrix * GetTranslationMatrix( V4(Entity->ColliderComponent->CollisionPoint,1));
         Body->TM = M4Identity();
         Body->PrimitiveType = primitive_type::POINT;
+        Body->Surface = GreenSurface;
       }
     }
 
     if( Entity->Types & COMPONENT_TYPE_GJK_EPA_VISUALIZER  )
     {
       component_gjk_epa_visualizer* Vis = Entity->GjkEpaVisualizerComponent;
-      if(Vis->Playback)
+      if(Vis->Playback && Vis->IndexCount>0)
       {
-        {
-          component_surface* Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
-          Surface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
-          SetMaterial(Surface->Material, MATERIAL_BLUE_RUBBER);
 
-          u32* vi = Entity->GjkEpaVisualizerComponent->Indeces;
-          v3* v   = Entity->GjkEpaVisualizerComponent->Vertices;
+        render_buffer* Buffer = (render_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(render_buffer));
+        Buffer->VAO  = &Vis->VAO;
+        Buffer->VBO  = &Vis->VBO;
+        Buffer->Fill = Vis->UpdateVBO;
+        Buffer->nvi  = Vis->IndexCount;
+        Buffer->vi   = Vis->Indeces;
+        Buffer->nv   = Vis->VertexCount;
+        Buffer->v    = Vis->Vertices;
+
+        Buffer->ni   = Vis->NormalIndeces;
+        Buffer->nvn  = Vis->NormalCount;
+        Buffer->vn   = Vis->Normals;
+
+        component_surface* BlueRubberSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+        BlueRubberSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+        SetMaterial(BlueRubberSurface->Material, MATERIAL_BLUE_RUBBER);
+
+        component_surface* GreenRubberSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+        GreenRubberSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+        SetMaterial(GreenRubberSurface->Material, MATERIAL_GREEN_RUBBER);
+
+        component_surface* RedRubberSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+        RedRubberSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+        SetMaterial(RedRubberSurface->Material, MATERIAL_RED_RUBBER);
+
+        component_surface* WhiteSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+        WhiteSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+        SetMaterial(WhiteSurface->Material, MATERIAL_WHITE);
+
+        component_surface* RedSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+        RedSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+        SetMaterial(RedSurface->Material, MATERIAL_RED);
+
+        component_surface* GreenSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+        GreenSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+        SetMaterial(GreenSurface->Material, MATERIAL_GREEN);
+
+        // Show Origin
+        {
+          push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+          Header->Type = render_buffer_entry_type::PRIMITIVE;
+          Header->RenderState = RENDER_STATE_FILL;
+
+          entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
+          Body->Surface = WhiteSurface;
+          Body->M = GetTranslationMatrix( V4(0,0,0,1)) * GetScaleMatrix( V4(0.1,0.1,0.1,1));
+          Body->TM = M4Identity();
+          Body->PrimitiveType = primitive_type::VOXEL;
+        }
+
+        // Show CSO
+        {
+          u32* vi = Vis->Indeces;
+          v3* v   = Vis->Vertices;
 
           // Todo: This is inefficient, better option would be either instancing
           // http://www.opengl-tutorial.org/intermediate-tutorials/billboards-particles/particles-instancing/
@@ -201,138 +265,138 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
             push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
             Header->Type = render_buffer_entry_type::PRIMITIVE;
             Header->RenderState = RENDER_STATE_FILL;
+
             entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
             v3 Vertex = v[vi[i]];
             Body->M = GetTranslationMatrix(V4(Vertex,1)) * GetScaleMatrix(V4(0.05,0.05,0.05,1));
             Body->TM = M4Identity();
-            Body->Surface = Surface;
+            Body->Surface = BlueRubberSurface;
             Body->PrimitiveType = primitive_type::VOXEL;
           }
         }
 
+        // Show GJK
+        if( Vis->ActiveSimplexFrame <(s32) Vis->SimplexCount )
         {
-          push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-          Header->RenderState = RENDER_STATE_WIREFRAME;
-          Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
-          entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_indexed_buffer));
-          Body->VAO = &Entity->GjkEpaVisualizerComponent->VAO;
-          Body->VBO = &Entity->GjkEpaVisualizerComponent->VBO;
-          Body->FillVBO = Entity->GjkEpaVisualizerComponent->UpdateVBO;
-          Body->nvi = Entity->GjkEpaVisualizerComponent->IndexCount;
-          Body->vi  = Entity->GjkEpaVisualizerComponent->Indeces;
-          Body->nv  = Entity->GjkEpaVisualizerComponent->VertexCount;
-          Body->v   = Entity->GjkEpaVisualizerComponent->Vertices;
-
-          Body->Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
-          Body->Surface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
-          SetMaterial(Body->Surface->Material, MATERIAL_GREEN_RUBBER);
-          Body->M  = M4Identity();
-          Body->NM = M4Identity();
-
           simplex_index* SI = &Vis->Simplex[Vis->ActiveSimplexFrame];
-          Body->ElementStart  = SI->Offset;
-          Body->ElementLength = SI->Length;
 
-          switch(SI->Length)
+          // GJK WireFrame
           {
-            case 1: Body->BufferType = BUFFER_TYPE_LINE;     break;
-            case 2: Body->BufferType = BUFFER_TYPE_LINE;     break;
-            case 3: Body->BufferType = BUFFER_TYPE_TRIANGLE; break;
-            case 4: Body->BufferType = BUFFER_TYPE_TRIANGLE; break;
+            push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+            Header->RenderState = RENDER_STATE_WIREFRAME;
+            Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
+            entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_indexed_buffer));
+            Body->Buffer = Buffer;
+            Body->Surface = GreenRubberSurface;
+            Body->M  = M4Identity();
+            Body->NM = M4Identity();
+
+            Body->ElementStart  = SI->Offset;
+            Body->ElementLength = SI->Length;
+
+            switch(SI->Length)
+            {
+              case 1: Body->DataType = DATA_TYPE_LINE;      break;
+              case 2: Body->DataType = DATA_TYPE_LINE;      break;
+              case 3: Body->DataType = DATA_TYPE_TRIANGLE;  break;
+              case 12: Body->DataType = DATA_TYPE_TRIANGLE; break;
+              default: INVALID_CODE_PATH; break;
+            }
           }
-        }
 
+          // GJK CSO Points
+          {
+            // Todo: This is inefficient, better option would be either instancing
+            // http://www.opengl-tutorial.org/intermediate-tutorials/billboards-particles/particles-instancing/
+            // Or fill every quad into one big buffer and draw them with one draw call
+            u32* vi = Entity->GjkEpaVisualizerComponent->Indeces;
+            v3* v   = Entity->GjkEpaVisualizerComponent->Vertices;
+            for(u32 i = SI->Offset; i < SI->Offset + SI->Length; ++i)
+            {
+              push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+              Header->Type = render_buffer_entry_type::PRIMITIVE;
+              Header->RenderState = RENDER_STATE_FILL;
+              entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
+              v3 Vertex = v[vi[i]];
+              Body->M = GetTranslationMatrix(V4(Vertex,1)) * GetScaleMatrix(V4(0.1,0.1,0.1,1));
+              Body->TM = M4Identity();
+              Body->Surface = GreenRubberSurface;
+              Body->PrimitiveType = primitive_type::VOXEL;
+            }
+          }
+
+          // GJK Closset Point
+          {
+            push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+            Header->Type = render_buffer_entry_type::PRIMITIVE;
+            Header->RenderState = RENDER_STATE_FILL;
+
+            entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
+            Body->Surface = RedRubberSurface;
+            Body->M = GetTranslationMatrix( V4(SI->ClosestPoint,1)) * GetScaleMatrix( V4(0.09,0.12,0.09,1));
+            Body->TM = M4Identity();
+            Body->PrimitiveType = primitive_type::VOXEL;
+          }
+
+        }else if(Vis->ActiveSimplexFrame == (s32)Vis->SimplexCount )
         {
-          component_surface* Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
-          Surface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
-          SetMaterial(Surface->Material, MATERIAL_GREEN_RUBBER);
+          // Show EPA
+          epa_index* EPA = &Vis->EPA[Vis->ActiveEPAFrame];
 
-          u32 nvi = Entity->GjkEpaVisualizerComponent->IndexCount;
-          u32* vi = Entity->GjkEpaVisualizerComponent->Indeces;
-          v3* v   = Entity->GjkEpaVisualizerComponent->Vertices;
+          {
+            push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+            Header->RenderState = EPA->FillMesh ? RENDER_STATE_FILL : RENDER_STATE_WIREFRAME;
+            Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
 
-          // Todo: This is inefficient, better option would be either instancing
-          // http://www.opengl-tutorial.org/intermediate-tutorials/billboards-particles/particles-instancing/
-          // Or fill every quad into one big buffer and draw them with one draw call
-          simplex_index* SI = &Vis->Simplex[Vis->ActiveSimplexFrame];
-          for(u32 i = SI->Offset; i < SI->Offset + SI->Length; ++i)
+            entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_indexed_buffer));
+            Body->Buffer = Buffer;
+            Body->Surface = BlueRubberSurface;
+            Body->M  = M4Identity();
+            Body->NM = M4Identity();
+            Body->ElementStart  = EPA->MeshOffset;
+            Body->ElementLength = EPA->MeshLength;
+            Body->DataType = DATA_TYPE_TRIANGLE;
+          }
+          if(!EPA->FillMesh)
+          {
+            push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+            Header->RenderState = RENDER_STATE_FILL;
+            Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
+
+            entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_indexed_buffer));
+            Body->Buffer   = Buffer;
+            Body->Surface = GreenRubberSurface;
+            Body->M  = M4Identity();
+            Body->NM = M4Identity();
+
+            Body->ElementStart  = EPA->ClosestFace;
+            Body->ElementLength = 3;
+            Body->DataType = DATA_TYPE_TRIANGLE;
+          }
           {
             push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
             Header->Type = render_buffer_entry_type::PRIMITIVE;
             Header->RenderState = RENDER_STATE_FILL;
+
             entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
-            v3 Vertex = v[vi[i]];
-            Body->M = GetTranslationMatrix(V4(Vertex,1)) * GetScaleMatrix(V4(0.1,0.1,0.1,1));
+            Body->Surface = RedSurface;
+            Body->M = GetTranslationMatrix( V4(EPA->ClosestPointOnFace,1)) * GetScaleMatrix( V4(0.11,0.11,0.11,1));
             Body->TM = M4Identity();
-            Body->Surface = Surface;
+            Body->PrimitiveType = primitive_type::VOXEL;
+          }
+          {
+            push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+            Header->Type = render_buffer_entry_type::PRIMITIVE;
+            Header->RenderState = RENDER_STATE_FILL;
+
+            entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
+            Body->Surface = GreenSurface;
+            Body->M = GetTranslationMatrix( V4(EPA->SupportPoint,1)) * GetScaleMatrix( V4(0.11,0.11,0.11,1));
+            Body->TM = M4Identity();
             Body->PrimitiveType = primitive_type::VOXEL;
           }
         }
-
-        {
-          push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-          Header->Type = render_buffer_entry_type::PRIMITIVE;
-          Header->RenderState = RENDER_STATE_FILL;
-          entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
-
-          Body->Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
-          Body->Surface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
-          SetMaterial(Body->Surface->Material, MATERIAL_RED_RUBBER);
-
-          simplex_index* SI = &Vis->Simplex[Vis->ActiveSimplexFrame];
-          Body->M = GetTranslationMatrix( V4(SI->ClosestPoint,1)) * GetScaleMatrix( V4(0.1,0.1,0.1,1));
-          Body->TM = M4Identity();
-          Body->PrimitiveType = primitive_type::VOXEL;
-        }
-
-        {
-          push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-          Header->Type = render_buffer_entry_type::PRIMITIVE;
-          Header->RenderState = RENDER_STATE_FILL;
-          entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
-
-          Body->Surface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
-          Body->Surface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
-          SetMaterial(Body->Surface->Material, MATERIAL_WHITE);
-
-          Body->M = GetTranslationMatrix( V4(0,0,0,1)) * GetScaleMatrix( V4(0.1,0.1,0.1,1));
-          Body->TM = M4Identity();
-          Body->PrimitiveType = primitive_type::VOXEL;
-        }
       }
     }
   }
-#if 0
-  // Get Position from Entity->CameraComponent->V
-  u32 Width = 12;
-  u32 Height = 12;
-
-  sprite_sheet Sprite = World->Assets->TileMapSpriteSheet;
-  for(u32 i = 0; i < Height; ++i )
-  {
-    for(u32 j = 0; j < Width; ++j )
-    {
-      tile_contents Contents = GetTileContents( &World->TileMap, j, i, 0);
-      if(Contents.Type == TILE_TYPE_FLOOR)
-      {
-        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-        Header->Type = render_buffer_entry_type::TILE;
-        entry_type_sprite* Body = (entry_type_map_tile*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_map_tile));
-
-        Body->Bitmap = Contents.Bitmap;
-
-        r32 TileWidth  = World->TileMap.TileWidthInMeters;
-        r32 TileHeight = World->TileMap.TileHeightInMeters;
-
-        m4 ScaleMatrix = GetScaleMatrix( V4(TileWidth, TileHeight, 1, 0) );
-        m4 TranslationMatrix = GetTranslationMatrix( V4(TileWidth * j, TileHeight * i, 0, 1 ) );
-
-        m4 Matrix = TranslationMatrix * ScaleMatrix;
-        Body->M = Matrix;
-
-        Body->TM = Contents.TM;
-      }
-    }
-  }
-#endif
 }

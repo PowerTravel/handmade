@@ -263,9 +263,9 @@ void OpenGLDraw( u32 VertexArrayObject, u32 ElementType, u32 nrVertecies, u32 Of
   GLenum Mode = GL_TRIANGLES;
   switch(ElementType)
   {
-    case BUFFER_TYPE_POINT:    Mode = GL_POINTS;    break;
-    case BUFFER_TYPE_LINE:     Mode = GL_LINES;     break;
-    case BUFFER_TYPE_TRIANGLE: Mode = GL_TRIANGLES; break;
+    case DATA_TYPE_POINT:    Mode = GL_POINTS;    break;
+    case DATA_TYPE_LINE:     Mode = GL_LINES;     break;
+    case DATA_TYPE_TRIANGLE: Mode = GL_TRIANGLES; break;
   }
   glBindVertexArray( VertexArrayObject );
   glDrawElements( Mode, nrVertecies, GL_UNSIGNED_INT, (GLvoid*)(sizeof(GLuint) * Offset));
@@ -536,9 +536,9 @@ gl_vertex_buffer CreateGLVertexBuffer( game_render_commands* Commands,
   return Result;
 }
 
-void OpenGLPushBufferData(game_render_commands* Commands, entry_type_indexed_buffer* Buffer)
+void OpenGLPushBufferData(game_render_commands* Commands, render_buffer* Buffer)
 {
-  if(!Buffer->FillVBO)
+  if(!Buffer->Fill)
   {
     return;
   }
@@ -599,7 +599,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
   // Accept fragment if it closer to the camera than the former one
   glDepthFunc(GL_LESS);
 
-  glClearColor(0,0,0.4,1);
+  glClearColor(0.7,0.7,0.7,1);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -648,7 +648,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
         glUniformMatrix4fv(Prog->M,  1, GL_TRUE, IndexedBuffer->M.E);
         glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, IndexedBuffer->NM.E);;
 
-        OpenGLPushBufferData(Commands, IndexedBuffer);
+        OpenGLPushBufferData(Commands, IndexedBuffer->Buffer);
 
         Assert(IndexedBuffer->Surface);
         component_surface* Surface = IndexedBuffer->Surface;
@@ -664,7 +664,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
         glUniform4fv( Prog->specularProduct, 1, SpecularColor.E);
         glUniform1f( Prog->shininess, Material->Shininess);
 
-        OpenGLDraw( *IndexedBuffer->VAO, IndexedBuffer->BufferType, IndexedBuffer->ElementLength, IndexedBuffer->ElementStart );
+        OpenGLDraw( *IndexedBuffer->Buffer->VAO, IndexedBuffer->DataType, IndexedBuffer->ElementLength, IndexedBuffer->ElementStart );
 
       }break;
 
@@ -692,9 +692,9 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
 
           VAO = PointVao;
           NrIndeces = 1;
-          ElementType = BUFFER_TYPE_POINT;
+          ElementType = DATA_TYPE_POINT;
 
-        OpenGLDraw( VAO, BUFFER_TYPE_TRIANGLE, NrIndeces, 0 );
+        OpenGLDraw( VAO, DATA_TYPE_TRIANGLE, NrIndeces, 0 );
         }else if(Primitive->PrimitiveType == primitive_type::QUAD)
         {
           local_persist u32 QuadVAO = 0;
@@ -708,7 +708,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
           }
           VAO = QuadVAO;
           NrIndeces = 6;
-          ElementType = BUFFER_TYPE_TRIANGLE;
+          ElementType = DATA_TYPE_TRIANGLE;
         }else if(Primitive->PrimitiveType == primitive_type::VOXEL)
         {
           local_persist u32 VoxelVAO = 0;
@@ -722,7 +722,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
           }
           VAO = VoxelVAO;
           NrIndeces = 36;
-          ElementType = BUFFER_TYPE_TRIANGLE;
+          ElementType = DATA_TYPE_TRIANGLE;
         }
 
         glUniformMatrix4fv(Prog->M,  1, GL_TRUE, Primitive->M.E);

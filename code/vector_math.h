@@ -1,5 +1,4 @@
-#ifndef MATH_H
-#define MATH_H
+#pragma once
 
 #include "intrinsics.h"
 
@@ -960,5 +959,17 @@ ProjectPointOntoPlane( const v3& PointToProject, const v3& PointOnPlane, const v
   return ProjectedPoint;
 }
 
+v3 GetBaryocentricCoordinates(const v3& p0, const v3& p1, const v3& p2, const v3& normal, const v3& Point)
+{
+  r32 OneOverFaceArea = 1.f/(normal * CrossProduct( p1 - p0, p2 - p0));
+  r32 SubAreaA = normal * CrossProduct( p2 - p1, Point - p1);
+  r32 SubAreaB = normal * CrossProduct( p0 - p2, Point - p2);
+  //r32 SubAreaC = Norm( CrossProduct( p1 - p0, Point - p0) );
+  r32 LambdaA = SubAreaA * OneOverFaceArea;
+  r32 LambdaB = SubAreaB * OneOverFaceArea;
+  r32 LambdaC = 1.f-(LambdaA + LambdaB);
+  //r32 LambdaC = SubAreaC * OneOverFaceArea;
 
-#endif
+  v3 Result = V3(LambdaA, LambdaB, LambdaC);
+  return Result;
+}

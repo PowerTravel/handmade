@@ -14,11 +14,11 @@ enum class render_buffer_entry_type
   LIGHT
 };
 
-enum buffer_type
+enum data_type
 {
-  BUFFER_TYPE_POINT,
-  BUFFER_TYPE_LINE,
-  BUFFER_TYPE_TRIANGLE
+  DATA_TYPE_POINT,
+  DATA_TYPE_LINE,
+  DATA_TYPE_TRIANGLE
 };
 
 enum render_state
@@ -35,28 +35,33 @@ struct entry_type_light
   m4 M;
 };
 
-struct entry_type_indexed_buffer
+struct render_buffer
 {
+  b32 Fill;
   u32* VAO;
   u32* VBO;
-  b32 FillVBO;
   u32 nvi;   // Nr Indeces
-  u32 nv;    // Nr Verices
-  u32 nvn;   // Nr Vertice Normals
-  u32 nvt;   // Nr Trxture Vertices
-
-  v3* v;     // Vertices
-  v3* vn;    // Vertice Normals
-  v2* vt;    // Texture Vertices
   u32* vi;   // Vertex Indeces
   u32* ti;   // Texture Indeces
   u32* ni;   // Normal Indeces
 
+  u32 nv;    // Nr Verices
+  v3* v;     // Vertices
+
+  u32 nvn;   // Nr Vertice Normals
+  v3* vn;    // Vertice Normals
+
+  u32 nvt;   // Nr Trxture Vertices
+  v2* vt;    // Texture Vertices
+};
+
+struct entry_type_indexed_buffer
+{
+  u32 DataType;
+  render_buffer* Buffer;
   component_surface* Surface;   // Has textures and render materials
   m4 M;                         // Model Matrix Transform
   m4 NM;                        // Normal Model Matrix Transform Transpose(Inv(ModelMatrix))
-
-  u32 BufferType;
   u32 ElementStart;
   u32 ElementLength;
 };

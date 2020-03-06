@@ -9,7 +9,7 @@ gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
   gjk_support Result = {};
   v3 NormalizedDirection = Normalize(Direction);
 
-#if 0
+#if 1
   v4 ADirModelSpace =  RigidInverse(*AModelMat) * V4( NormalizedDirection, 0);
   v4 BDirModelSpace = (RigidInverse(*BModelMat) * V4(-NormalizedDirection, 0));
 #else
@@ -194,21 +194,13 @@ VertexEdge(const v3& Vertex, gjk_simplex& Simplex, u32 Index0 = 0, u32 Index1 = 
 
 // Checks if the Vertex can be projected onto the Triangle.
 internal inline b32
-IsVertexInsideTriangle(const v3& Vertex, const v3& Normal, const v3 Triangle[])
+IsVertexInsideTriangle(const v3& VertexOnPlane, const v3& Normal, const v3 Triangle[])
 {
-  for( u32 Index = 0;
-           Index < 3;
-         ++Index )
-  {
-    const v3 v = Vertex - Triangle[Index];
-    const v3 e = Triangle[ (Index+1) % 3] - Triangle[Index];
-    const v3 x = CrossProduct(e,v);
-    if( (x * Normal) < 0 )
-    {
-      return false;
-    }
-  }
-  return true;
+  const v3 Coords = GetBaryocentricCoordinates( Triangle[0], Triangle[1], Triangle[2], Normal, VertexOnPlane);
+  const b32 InsideTriangle = (Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
+                             (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
+                             (Coords.E[2] >= 0) && (Coords.E[2] <= 1);
+  return InsideTriangle;
 }
 
 // See if the Vertex (Origin) can be projected onto a triangle. Otherwise reduce to a line (or point).
@@ -219,7 +211,7 @@ VertexTriangle( const v3& Vertex, gjk_simplex& Simplex, const u32 Index0 = 0, co
 
   const v3 Triangle[3]    = {Simplex.SP[Index0].S, Simplex.SP[Index1].S, Simplex.SP[Index2].S};
   const v3 Normal         = GetPlaneNormal(Triangle[0],Triangle[1],Triangle[2]);
-  const v3 ProjectedPoint = ProjectPointOntoPlane( Vertex, Triangle[Index0], Normal );
+  const v3 ProjectedPoint = ProjectPointOntoPlane( Vertex, Triangle[0], Normal );
 
   if( IsVertexInsideTriangle( ProjectedPoint, Normal, Triangle) )
   {
@@ -352,7 +344,6 @@ VertexTetrahedron( const v3& Vertex, gjk_simplex& Simplex )
     return Result;
   }
 
-
   Result = VertexTriangle( Vertex, Simplex, TriangleIndeces[0], TriangleIndeces[1], TriangleIndeces[2]);
   u32 TriangleIndex0 = TriangleIndeces[0];
   u32 TriangleIndex1 = TriangleIndeces[1];
@@ -423,58 +414,9 @@ IsPointOnSimplexSurface(const gjk_simplex& Simplex, const v3& Point)
   return false;
 }
 
-void DEBUG_GJKCollisionDetectionSequenceToFile(gjk_simplex& Simplex,
-                                               gjk_partial_result* Partial,
-                                               b32 append,
-                                               memory_arena* TemporaryArena,
-                                               platform_api* API)
-{
-  if(!API || !TemporaryArena) return;
-
-  char FilePath[] = "..\\handmade\\code\\matlab\\data\\GJKSimplexSeries.m";
-  temporary_memory TempMem = BeginTemporaryMemory(TemporaryArena);
-  char* DebugString = (char*) PushArray(TemporaryArena, (Simplex.Dimension+2)*64, char);
-  char* Scanner = DebugString;
-
-  for (u32 i = 0; i < Simplex.Dimension; ++i)
-  {
-    gjk_support SP = Simplex.SP[i];
-    Scanner += str::itoa(i+1, 64, Scanner);
-    *Scanner++ = ' ';
-    Scanner += str::ToString(SP.S, 4, 64, Scanner);
-    *Scanner++ = '\n';
-  }
-
-  if(Partial)
-  {
-    Scanner += str::itoa(Simplex.Dimension+1, 64, Scanner);
-    *Scanner++ = ' ';
-    Scanner += str::ToString(Partial->ClosestPoint, 4, 64, Scanner);
-  }else{
-    Scanner += str::itoa(Simplex.Dimension+1, 64, Scanner);
-    *Scanner++ = ' ';
-    Scanner += str::ToString(V3(0,0,0), 4, 64, Scanner);
-  }
-
-  thread_context Thread = {};
-  if(append)
-  {
-    if(Simplex.Dimension)
-    {
-      Scanner += str::itoa(-1, 64, Scanner);
-      *Scanner++ = ' ';
-      Scanner = PaddWithZeros(3, Scanner);
-      *Scanner++ = '\n';
-    }
-    API->DEBUGPlatformAppendToFile(&Thread, FilePath, str::StringLength(DebugString), (void*)DebugString);
-  }else{
-    API->DEBUGPlatformWriteEntireFile(&Thread, FilePath, str::StringLength(DebugString), (void*)DebugString);
-  }
-
-  EndTemporaryMemory(TempMem);
-}
-
-void RecordGJKFrame( component_gjk_epa_visualizer* Vis, gjk_simplex* Simplex, const v3& ClosestPointOnSurface )
+void RecordGJKFrame( component_gjk_epa_visualizer* Vis,
+                      const m4& AModelMat, const collider_mesh* AMesh,
+                      const m4& BModelMat, const collider_mesh* BMesh, gjk_simplex* Simplex, const v3& ClosestPointOnSurface )
 {
   if(!Vis->TriggerRecord)
   {
@@ -484,23 +426,15 @@ void RecordGJKFrame( component_gjk_epa_visualizer* Vis, gjk_simplex* Simplex, co
 
   if(!Vis->CSOMeshLength)
   {
-    aabb3f A = Vis->A->ColliderComponent->AABB;
-    v3 Ap[8] = {};
-    m4 ModelMatrixA = Vis->A->SpatialComponent->ModelMatrix;
-    GetAABBVertices(&A, Ap, NULL);
 
-    aabb3f B = Vis->A->ColliderComponent->AABB;
-    v3 Bp[8] = {};
-    m4 ModelMatrixB = Vis->B->SpatialComponent->ModelMatrix;
-    GetAABBVertices(&B, Bp, NULL);
-
-    v3 CSO[64] = {};
+    v3 CSO[128] = {};
+    Assert((AMesh->nv * BMesh->nv) < ArrayCount(CSO));
     u32 CSOCount = 0;
-    for(u32 i = 0; i < ArrayCount(Ap); ++i)
+    for(u32 i = 0; i < AMesh->nv; ++i)
     {
-      for(u32 j = 0; j < ArrayCount(Bp); ++j)
+      for(u32 j = 0; j < BMesh->nv; ++j)
       {
-        v3 cso = V3( ModelMatrixA * V4(Ap[i],1) - ModelMatrixB * V4(Bp[j],1));
+        v3 cso = V3( AModelMat * V4(AMesh->v[i],1) - BModelMat * V4(BMesh->v[j],1));
         b32 UniqueCSO = true;
         for(u32 k = 0; k < CSOCount; ++k)
         {
@@ -518,7 +452,7 @@ void RecordGJKFrame( component_gjk_epa_visualizer* Vis, gjk_simplex* Simplex, co
       }
     }
     Vis->VertexCount = CSOCount;
-    utils::Copy(Vis->VertexCount*sizeof(v3), CSO, &Vis->Vertices);
+    utils::Copy(Vis->VertexCount*sizeof(v3), CSO, Vis->Vertices);
     Vis->CSOMeshOffset = 0;
     Vis->CSOMeshLength = CSOCount;
     for(u32 i = 0; i < CSOCount; ++i)
@@ -529,8 +463,8 @@ void RecordGJKFrame( component_gjk_epa_visualizer* Vis, gjk_simplex* Simplex, co
   }
 
   Vis->UpdateVBO = true;
-  Assert(Vis->IndexCount < ArrayCount(Vis->Indeces));
-  Assert(Vis->VertexCount < ArrayCount(Vis->Vertices));
+  Assert(Vis->IndexCount  < Vis->MaxIndexCount);
+  Assert(Vis->VertexCount < Vis->MaxVertexCount);
 
   simplex_index* SI = &Vis->Simplex[Vis->SimplexCount++];
   SI->ClosestPoint = ClosestPointOnSurface;
@@ -553,7 +487,7 @@ void RecordGJKFrame( component_gjk_epa_visualizer* Vis, gjk_simplex* Simplex, co
 
     if(Unique)
     {
-      Assert(ArrayCount(Vis->Vertices) > VerticeIndex);
+      Assert(Vis->MaxVertexCount > VerticeIndex);
       Vis->Vertices[Vis->VertexCount++] = Vertex;
     }
     Vis->Indeces[SI->Offset+i] = VerticeIndex;
@@ -606,9 +540,9 @@ void RecordGJKFrame( component_gjk_epa_visualizer* Vis, gjk_simplex* Simplex, co
   Vis->IndexCount = SI->Offset + SI->Length;
 
   u32 IndexCount = 0;
-  Assert(ArrayCount(Vis->Indeces)  > Vis->IndexCount);
-  Assert(ArrayCount(Vis->Vertices) > Vis->VertexCount);
-  Assert(ArrayCount(Vis->Simplex)  > Vis->SimplexCount);
+  Assert( Vis->MaxIndexCount    > Vis->IndexCount);
+  Assert( Vis->MaxVertexCount   > Vis->VertexCount);
+  Assert( Vis->MaxSimplexCount  > Vis->SimplexCount);
 
   u32 SimplexCount = 0;
   u32 ActiveSimplexFrame = 0;
@@ -666,7 +600,7 @@ gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_m
       }
     }
 
-    if(Vis) RecordGJKFrame(Vis, &Simplex, PartialResult.ClosestPoint);
+    if(Vis) RecordGJKFrame(Vis, *AModelMat, AMesh, *BModelMat, BMesh, &Simplex, PartialResult.ClosestPoint);
 
     if(PartialResult.Reduced)
     {
@@ -677,10 +611,6 @@ gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_m
 
     if( Result.ContainsOrigin || (PartialResult.Distance >= PreviousDistance))
     {
-      if(Vis)
-      {
-        Vis->TriggerRecord = false;
-      }
       return Result;
     }
   }

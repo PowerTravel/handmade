@@ -68,7 +68,7 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
   Light->LightComponent->Color = V4(5,5,5,1);
-  Put( V3(0,3,3), 0, V3(0,1,0), Light->SpatialComponent );
+  Put( V3(0,2,4), 0, V3(0,1,0), Light->SpatialComponent );
 
   obj_loaded_file* cube = ReadOBJFile( Thread, GameState,
          Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
@@ -85,12 +85,28 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
   Put( V3( 3,0,1), Pi32/4, V3(1,1,1), CubeB->SpatialComponent );
   Scale( V3(1, 1, 1),  CubeB->SpatialComponent );
 
-  entity* CsoObject = NewEntity( World );
-  NewComponents( World, CsoObject, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
-  CsoObject->GjkEpaVisualizerComponent->A = CubeA;
-  CsoObject->GjkEpaVisualizerComponent->B = CubeB;
-  CsoObject->ControllerComponent->Controller = GetController(Input, 1);
-  CsoObject->ControllerComponent->ControllerMappingFunction = EpaGjkVisualizerController;
+  NewComponents( World, CubeA, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
+
+  CubeA->GjkEpaVisualizerComponent->MaxIndexCount = 1024;
+  CubeA->GjkEpaVisualizerComponent->Indeces = (u32*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->MaxIndexCount, u32);
+
+  CubeA->GjkEpaVisualizerComponent->MaxVertexCount = 1024;
+  CubeA->GjkEpaVisualizerComponent->Vertices = (v3*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->MaxVertexCount, v3);
+
+  CubeA->GjkEpaVisualizerComponent->NormalMaxIndexCount = 1024;
+  CubeA->GjkEpaVisualizerComponent->NormalIndeces = (u32*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->NormalMaxIndexCount, u32);
+
+  CubeA->GjkEpaVisualizerComponent->MaxNormalCount = 1024;
+  CubeA->GjkEpaVisualizerComponent->Normals = (v3*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->MaxNormalCount, v3);
+
+  CubeA->GjkEpaVisualizerComponent->MaxSimplexCount = 16;
+  CubeA->GjkEpaVisualizerComponent->Simplex = (simplex_index*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->MaxSimplexCount, simplex_index);
+
+  CubeA->GjkEpaVisualizerComponent->MaxEPACount = 32;
+  CubeA->GjkEpaVisualizerComponent->EPA = (epa_index*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->MaxEPACount, epa_index);;
+
+  CubeA->ControllerComponent->Controller = GetController(Input, 1);
+  CubeA->ControllerComponent->ControllerMappingFunction = EpaGjkVisualizerController;
 
   entity* ControllableCamera = NewEntity( World );
   NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
@@ -123,23 +139,22 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
 
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
-  Light->LightComponent->Color = V4(10,10,10,1);
-  Put( V3(3,3,3), 0, V3(0,1,0), Light->SpatialComponent );
+  Light->LightComponent->Color = V4(3,3,3,1);
+  Put( V3(0,20,0), 0, V3(0,1,0), Light->SpatialComponent );
 
-
-  for (s32 i = -0; i < 1; ++i)
+  for (s32 i = -0; i < 4; ++i)
   {
-    for (s32 j = 0; j < 1; ++j)
+    for (s32 j = 0; j < 4; ++j)
     {
-      for (s32 k = -0; k < 1; ++k)
+      for (s32 k = -0; k < 4; ++k)
       {
         entity* cubeEntity = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
         NewComponents( World, cubeEntity, COMPONENT_TYPE_DYNAMICS );
 
         // Uncomment this and set j < 1 in the for loop to reproduce a bug where
         // GJK perodically does not find a collision.
-        Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,2,1), cubeEntity->SpatialComponent );
-        //Put( V3(2.1f*i-0.1f, 2.f*j, 2.1f*k-0.1f), Pi32/4.f, V3(0,1,0), cubeEntity->SpatialComponent );
+        //Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,2,1), cubeEntity->SpatialComponent );
+        Put( V3(2.1f*i-0.1f, 2.f*j, 2.1f*k-0.1f), Pi32/4.f, V3(0,1,0), cubeEntity->SpatialComponent );
         cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
         cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0.5,0);
         cubeEntity->DynamicsComponent->Mass = 1;
@@ -152,6 +167,29 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   Put( V3( 0,-2, 0), 0, V3(0,1,0), floor->SpatialComponent );
   Scale( V3( 8, 1, 8),  floor->SpatialComponent );
 
+#if 0
+  NewComponents( World, floor, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
+  floor->GjkEpaVisualizerComponent->MaxIndexCount = 1024;
+  floor->GjkEpaVisualizerComponent->Indeces = (u32*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->MaxIndexCount, u32);
+
+  floor->GjkEpaVisualizerComponent->MaxVertexCount = 1024;
+  floor->GjkEpaVisualizerComponent->Vertices = (v3*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->MaxVertexCount, v3);
+
+  floor->GjkEpaVisualizerComponent->NormalMaxIndexCount = 1024;
+  floor->GjkEpaVisualizerComponent->NormalIndeces = (u32*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->NormalMaxIndexCount, u32);
+
+  floor->GjkEpaVisualizerComponent->MaxNormalCount = 1024;
+  floor->GjkEpaVisualizerComponent->Normals = (v3*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->MaxNormalCount, v3);
+
+  floor->GjkEpaVisualizerComponent->MaxSimplexCount = 16;
+  floor->GjkEpaVisualizerComponent->Simplex = (simplex_index*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->MaxSimplexCount, simplex_index);
+
+  floor->GjkEpaVisualizerComponent->MaxEPACount = 32;
+  floor->GjkEpaVisualizerComponent->EPA = (epa_index*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->MaxEPACount, epa_index);
+
+  floor->ControllerComponent->Controller = GetController(Input, 1);
+  floor->ControllerComponent->ControllerMappingFunction = EpaGjkVisualizerController;
+#endif
   entity* ControllableCamera = NewEntity( World );
   NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
 
