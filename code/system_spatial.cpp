@@ -269,9 +269,9 @@ void SpatialSystemUpdate( world* World, platform_api* API)
         GetAABBInverseMassMatrix( &CB->AABB, mb, &InvM[2], &InvM[3]);
         MultiplyDiagonalM12V12(InvM, ConstraintData->J, ConstraintData->InvMJ);
       }
-      if( A->GjkEpaVisualizerComponent)
+      if(Vis)
       {
-        A->GjkEpaVisualizerComponent->TriggerRecord = false;
+        Vis->TriggerRecord = false;
       }
     }
     ColliderPair = ColliderPair->Previous;
@@ -285,7 +285,7 @@ void SpatialSystemUpdate( world* World, platform_api* API)
       contact_data* ContactData = &Constraint->ContactData;
       r32 PenetrationDepth = ContactData->PenetrationDepth;
       v3  ContactNormal    = ContactData->ContactNormal;
-      r32 Baumgarte        = getBaumgarteCoefficient(dt, 0.9, PenetrationDepth);
+      r32 Baumgarte        = getBaumgarteCoefficient(dt, 0.7, PenetrationDepth);
       r32 Restitution      = getRestitutionCoefficient(Constraint->V, 0.0f, ContactNormal);
       r32 Lambda           = GetLambda( Constraint->V, Constraint->J, Constraint->InvMJ, Baumgarte, Restitution);
 

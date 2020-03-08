@@ -1655,7 +1655,7 @@ WinMain(  HINSTANCE aInstance,
         //GameMemory.PlatformAPI.FileError = Win32FileError;
         //GameMemory.PlatformAPI.CloseFile = Win32CloseFile;
 
-        GameMemory.PlatformAPI.AllocateMemory = Win32AllocateMemory;
+      GameMemory.PlatformAPI.AllocateMemory = Win32AllocateMemory;
       GameMemory.PlatformAPI.DeallocateMemory = Win32DeallocateMemory;
 
       GameMemory.PlatformAPI.DEBUGPlatformFreeFileMemory = DEBUGPlatformFreeFileMemory;

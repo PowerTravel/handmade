@@ -102,13 +102,13 @@ struct win32_replay_buffer
 
 struct win32_state
 {
-    win32_memory_block MemorySentinel;
+  win32_memory_block MemorySentinel;
 
   u64 TotalSize;
-  void* GameMemoryBlock;
+//  void* GameMemoryBlock;
   //TODO, give support for more than 1 replaybuffer
   //    It works fine to add as many ass you want, however
-  //    selecting specifik buffers to record to is not implemented.
+  //    selecting specific buffers to record to is not implemented.
   //    Also slow startup for some reason with many buffers.
   //    See ReplayBuffer loop initialization in win32_handmade.cpp
   win32_replay_buffer ReplayBuffer[1];

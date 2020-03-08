@@ -82,7 +82,7 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
 
   entity* CubeB = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
   SetMaterial(CubeB->SurfaceComponent->Material, MATERIAL_BLUE_RUBBER);
-  Put( V3( 3,0,1), Pi32/4, V3(1,1,1), CubeB->SpatialComponent );
+  Put( V3( 3,0,1), Pi32/4, V3(0,0,1), CubeB->SpatialComponent );
   Scale( V3(1, 1, 1),  CubeB->SpatialComponent );
 
   NewComponents( World, CubeA, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
@@ -142,11 +142,11 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   Light->LightComponent->Color = V4(3,3,3,1);
   Put( V3(0,20,0), 0, V3(0,1,0), Light->SpatialComponent );
 
-  for (s32 i = -0; i < 4; ++i)
+  for (s32 i = -0; i < 1; ++i)
   {
-    for (s32 j = 0; j < 4; ++j)
+    for (s32 j = 0; j < 1; ++j)
     {
-      for (s32 k = -0; k < 4; ++k)
+      for (s32 k = -0; k < 1; ++k)
       {
         entity* cubeEntity = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
         NewComponents( World, cubeEntity, COMPONENT_TYPE_DYNAMICS );
@@ -154,9 +154,9 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
         // Uncomment this and set j < 1 in the for loop to reproduce a bug where
         // GJK perodically does not find a collision.
         //Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,2,1), cubeEntity->SpatialComponent );
-        Put( V3(2.1f*i-0.1f, 2.f*j, 2.1f*k-0.1f), Pi32/4.f, V3(0,1,0), cubeEntity->SpatialComponent );
+        Put( V3(2.f*i, 2.f*j, 2.f*k), 0, V3(0,1,0), cubeEntity->SpatialComponent );
         cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
-        cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0.5,0);
+        cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0,0);
         cubeEntity->DynamicsComponent->Mass = 1;
       }
     }
@@ -167,7 +167,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   Put( V3( 0,-2, 0), 0, V3(0,1,0), floor->SpatialComponent );
   Scale( V3( 8, 1, 8),  floor->SpatialComponent );
 
-#if 0
+#if 1
   NewComponents( World, floor, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
   floor->GjkEpaVisualizerComponent->MaxIndexCount = 1024;
   floor->GjkEpaVisualizerComponent->Indeces = (u32*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->MaxIndexCount, u32);
@@ -378,8 +378,8 @@ void initiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
     Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
 
     //Create2DScene(Thread, Memory, RenderCommands, Input );
-    //CreateCollisionTestScene(Thread, Memory, RenderCommands, Input );
-    CreateEpaVisualizerTestScene(Thread, Memory, RenderCommands, Input );
+    CreateCollisionTestScene(Thread, Memory, RenderCommands, Input );
+    //CreateEpaVisualizerTestScene(Thread, Memory, RenderCommands, Input );
     for (s32 ControllerIndex = 0;
     ControllerIndex < ArrayCount(Input->Controllers);
       ++ControllerIndex)
