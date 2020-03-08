@@ -1775,7 +1775,8 @@ WinMain(  HINSTANCE aInstance,
             Game = Win32LoadGameCode(SourceGameCodeDLLFullPath,
                           TempGameCodeDLLFullPath,
                           TempGameCodeLockFullPath);
-          NewInput->ExecutableReloaded = true;
+            Sleep(1500);
+            NewInput->ExecutableReloaded = true;
           }
 
           game_controller_input* OldKeyboardController =GetController(OldInput,0);
