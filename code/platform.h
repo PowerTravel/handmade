@@ -333,8 +333,23 @@ extern platform_api Platform;
 
 struct game_memory
 {
-  struct game_state* GameState;
-  platform_api PlatformAPI;
+//    uint64 PermanentStorageSize;
+//    void *PermanentStorage; // NOTE(casey): REQUIRED to be cleared to zero at startup
+
+//    uint64 TransientStorageSize;
+//    void *TransientStorage; // NOTE(casey): REQUIRED to be cleared to zero at startup
+
+//    uint64 DebugStorageSize;
+//    void *DebugStorage; // NOTE(casey): REQUIRED to be cleared to zero at startup
+
+//    platform_work_queue *HighPriorityQueue;
+//    platform_work_queue *LowPriorityQueue;
+
+//    b32 ExecutableReloaded;
+//    platform_api PlatformAPI;
+
+    struct game_state* GameState;
+    platform_api PlatformAPI;
 };
 
 #define GAME_UPDATE_AND_RENDER(name) void name(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )

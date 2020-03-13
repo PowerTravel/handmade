@@ -1,3 +1,4 @@
+#include "utility_macros.h"
 #include "entity_components.h"
 #include "component_camera.h"
 #include "component_controller.h"
@@ -9,17 +10,21 @@
 #include "component_surface.h"
 #include "component_sprite_animation.h"
 #include "component_gjk_epa_visualizer.h"
-#include "utility_macros.h"
+#include "epa_collision_data.h"
 
 world* AllocateWorld( u32 NrMaxEntities )
 {
-	world* Result = BootstrapPushStruct( world, Arena );
+	world* Result = BootstrapPushStruct( world, PersistentArena );
 
 	InitializeTileMap( &Result->TileMap );
 
 	Result->NrEntities = 0;
 	Result->NrMaxEntities = NrMaxEntities;
-	Result->Entities = (entity*) PushArray( &Result->Arena, NrMaxEntities, entity );
+	Result->Entities = (entity*) PushArray( &Result->PersistentArena, Result->NrMaxEntities, entity );
+
+	Result->NrContacts = 0;
+	Result->MaxNrContacts = NrMaxEntities;
+	Result->Contacts = (contact_data_list*)  PushSize(&Result->PersistentArena, Result->MaxNrContacts*( sizeof(contact_data_list) + 4*sizeof(contact_data)));
 
 	return Result;
 }
@@ -33,45 +38,45 @@ void NewComponents( world* World, entity* Entity, u32 EntityFlags )
 
 	if( EntityFlags & COMPONENT_TYPE_CAMERA )
 	{
-		Entity->CameraComponent = (component_camera*) PushStruct(&World->Arena, component_camera);
+		Entity->CameraComponent = (component_camera*) PushStruct(&World->PersistentArena, component_camera);
 	}
 	if( EntityFlags & COMPONENT_TYPE_LIGHT )
 	{
-		Entity->LightComponent = (component_light*) PushStruct(&World->Arena, component_light);
+		Entity->LightComponent = (component_light*) PushStruct(&World->PersistentArena, component_light);
 	}
 	if( EntityFlags & COMPONENT_TYPE_CONTROLLER )
 	{
-		Entity->ControllerComponent = (component_controller*) PushStruct(&World->Arena, component_controller);
+		Entity->ControllerComponent = (component_controller*) PushStruct(&World->PersistentArena, component_controller);
 	}
 	if( EntityFlags & COMPONENT_TYPE_MESH )
 	{
-		Entity->MeshComponent = (component_mesh*) PushStruct(&World->Arena, component_mesh);
+		Entity->MeshComponent = (component_mesh*) PushStruct(&World->PersistentArena, component_mesh);
 	}
 	if( EntityFlags & COMPONENT_TYPE_SPATIAL )
 	{
-		Entity->SpatialComponent = (component_spatial*) PushStruct(&World->Arena, component_spatial);
+		Entity->SpatialComponent = (component_spatial*) PushStruct(&World->PersistentArena, component_spatial);
 	}
 	if( EntityFlags & COMPONENT_TYPE_COLLIDER )
 	{
 		Assert(Entity->SpatialComponent); // Collision Requires Spatial
-		Entity->ColliderComponent = (component_collider*) PushStruct(&World->Arena, component_collider);
+		Entity->ColliderComponent = (component_collider*) PushStruct(&World->PersistentArena, component_collider);
 	}
 	if( EntityFlags & COMPONENT_TYPE_DYNAMICS )
 	{
 		Assert(Entity->SpatialComponent && Entity->ColliderComponent); // Dynamics Requires Spatial and Collision
-		Entity->DynamicsComponent = (component_dynamics*) PushStruct(&World->Arena, component_dynamics);
+		Entity->DynamicsComponent = (component_dynamics*) PushStruct(&World->PersistentArena, component_dynamics);
 	}
 	if( EntityFlags & COMPONENT_TYPE_SURFACE )
 	{
-		Entity->SurfaceComponent = (component_surface*) PushStruct(&World->Arena, component_surface);
+		Entity->SurfaceComponent = (component_surface*) PushStruct(&World->PersistentArena, component_surface);
 	}
 	if( EntityFlags & COMPONENT_TYPE_SPRITE_ANIMATION )
 	{
-		Entity->SpriteAnimationComponent = (component_sprite_animation*) PushStruct(&World->Arena, component_sprite_animation);
+		Entity->SpriteAnimationComponent = (component_sprite_animation*) PushStruct(&World->PersistentArena, component_sprite_animation);
 	}
 	if( EntityFlags & COMPONENT_TYPE_GJK_EPA_VISUALIZER )
 	{
-		Entity->GjkEpaVisualizerComponent = (component_gjk_epa_visualizer*) PushStruct(&World->Arena, component_gjk_epa_visualizer);
+		Entity->GjkEpaVisualizerComponent = (component_gjk_epa_visualizer*) PushStruct(&World->PersistentArena, component_gjk_epa_visualizer);
 	}
 }
 

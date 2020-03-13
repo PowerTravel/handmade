@@ -88,16 +88,19 @@ internal inline r32 DotProductV12xV12( v3* A, v3* B)
 }
 
 internal inline r32
-getBaumgarteCoefficient(r32 dt, r32 Scalar, r32 PenetrationDepth)
+getBaumgarteCoefficient(r32 dt, r32 Scalar, r32 PenetrationDepth, r32 Slop)
 {
-  r32 Baumgarte = - (Scalar / dt) * PenetrationDepth;
+  r32 k = (PenetrationDepth  - Slop) > 0 ? (PenetrationDepth  - Slop) : 0;
+  r32 Baumgarte = - (Scalar / dt) * k;
   return Baumgarte;
 }
 
 internal inline r32
-getRestitutionCoefficient(v3 V[], r32 Scalar, v3 Normal)
+getRestitutionCoefficient(v3 V[], r32 Scalar, v3 Normal, r32 Slop)
 {
-  r32 Restitution = Scalar * ((V[0] + V[1] + V[2] + V[3]) * Normal);
+  r32 ClosingSpeed = ((V[0] + V[1] + V[2] + V[3]) * Normal);
+  ClosingSpeed = (ClosingSpeed - Slop) > 0 ? (ClosingSpeed - Slop) : 0;
+  r32 Restitution = Scalar * ClosingSpeed;
   return Restitution;
 }
 
@@ -112,39 +115,97 @@ internal r32 GetLambda(  v3 V[], v3 J[], v3 InvMJ[],
   return Result;
 }
 
-struct constraint_data
+v3 ClosestPointOnEdge(const v3& EdgeStart, const v3& EdgeEnd, const v3& Point)
 {
-  contact_data ContactData;
-  v3 J[4];
-  v3 InvMJ[4];
-  v3 V[4];
-  r32 AccumulatedLambda;
-  entity* A;
-  entity* B;
-  constraint_data* Next;
-};
+  const v3 EdgeDirection = Normalize(EdgeEnd-EdgeStart);
+  const r32 EdgeLength = Norm(EdgeEnd-EdgeStart);
+  const r32 ProjectionScalar = (Point-EdgeStart)*EdgeDirection;
+
+  v3 ClosestPointOnEdge = {};
+  if(ProjectionScalar <= 0)
+  {
+    ClosestPointOnEdge = EdgeStart;
+  }else if(ProjectionScalar >= EdgeLength )
+  {
+    ClosestPointOnEdge = EdgeEnd;
+  }else{
+    ClosestPointOnEdge = EdgeStart + ProjectionScalar * EdgeDirection;
+  }
+
+  return ClosestPointOnEdge;
+}
 
 void SpatialSystemUpdate( world* World, platform_api* API)
 {
   r32 dt =  World->dtForFrame;
   local_persist v3 CollisionPoint = {};
-  memory_arena* Arena = &World->Arena;
+  memory_arena* PersistentArena = &World->PersistentArena;
+  memory_arena* TransientArena = World->TransientArena;
   tile_map* TileMap = &World->TileMap;
 
+  temporary_memory TempMem1 = BeginTemporaryMemory( TransientArena );
 
-  temporary_memory TempMem1 = BeginTemporaryMemory( Arena );
-
-  memory_index DebugPrintMemorySize = Megabytes(2);
-  char* const DebugPrintMemory = (char*) PushArray(Arena, DebugPrintMemorySize, char);
+  memory_index DebugPrintMemorySize = Megabytes(1);
+  char* const DebugPrintMemory = (char*) PushArray(TransientArena, DebugPrintMemorySize, char);
   char* Scanner = DebugPrintMemory;
+
+
+  // Remove invalid contacts
+  for (u32 i = 0; i < World->NrContacts; ++i)
+  {
+    umm ByteStride  =  i * ( sizeof(contact_data_list) + 4*sizeof(contact_data));
+    contact_data_list* ContactData = (contact_data_list*) ( ( (u8*) World->Contacts ) + ByteStride);
+    Assert(ContactData->MaxNrContacts ==4);
+    contact_data SavedContacts[4] = {};
+    u32 SavedContactIdx = 0;
+    m4 ModelMatA = ContactData->A->SpatialComponent->ModelMatrix;
+    m4 ModelMatB = ContactData->B->SpatialComponent->ModelMatrix;
+    for (u32 j = 0; j < ContactData->NrContacts; ++j)
+    {
+      contact_data* Contact = &ContactData->Contacts[j];
+      const v3 LocalToGlobalA = V3( ModelMatA * V4(Contact->A_ContactModelSpace,1));
+      const v3 LocalToGlobalB = V3( ModelMatB * V4(Contact->B_ContactModelSpace,1));
+
+      const v3 rAB = LocalToGlobalB - LocalToGlobalA;
+
+      const v3 rA  = Contact->A_ContactWorldSpace - LocalToGlobalA;
+      const v3 rB  = Contact->B_ContactWorldSpace - LocalToGlobalB;
+
+      const r32 normDot = Contact->ContactNormal * rAB;
+      const b32 stillPenetrating = normDot <= 0.0f;
+
+      const r32 persistentThresholdSq = 0.01;
+      const r32 lenDiffA = NormSq(rA);
+      const r32 lenDiffB = NormSq(rB);
+
+      // keep contact point if the collision pair is
+      // still colliding at this point, and the local
+      // positions are not too far from the global
+      // positions original acquired from collision detection
+      if (stillPenetrating && (lenDiffA < persistentThresholdSq || lenDiffB < persistentThresholdSq) )
+      {
+        // Persistent contact
+        SavedContacts[SavedContactIdx++] = *Contact;
+      }
+    }
+
+    utils::Copy(sizeof(SavedContacts), SavedContacts, ContactData->Contacts);
+    ContactData->NrContacts = SavedContactIdx;
+  }
 
   aabb_tree BroadPhaseTree = {};
 
   for(u32 Index = 0;  Index < World->NrEntities; ++Index )
   {
     entity* E = &World->Entities[Index];
+    #if 0
     if( E->Types & COMPONENT_TYPE_DYNAMICS )
     {
+      #if 1
+      v3 Gravity = V3(0,-10,0);
+      component_dynamics*  D = E->DynamicsComponent;
+      D->LinearVelocity += dt * Gravity * D->Mass;
+      #else
       component_spatial*   S = E->SpatialComponent;
       component_collider*  C = E->ColliderComponent;
       component_dynamics*  D = E->DynamicsComponent;
@@ -155,29 +216,29 @@ void SpatialSystemUpdate( world* World, platform_api* API)
 
       v3 Gravity = V3(0,-10,0);
       v3 LinearAcceleration = Gravity * Mass;
-      LinearVelocity        = LinearVelocity + dt * LinearAcceleration;
+      LinearVelocity     = LinearVelocity + dt * LinearAcceleration;
       Translate(dt * LinearVelocity, S);
 
       v3 AngularAcceleration = {};
-      AngularVelocity    = AngularVelocity + dt * AngularAcceleration;
+      AngularVelocity = AngularVelocity + dt * AngularAcceleration;
       Rotate(Norm(dt*AngularVelocity), Normalize(dt*AngularVelocity) ,S);
 
       D->LinearVelocity  = LinearVelocity;
       D->AngularVelocity = AngularVelocity;
+      #endif
     }
+    #endif
     if( E->Types & COMPONENT_TYPE_COLLIDER )
     {
       aabb3f AABBWorldSpace = {};
       GetTransformedAABBFromColliderMesh( E->ColliderComponent, E->SpatialComponent->ModelMatrix, &AABBWorldSpace );
-      AABBTreeInsert( Arena, &BroadPhaseTree, E, AABBWorldSpace );
-
-      E->ColliderComponent->IsColliding = false;
+      AABBTreeInsert( TransientArena, &BroadPhaseTree, E, AABBWorldSpace );
 
       if(API)
       {
         // Print Tree
         s64 RemainingSize = DebugPrintMemorySize + DebugPrintMemory - Scanner;
-        Scanner += GetPrintableTree( Arena, &BroadPhaseTree, RemainingSize, Scanner);
+        Scanner += GetPrintableTree( TransientArena, &BroadPhaseTree, RemainingSize, Scanner);
         RemainingSize = DebugPrintMemorySize + DebugPrintMemory - Scanner;
         Scanner += str::itoa(-1,RemainingSize,Scanner);
         *Scanner++ = ' ';
@@ -188,9 +249,9 @@ void SpatialSystemUpdate( world* World, platform_api* API)
     }
   }
 
-  broad_phase_result_stack* const BroadPhaseResult = GetCollisionPairs( Arena, &BroadPhaseTree );
+  broad_phase_result_stack* const BroadPhaseResult = GetCollisionPairs( TransientArena, &BroadPhaseTree );
   broad_phase_result_stack* ColliderPair = BroadPhaseResult;
-  constraint_data* ConstraintHead = 0;
+
   while( ColliderPair )
   {
     entity* A = ColliderPair->A;
@@ -216,59 +277,203 @@ void SpatialSystemUpdate( world* World, platform_api* API)
           &SA->ModelMatrix, CA->Mesh,
           &SB->ModelMatrix, CB->Mesh,
           Vis);
-      if(NarrowPhaseResult.ContainsOrigin)
+
+      if (NarrowPhaseResult.ContainsOrigin)
       {
-        constraint_data* ConstraintData = (constraint_data*) PushStruct(Arena, constraint_data);
-
-        ConstraintData->ContactData = EPACollisionResolution(&World->Arena,  &SA->ModelMatrix, CA->Mesh,
-                                                                             &SB->ModelMatrix, CB->Mesh,
-                                                                             NarrowPhaseResult.Simplex,
-                                                                             Vis);
-        ConstraintData->AccumulatedLambda = 0;
-        ConstraintData->A = A;
-        ConstraintData->B = B;
-        ConstraintData->Next = ConstraintHead;
-        ConstraintHead = ConstraintData;
-
-        CA->IsColliding = true;
-        CB->IsColliding = true;
-        CA->CollisionPoint = ConstraintData->ContactData.A_ContactModelSpace;
-        CB->CollisionPoint = ConstraintData->ContactData.B_ContactModelSpace;
-        v3 va = {};
-        v3 wa = {};
-        v3 vb = {};
-        v3 wb = {};
-        r32 ma = 10e37;
-        r32 mb = 10e37; // Solve stationary objects with stationary constraint?
-        if(A->Types & COMPONENT_TYPE_DYNAMICS)
+        contact_data NewContact = EPACollisionResolution(TransientArena, &SA->ModelMatrix, CA->Mesh,
+                                                                         &SB->ModelMatrix, CB->Mesh,
+                                                                         NarrowPhaseResult.Simplex,
+                                                                         Vis);
+        // TODO: Find a smarter way than to check the relevant collision points instead of looping through all of them
+        // Loop through all existing contacts and see if we have similar boidies already connecting
+        contact_data_list* ContactData = 0;
+        for(u32 i = 0; i < World->NrContacts; ++i)
         {
-          va = DA->LinearVelocity;
-          wa = DA->AngularVelocity;
-          ma = DA->Mass;
+          umm ByteStride  =  i * ( sizeof(contact_data_list) + 4*sizeof(contact_data));
+          contact_data_list* WorldContact = (contact_data_list*) ( ( (u8*) World->Contacts ) + ByteStride);
+          if(WorldContact->A->id == A->id && WorldContact->B->id == B->id )
+          {
+            ContactData = WorldContact;
+          }
+          else if (WorldContact->B->id == A->id && WorldContact->A->id == B->id )
+          {
+            // Note: Jakob, This can be a source of bugs. Check it.
+            contact_data Tmp = {};
+            Tmp.A_ContactWorldSpace =  NewContact.B_ContactWorldSpace;
+            Tmp.B_ContactWorldSpace =  NewContact.A_ContactWorldSpace;
+            Tmp.A_ContactModelSpace =  NewContact.B_ContactModelSpace;
+            Tmp.B_ContactModelSpace =  NewContact.A_ContactModelSpace;
+            Tmp.ContactNormal       = -NewContact.ContactNormal;
+            Tmp.TangentNormalOne    =  NewContact.TangentNormalOne;
+            Tmp.TangentNormalTwo    =  NewContact.TangentNormalTwo;
+            Tmp.PenetrationDepth    =  NewContact.PenetrationDepth;
+            NewContact = Tmp;
+            ContactData = WorldContact;
+          }
         }
 
-        if(B->Types & COMPONENT_TYPE_DYNAMICS)
+        if(!ContactData)
         {
-          vb = DB->LinearVelocity;
-          wb = DB->AngularVelocity;
-          mb = DB->Mass;
+          Assert(World->NrContacts < World->MaxNrContacts);
+          umm ByteStride  =  World->NrContacts * ( sizeof(contact_data_list) + 4*sizeof(contact_data));
+          ContactData = (contact_data_list*) ( ( (u8*) World->Contacts ) + ByteStride);
+          World->NrContacts++;
+          ContactData->A = A;
+          ContactData->B = B;
+
+          ContactData->NrContacts = 0;
+          ContactData->MaxNrContacts = 4;
+          ContactData->Contacts = (contact_data*) (ContactData + 1);
+
         }
-        const v3& ra = ConstraintData->ContactData.A_ContactModelSpace;
-        const v3& rb = ConstraintData->ContactData.B_ContactModelSpace;
-        const v3& n  = ConstraintData->ContactData.ContactNormal;
-        ConstraintData->J[0] = -n;
-        ConstraintData->J[1] = -CrossProduct(ra, n);
-        ConstraintData->J[2] = n;
-        ConstraintData->J[3] = CrossProduct(rb, n);
-        ConstraintData->V[0] = va;
-        ConstraintData->V[1] = wa;
-        ConstraintData->V[2] = vb;
-        ConstraintData->V[3] = wb;
-        m3 InvM[4] = {};
-        GetAABBInverseMassMatrix( &CA->AABB, ma, &InvM[0], &InvM[1]);
-        GetAABBInverseMassMatrix( &CB->AABB, mb, &InvM[2], &InvM[3]);
-        MultiplyDiagonalM12V12(InvM, ConstraintData->J, ConstraintData->InvMJ);
+
+        b32 FarEnough = true;
+        for (u32 i = 0; i < ContactData->NrContacts; ++i)
+        {
+          const contact_data* OldContact = &ContactData->Contacts[i];
+          const v3 rALocal = NewContact.A_ContactModelSpace - OldContact->A_ContactModelSpace;
+          const v3 rBLocal = NewContact.B_ContactModelSpace - OldContact->B_ContactModelSpace;
+          const v3 rAGlobal = NewContact.A_ContactWorldSpace - OldContact->A_ContactWorldSpace;
+          const v3 rBGlobal = NewContact.B_ContactWorldSpace - OldContact->B_ContactWorldSpace;
+          r32 nsrla = Norm(rALocal);
+          r32 nsrlb = Norm(rBLocal);
+          r32 nsrga = Norm(rAGlobal);
+          r32 nsrgb = Norm(rBGlobal);
+
+          const b32 NotFarEnoughAL = Norm(rALocal)  < 0.01;
+          const b32 NotFarEnoughBL = Norm(rBLocal)  < 0.01;
+          const b32 NotFarEnoughAG = Norm(rAGlobal) < 0.01;
+          const b32 NotFarEnoughBG = Norm(rBGlobal) < 0.01;
+
+          if (NotFarEnoughAG || NotFarEnoughBG)
+          {
+            FarEnough = false;
+            //ContactData->Contacts[i] = NewContact;
+            break;
+          }
+        }
+
+        if (FarEnough)
+        {
+          if (ContactData->NrContacts < ContactData->MaxNrContacts)
+          {
+            ContactData->Contacts[ContactData->NrContacts++] = NewContact;
+          }else{
+            #if 0
+            local_persist u32 idx = 4;
+            ContactData->Contacts[idx % 4] = NewContact;
+            idx++;
+            #else
+            Assert(ContactData->MaxNrContacts == 4);
+            Assert(ContactData->NrContacts == ContactData->MaxNrContacts);
+
+            contact_data PossibleContacts[5] = {};
+            v3 ContactPoints[4] = {};
+            u32 AddedContacts[4] = {};
+            utils::Copy(4* sizeof(contact_data), ContactData->Contacts, PossibleContacts );
+            PossibleContacts[4] = NewContact;
+            const m4 ModelMatA = ContactData->A->SpatialComponent->ModelMatrix;
+            const m4 ModelMatB = ContactData->B->SpatialComponent->ModelMatrix;
+            r32 Depth = 0;
+            u32 nrAddedContacts = 0;
+            for (u32 i = 0; i < ArrayCount(PossibleContacts); ++i)
+            {
+              const v3 PossiblePointA = V3( ModelMatA * V4(PossibleContacts[i].A_ContactModelSpace,1));
+              const v3 PossiblePointB = V3( ModelMatB * V4(PossibleContacts[i].B_ContactModelSpace,1));
+              const r32 PenetrationDepth = Norm(PossiblePointB - PossiblePointA);
+              if(Depth < PenetrationDepth)
+              {
+                AddedContacts[0] = i;
+                ContactData->Contacts[0] = PossibleContacts[i];
+                Depth = PenetrationDepth;
+                ContactPoints[0] = PossiblePointA;
+              }
+            }
+
+            r32 Length = 0;
+            for (u32 i = 0; i < ArrayCount(PossibleContacts); ++i)
+            {
+              if(i == AddedContacts[0])
+              {
+                continue;
+              }
+
+              const v3 PossiblePointA = V3( ModelMatA * V4(PossibleContacts[i].A_ContactModelSpace,1));
+
+              r32 TestLength = Norm(PossiblePointA - ContactPoints[0]);
+              if(Length < TestLength)
+              {
+                AddedContacts[1] = i;
+                ContactPoints[1] = PossiblePointA;
+                ContactData->Contacts[1] = PossibleContacts[i];
+                Length = TestLength;
+              }
+            }
+
+            Length = 0;
+            for (u32 i = 0; i < ArrayCount(PossibleContacts); ++i)
+            {
+              if(i == AddedContacts[0] || i == AddedContacts[1])
+              {
+                continue;
+              }
+              const v3 PossiblePoint = V3( ModelMatA * V4(PossibleContacts[i].A_ContactModelSpace,1));
+              const v3 ClosestPoint = ClosestPointOnEdge(ContactPoints[0], ContactPoints[1], PossiblePoint);
+
+              const r32 TestLength = Norm(PossiblePoint - ClosestPoint);
+              if(Length < TestLength)
+              {
+                AddedContacts[2] = i;
+                ContactPoints[2] = PossiblePoint;
+                ContactData->Contacts[2] = PossibleContacts[i];
+                Length = TestLength;
+              }
+            }
+
+            Length = 0;
+            b32 FinalPointAdded = false;
+            for (u32 i = 0; i < ArrayCount(PossibleContacts); ++i)
+            {
+              if(i == AddedContacts[0] || i == AddedContacts[1] || i == AddedContacts[2])
+              {
+                continue;
+              }
+
+              const v3 PossiblePoint = V3( ModelMatA * V4(PossibleContacts[i].A_ContactModelSpace,1));
+              const v3 a = ContactPoints[0];
+              const v3 b = ContactPoints[1];
+              const v3 c = ContactPoints[2];
+              const v3 v = PossiblePoint;
+              const v3 Normal = GetPlaneNormal(a,b,c);
+              const v3 ProjectedPoint = ProjectPointOntoPlane(v, a, Normal);
+              const v3 Coords = GetBaryocentricCoordinates( a, b, c, Normal, ProjectedPoint);
+              const b32 InsideTriangle = (Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
+                                         (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
+                                         (Coords.E[2] >= 0) && (Coords.E[2] <= 1);
+              if(InsideTriangle)
+              {
+                continue;
+              }
+
+              r32 CumuLength = Norm(v-a) + Norm(v-b) + Norm(v-c);
+              if(CumuLength > Length)
+              {
+                FinalPointAdded = true;
+                AddedContacts[3] = i;
+                ContactData->Contacts[3] = PossibleContacts[i];
+              }
+            }
+
+            if(!FinalPointAdded)
+            {
+              ContactData->NrContacts = 3;
+              ContactData->Contacts[3] = {};
+            }
+            #endif
+          }
+        }
       }
+
       if(Vis)
       {
         Vis->TriggerRecord = false;
@@ -277,66 +482,148 @@ void SpatialSystemUpdate( world* World, platform_api* API)
     ColliderPair = ColliderPair->Previous;
   }
 
-  for (int i = 0; i < 4; ++i)
+  for(u32 i = 0; i < World->NrContacts; ++i)
   {
-    constraint_data* Constraint = ConstraintHead;
-    while(Constraint)
+    contact_data_list* ContactData = (contact_data_list*) ((u8*) (World->Contacts ) + i * ( sizeof(contact_data_list) + 4*sizeof(contact_data)));
+    entity* A = ContactData->A;
+    entity* B = ContactData->B;
+    v3 va = {};
+    v3 wa = {};
+    v3 vb = {};
+    v3 wb = {};
+    r32 ma = 10e37;
+    r32 mb = 10e37; // Solve stationary objects with stationary constraint?
+    if (A->DynamicsComponent)
     {
-      contact_data* ContactData = &Constraint->ContactData;
-      r32 PenetrationDepth = ContactData->PenetrationDepth;
-      v3  ContactNormal    = ContactData->ContactNormal;
-      r32 Baumgarte        = getBaumgarteCoefficient(dt, 0.7, PenetrationDepth);
-      r32 Restitution      = getRestitutionCoefficient(Constraint->V, 0.0f, ContactNormal);
-      r32 Lambda           = GetLambda( Constraint->V, Constraint->J, Constraint->InvMJ, Baumgarte, Restitution);
+      va = A->DynamicsComponent->LinearVelocity;
+      wa = A->DynamicsComponent->AngularVelocity;
+      ma = A->DynamicsComponent->Mass;
+    }
 
-      r32 OldCumulativeLambda = Constraint->AccumulatedLambda;
-      Constraint->AccumulatedLambda += Lambda;
-      Constraint->AccumulatedLambda = Constraint->AccumulatedLambda <=0 ? 0 : Constraint->AccumulatedLambda;
-      r32 LambdaDiff = Constraint->AccumulatedLambda - OldCumulativeLambda;
+    if (B->DynamicsComponent)
+    {
+      vb = B->DynamicsComponent->LinearVelocity;
+      wb = B->DynamicsComponent->AngularVelocity;
+      mb = B->DynamicsComponent->Mass;
+    }
 
-      v3 DeltaV[4] = {};
-      ScaleV12(LambdaDiff,  Constraint->InvMJ, DeltaV);
+    m3 InvM[4] = {};
+    GetAABBInverseMassMatrix( &A->ColliderComponent->AABB, ma, &InvM[0], &InvM[1]);
+    GetAABBInverseMassMatrix( &B->ColliderComponent->AABB, mb, &InvM[2], &InvM[3]);
 
-      Constraint->V[0] += DeltaV[0];
-      Constraint->V[1] += DeltaV[1];
-      Constraint->V[2] += DeltaV[2];
-      Constraint->V[3] += DeltaV[3];
 
-      Constraint = Constraint->Next;
+    for(u32 j = 0; j < ContactData->NrContacts; ++j)
+    {
+      contact_data* Contact = &ContactData->Contacts[j];
+      const v3& ra = Contact->A_ContactModelSpace;
+      const v3& rb = Contact->B_ContactModelSpace;
+      const v3& n  = Contact->ContactNormal;
+
+      Contact->J[0] = -n;
+      Contact->J[1] = -CrossProduct(ra, n);
+      Contact->J[2] = n;
+      Contact->J[3] = CrossProduct(rb, n);
+
+      MultiplyDiagonalM12V12(InvM, Contact->J, Contact->InvMJ);
+    }
+  }
+  for(u32 j = 0; j < World->NrContacts; ++j)
+  {
+    contact_data_list* ContactData = (contact_data_list*) ((u8*) (World->Contacts ) + j * ( sizeof(contact_data_list) + 4*sizeof(contact_data)));
+    for(u32 k = 0; k < ContactData->NrContacts; ++k)
+    {
+        contact_data* Contact = &ContactData->Contacts[k];
+        Contact->AccumulatedLambda = 0;
+    }
+  }
+  for (u32 i = 0; i < 10; ++i)
+  {
+    for(u32 j = 0; j < World->NrContacts; ++j)
+    {
+      contact_data_list* ContactData = (contact_data_list*) ((u8*) (World->Contacts ) + j * ( sizeof(contact_data_list) + 4*sizeof(contact_data)));
+      entity* A = ContactData->A;
+      entity* B = ContactData->B;
+      for(u32 k = 0; k < ContactData->NrContacts; ++k)
+      {
+        v3 V[4] = {};
+        if(A->DynamicsComponent)
+        {
+          V[0] = A->DynamicsComponent->LinearVelocity;
+          V[1] = A->DynamicsComponent->AngularVelocity;
+        }
+        if(B->DynamicsComponent)
+        {
+          V[2] = B->DynamicsComponent->LinearVelocity;
+          V[3] = B->DynamicsComponent->AngularVelocity;
+        }
+
+        contact_data* Contact = &ContactData->Contacts[k];
+        r32 PenetrationDepth  = Norm(V3(A->SpatialComponent->ModelMatrix * V4( Contact->A_ContactModelSpace, 1)) -
+                                     V3(B->SpatialComponent->ModelMatrix * V4( Contact->B_ContactModelSpace,1)));
+        //r32 PenetrationDepth  = Contact->PenetrationDepth;
+        v3  ContactNormal     = Contact->ContactNormal;
+        r32 Baumgarte         = getBaumgarteCoefficient(dt, 0.25, PenetrationDepth, 0.01);
+        r32 Restitution       = getRestitutionCoefficient(V, 0.0f, ContactNormal, 0.00);
+        r32 Lambda            = GetLambda( V, Contact->J, Contact->InvMJ, Baumgarte, Restitution);
+
+        r32 OldCumulativeLambda = Contact->AccumulatedLambda;
+        Contact->AccumulatedLambda += Lambda;
+        Contact->AccumulatedLambda = Contact->AccumulatedLambda <=0 ? 0 : Contact->AccumulatedLambda;
+        r32 LambdaDiff = Contact->AccumulatedLambda - OldCumulativeLambda;
+
+        v3 DeltaV[4] = {};
+        ScaleV12(LambdaDiff, Contact->InvMJ, DeltaV);
+
+        if(A->DynamicsComponent)
+        {
+          A->DynamicsComponent->LinearVelocity  += DeltaV[0];
+          A->DynamicsComponent->AngularVelocity += DeltaV[1];
+        }
+        if(B->DynamicsComponent)
+        {
+          B->DynamicsComponent->LinearVelocity  += DeltaV[2];
+          B->DynamicsComponent->AngularVelocity += DeltaV[3];
+        }
+      }
     }
   }
 
-  constraint_data* Constraint = ConstraintHead;
-  while(Constraint)
+  for(u32 Index = 0;  Index < World->NrEntities; ++Index )
   {
-    contact_data* ContactData = &Constraint->ContactData;
-    if(Constraint->A->Types & COMPONENT_TYPE_DYNAMICS)
+    entity* E = &World->Entities[Index];
+    if( E->Types & COMPONENT_TYPE_DYNAMICS )
     {
-      entity* A = Constraint->A;
-      A->DynamicsComponent->LinearVelocity = Constraint->V[0];
-      v3 DeltaX = dt * A->DynamicsComponent->LinearVelocity;
-      Translate(DeltaX, A->SpatialComponent);
+      #if 0
+      component_spatial*   S = E->SpatialComponent;
+      component_dynamics*  D = E->DynamicsComponent;
+      v3 Gravity = V3(0,-10,0);
+      D->LinearVelocity += dt * Gravity / D->Mass;
+      Translate(dt * D->LinearVelocity, S);
+      Rotate(Norm(D->AngularVelocity), Normalize(dt*D->AngularVelocity) ,S);
+      #else
+      component_spatial*   S = E->SpatialComponent;
+      component_collider*  C = E->ColliderComponent;
+      component_dynamics*  D = E->DynamicsComponent;
+      v3  Position        = GetPosition(S);
+      v3  LinearVelocity  = D->LinearVelocity;
+      v3  AngularVelocity = D->AngularVelocity;
+      r32 Mass            = D->Mass;
 
-      //A->DynamicsComponent->AngularVelocity = dt * Constraint->V[1];
-      //v3 DeltaRot = dt * Constraint->V[1];
-      //Rotate(Norm(DeltaRot), Normalize(DeltaRot), A->SpatialComponent);
+      v3 Gravity = V3(0,-10,0);
+      v3 LinearAcceleration = Gravity / Mass;
+      LinearVelocity        = LinearVelocity + dt * LinearAcceleration;
+      Translate(dt * LinearVelocity, S);
+
+      v3 AngularAcceleration = {};
+      AngularVelocity = AngularVelocity + dt * AngularAcceleration;
+      Rotate(Norm(dt*AngularVelocity), Normalize(dt*AngularVelocity) ,S);
+
+      D->LinearVelocity  = LinearVelocity;
+      D->AngularVelocity = AngularVelocity;
+      #endif
     }
-
-    if(Constraint->B->Types & COMPONENT_TYPE_DYNAMICS)
-    {
-      entity* B = Constraint->B;
-      B->DynamicsComponent->LinearVelocity = Constraint->V[2];
-      v3 DeltaX = dt * B->DynamicsComponent->LinearVelocity;
-      Translate(DeltaX, B->SpatialComponent);
-
-      //B->DynamicsComponent->AngularVelocity =dt * Constraint->V[3];
-      //v3 DeltaRot = dt * Constraint->V[3];
-      //Rotate(Norm(DeltaRot), Normalize(DeltaRot), B->SpatialComponent);
-    }
-
-    Constraint = Constraint->Next;
   }
 
   EndTemporaryMemory( TempMem1 );
-  CheckArena(Arena);
+  CheckArena(TransientArena);
 }

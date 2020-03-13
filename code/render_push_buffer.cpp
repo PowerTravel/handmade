@@ -183,17 +183,6 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         Body->ElementStart  = 0;
         Body->ElementLength = Buffer->nvi;
       }
-      if(Entity->ColliderComponent->IsColliding)
-      {
-        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
-        Header->Type = render_buffer_entry_type::PRIMITIVE;
-        Header->RenderState = RENDER_STATE_POINTS;
-        entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
-        Body->M = Entity->SpatialComponent->ModelMatrix * GetTranslationMatrix( V4(Entity->ColliderComponent->CollisionPoint,1));
-        Body->TM = M4Identity();
-        Body->PrimitiveType = primitive_type::POINT;
-        Body->Surface = GreenSurface;
-      }
     }
 
     if( Entity->Types & COMPONENT_TYPE_GJK_EPA_VISUALIZER  )
@@ -396,6 +385,72 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
             Body->PrimitiveType = primitive_type::VOXEL;
           }
         }
+      }
+    }
+  }
+
+  component_surface* GreenSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+  GreenSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+  SetMaterial(GreenSurface->Material, MATERIAL_GREEN);
+  component_surface* RedSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+  RedSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+  SetMaterial(RedSurface->Material, MATERIAL_RED);
+
+  component_surface* BlueSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+  BlueSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+  SetMaterial(BlueSurface->Material, MATERIAL_BLUE);
+  component_surface* WhiteSurface = (component_surface*) RenderCommands->RenderMemory.GetMemory(sizeof(component_surface));
+  WhiteSurface->Material = (material*) RenderCommands->RenderMemory.GetMemory(sizeof(material));
+  SetMaterial(WhiteSurface->Material, MATERIAL_WHITE);
+
+  for( u32 i = 0; i <World->NrContacts; ++i)
+  {
+    contact_data_list* ContactData = (contact_data_list*) ((u8*) (World->Contacts ) + i * ( sizeof(contact_data_list) + 4*sizeof(contact_data)));
+    entity* A = ContactData->A;
+    entity* B = ContactData->B;
+    for( u32 j = 0; j <ContactData->NrContacts; ++j)
+    {
+      #if 0
+      {
+        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+        Header->Type = render_buffer_entry_type::PRIMITIVE;
+        Header->RenderState = RENDER_STATE_POINTS;
+        entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
+        Body->M = GetTranslationMatrix( V4(ContactData->Contacts[j].A_ContactWorldSpace,1));
+        Body->TM = M4Identity();
+        Body->PrimitiveType = primitive_type::POINT;
+        Body->Surface = RedSurface;
+      }
+      {
+        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+        Header->Type = render_buffer_entry_type::PRIMITIVE;
+        Header->RenderState = RENDER_STATE_POINTS;
+        entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
+        Body->M = GetTranslationMatrix( V4(ContactData->Contacts[j].B_ContactWorldSpace,1));
+        Body->TM = M4Identity();
+        Body->PrimitiveType = primitive_type::POINT;
+        Body->Surface = GreenSurface;
+      }
+      #endif
+      {
+        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+        Header->Type = render_buffer_entry_type::PRIMITIVE;
+        Header->RenderState = RENDER_STATE_POINTS;
+        entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
+        Body->M = GetTranslationMatrix( A->SpatialComponent->ModelMatrix * V4(ContactData->Contacts[j].A_ContactModelSpace,1));
+        Body->TM = M4Identity();
+        Body->PrimitiveType = primitive_type::POINT;
+        Body->Surface = BlueSurface;
+      }
+      {
+        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderCommands, &PreviousEntry );
+        Header->Type = render_buffer_entry_type::PRIMITIVE;
+        Header->RenderState = RENDER_STATE_POINTS;
+        entry_type_primitive* Body = (entry_type_primitive*) RenderCommands->RenderMemory.GetMemory(sizeof(entry_type_primitive));
+        Body->M = GetTranslationMatrix( B->SpatialComponent->ModelMatrix * V4(ContactData->Contacts[j].B_ContactModelSpace,1));
+        Body->TM = M4Identity();
+        Body->PrimitiveType = primitive_type::POINT;
+        Body->Surface = WhiteSurface;
       }
     }
   }

@@ -3,7 +3,7 @@
 #include "aabb.h"
 #include "entity_components.h"
 #include "component_spatial.h"
-
+struct contact_data;
 struct collider_mesh
 {
   u32 VAO;
@@ -21,8 +21,6 @@ struct component_collider
   // Always in Model Space
   collider_mesh* Mesh;
   aabb3f AABB;
-  b32 IsColliding;
-  v3 CollisionPoint;
 };
 
 void SetAABBFromColliderMesh( component_collider* Collider )

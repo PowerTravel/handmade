@@ -1293,10 +1293,10 @@ entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* Me
   Translate( -GetAABBCenter(OBJGrp->aabb), Entity->SpatialComponent );
 
   Entity->ColliderComponent->AABB = OBJGrp->aabb;
-  Entity->ColliderComponent->Mesh = (collider_mesh*) PushStruct(&World->Arena, collider_mesh);
-  SetColliderMeshFromAABB( &World->Arena, Entity->ColliderComponent );
+  Entity->ColliderComponent->Mesh = (collider_mesh*) PushStruct(&World->PersistentArena, collider_mesh);
+  SetColliderMeshFromAABB( &World->PersistentArena, Entity->ColliderComponent );
 
-  Entity->SurfaceComponent->Material = PushStruct( &World->Arena, material);
+  Entity->SurfaceComponent->Material = PushStruct( &World->PersistentArena, material);
   SetMtlMaterialToSurfaceMaterial( OBJGrp->Material, Entity->SurfaceComponent->Material);
 
   return Entity;

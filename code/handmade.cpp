@@ -60,6 +60,7 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
 
   GameState->World = AllocateWorld(20);
   world* World = GameState->World;
+  World->TransientArena = TemporaryArena;
 
   GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
   game_assets* Assets = GameState->World->Assets;
@@ -114,20 +115,20 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
   r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
   r32 FieldOfView =  90;
   SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
-  LookAt(ControllableCamera->CameraComponent, 3*V3(0,0,1), V3(0,0,0));
+  LookAt(ControllableCamera->CameraComponent, 3*V3(0,3,8), V3(0,3,0));
   ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
   ControllableCamera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
 }
 
-void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
+void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input)
 {
-  game_state* GameState = Memory->GameState;
-  memory_arena* AssetArena = &GameState->AssetArena;
+  game_state* GameState        = Memory->GameState;
+  memory_arena* AssetArena     = &GameState->AssetArena;
   memory_arena* TemporaryArena = &GameState->TemporaryArena;
 
   GameState->World = AllocateWorld(1000);
   world* World = GameState->World;
-
+  World->TransientArena = TemporaryArena;
 
   GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
   game_assets* Assets = GameState->World->Assets;
@@ -140,7 +141,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
   Light->LightComponent->Color = V4(3,3,3,1);
-  Put( V3(0,20,0), 0, V3(0,1,0), Light->SpatialComponent );
+  Put( V3(10,10,10), 0, V3(0,1,0), Light->SpatialComponent );
 
   for (s32 i = -0; i < 1; ++i)
   {
@@ -154,8 +155,8 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
         // Uncomment this and set j < 1 in the for loop to reproduce a bug where
         // GJK perodically does not find a collision.
         //Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,2,1), cubeEntity->SpatialComponent );
-        Put( V3(2.f*i, 2.f*j, 2.f*k), 0, V3(0,1,0), cubeEntity->SpatialComponent );
-        cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
+        Put( V3(1.f*i, 1.f*j, 1.f*k), 0 , V3(1,1,1), cubeEntity->SpatialComponent );
+        cubeEntity->DynamicsComponent->LinearVelocity  = V3(0.1,0,0);
         cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0,0);
         cubeEntity->DynamicsComponent->Mass = 1;
       }
@@ -164,8 +165,8 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
 
   entity* floor = CreateEntityFromOBJGroup( World, &cube->Objects[1], cube->MeshData );
 
-  Put( V3( 0,-2, 0), 0, V3(0,1,0), floor->SpatialComponent );
-  Scale( V3( 8, 1, 8),  floor->SpatialComponent );
+  Put( V3( 0,-0.2, 0), 0, V3(0,1,0), floor->SpatialComponent );
+  Scale( V3( 8, 0.4, 8),  floor->SpatialComponent );
 
 #if 1
   NewComponents( World, floor, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
@@ -196,7 +197,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
   r32 FieldOfView =  90;
   SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
-  LookAt(ControllableCamera->CameraComponent, 3*V3(0,0,1), V3(0,0,0));
+  LookAt(ControllableCamera->CameraComponent, 1*V3(0,3,3), V3(0,0,0));
 
   ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
   ControllableCamera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
@@ -210,6 +211,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 
   GameState->World = AllocateWorld(100);
   world* World = GameState->World;
+  World->TransientArena = TemporaryArena;
 
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
@@ -237,7 +239,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 
   Put( V3(0,3,0), 0, V3(0,1,0), Player->SpatialComponent );
   Player->ColliderComponent->AABB = AABB3f( V3(-0.5,-0.5,0), V3(0.5,0.5,0) );
-  SetColliderMeshFromAABB(&World->Arena, Player->ColliderComponent);
+  SetColliderMeshFromAABB(&World->PersistentArena, Player->ColliderComponent);
 
   Player->DynamicsComponent->LinearVelocity  = V3(0,0,0);
   Player->DynamicsComponent->AngularVelocity = V3(0,0,0);
@@ -371,7 +373,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 
 }
 
-void initiateGame(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
+void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
 {
   if (!Memory->GameState)
   {
@@ -411,7 +413,7 @@ platform_api Platform;
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
   Platform = Memory->PlatformAPI;
-  initiateGame(Thread, Memory, RenderCommands, Input);
+  InitiateGame(Thread, Memory, RenderCommands, Input);
 
   game_state* GameState = Memory->GameState;
   world* World = GameState->World;

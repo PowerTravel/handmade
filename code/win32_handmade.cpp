@@ -1775,7 +1775,7 @@ WinMain(  HINSTANCE aInstance,
             Game = Win32LoadGameCode(SourceGameCodeDLLFullPath,
                           TempGameCodeDLLFullPath,
                           TempGameCodeLockFullPath);
-            Sleep(1500);
+            Sleep(2000);
             NewInput->ExecutableReloaded = true;
           }
 

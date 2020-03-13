@@ -1,6 +1,8 @@
 #pragma once
 #include "gjk_narrow_phase.h"
 
+struct entity;
+
 struct contact_data
 {
   v3 A_ContactWorldSpace;
@@ -11,6 +13,13 @@ struct contact_data
   v3 TangentNormalOne;
   v3 TangentNormalTwo;
   r32 PenetrationDepth;
+
+  v3 J[4];
+  v3 InvMJ[4];
+  r32 Lambda;
+  r32 AccumulatedLambda;
+  r32 CachedLambda;
+  b32 PersistentContact;
 };
 
 contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AModelMat, const collider_mesh* AMesh,
