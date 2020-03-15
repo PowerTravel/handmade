@@ -155,8 +155,8 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
         // Uncomment this and set j < 1 in the for loop to reproduce a bug where
         // GJK perodically does not find a collision.
         //Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,2,1), cubeEntity->SpatialComponent );
-        Put( V3(1.f*i, 1.f*j, 1.f*k), 0 , V3(1,1,1), cubeEntity->SpatialComponent );
-        cubeEntity->DynamicsComponent->LinearVelocity  = V3(0.1,0,0);
+        Put( V3(1.f*i, 1.0f*j, 1.f*k), 0, V3(1,1,1), cubeEntity->SpatialComponent );
+        cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0.1);
         cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0,0);
         cubeEntity->DynamicsComponent->Mass = 1;
       }
@@ -165,8 +165,8 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
 
   entity* floor = CreateEntityFromOBJGroup( World, &cube->Objects[1], cube->MeshData );
 
-  Put( V3( 0,-0.2, 0), 0, V3(0,1,0), floor->SpatialComponent );
-  Scale( V3( 8, 0.4, 8),  floor->SpatialComponent );
+  Put( V3( 0,-1, 0), 0, V3(0,1,0), floor->SpatialComponent );
+  Scale( V3( 18, 1, 18),  floor->SpatialComponent );
 
 #if 1
   NewComponents( World, floor, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
@@ -197,7 +197,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
   r32 FieldOfView =  90;
   SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
-  LookAt(ControllableCamera->CameraComponent, 1*V3(0,3,3), V3(0,0,0));
+  LookAt(ControllableCamera->CameraComponent, 1*V3(3,3,3), V3(0,0,0));
 
   ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
   ControllableCamera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;

@@ -54,7 +54,7 @@ struct world
 
 struct game_state
 {
-	memory_arena AssetArena;      // Persistent Over Frames
+	memory_arena AssetArena;
 	memory_arena TemporaryArena;
 	world* World;
 

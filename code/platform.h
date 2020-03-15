@@ -331,23 +331,32 @@ struct platform_api
 
 extern platform_api Platform;
 
+
+#if 0
+enum
+{
+  DebugCycleCounter_GameUpdateAndRender,
+  DebugCycleCounter_OpenGLRenderGroupToOutput,
+  DebugCycleCounter_FillRenderPushBuffer,
+  DebugCycleCounter_DebugCycleCounterCount,
+};
+
+struct debug_cycle_counter
+{
+  u64 CycleCount;
+  u32 HitCount;
+};
+#if _MSC_VER
+#pragma intrinsic(__rdtsc)
+#define BEGIN_TIMED_BLOCK(ID) u64 StartCycleCount##ID = __rdtsc();
+#define END_TIMED_BLOCK(ID) DebugGlobalMemory->Counters[DebugCycleCounter_##ID].CycleCount += __rdtsc();
+#else
+#define BEGIN_TIMED_BLOCK(ID)
+#define END_TIMED_BLOCK(ID)
+#endif
+#endif
 struct game_memory
 {
-//    uint64 PermanentStorageSize;
-//    void *PermanentStorage; // NOTE(casey): REQUIRED to be cleared to zero at startup
-
-//    uint64 TransientStorageSize;
-//    void *TransientStorage; // NOTE(casey): REQUIRED to be cleared to zero at startup
-
-//    uint64 DebugStorageSize;
-//    void *DebugStorage; // NOTE(casey): REQUIRED to be cleared to zero at startup
-
-//    platform_work_queue *HighPriorityQueue;
-//    platform_work_queue *LowPriorityQueue;
-
-//    b32 ExecutableReloaded;
-//    platform_api PlatformAPI;
-
     struct game_state* GameState;
     platform_api PlatformAPI;
 };

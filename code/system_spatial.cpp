@@ -149,7 +149,9 @@ void SpatialSystemUpdate( world* World, platform_api* API)
   char* const DebugPrintMemory = (char*) PushArray(TransientArena, DebugPrintMemorySize, char);
   char* Scanner = DebugPrintMemory;
 
-
+  u8* TmpList = (u8*) PushSize(TransientArena, World->NrContacts * ( sizeof(contact_data_list) + 4*sizeof(contact_data) ));
+  u32 ManifoldIndex = 0;
+  u8* MemoryLocation = TmpList;
   // Remove invalid contacts
   for (u32 i = 0; i < World->NrContacts; ++i)
   {
@@ -182,26 +184,36 @@ void SpatialSystemUpdate( world* World, platform_api* API)
       // still colliding at this point, and the local
       // positions are not too far from the global
       // positions original acquired from collision detection
-      if (stillPenetrating && (lenDiffA < persistentThresholdSq || lenDiffB < persistentThresholdSq) )
+      if (stillPenetrating && (lenDiffA < persistentThresholdSq && lenDiffB < persistentThresholdSq) )
       {
         // Persistent contact
         SavedContacts[SavedContactIdx++] = *Contact;
       }
     }
 
-    utils::Copy(sizeof(SavedContacts), SavedContacts, ContactData->Contacts);
-    ContactData->NrContacts = SavedContactIdx;
+    if(SavedContactIdx)
+    {
+      utils::Copy(sizeof(contact_data_list), ContactData, MemoryLocation);
+      ((contact_data_list*)MemoryLocation)->NrContacts = SavedContactIdx;
+      MemoryLocation+=sizeof(contact_data_list);
+      utils::Copy(sizeof(SavedContacts), SavedContacts, MemoryLocation);
+      MemoryLocation+=sizeof(SavedContacts);
+      ManifoldIndex++;
+    }
   }
+
+  utils::Copy(MemoryLocation-TmpList, TmpList, World->Contacts);
+  World->NrContacts = ManifoldIndex;
 
   aabb_tree BroadPhaseTree = {};
 
   for(u32 Index = 0;  Index < World->NrEntities; ++Index )
   {
     entity* E = &World->Entities[Index];
-    #if 0
+    #if 1
     if( E->Types & COMPONENT_TYPE_DYNAMICS )
     {
-      #if 1
+      #if 0
       v3 Gravity = V3(0,-10,0);
       component_dynamics*  D = E->DynamicsComponent;
       D->LinearVelocity += dt * Gravity * D->Mass;
@@ -217,12 +229,14 @@ void SpatialSystemUpdate( world* World, platform_api* API)
       v3 Gravity = V3(0,-10,0);
       v3 LinearAcceleration = Gravity * Mass;
       LinearVelocity     = LinearVelocity + dt * LinearAcceleration;
-      Translate(dt * LinearVelocity, S);
 
       v3 AngularAcceleration = {};
       AngularVelocity = AngularVelocity + dt * AngularAcceleration;
-      Rotate(Norm(dt*AngularVelocity), Normalize(dt*AngularVelocity) ,S);
+#if 0
+      Translate(dt * LinearVelocity, S);
 
+      Rotate(Norm(dt*AngularVelocity), Normalize(dt*AngularVelocity) ,S);
+#endif
       D->LinearVelocity  = LinearVelocity;
       D->AngularVelocity = AngularVelocity;
       #endif
@@ -359,7 +373,7 @@ void SpatialSystemUpdate( world* World, platform_api* API)
           {
             ContactData->Contacts[ContactData->NrContacts++] = NewContact;
           }else{
-            #if 0
+            #if 1
             local_persist u32 idx = 4;
             ContactData->Contacts[idx % 4] = NewContact;
             idx++;
@@ -587,19 +601,20 @@ void SpatialSystemUpdate( world* World, platform_api* API)
       }
     }
   }
-
+#if 1
   for(u32 Index = 0;  Index < World->NrEntities; ++Index )
   {
     entity* E = &World->Entities[Index];
     if( E->Types & COMPONENT_TYPE_DYNAMICS )
     {
-      #if 0
+      #if 1
       component_spatial*   S = E->SpatialComponent;
       component_dynamics*  D = E->DynamicsComponent;
-      v3 Gravity = V3(0,-10,0);
-      D->LinearVelocity += dt * Gravity / D->Mass;
+      //v3 Gravity = V3(0,-10,0);
+      //D->LinearVelocity += dt * Gravity / D->Mass;
       Translate(dt * D->LinearVelocity, S);
-      Rotate(Norm(D->AngularVelocity), Normalize(dt*D->AngularVelocity) ,S);
+      Rotate(dt*Norm(D->AngularVelocity), Normalize(D->AngularVelocity) ,S);
+	  int a = 10;
       #else
       component_spatial*   S = E->SpatialComponent;
       component_collider*  C = E->ColliderComponent;
@@ -623,7 +638,7 @@ void SpatialSystemUpdate( world* World, platform_api* API)
       #endif
     }
   }
-
+#endif
   EndTemporaryMemory( TempMem1 );
   CheckArena(TransientArena);
 }

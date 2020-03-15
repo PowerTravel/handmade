@@ -149,19 +149,19 @@ SetPositionToAffineMatrix( const v4& Position, m4& M )
 inline void
 Rotate( const r32 Angle, const v4& Axis, m4& T )
 {
-  m4 RotMat = GetRotationMatrix( Angle, Axis );
+  const m4 RotMat = GetRotationMatrix( Angle, Axis );
 
-  m4 tto = M4(1,0,0,-T.E[3],
-              0,1,0,-T.E[7],
-              0,0,1,-T.E[13],
-              0,0,0, 1);
+  const m4 tto = M4(1,0,0,-T.E[3],
+                    0,1,0,-T.E[7],
+                    0,0,1,-T.E[11],
+                    0,0,0, 1);
 
-  m4 bfo = M4(1,0,0, T.E[3],
-              0,1,0, T.E[7],
-              0,0,1, T.E[13],
-              0,0,0, 1);
+  const m4 bfo = M4(1,0,0, T.E[3],
+                    0,1,0, T.E[7],
+                    0,0,1, T.E[11],
+                    0,0,0, 1);
 
-  T =  bfo * RotMat * tto * T;
+  T = bfo * RotMat * tto * T;
 }
 
 inline m4
@@ -181,12 +181,12 @@ Scale( const v4& Scale, m4& T )
 
   m4 tto = M4(1,0,0,-T.E[3],
               0,1,0,-T.E[7],
-              0,0,1,-T.E[13],
+              0,0,1,-T.E[11],
               0,0,0,1);
 
   m4 bfo = M4(1,0,0, T.E[3],
               0,1,0, T.E[7],
-              0,0,1, T.E[13],
+              0,0,1, T.E[11],
               0,0,0,1);
 
   T =  bfo * ScaleMat * tto * T;
