@@ -1,6 +1,6 @@
 #include "primitive_meshes.h"
 #include "platform_opengl.h"
-#include "vector_math.h"
+#include "math/vector_math.h"
 #include "types.h"
 
 internal void PushGLVertex( u32 Idx, v3 v, v3 n, opengl_vertex* Data )

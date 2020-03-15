@@ -3,7 +3,7 @@
 #include "component_gjk_epa_visualizer.h"
 #include "component_collider.h"
 #include "utility_macros.h"
-#include "affine_transformations.h"
+#include "math/affine_transformations.h"
 
 
 gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,

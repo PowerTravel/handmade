@@ -1,9 +1,9 @@
 #pragma once
 
 #include "types.h"
-#include "vector_math.h"
+#include "math/vector_math.h"
 #include "data_containers.h"
-#include "aabb.h"
+#include "math/aabb.h"
 
 struct bitmap;
 

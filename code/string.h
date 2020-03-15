@@ -1,10 +1,9 @@
-#ifndef STRING_H
-#define STRING_H
+#pragma once
 
 #define STR_MAX_LINE_LENGTH 512
 #define STR_MAX_WORD_LENGTH 64
 
-#include "vector_math.h"
+#include "math/vector_math.h"
 #include "types.h"
 #include "intrinsics.h"
 
@@ -423,5 +422,3 @@ memory_index ToString( const v3 Vector, const u32 DecimalPrecision, const memory
 }
 
 } // Namespace str
-
-#endif

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "vector_math.h"
-#include "aabb.h"
+#include "math/vector_math.h"
+#include "math/aabb.h"
 #include "component_mesh.h"
 #include "platform.h"
 

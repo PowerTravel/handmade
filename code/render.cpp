@@ -1,6 +1,6 @@
 
 #include "platform.h"
-#include "affine_transformations.h"
+#include "math/affine_transformations.h"
 
 internal void
 DrawRectangle( bitmap* Buffer, r32 RealMinX, r32 RealMinY, r32 Width, r32 Height, r32 R, r32 G, r32 B )

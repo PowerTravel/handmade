@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vector_math.h"
+#include "math/vector_math.h"
 
 // Requires spatial and collision primitive
 struct component_dynamics

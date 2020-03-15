@@ -1,11 +1,11 @@
 #include "handmade.h"
 
 #include "random.h"
+#include "tiles_spritesheet.h"
 
-#include "aabb.cpp"
+#include "math/aabb.cpp"
 #include "handmade_tile.cpp"
 #include "obj_loader.cpp"
-#include "tiles_spritesheet.hpp"
 #include "render_push_buffer.cpp"
 #include "dynamic_aabb_tree.cpp"
 #include "gjk_narrow_phase.cpp"

@@ -1,5 +1,5 @@
 #include "obj_loader.h"
-#include "vector_math.h"
+#include "math/vector_math.h"
 #include "bitmap.h"
 #include "string.h"
 #include "utility_macros.h"

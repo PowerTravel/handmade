@@ -1,6 +1,6 @@
 #pragma once
 
-#include "aabb.h"
+#include "math/aabb.h"
 #include "data_containers.h"
 
 struct collider_mesh;

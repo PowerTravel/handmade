@@ -1,6 +1,6 @@
 #pragma once
 
-#include "affine_transformations.h"
+#include "math/affine_transformations.h"
 
 struct component_camera
 {

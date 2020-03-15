@@ -86,7 +86,7 @@
 #define GL_PROGRAM_POINT_SIZE             0x8642
 #define GL_ELEMENT_ARRAY_BUFFER_BINDING   0x8895
 
-#include "vector_math.h"
+#include "math/vector_math.h"
 
 struct opengl_vertex
 {

@@ -2,7 +2,7 @@
 
 #include "bitmap.h"
 #include "data_containers.h"
-#include "affine_transformations.h"
+#include "math/affine_transformations.h"
 
 hash_map<bitmap_coordinate> LoadTileSpriteSheetCoordinates(memory_arena* Arena)
 {

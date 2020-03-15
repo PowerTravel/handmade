@@ -2,7 +2,7 @@
 
 #include "entity_components.h"
 #include "primitive_meshes.h"
-#include "vector_math.h"
+#include "math/vector_math.h"
 
 struct component_mesh;
 struct component_surface;

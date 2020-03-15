@@ -1,6 +1,6 @@
 #include "component_camera.h"
 #include "entity_components.h"
-#include "affine_transformations.h"
+#include "math/affine_transformations.h"
 
 // This is a broken function
 void UpdateViewMatrixAngularMovement(  component_camera* Camera )

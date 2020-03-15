@@ -1,6 +1,6 @@
 #pragma once
 
-#include "aabb.h"
+#include "math/aabb.h"
 #include "component_collider.h"
 
 struct entity;
