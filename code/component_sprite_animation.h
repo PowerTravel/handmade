@@ -1,5 +1,8 @@
 #pragma once
 
+#include "bitmap.h"
+#include "data_containers.h"
+
 enum sprite_type
 {
   SPRITE_TYPE_NA,
@@ -56,22 +59,3 @@ struct component_sprite_animation
   list<m4>* ActiveSeries;
   b32 InvertX;
 };
-
-
-
-list<m4> GetSeriesWithTypeAndOrientation(component_sprite_animation* AnimationComponent, sprite_type Type, sprite_orientation Orientation )
-{
-  /*
-  u32 Index = 0;
-  while( Index < AnimationComponent->NrEntries )
-  {
-    sprite_series* Animation = AnimationComponent->Animations + Index++;
-    if( ( Animation->Type == Type) && (Animation->Orientation == Orientation) )
-    {
-      return Animation;
-    }
-  }
-
-  */
-  return 0;
-}

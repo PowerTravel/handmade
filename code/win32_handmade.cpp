@@ -13,11 +13,6 @@
 
 // Note(Jakob): If you have windows questions, look for answers given by Raymond Chen
 
-#include <stdio.h>
-#include <windows.h>
-#include <xinput.h>
-#include <dsound.h>
-
 #include "win32_handmade.h"
 #include "win32_init_opengl.h"
 
@@ -65,6 +60,7 @@ global_variable x_input_set_state* XInputSetState_ = XInputSetStateStub;
 #define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name( LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter )
 typedef DIRECT_SOUND_CREATE(direct_sound_create );
 
+#include "aabb.cpp"
 #include "primitive_meshes.cpp"
 #include "platform_opengl.cpp"
 

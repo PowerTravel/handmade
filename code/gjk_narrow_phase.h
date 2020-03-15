@@ -3,6 +3,9 @@
 #include "aabb.h"
 #include "data_containers.h"
 
+struct collider_mesh;
+struct component_gjk_epa_visualizer;
+
 // Gilbert-Johnson-Keerthi (GJK) collision detection algorithm
 // See: http://www.allenchou.net/2013/12/game-physics-collision-detection-gjk/
 struct gjk_support
@@ -34,7 +37,7 @@ gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
 void SetPointsAndIndecesForCCWTetrahedron( gjk_simplex* Simplex, u32 TriangleIndeces[]);
 void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
                     const m4* BModelMat, const collider_mesh* BMesh,
-                    gjk_simplex& Simplex);
+                    gjk_simplex* Simplex);
 
 gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_mesh* AMesh,
                                            const m4* BModelMat, const collider_mesh* BMesh,

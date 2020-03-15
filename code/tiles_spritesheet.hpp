@@ -1,4 +1,8 @@
- #pragma once
+#pragma once
+
+#include "bitmap.h"
+#include "data_containers.h"
+#include "affine_transformations.h"
 
 hash_map<bitmap_coordinate> LoadTileSpriteSheetCoordinates(memory_arena* Arena)
 {

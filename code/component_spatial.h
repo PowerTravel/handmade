@@ -1,7 +1,6 @@
 #pragma once
 
 #include "affine_transformations.h"
-#include "aabb.h"
 
 struct component_spatial
 {

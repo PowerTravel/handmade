@@ -1,7 +1,10 @@
 #include "gjk_narrow_phase.h"
 #include "epa_collision_data.h"
 #include "component_gjk_epa_visualizer.h"
+#include "component_collider.h"
 #include "utility_macros.h"
+#include "affine_transformations.h"
+
 
 gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
             const m4* BModelMat, const collider_mesh* BMesh, const v3 Direction )
@@ -56,9 +59,9 @@ gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
 
 void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
                     const m4* BModelMat, const collider_mesh* BMesh,
-                    gjk_simplex& Simplex)
+                    gjk_simplex* Simplex)
 {
-  switch(Simplex.Dimension)
+  switch(Simplex->Dimension)
   {
     // Fall-through intended
     case 1:
@@ -73,10 +76,10 @@ void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
         gjk_support Support = CsoSupportFunction( AModelMat, AMesh,
                                               BModelMat, BMesh,
                                               SearchDirections[i] );
-        if(Norm(Support.S - Simplex.SP[0].S) >= 10E-4)
+        if(Norm(Support.S - Simplex->SP[0].S) >= 10E-4)
         {
-          Simplex.SP[1] = Support;
-          Simplex.Dimension = 2;
+          Simplex->SP[1] = Support;
+          Simplex->Dimension = 2;
           break;
         }
       }
@@ -88,7 +91,7 @@ void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
         V3(0,1,0),
         V3(0,0,1)};
 
-      const v3 LineVector = Simplex.SP[1].S - Simplex.SP[0].S;
+      const v3 LineVector = Simplex->SP[1].S - Simplex->SP[0].S;
 
       // Find least significant axis
       r32 LineVecPart = Abs(LineVector.X);
@@ -115,8 +118,8 @@ void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
                                               SearchDirection );
         if(Norm(Support.S) >= 10E-4)
         {
-          Simplex.SP[2] = Support;
-          Simplex.Dimension = 3;
+          Simplex->SP[2] = Support;
+          Simplex->Dimension = 3;
           break;
         }
         SearchDirection = V3(RotMat * V4(SearchDirection,0));
@@ -125,14 +128,14 @@ void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
     }
     case 3:
     {
-      const v3 p0 = Simplex.SP[1].S - Simplex.SP[0].S;
-      const v3 p1 = Simplex.SP[2].S - Simplex.SP[0].S;
+      const v3 p0 = Simplex->SP[1].S - Simplex->SP[0].S;
+      const v3 p1 = Simplex->SP[2].S - Simplex->SP[0].S;
       const v3 SearchDirection = CrossProduct(p0,p1);
 
       gjk_support Support = CsoSupportFunction( AModelMat, AMesh,
                                             BModelMat, BMesh,
                                             SearchDirection );
-      const v3 p2 = Support.S - Simplex.SP[0].S;
+      const v3 p2 = Support.S - Simplex->SP[0].S;
 
       r32 Det = p2 * CrossProduct(p0,p1);
       if(Det <= 10E-4)
@@ -142,8 +145,8 @@ void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
                                  -SearchDirection );
       }
 
-      Simplex.SP[3] = Support;
-      Simplex.Dimension = 4;
+      Simplex->SP[3] = Support;
+      Simplex->Dimension = 4;
     }
   }
 }

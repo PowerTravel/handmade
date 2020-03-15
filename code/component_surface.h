@@ -1,5 +1,7 @@
-#ifndef COMPONENT_SURFACE_H
-#define COMPONENT_SURFACE_H
+#pragma once
+
+#include "vector_math.h"
+
 struct bitmap;
 
 enum MATERIAL_TYPE
@@ -121,5 +123,3 @@ void SetMaterial(material* Material, u32 MaterialType)
 		default: Assert(0) break;
 	}
 }
-
-#endif // COMPONENT_SURFACE_PROPERTY_H

@@ -1,4 +1,9 @@
-
+#include "component_spatial.h"
+#include "component_collider.h"
+#include "component_dynamics.h"
+#include "component_gjk_epa_visualizer.h"
+#include "entity_components.h"
+#include "handmade_tile.h"
 #include "vector_math.h"
 #include "utility_macros.h"
 #include "aabb.h"
@@ -296,7 +301,7 @@ void SpatialSystemUpdate( world* World, platform_api* API)
       {
         contact_data NewContact = EPACollisionResolution(TransientArena, &SA->ModelMatrix, CA->Mesh,
                                                                          &SB->ModelMatrix, CB->Mesh,
-                                                                         NarrowPhaseResult.Simplex,
+                                                                         &NarrowPhaseResult.Simplex,
                                                                          Vis);
         // TODO: Find a smarter way than to check the relevant collision points instead of looping through all of them
         // Loop through all existing contacts and see if we have similar boidies already connecting

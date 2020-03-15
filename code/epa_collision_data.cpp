@@ -1,5 +1,9 @@
+#include "component_gjk_epa_visualizer.h"
 #include "epa_collision_data.h"
-#include "standalone_utility.h"
+#include "gjk_narrow_phase.h"
+#include "memory.h"
+#include "component_collider.h"
+
 
 // Todo: Should we store a void* in the structures to be used for metadata?
 //       Ex, Face Normals, Support points, Makes this a more general mesh datastructure
@@ -694,7 +698,7 @@ void RecordFrame(epa_mesh* Mesh, component_gjk_epa_visualizer* Vis, epa_face* Cl
 
 contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AModelMat, const collider_mesh* AMesh,
                                     const m4* BModelMat, const collider_mesh* BMesh,
-                                    gjk_simplex& Simplex, component_gjk_epa_visualizer* Vis)
+                                    gjk_simplex* Simplex, component_gjk_epa_visualizer* Vis)
 {
   temporary_memory TempMem = BeginTemporaryMemory(TemporaryArena);
 
@@ -703,7 +707,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
                 Simplex);
 
 
-  epa_mesh* Mesh = CreateSimplexMesh(TemporaryArena, &Simplex);
+  epa_mesh* Mesh = CreateSimplexMesh(TemporaryArena, Simplex);
 
   // Get the first new point
   r32 DistanceClosestToFace = 0;

@@ -1,5 +1,11 @@
-#ifndef HANDMADE_TILE_H
-#define HANDMADE_TILE_H
+#pragma once
+
+#include "types.h"
+#include "vector_math.h"
+#include "data_containers.h"
+#include "aabb.h"
+
+struct bitmap;
 
 struct tile_map_position{
 
@@ -67,4 +73,9 @@ struct tile_map{
 };
 
 
-#endif // HANDMADE_TILE_H
+void InitializeTileMap( tile_map* TileMap );
+void GetIntersectingTiles(tile_map* TileMap, list<tile_map_position>* OutputList, aabb3f* AABB );
+inline tile_contents GetTileContents(tile_map* TileMap, tile_page* TilePage, s32 RelTileIndexX, s32 RelTileIndexY );
+inline tile_contents GetTileContents(tile_map* TileMap, s32 AbsTileX, s32 AbsTileY, s32 AbsTileZ);
+inline tile_contents GetTileContents(tile_map* TileMap, tile_map_position CanPos);
+aabb3f GetTileAABB(tile_map* TileMap, tile_map_position CanPos );

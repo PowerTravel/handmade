@@ -1,7 +1,14 @@
 #include "obj_loader.h"
+#include "vector_math.h"
+#include "bitmap.h"
 #include "string.h"
 #include "utility_macros.h"
 #include "data_containers.h"
+#include "component_surface.h"
+#include "component_spatial.h"
+#include "component_collider.h"
+#include "entity_components.h"
+
 
 v4 ParseNumbers(char* String)
 {

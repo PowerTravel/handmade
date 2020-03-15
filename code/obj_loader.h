@@ -1,5 +1,16 @@
 #pragma once
 
+#include "vector_math.h"
+#include "aabb.h"
+#include "component_mesh.h"
+#include "platform.h"
+
+struct bitmap;
+struct world;
+struct game_state;
+struct thread_context;
+struct entity;
+
 struct mtl_material
 {
   u32 NameLength;

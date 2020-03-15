@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types.h"
+
 enum ColorDecodeMask
 {
   BITMAP_MASK_ALPHA  = 0xff000000,

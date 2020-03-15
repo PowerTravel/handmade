@@ -1,4 +1,9 @@
 #include "component_controller.h"
+#include "component_camera.h"
+#include "component_spatial.h"
+#include "component_dynamics.h"
+#include "handmade.h"
+#include "entity_components.h"
 
 void ControllerSystemUpdate( world* World )
 {

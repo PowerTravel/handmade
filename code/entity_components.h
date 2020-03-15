@@ -1,5 +1,7 @@
 #pragma once
 
+#include "types.h"
+
 static s32 EntityID = 0;
 
 struct component_camera;
@@ -12,6 +14,8 @@ struct component_dynamics;
 struct component_surface;
 struct component_sprite_animation;
 struct component_gjk_epa_visualizer;
+
+struct world;
 
 struct entity
 {
@@ -27,7 +31,6 @@ struct entity
   component_dynamics*         DynamicsComponent;
   component_surface*          SurfaceComponent;
   component_sprite_animation* SpriteAnimationComponent;
-
   component_gjk_epa_visualizer*   GjkEpaVisualizerComponent;
 };
 
@@ -46,3 +49,8 @@ enum component_types
   COMPONENT_TYPE_GJK_EPA_VISUALIZER = 0x0200,
   COMPONENT_TYPE_FINAL              = 0x0400
 };
+
+
+void NewComponents( world* World, entity* Entity, u32 EntityFlags );
+entity* NewEntity( world* World );
+entity* CreateCameraEntity(world* World, r32 AngleOfView, r32 AspectRatio );

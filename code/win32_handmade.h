@@ -1,3 +1,9 @@
+#pragma once
+
+#include <stdio.h>
+#include <windows.h>
+#include <xinput.h>
+#include <dsound.h>
 
 #include "types.h"
 #include "intrinsics.h"

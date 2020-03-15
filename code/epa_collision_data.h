@@ -1,7 +1,12 @@
 #pragma once
-#include "gjk_narrow_phase.h"
 
+#include "vector_math.h"
+
+struct gjk_simplex;
 struct entity;
+struct memory_arena;
+struct collider_mesh;
+struct component_gjk_epa_visualizer;
 
 struct contact_data
 {
@@ -23,5 +28,5 @@ struct contact_data
 };
 
 contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AModelMat, const collider_mesh* AMesh,
-                                    const m4* BModelMat, const collider_mesh* BMesh, gjk_simplex& Simplex,
+                                    const m4* BModelMat, const collider_mesh* BMesh, gjk_simplex* Simplex,
                                     component_gjk_epa_visualizer* Vis = 0 );

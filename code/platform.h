@@ -45,10 +45,8 @@
 #endif
 
 #include <stddef.h> // size_t exists in this header on some platforms
-
 #include "types.h"
 #include "standalone_utility.h"
-#include "vector_math.h"
 #include "platform_opengl.h"
 
 struct thread_context
@@ -107,8 +105,8 @@ struct game_render_commands
   opengl_program2D RenderProgram2D;
   opengl_program3D RenderProgram3D;
 
-  utils::push_buffer TemporaryMemory;     // Buffer used for temporary storage
-  utils::push_buffer RenderMemory;  // The Render Push Buffer
+  utils::push_buffer TemporaryMemory; // Buffer used for temporary storage
+  utils::push_buffer RenderMemory;    // The Render Push Buffer
   u32 RenderMemoryElementCount;
 };
 

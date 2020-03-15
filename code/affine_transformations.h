@@ -1,5 +1,4 @@
-#ifndef AFFINE_TRANSFORMATIONS
-#define AFFINE_TRANSFORMATIONS
+#pragma once
 
 #include "vector_math.h"
 
@@ -214,5 +213,3 @@ PointMultiply( const m4& M, const v4& b )
 
   return Result;
 }
-
-#endif

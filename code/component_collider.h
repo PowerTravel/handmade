@@ -1,9 +1,8 @@
 #pragma once
 
 #include "aabb.h"
-#include "entity_components.h"
-#include "component_spatial.h"
-struct contact_data;
+#include "memory.h"
+
 struct collider_mesh
 {
   u32 VAO;
@@ -67,13 +66,12 @@ void GetTransformedAABBFromColliderMesh( component_collider* Collider, const m4&
   *ReturnAABB = AABB3f(Min,Max);
 }
 
-void
-SetColliderMeshFromAABB( memory_arena* Arena, component_collider* Collider )
+void SetColliderMeshFromAABB( memory_arena* Arena, component_collider* Collider )
 {
   Collider->Mesh = (collider_mesh*) PushStruct(Arena, collider_mesh);
   Collider->Mesh->nv  = 8;
   Collider->Mesh->nvi = 36;
-  Collider->Mesh->v  = (v3*)  PushArray(Arena,  Collider->Mesh->nv, v3);
+  Collider->Mesh->v  = (v3*)  PushArray(Arena, Collider->Mesh->nv,  v3);
   Collider->Mesh->vi = (u32*) PushArray(Arena, Collider->Mesh->nvi, u32);
 
   GetAABBVertices( &Collider->AABB, Collider->Mesh->v, Collider->Mesh->vi);

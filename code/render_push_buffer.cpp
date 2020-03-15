@@ -1,9 +1,13 @@
 #include "render_push_buffer.h"
-
 #include "component_camera.h"
 #include "component_surface.h"
 #include "component_light.h"
+#include "component_spatial.h"
 #include "component_collider.h"
+#include "component_sprite_animation.h"
+#include "component_gjk_epa_visualizer.h"
+#include "component_mesh.h"
+#include "epa_collision_data.h"
 
 push_buffer_header* PushNewHeader(game_render_commands* RenderCommands, push_buffer_header** PreviousEntry)
 {

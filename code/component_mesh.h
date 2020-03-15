@@ -1,5 +1,7 @@
 #pragma once
 
+#include "vector_math.h"
+
 struct mesh_data
 {
   u32 nv;    // Nr Verices

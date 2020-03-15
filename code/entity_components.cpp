@@ -1,3 +1,6 @@
+#include "epa_collision_data.h"
+#include "handmade.h"
+#include "handmade_tile.h"
 #include "utility_macros.h"
 #include "entity_components.h"
 #include "component_camera.h"
@@ -10,7 +13,6 @@
 #include "component_surface.h"
 #include "component_sprite_animation.h"
 #include "component_gjk_epa_visualizer.h"
-#include "epa_collision_data.h"
 
 world* AllocateWorld( u32 NrMaxEntities )
 {

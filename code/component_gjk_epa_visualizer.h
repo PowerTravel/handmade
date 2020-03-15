@@ -1,7 +1,10 @@
 #pragma once
 
-#include "component_collider.h"
 #include "vector_math.h"
+#include "entity_components.h"
+#include "component_controller.h"
+#include "platform.h"
+
 struct simplex_index
 {
   u32  Offset;

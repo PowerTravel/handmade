@@ -1,3 +1,4 @@
+#pragma once
 /*
  * This file will bootstrap OpenGL on windows.
  * It declares globaly OpenGL functions and gets
@@ -5,6 +6,7 @@
  */
 
 #include <gl/gl.h>
+#include "types.h"
 #include "platform_opengl.h"
 
 global_variable GLuint OpenGLDefaultInternalTextureFormat;

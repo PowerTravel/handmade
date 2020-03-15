@@ -1,8 +1,4 @@
-
 #include "handmade_tile.h"
-#include "aabb.h"
-#include "entity_components.h"
-#include "data_containers.h"
 
 inline u32
 Get3DIdx(s32 x, s32 y, s32 z, s32 X, s32 Y, s32 Z  )
@@ -65,8 +61,7 @@ MoveNewTileMapPosition(tile_map* TileMap, tile_map_position OldCanPos, r32 dx, r
   return Result;
 }
 
-internal aabb3f
-GetTileAABB(tile_map* TileMap, tile_map_position CanPos )
+aabb3f GetTileAABB(tile_map* TileMap, tile_map_position CanPos )
 {
 
   r32 HalfWidth  = TileMap->TileWidthInMeters;
@@ -262,8 +257,7 @@ IsTileMapPointEmpty(tile_map* TileMap, tile_map_position CanPos)
   return TileContents.Type == TILE_TYPE_NONE;
 }
 
-internal void
-InitializeTileMap( tile_map* TileMap )
+void InitializeTileMap( tile_map* TileMap )
 {
   TileMap->TileWidthInMeters = 1.f;
   TileMap->TileHeightInMeters = 1.f;

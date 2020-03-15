@@ -1,20 +1,10 @@
-#ifndef HANDMADE_H
-#define HANDMADE_H
-
-#include <stdio.h>
-
-#include "platform.h"
-
-#include "vector_math.h"
-
+#pragma once
 #include "memory.h"
-#include "data_containers.h"
 #include "bitmap.h"
-#include "entity_components.h"
-#include "render_push_buffer.h"
 #include "handmade_tile.h"
 
 struct contact_data;
+struct entity;
 
 struct game_assets
 {
@@ -60,5 +50,3 @@ struct game_state
 
 	b32 IsInitialized;
 };
-
-#endif // HANDMADE_H

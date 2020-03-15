@@ -2,15 +2,17 @@
 
 #define CopyArray( Count, Source, Dest ) utils::Copy( (Count)*sizeof( *(Source) ), ( Source ), ( Dest ) )
 
+#include "types.h"
+
 namespace utils
 {
   inline void* Copy(memory_index aSize, void* SourceInit, void* DestInit)
   {
-      u8 *Source = (u8 *)SourceInit;
-      u8 *Dest = (u8 *)DestInit;
-      while(aSize--) {*Dest++ = *Source++;}
+    u8 *Source = (u8 *)SourceInit;
+    u8 *Dest = (u8 *)DestInit;
+    while(aSize--) {*Dest++ = *Source++;}
 
-      return(DestInit);
+    return(DestInit);
   }
 
   class push_buffer
