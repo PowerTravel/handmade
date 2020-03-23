@@ -3,6 +3,7 @@
 #include "entity_components.h"
 #include "primitive_meshes.h"
 #include "math/vector_math.h"
+#include "standalone_utility.h"
 
 struct component_mesh;
 struct component_surface;
@@ -12,7 +13,8 @@ enum class render_buffer_entry_type
 {
   INDEXED_BUFFER,
   PRIMITIVE,
-  LIGHT
+  LIGHT,
+  STRING
 };
 
 enum data_type
@@ -85,10 +87,18 @@ struct push_buffer_header
 
 struct game_assets;
 
-struct render_push_buffer
+struct render_group
 {
+  r32 ScreenWidth;
+  r32 ScreenHeight;
+
   m4 ProjectionMatrix;
   m4 ViewMatrix;
+
+  u32 ElementCount;
+  utils::push_buffer Buffer;
+
   game_assets* Assets;
   push_buffer_header* First;
+  push_buffer_header* Last;
 };

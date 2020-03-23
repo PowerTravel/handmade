@@ -32,6 +32,7 @@
 #define GL_MAX_SAMPLES                    0x8D57
 #define GL_MAX_COLOR_TEXTURE_SAMPLES      0x910E
 #define GL_MAX_DEPTH_TEXTURE_SAMPLES      0x910F
+#define GL_ONE_MINUS_CONSTANT_COLOR       0x8002
 
 #define GL_FRAGMENT_SHADER                0x8B30
 #define GL_VERTEX_SHADER                  0x8B31

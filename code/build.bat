@@ -18,17 +18,18 @@ pushd ..\..\build
 REM 32-bit build
 REM cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp  /link -subsystem:windows,5.1 %CommonLinkerFlags%
 
+rem Add a new DEBUG_PREFIX for each compilation unit
 
 REM 64-bit build
 REM Optimization switches -O2
 del *.pdb > NUL 2> NUL
 echo CreateLock
 echo WAITING FOR PDB > lock.tmp
-cl %CommonCompilerFlags% -MTd ..\handmade\code\handmade.cpp -Fmhandmade.map -LD /link -incremental:no -opt:ref -PDB:handmade_%random%.pdb -EXPORT:GameUpdateAndRender -EXPORT:GameGetSoundSamples
+cl %CommonCompilerFlags% -DDebugRecordArray=DebugRecords_Main -MTd ..\handmade\code\handmade.cpp -Fmhandmade.map -LD /link -incremental:no -opt:ref -PDB:handmade_%random%.pdb -EXPORT:GameUpdateAndRender -EXPORT:GameGetSoundSamples -EXPORT:DEBUGGameFrameEnd
 set LastError=%ERRORLEVEL%
 echo DeleteLock
 del lock.tmp
-cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp -Fmwin32_handmade.map /link %CommonLinkerFlags%
+cl %CommonCompilerFlags% -DDebugRecordArray=DebugRecords_Render ..\handmade\code\win32_handmade.cpp -Fmwin32_handmade.map /link %CommonLinkerFlags%
 popd
 
 ..\ctime\ctime -end handmade_hero.ctm %LastError%

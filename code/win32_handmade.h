@@ -73,6 +73,7 @@ struct win32_game_code
   // IMPORTANT: Both functions can be 0; Must check before calling
   game_update_and_render* UpdateAndRender;
   game_get_sound_samples* GetSoundSamples;
+  debug_frame_end*        DEBUGGameFrameEnd;
 
   b32 IsValid;
 };

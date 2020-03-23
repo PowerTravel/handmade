@@ -1,7 +1,20 @@
+/*
+  TODO: AssetSystem.
+    - Easy API to upload render assets to opengl
+        * Per Render Asset: Must know if it's loaded into GPU and what it's handle is.
+    - Easy API to add new assets
+    - Just ask interface, I want a Cube with blue surface.
+    - Render States. I want to render the cube filled with wire-mesh
+  TODO: Multi Threading
+
+*/
+
 #include "handmade.h"
 
 #include "random.h"
 #include "tiles_spritesheet.h"
+
+platform_api Platform;
 
 #include "math/aabb.cpp"
 #include "handmade_tile.cpp"
@@ -15,6 +28,81 @@
 #include "system_sprite_animation.cpp"
 #include "system_spatial.cpp"
 #include "system_camera.cpp"
+
+
+#include "debug.h"
+
+
+// STBTT_DEF int stbtt_FindGlyphIndex(const stbtt_fontinfo *info, int unicode_codepoint);
+// STBTT_DEF void stbtt_GetGlyphHMetrics(const stbtt_fontinfo *info, int glyph_index, int *advanceWidth, int *leftSideBearing);
+// STBTT_DEF int  stbtt_GetGlyphKernAdvance(const stbtt_fontinfo *info, int glyph1, int glyph2);
+// STBTT_DEF int  stbtt_GetGlyphBox(const stbtt_fontinfo *info, int glyph_index, int *x0, int *y0, int *x1, int *y1);
+
+internal stb_font_map STBBakeFont(memory_arena* Memory)
+{
+  const s32 Ranges[] =
+  {
+      0x20, 0x80,       // BasicLatin
+      0xA1, 0x100,      // ExtendedLatin
+      0x16A0, 0x1700,   // Runic
+      0x600, 0x700,     // Arabic
+      0x370, 0x400,     // Greek
+      0x2200, 0x2300    // Mathematical
+  };
+
+  thread_context Thread;
+  debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\courbd.ttf");
+  Assert(TTFFile.Contents);
+  stb_font_map Result = {};
+  Result.StartChar = Ranges[0];
+  Result.NumChars = Ranges[1] - Ranges[0];
+  Result.FontHeightPx = 28.f;
+  Result.CharData = PushArray(Memory, Result.NumChars, stbtt_bakedchar);
+
+  stbtt_GetScaledFontVMetrics((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
+   Result.FontHeightPx, &Result.Ascent, &Result.Descent, &Result.LineGap);
+
+  Result.BitMap.BPP = 8;
+  Result.BitMap.Width = 1028;
+  Result.BitMap.Height = 1028;
+  Result.BitMap.Pixels = (void*) PushArray(Memory, Result.BitMap.Width * Result.BitMap.Height, u8);
+  s32 ret = stbtt_BakeFontBitmap((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
+                       Result.FontHeightPx,
+                       (u8*)Result.BitMap.Pixels, Result.BitMap.Width, Result.BitMap.Height,
+                       Result.StartChar, Result.NumChars,
+                       Result.CharData);
+  Assert(ret>0);
+
+  Platform.DEBUGPlatformFreeFileMemory(&Thread, TTFFile.Contents);
+
+  return Result;
+}
+
+global_variable render_group* GlobalDebugRenderGroup;
+
+void OverlayCycleCounters(u32 DebugRecordCount, debug_record* DebugRecords)
+{
+  r32 HeightSTB = 0;
+  for(u32 i = 0; i<DebugRecordCount; ++i)
+  {
+    debug_record* Record = &DebugRecords[i];
+    u64 HitCount_CycleCount = AtomicExchangeu64(&Record->HitCount_CycleCount,0);
+    u32 HitCount = (u32)(HitCount_CycleCount >> 32);
+    u32 CycleCount   = (u32)(HitCount_CycleCount & 0xFFFFFFFF);
+    if(HitCount)
+    {
+      c8 StringBuffer[256] = {};
+      _snprintf_s( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
+    "(%3d)%-28s:%2dh :%8dh/cy",
+        Record->LineNumber, Record->FunctionName, HitCount,
+        (int) (CycleCount / HitCount));
+
+      DEBUGAddTextSTB(GlobalDebugRenderGroup, StringBuffer, 10, HeightSTB);
+      HeightSTB++;
+    }
+  }
+}
+
 
 internal void
 GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
@@ -50,19 +138,33 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
   }
 }
 
+void AllocateWorld( u32 NrMaxEntities, game_state* GameState )
+{
+  GameState->World = (world*) PushStruct(&GameState->PersistentArena, world);
+  GameState->World->AssetArena      = &GameState->AssetArena;
+  GameState->World->PersistentArena = &GameState->PersistentArena;
+  GameState->World->TransientArena  = &GameState->TransientArena;
+
+  GameState->World->NrEntities = 0;
+  GameState->World->NrMaxEntities = NrMaxEntities;
+  GameState->World->Entities = (entity*) PushArray( &GameState->PersistentArena, GameState->World->NrMaxEntities, entity );
+
+  GameState->World->NrContacts = 0;
+  GameState->World->MaxNrContacts = NrMaxEntities;
+  GameState->World->Contacts = (contact_data_list*)  PushSize( &GameState->PersistentArena, GameState->World->MaxNrContacts*( sizeof(contact_data_list) + 4*sizeof(contact_data)));
+
+  GameState->World->Assets = PushStruct(GameState->World->AssetArena, game_assets);
+}
 
 void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
 {
   game_state* GameState = Memory->GameState;
   memory_arena* AssetArena = &GameState->AssetArena;
-  memory_arena* TemporaryArena = &GameState->TemporaryArena;
+  memory_arena* TransientArena = &GameState->TransientArena;
 
-  GameState->World = AllocateWorld(20);
+  AllocateWorld(20, GameState);
   world* World = GameState->World;
-  World->TransientArena = TemporaryArena;
-
-  GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
-  game_assets* Assets = GameState->World->Assets;
+  game_assets* Assets = World->Assets;
 
 
   entity* Light = NewEntity( World );
@@ -71,8 +173,8 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
   Put( V3(0,2,4), 0, V3(0,1,0), Light->SpatialComponent );
 
   obj_loaded_file* cube = ReadOBJFile( Thread, GameState,
-         Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-         Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
+         Platform.DEBUGPlatformReadEntireFile,
+         Platform.DEBUGPlatformFreeFileMemory,
          "..\\handmade\\data\\cube\\cube.obj");
 
   entity* CubeA = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
@@ -114,7 +216,7 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
   r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
   r32 FieldOfView =  90;
   SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
-  LookAt(ControllableCamera->CameraComponent, 3*V3(0,3,8), V3(0,3,0));
+  LookAt(ControllableCamera->CameraComponent, 1*V3(0,3,8), V3(0,3,0));
   ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
   ControllableCamera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
 }
@@ -123,14 +225,11 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
 {
   game_state* GameState        = Memory->GameState;
   memory_arena* AssetArena     = &GameState->AssetArena;
-  memory_arena* TemporaryArena = &GameState->TemporaryArena;
+  memory_arena* TransientArena = &GameState->TransientArena;
 
-  GameState->World = AllocateWorld(1000);
+  AllocateWorld(1000, GameState);
   world* World = GameState->World;
-  World->TransientArena = TemporaryArena;
-
-  GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
-  game_assets* Assets = GameState->World->Assets;
+  game_assets* Assets = World->Assets;
 
   obj_loaded_file* cube = ReadOBJFile( Thread, GameState,
          Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
@@ -142,11 +241,11 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   Light->LightComponent->Color = V4(3,3,3,1);
   Put( V3(10,10,10), 0, V3(0,1,0), Light->SpatialComponent );
 
-  for (s32 i = -0; i < 1; ++i)
+  for (s32 i = -0; i < 2; ++i)
   {
     for (s32 j = 0; j < 1; ++j)
     {
-      for (s32 k = -0; k < 1; ++k)
+      for (s32 k = -0; k < 2; ++k)
       {
         entity* cubeEntity = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
         NewComponents( World, cubeEntity, COMPONENT_TYPE_DYNAMICS );
@@ -154,8 +253,8 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
         // Uncomment this and set j < 1 in the for loop to reproduce a bug where
         // GJK perodically does not find a collision.
         //Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,2,1), cubeEntity->SpatialComponent );
-        Put( V3(1.f*i, 1.0f*j, 1.f*k), 0, V3(1,1,1), cubeEntity->SpatialComponent );
-        cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0.1);
+        Put( V3(1.1f*i, 1.0f*j, 1.1f*k), 0, V3(1,1,1), cubeEntity->SpatialComponent );
+        cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
         cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0,0);
         cubeEntity->DynamicsComponent->Mass = 1;
       }
@@ -164,7 +263,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
 
   entity* floor = CreateEntityFromOBJGroup( World, &cube->Objects[1], cube->MeshData );
 
-  Put( V3( 0,-1, 0), 0, V3(0,1,0), floor->SpatialComponent );
+  Put( V3( 0,-2, 0), 0, V3(0,1,0), floor->SpatialComponent );
   Scale( V3( 18, 1, 18),  floor->SpatialComponent );
 
 #if 1
@@ -206,20 +305,18 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 {
   game_state* GameState = Memory->GameState;
   memory_arena* AssetArena = &GameState->AssetArena;
-  memory_arena* TemporaryArena = &GameState->TemporaryArena;
+  memory_arena* TransientArena = &GameState->TransientArena;
 
-  GameState->World = AllocateWorld(100);
+  AllocateWorld(100, GameState);
+  InitializeTileMap( &GameState->World->TileMap );
   world* World = GameState->World;
-  World->TransientArena = TemporaryArena;
+  game_assets* Assets = World->Assets;
 
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
   Light->LightComponent->Color = V4(1,1,1,1);
   Light->SpatialComponent->ModelMatrix = M4Identity();
   Translate( V3(3,3,3), Light->SpatialComponent );
-
-  GameState->World->Assets = (game_assets*) PushStruct(AssetArena, game_assets);
-  game_assets* Assets = GameState->World->Assets;
 
   entity* Player = NewEntity( World );
 
@@ -238,7 +335,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 
   Put( V3(0,3,0), 0, V3(0,1,0), Player->SpatialComponent );
   Player->ColliderComponent->AABB = AABB3f( V3(-0.5,-0.5,0), V3(0.5,0.5,0) );
-  SetColliderMeshFromAABB(&World->PersistentArena, Player->ColliderComponent);
+  SetColliderMeshFromAABB(World->PersistentArena, Player->ColliderComponent);
 
   Player->DynamicsComponent->LinearVelocity  = V3(0,0,0);
   Player->DynamicsComponent->AngularVelocity = V3(0,0,0);
@@ -252,8 +349,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
         "..\\handmade\\data\\Platformer\\Adventurer\\adventurer-Sheet.tga" );
   bitmap* HeroSpriteSheet = Assets->HeroSpriteSheet.bitmap;
 
-
-  hash_map<bitmap_coordinate> HeroCoordinates = LoadAdventurerSpriteSheetCoordinates( TemporaryArena );
+  hash_map<bitmap_coordinate> HeroCoordinates = LoadAdventurerSpriteSheetCoordinates( TransientArena );
   SpriteAnimation->Bitmap = Assets->HeroSpriteSheet.bitmap;
   SpriteAnimation->Animation = hash_map< list<m4> >(AssetArena,6);
 
@@ -376,11 +472,36 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
 {
   if (!Memory->GameState)
   {
-    Memory->GameState = BootstrapPushStruct(game_state, AssetArena);
+    Memory->GameState = BootstrapPushStruct(game_state, PersistentArena);
+
+    u32 RenderMemorySize = Megabytes(4);
+    u32 TempMemorySize   = Megabytes(16);
+    RenderCommands->TemporaryMemory = utils::push_buffer((u8*) PushSize(&Memory->GameState->PersistentArena, TempMemorySize), TempMemorySize);
 
     //Create2DScene(Thread, Memory, RenderCommands, Input );
     CreateCollisionTestScene(Thread, Memory, RenderCommands, Input );
     //CreateEpaVisualizerTestScene(Thread, Memory, RenderCommands, Input );
+
+    RenderCommands->MainRenderGroup.ElementCount = 0;
+    RenderCommands->MainRenderGroup.Buffer = utils::push_buffer((u8*) PushSize(&Memory->GameState->PersistentArena, RenderMemorySize), RenderMemorySize);
+    RenderCommands->MainRenderGroup.Assets = Memory->GameState->World->Assets;
+    RenderCommands->MainRenderGroup.ScreenWidth  = (r32) RenderCommands->Width;
+    RenderCommands->MainRenderGroup.ScreenHeight = (r32) RenderCommands->Height;
+    RenderCommands->MainRenderGroup.ProjectionMatrix = M4Identity();
+    RenderCommands->MainRenderGroup.ViewMatrix = M4Identity();
+
+
+
+    RenderCommands->DebugRenderGroup.ElementCount = 0;
+    RenderCommands->DebugRenderGroup.Buffer = utils::push_buffer((u8*) PushSize(&Memory->GameState->PersistentArena, RenderMemorySize), RenderMemorySize);
+    RenderCommands->DebugRenderGroup.Assets = Memory->GameState->World->Assets;
+    RenderCommands->DebugRenderGroup.ScreenWidth  =  (r32) RenderCommands->Width;
+    RenderCommands->DebugRenderGroup.ScreenHeight =  (r32) RenderCommands->Height;
+    RenderCommands->DebugRenderGroup.ProjectionMatrix = M4Identity();
+    RenderCommands->DebugRenderGroup.ViewMatrix = M4Identity();
+
+    Memory->GameState->World->Assets->STBFontMap = STBBakeFont(&Memory->GameState->AssetArena);
+
     for (s32 ControllerIndex = 0;
     ControllerIndex < ArrayCount(Input->Controllers);
       ++ControllerIndex)
@@ -392,44 +513,59 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
   }
 }
 
+
 /*
   Note:
-  extern "C" prevents the C++ compiler from renaming the functions which it does for function-overloading reasons (among other things) by forcing it to use C conventions which does not support overloading. Also called 'name mangling' or 'name decoration'. The actual function names are visible in the outputted .map file in the build directory
+  extern "C" prevents the C++ compiler from renaming the functions which it does for function-overloading reasons
+  (among other things) by forcing it to use C conventions which does not support overloading.
+  Also called 'name mangling' or 'name decoration'. The actual function names are visible in the outputted .map file
+  i the build directory.
 */
+
+// Signature is
+//void game_update_and_render (thread_context* Thread,
+//                game_memory* Memory,
+//                render_commands* RenderCommands,
+//                game_input* Input )
+extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
+{
+  GlobalDebugRenderGroup = &RenderCommands->DebugRenderGroup;
+  TIMED_BLOCK()
+  Platform = Memory->PlatformAPI;
+  InitiateGame(Thread, Memory, RenderCommands, Input);
+  game_state* GameState = Memory->GameState;
+  world* World = GameState->World;
+  World->dtForFrame = Input->dt;
+  World->GlobalTimeSec += Input->dt;
+
+  v2 StringScreenPos = V2(0.1,0.1);
+
+  ControllerSystemUpdate(GameState->World);
+  SpatialSystemUpdate(GameState->World, &Memory->PlatformAPI);
+  CameraSystemUpdate(GameState->World);
+  SpriteAnimationSystemUpdate(GameState->World);
+  FillRenderPushBuffer( World, RenderCommands );
+  CheckArena(&GameState->TransientArena);
+}
+
+extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
+{
+  GameOutputSound(SoundBuffer, 400);
+}
+
+extern debug_record DebugRecordArray[__COUNTER__] = {};
+
 // Signature is
 //void game_update_and_render (thread_context* Thread,
 //                game_memory* Memory,
 //                render_commands* RenderCommands,
 //                game_input* Input )
 
-s32 eqFun( const s32* A, const s32* B)
+
+extern const u32 DebugRecordsRenderCount;
+debug_record DebugRecords_Render[];
+
+extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 {
-  return *A-*B;
-}
-
-platform_api Platform;
-
-extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
-{
-  Platform = Memory->PlatformAPI;
-  InitiateGame(Thread, Memory, RenderCommands, Input);
-
-  game_state* GameState = Memory->GameState;
-  world* World = GameState->World;
-  World->dtForFrame = Input->dt;
-  World->GlobalTimeSec += Input->dt;
-
-  ControllerSystemUpdate(GameState->World);
-  SpatialSystemUpdate(GameState->World, &Memory->PlatformAPI);
-  CameraSystemUpdate(GameState->World);
-  SpriteAnimationSystemUpdate(GameState->World);
-
-  FillRenderPushBuffer( World, RenderCommands );
-
-  CheckArena(&GameState->TemporaryArena);
-}
-
-extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
-{
-  GameOutputSound(SoundBuffer, 400);
+  OverlayCycleCounters(ArrayCount(DebugRecordArray), DebugRecordArray);
 }

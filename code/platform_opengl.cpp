@@ -7,6 +7,7 @@
 #include "component_camera.h"
 #include "string.h"
 #include "bitmap.h"
+#include "debug.h"
 
 global_variable u32 TextureBindCount = 0;
 
@@ -120,6 +121,50 @@ void main() \n\
 
   return Result;
 }
+
+
+opengl_program3D OpenGLCreateTextOverlayShader()
+{
+  char VertexShaderCode[] = {
+"#version  330 core\n\
+layout (location = 0) in vec3 vertice;\n\
+layout (location = 2) in vec2 textureCoordinate;\n\
+\n\
+uniform mat4 M;  // Model Matrix - Transforms points from ModelSpace to WorldSpace.\n\
+uniform mat4 TM; // Texture Model Matrix. Shifts texture coordinates in a bitmap\n\
+out vec2 texCoord;\n\
+\n\
+void main()\n\
+{\n\
+  gl_Position = M*vec4(vertice,1);\n\
+  vec4 tmpTex = TM*vec4(textureCoordinate,0,1);\n\
+  texCoord = vec2(tmpTex.x,tmpTex.y);\n\
+}\n\
+"};
+
+  char FragmentShaderCode[] ={
+"#version 330 core\n\
+out vec4 fragColor;\n\
+\n\
+in vec2 texCoord;\n\
+uniform sampler2D ourTexture;\n\
+\n\
+void main() \n\
+{\n\
+  fragColor = texture(ourTexture, texCoord);\n\
+}\n\
+"};
+
+  opengl_program3D Result = {};
+  Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
+  glUseProgram(Result.Program);
+  Result.M =  glGetUniformLocation(Result.Program, "M");
+  Result.TM = glGetUniformLocation(Result.Program, "TM");
+  glUseProgram(0);
+
+  return Result;
+}
+
 
 opengl_program3D OpenGLCreateShaderProgram3D()
 {
@@ -382,10 +427,36 @@ void OpenGLSetViewport( r32 ViewPortAspectRatio, s32 WindowWidth, s32 WindowHeig
 
 }
 
-void LoadOrBindTexture( bitmap* Bitmap )
+
+#if 0
+//  Code for transforming an 8-bit texture to a 32 bit texture
+      u8* BitmapMemory = (u8*) TemporaryMemory.GetMemory( sizeof(u32) * RenderTarget->Width * RenderTarget->Height );
+      u32* Pixel = (u32*) BitmapMemory;
+      u8*  SrcPixel =  (u8*) RenderTarget->Pixels;
+      u8*  EndSrcPixel = ((u8*) RenderTarget->Pixels)+ RenderTarget->Width * RenderTarget->Height;
+      while(SrcPixel != EndSrcPixel)
+      {
+        u8 Alpha = *SrcPixel;
+        u8 Blue = 0;
+        u8 Green = 0;
+        u8 Red = 0;
+        u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
+        *Pixel++ = PixelData;
+        SrcPixel++;
+      }
+
+      glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
+        RenderTarget->Width,  RenderTarget->Height,
+        0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
+        BitmapMemory);
+#endif
+
+void LoadOrBindTexture( bitmap* Bitmap, utils::push_buffer TemporaryMemory)
 {
+  Assert(TemporaryMemory.IsEmpty());
   local_persist bitmap EmptyBitmap = {};
   u8 WhitePixel[4] = {255,255,255,255};
+  EmptyBitmap.BPP  = 32;
   EmptyBitmap.Width  = 1;
   EmptyBitmap.Height = 1;
   EmptyBitmap.Pixels = (void*) WhitePixel;
@@ -399,23 +470,37 @@ void LoadOrBindTexture( bitmap* Bitmap )
     // Enable texture slot
     glBindTexture( GL_TEXTURE_2D, RenderTarget->Handle );
 
-    // Send a Texture to GPU referenced to the enabled texture slot
-    glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
-              RenderTarget->Width,  RenderTarget->Height,
-              0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
-              RenderTarget->Pixels);
-
     // Set texture environment state:
     // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
 
+    // Parameters set with glTexParameter affects the currently bound texture object,
+    // and stays with the texture object until changed.
+
     // How to resize textures
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST ); // Just take nearest
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST ); // Just take nearest
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR ); // Just take nearest
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR ); // Just take nearest
 
     // Wrapping textures, (Mirror. Repeat border color, clamp, repeat etc... )
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
+
+    // Send a Texture to GPU referenced to the enabled texture slot
+    if(RenderTarget->BPP == 8)
+    {
+      glTexImage2D( GL_TEXTURE_2D,  0, GL_ALPHA,
+        RenderTarget->Width,  RenderTarget->Height,
+        0, GL_ALPHA, GL_UNSIGNED_BYTE,
+        RenderTarget->Pixels);
+  	}else{
+      glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
+                RenderTarget->Width,  RenderTarget->Height,
+                0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
+                RenderTarget->Pixels);
+  	}
   }
+
+  // Set texture environment state:
+  // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
 
   glBindTexture( GL_TEXTURE_2D, RenderTarget->Handle );
 }
@@ -580,10 +665,10 @@ internal void setOpenGLState(u32 State)
 internal void
 OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 WindowHeight )
 {
+  TIMED_BLOCK();
   Assert(Commands->TemporaryMemory.IsEmpty());
 
-
-  render_push_buffer* RenderPushBuffer = (render_push_buffer*) Commands->RenderMemory.GetBase();
+  render_group* RenderGroup = &Commands->MainRenderGroup;
 
   if(!Commands->RenderProgram3D.Program)
   {
@@ -595,15 +680,15 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
   // Enable Textures
   glEnable(GL_TEXTURE_2D);
   // Activates the gl_PointSize = 10.0; variable in the shader
+  // TODO: Remove this, use a billboard instead
   glEnable(GL_PROGRAM_POINT_SIZE);
   // Accept fragment if it closer to the camera than the former one
   glDepthFunc(GL_LESS);
 
   glClearColor(0.7,0.7,0.7,1);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
   const r32 DesiredAspectRatio = 1.77968526f;
   OpenGLSetViewport( DesiredAspectRatio, WindowWidth, WindowHeight );
 
@@ -611,8 +696,8 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
   // Our math library uses Row major convention which means we need to transpose the
   // matrices AND reverse the order of multiplication.
   // Transpose(A*B) = Transpose(B) * Transpose(A)
-  m4 V = RenderPushBuffer->ViewMatrix;
-  m4 P = RenderPushBuffer->ProjectionMatrix;
+  m4 V = RenderGroup->ViewMatrix;
+  m4 P = RenderGroup->ProjectionMatrix;
 
   m4 Identity = M4Identity();
   opengl_program3D* Prog = &Commands->RenderProgram3D;
@@ -625,7 +710,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
   v4 LightColor    = V4(0,0,0,1);
 
   // For each render group
-  for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
+  for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
   {
     u8* Head = (u8*) Entry;
     u8* Body = Head + sizeof(push_buffer_header);
@@ -653,7 +738,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
         Assert(IndexedBuffer->Surface);
         component_surface* Surface = IndexedBuffer->Surface;
         material* Material = Surface->Material;
-        LoadOrBindTexture(Material->DiffuseMap);
+        LoadOrBindTexture(Material->DiffuseMap,Commands->TemporaryMemory);
 
         u32 SurfaceSmoothnes = 3;
         v4 AmbientColor   = Material->DiffuseMap ? V4(0,0,0,1) : Blend(&LightColor, &Material->AmbientColor);
@@ -735,7 +820,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
         v4 AmbientColor   = Material->DiffuseMap ? V4(0,0,0,1) : Blend(&LightColor, &Material->AmbientColor);
         v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
         v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
-        LoadOrBindTexture(Material->DiffuseMap);
+        LoadOrBindTexture(Material->DiffuseMap, Commands->TemporaryMemory);
         glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
         glUniform4fv( Prog->diffuseProduct,  1, DiffuseColor.E);
         glUniform4fv( Prog->specularProduct, 1, SpecularColor.E);
@@ -746,76 +831,78 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
     }
   }
 
-#if 0
-  // Here we do overlays so clear GL_DEPTH_BUFFER_BIT
-  glClear(GL_DEPTH_BUFFER_BIT);
-  for( push_buffer_header* Entry = RenderPushBuffer->First; Entry != 0; Entry = Entry->Next )
+  RenderGroup->Buffer.Clear();
+  RenderGroup->ElementCount = 0;
+  RenderGroup->First = 0;
+
+
+  // DEBUG OVERLAY
+
+  local_persist opengl_program3D TextOverlay = {};
+  if(!TextOverlay.Program)
+  {
+    TextOverlay = OpenGLCreateTextOverlayShader();
+  }
+
+  glUseProgram(TextOverlay.Program);
+
+  RenderGroup = &Commands->DebugRenderGroup;
+  // No need to clearh the depth buffer if we disable depth test
+  glDisable(GL_DEPTH_TEST);
+  // Enable Textures
+  glEnable(GL_TEXTURE_2D);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+  // For each render group
+  for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
   {
     u8* Head = (u8*) Entry;
     u8* Body = Head + sizeof(push_buffer_header);
+    setOpenGLState(Entry->RenderState);
     switch(Entry->Type)
     {
-      case render_buffer_entry_type::POINT:
+      case render_buffer_entry_type::PRIMITIVE:
       {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-        entry_type_point* Point = (entry_type_point*) Body;
-        local_persist u32 PointVao = 0;
-        if(!PointVao)
+        entry_type_primitive* Primitive = (entry_type_primitive*) Body;
+        u32 VAO = 0;
+        u32 NrIndeces = 0;
+        u32 ElementType = 0;
+        if(Primitive->PrimitiveType == primitive_type::QUAD)
         {
-          u32 idx = 0;
-          opengl_vertex v = {};
-          r32 length = 0.5;
-          v.v = V3(0,0,0);
-          v.vn = V3(0,0,1);
-          v.vt = V2(0,0);
-          OpenGLSendMeshToGPU(&PointVao, 1, &idx, 1, &v );
+          local_persist u32 QuadVAO = 0;
+          local_persist u32 QuadVBO = 0;
+          if(!QuadVAO)
+          {
+            opengl_vertex Vertex[4] = {};
+            u32 Index[6] = {};
+            GetQuad(Index, Vertex);
+            OpenGLSendMeshToGPU(&QuadVAO, &QuadVBO, 6, Index, 4, Vertex );
+          }
+          VAO = QuadVAO;
+          NrIndeces = 6;
+          ElementType = DATA_TYPE_TRIANGLE;
         }
-        LoadTexture(&EmptyBitmap);
-        glUniformMatrix4fv(Prog->M,  1, GL_TRUE, Point->M.E);
-        glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, M4Identity().E);
-        glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, M4Identity().E);
-        glUniform4fv( Prog->ambientProduct,  1, V4(1,1,1,1).E);
-        glUniform4fv( Prog->diffuseProduct,  1, V4(1,1,1,1).E);
-        glUniform4fv( Prog->specularProduct, 1, V4(1,1,1,1).E);
-        glUniform1f(  Prog->shininess, 1);
+        glUniformMatrix4fv((u32) TextOverlay.M,  1, GL_TRUE, Primitive->M.E);
+        glUniformMatrix4fv((u32) TextOverlay.TM, 1, GL_TRUE, Primitive->TM.E);
 
-        OpenGLDraw( PointVao, 6 );
-      }break;
-      case render_buffer_entry_type::WIREBOX:
-      {
-        entry_type_wirebox* WireBox = (entry_type_wirebox*) Body;
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        if(WireBox->CullFace)
-        {
-          glEnable(GL_CULL_FACE);
-        }else{
-          glDisable(GL_CULL_FACE);
-        }
-        if(!WireBox->Mesh->VAO)
-        {
-          PushColliderMeshToOpenGL( Commands, WireBox->Mesh );
-        }
-        LoadTexture(&EmptyBitmap);
-        glUniformMatrix4fv(Prog->M,  1, GL_TRUE, WireBox->M.E);
-        glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, M4Identity().E);
-        glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, M4Identity().E);
-        glUniform4fv( Prog->ambientProduct,  1, V4(1,1,1,1).E);
-        glUniform4fv( Prog->diffuseProduct,  1, V4(1,1,1,1).E);
-        glUniform4fv( Prog->specularProduct, 1, V4(1,1,1,1).E);
-        glUniform1f(  Prog->shininess, 1);
+        component_surface* Surface = Primitive->Surface;
+        material* Material =  Surface->Material;
+        LoadOrBindTexture(Material->DiffuseMap, Commands->TemporaryMemory);
 
-        OpenGLDraw( WireBox->Mesh->VAO, 6 );
-        break;
+        OpenGLDraw( VAO, ElementType, NrIndeces, 0 );
+        Assert(Commands->TemporaryMemory.IsEmpty());
       }
     }
 
   }
-#endif
-  Assert(Commands->TemporaryMemory.IsEmpty());
+  RenderGroup->Buffer.Clear();
+  RenderGroup->ElementCount = 0;
+  RenderGroup->First = 0;
 }
 #if 1
 
-internal void DisplayBitmapViaOpenGL( u32 Width, u32 Height, void* Memory )
+void DisplayBitmapViaOpenGL( u32 Width, u32 Height, void* Memory )
 {
   const r32 DesiredAspectRatio = 1.77968526f;
   OpenGLSetViewport( DesiredAspectRatio, Width, Height );

@@ -62,5 +62,9 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
          debug_platfrom_free_file_memory* FreeEntireFile,
          char* FileName);
 
+bitmap* LoadTGA( thread_context* Thread, memory_arena* AssetArena,
+         debug_platform_read_entire_file* ReadEntireFile,
+         debug_platfrom_free_file_memory* FreeEntireFile,
+         char* FileName);
 entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* MeshData );
 void CreateEntitiesFromOBJFile( world* World, obj_loaded_file* ObjFile );

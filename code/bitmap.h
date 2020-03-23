@@ -17,6 +17,7 @@ enum ColorDecodeMask
 struct bitmap
 {
   u32   Handle;
+  u32   BPP;
   u32   Width;
   u32   Height;
   void* Pixels;

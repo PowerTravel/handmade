@@ -9,6 +9,7 @@
 gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
             const m4* BModelMat, const collider_mesh* BMesh, const v3 Direction )
 {
+  TIMED_BLOCK()
   gjk_support Result = {};
   v3 NormalizedDirection = Normalize(Direction);
 
@@ -61,6 +62,7 @@ void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
                     const m4* BModelMat, const collider_mesh* BMesh,
                     gjk_simplex* Simplex)
 {
+  TIMED_BLOCK();
   switch(Simplex->Dimension)
   {
     // Fall-through intended
@@ -162,6 +164,7 @@ struct gjk_partial_result
 internal gjk_partial_result
 VertexEdge(const v3& Vertex, gjk_simplex& Simplex, u32 Index0 = 0, u32 Index1 = 1)
 {
+  TIMED_BLOCK();
   gjk_partial_result Result = {};
 
   const v3 o = Simplex.SP[Index0].S;
@@ -199,6 +202,7 @@ VertexEdge(const v3& Vertex, gjk_simplex& Simplex, u32 Index0 = 0, u32 Index1 = 
 internal inline b32
 IsVertexInsideTriangle(const v3& VertexOnPlane, const v3& Normal, const v3 Triangle[])
 {
+  TIMED_BLOCK();
   const v3 Coords = GetBaryocentricCoordinates( Triangle[0], Triangle[1], Triangle[2], Normal, VertexOnPlane);
   const b32 InsideTriangle = (Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
                              (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
@@ -210,6 +214,7 @@ IsVertexInsideTriangle(const v3& VertexOnPlane, const v3& Normal, const v3 Trian
 internal gjk_partial_result
 VertexTriangle( const v3& Vertex, gjk_simplex& Simplex, const u32 Index0 = 0, const u32 Index1 = 1, const u32 Index2 = 2)
 {
+  TIMED_BLOCK();
   gjk_partial_result Result = {};
 
   const v3 Triangle[3]    = {Simplex.SP[Index0].S, Simplex.SP[Index1].S, Simplex.SP[Index2].S};
@@ -335,6 +340,7 @@ void SetPointsAndIndecesForCCWTetrahedron( gjk_simplex* Simplex, u32 TriangleInd
 internal gjk_partial_result
 VertexTetrahedron( const v3& Vertex, gjk_simplex& Simplex )
 {
+  TIMED_BLOCK();
   gjk_partial_result Result = {};
 
   u32 TriangleIndeces[12] = {};
@@ -386,6 +392,7 @@ VertexTetrahedron( const v3& Vertex, gjk_simplex& Simplex )
 internal b32
 IsPointOnSimplexSurface(const gjk_simplex& Simplex, const v3& Point)
 {
+  TIMED_BLOCK();
   r32 Tol = 10E-7;
   switch(Simplex.Dimension)
   {
@@ -421,6 +428,7 @@ void RecordGJKFrame( component_gjk_epa_visualizer* Vis,
                       const m4& AModelMat, const collider_mesh* AMesh,
                       const m4& BModelMat, const collider_mesh* BMesh, gjk_simplex* Simplex, const v3& ClosestPointOnSurface )
 {
+  TIMED_BLOCK();
   if(!Vis->TriggerRecord)
   {
     Vis->UpdateVBO = false;
@@ -555,6 +563,7 @@ gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_m
                                            const m4* BModelMat, const collider_mesh* BMesh,
                                            component_gjk_epa_visualizer* Vis)
 {
+  TIMED_BLOCK()
   const v3 Origin = V3(0,0,0);
   gjk_collision_result Result = {};
   gjk_simplex& Simplex = Result.Simplex;

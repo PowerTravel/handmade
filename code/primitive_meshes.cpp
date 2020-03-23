@@ -3,12 +3,13 @@
 #include "math/vector_math.h"
 #include "types.h"
 
-internal void PushGLVertex( u32 Idx, v3 v, v3 n, opengl_vertex* Data )
+internal void PushGLVertex( u32 Idx, v3 v, v3 n, v2 t, opengl_vertex* Data )
 {
   opengl_vertex* Vert = Data+Idx;
   *Vert = {};
   Vert->v = v;
   Vert->vn = n;
+  Vert->vt = t;
 }
 
 // Need 6 indeces, 4 vertices
@@ -20,10 +21,10 @@ internal void GetQuad( u32* Indeces, opengl_vertex* Data )
   Indeces[3] = 0;
   Indeces[4] = 2;
   Indeces[5] = 3;
-  PushGLVertex(0, V3(-0.5, -0.5, 0), V3( 0, 0, 1), Data);
-  PushGLVertex(1, V3( 0.5, -0.5, 0), V3( 0, 0, 1), Data);
-  PushGLVertex(2, V3( 0.5,  0.5, 0), V3( 0, 0, 1), Data);
-  PushGLVertex(3, V3(-0.5,  0.5, 0), V3( 0, 0, 1), Data);
+  PushGLVertex(0, V3(-0.5, -0.5, 0), V3( 0, 0, 1), V2( 0, 0), Data);
+  PushGLVertex(1, V3( 0.5, -0.5, 0), V3( 0, 0, 1), V2( 1, 0), Data);
+  PushGLVertex(2, V3( 0.5,  0.5, 0), V3( 0, 0, 1), V2( 1, 1), Data);
+  PushGLVertex(3, V3(-0.5,  0.5, 0), V3( 0, 0, 1), V2( 0, 1), Data);
 }
 
 internal void GetVoxel( u32* Indeces, opengl_vertex* Data )
@@ -64,30 +65,30 @@ internal void GetVoxel( u32* Indeces, opengl_vertex* Data )
   Indeces[33] =22;
   Indeces[34] =21;
   Indeces[35] =23;
-  PushGLVertex( 0, V3(-0.5, -0.5,  0.5), V3( 0.0,  0.0,  1.0), Data);
-  PushGLVertex( 1, V3( 0.5, -0.5,  0.5), V3( 0.0,  0.0,  1.0), Data);
-  PushGLVertex( 2, V3(-0.5,  0.5,  0.5), V3( 0.0,  0.0,  1.0), Data);
-  PushGLVertex( 3, V3( 0.5,  0.5,  0.5), V3( 0.0,  0.0,  1.0), Data);
-  PushGLVertex( 4, V3(-0.5,  0.5,  0.5), V3( 0.0,  1.0,  0.0), Data);
-  PushGLVertex( 5, V3( 0.5,  0.5,  0.5), V3( 0.0,  1.0,  0.0), Data);
-  PushGLVertex( 6, V3(-0.5,  0.5, -0.5), V3( 0.0,  1.0,  0.0), Data);
-  PushGLVertex( 7, V3( 0.5,  0.5, -0.5), V3( 0.0,  1.0,  0.0), Data);
-  PushGLVertex( 8, V3(-0.5,  0.5, -0.5), V3( 0.0,  0.0, -1.0), Data);
-  PushGLVertex( 9, V3( 0.5,  0.5, -0.5), V3( 0.0,  0.0, -1.0), Data);
-  PushGLVertex(10, V3(-0.5, -0.5, -0.5), V3( 0.0,  0.0, -1.0), Data);
-  PushGLVertex(11, V3( 0.5, -0.5, -0.5), V3( 0.0,  0.0, -1.0), Data);
-  PushGLVertex(12, V3(-0.5, -0.5, -0.5), V3( 0.0, -1.0,  0.0), Data);
-  PushGLVertex(13, V3( 0.5, -0.5, -0.5), V3( 0.0, -1.0,  0.0), Data);
-  PushGLVertex(14, V3(-0.5, -0.5,  0.5), V3( 0.0, -1.0,  0.0), Data);
-  PushGLVertex(15, V3( 0.5, -0.5,  0.5), V3( 0.0, -1.0,  0.0), Data);
-  PushGLVertex(16, V3( 0.5, -0.5,  0.5), V3( 1.0,  0.0,  0.0), Data);
-  PushGLVertex(17, V3( 0.5, -0.5, -0.5), V3( 1.0,  0.0,  0.0), Data);
-  PushGLVertex(18, V3( 0.5,  0.5,  0.5), V3( 1.0,  0.0,  0.0), Data);
-  PushGLVertex(19, V3( 0.5,  0.5, -0.5), V3( 1.0,  0.0,  0.0), Data);
-  PushGLVertex(20, V3(-0.5, -0.5, -0.5), V3(-1.0,  0.0,  0.0), Data);
-  PushGLVertex(21, V3(-0.5, -0.5,  0.5), V3(-1.0,  0.0,  0.0), Data);
-  PushGLVertex(22, V3(-0.5,  0.5, -0.5), V3(-1.0,  0.0,  0.0), Data);
-  PushGLVertex(23, V3(-0.5,  0.5,  0.5), V3(-1.0,  0.0,  0.0), Data);
+  PushGLVertex( 0, V3(-0.5, -0.5,  0.5), V3( 0.0,  0.0,  1.0), V2( 0.0,  0.0 ), Data);
+  PushGLVertex( 1, V3( 0.5, -0.5,  0.5), V3( 0.0,  0.0,  1.0), V2( 1.0,  0.0 ), Data);
+  PushGLVertex( 2, V3(-0.5,  0.5,  0.5), V3( 0.0,  0.0,  1.0), V2( 0.0,  1.0 ), Data);
+  PushGLVertex( 3, V3( 0.5,  0.5,  0.5), V3( 0.0,  0.0,  1.0), V2( 1.0,  1.0 ), Data);
+  PushGLVertex( 4, V3(-0.5,  0.5,  0.5), V3( 0.0,  1.0,  0.0), V2( 0.0,  1.0 ), Data);
+  PushGLVertex( 5, V3( 0.5,  0.5,  0.5), V3( 0.0,  1.0,  0.0), V2( 1.0,  1.0 ), Data);
+  PushGLVertex( 6, V3(-0.5,  0.5, -0.5), V3( 0.0,  1.0,  0.0), V2( 0.0,  1.0 ), Data);
+  PushGLVertex( 7, V3( 0.5,  0.5, -0.5), V3( 0.0,  1.0,  0.0), V2( 1.0,  1.0 ), Data);
+  PushGLVertex( 8, V3(-0.5,  0.5, -0.5), V3( 0.0,  0.0, -1.0), V2( 0.0,  1.0 ), Data);
+  PushGLVertex( 9, V3( 0.5,  0.5, -0.5), V3( 0.0,  0.0, -1.0), V2( 1.0,  1.0 ), Data);
+  PushGLVertex(10, V3(-0.5, -0.5, -0.5), V3( 0.0,  0.0, -1.0), V2( 0.0,  0.0 ), Data);
+  PushGLVertex(11, V3( 0.5, -0.5, -0.5), V3( 0.0,  0.0, -1.0), V2( 1.0,  0.0 ), Data);
+  PushGLVertex(12, V3(-0.5, -0.5, -0.5), V3( 0.0, -1.0,  0.0), V2( 0.0,  0.0 ), Data);
+  PushGLVertex(13, V3( 0.5, -0.5, -0.5), V3( 0.0, -1.0,  0.0), V2( 1.0,  0.0 ), Data);
+  PushGLVertex(14, V3(-0.5, -0.5,  0.5), V3( 0.0, -1.0,  0.0), V2( 0.0,  0.0 ), Data);
+  PushGLVertex(15, V3( 0.5, -0.5,  0.5), V3( 0.0, -1.0,  0.0), V2( 1.0,  0.0 ), Data);
+  PushGLVertex(16, V3( 0.5, -0.5,  0.5), V3( 1.0,  0.0,  0.0), V2( 1.0,  0.0 ), Data);
+  PushGLVertex(17, V3( 0.5, -0.5, -0.5), V3( 1.0,  0.0,  0.0), V2( 1.0,  0.0 ), Data);
+  PushGLVertex(18, V3( 0.5,  0.5,  0.5), V3( 1.0,  0.0,  0.0), V2( 1.0,  1.0 ), Data);
+  PushGLVertex(19, V3( 0.5,  0.5, -0.5), V3( 1.0,  0.0,  0.0), V2( 1.0,  1.0 ), Data);
+  PushGLVertex(20, V3(-0.5, -0.5, -0.5), V3(-1.0,  0.0,  0.0), V2( 0.0,  0.0 ), Data);
+  PushGLVertex(21, V3(-0.5, -0.5,  0.5), V3(-1.0,  0.0,  0.0), V2( 0.0,  0.0 ), Data);
+  PushGLVertex(22, V3(-0.5,  0.5, -0.5), V3(-1.0,  0.0,  0.0), V2( 0.0,  1.0 ), Data);
+  PushGLVertex(23, V3(-0.5,  0.5,  0.5), V3(-1.0,  0.0,  0.0), V2( 0.0,  1.0 ), Data);
 }
 
 void getPrimitive( primitive_type Type, u32* Indeces, opengl_vertex* GLData )

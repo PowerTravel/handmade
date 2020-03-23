@@ -697,15 +697,15 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
   char LineBuffer[STR_MAX_LINE_LENGTH];
 
   memory_arena* AssetArena = &aGameState->AssetArena;
-  memory_arena* TemporaryArena = &aGameState->TemporaryArena;
+  memory_arena* TransientArena = &aGameState->TransientArena;
 
-  temporary_memory TempMem = BeginTemporaryMemory(TemporaryArena);
+  temporary_memory TempMem = BeginTemporaryMemory(TransientArena);
 
 
   char* ScanPtr = ( char* ) ReadResult.Contents;
   char* FileEnd =  ( char* ) ReadResult.Contents + ReadResult.ContentSize;
 
-  fifo_queue<mtl_material*> ParsedMaterialQueue = fifo_queue<mtl_material*>(TemporaryArena);
+  fifo_queue<mtl_material*> ParsedMaterialQueue = fifo_queue<mtl_material*>(TransientArena);
   mtl_material* ActieveMaterial = 0;
 
   while( ScanPtr < FileEnd )
@@ -933,7 +933,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
 
         char LeftoverString[STR_MAX_LINE_LENGTH] = {};
 
-        fifo_queue<char*> SettingQueue = ExtractMTLSettings( TemporaryArena, 1, "-bm ",  " \t",  DataType.String,  LeftoverString );
+        fifo_queue<char*> SettingQueue = ExtractMTLSettings( TransientArena, 1, "-bm ",  " \t",  DataType.String,  LeftoverString );
         Assert(SettingQueue.GetSize() == 1);
 
         ActieveMaterial->BumpMapBM = (r32) str::StringToReal64( SettingQueue.Pop() );
@@ -976,13 +976,13 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
   return Result;
 }
 
-void SetBoundingBox( obj_loaded_file* OBJFile, memory_arena* TemporaryArena )
+void SetBoundingBox( obj_loaded_file* OBJFile, memory_arena* TransientArena )
 {
   mesh_data* MeshData = OBJFile->MeshData;
   for( u32 GroupIndex = 0; GroupIndex < OBJFile->ObjectCount; ++GroupIndex )
   {
-    temporary_memory TempMem = BeginTemporaryMemory(TemporaryArena);
-    b32* IsVertexCounted = (b32*) PushArray(TemporaryArena,  MeshData->nv, u32 );
+    temporary_memory TempMem = BeginTemporaryMemory(TransientArena);
+    b32* IsVertexCounted = (b32*) PushArray(TransientArena,  MeshData->nv, u32 );
 
     obj_group& OBJGroup = OBJFile->Objects[GroupIndex];
 
@@ -1030,7 +1030,7 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
 
   if( !ReadResult.ContentSize ){ return {}; }
 
-  memory_arena* TempArena = &aGameState->TemporaryArena;
+  memory_arena* TempArena = &aGameState->TransientArena;
   temporary_memory TempMem = BeginTemporaryMemory(TempArena);
 
 
@@ -1300,10 +1300,10 @@ entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* Me
   Translate( -GetAABBCenter(OBJGrp->aabb), Entity->SpatialComponent );
 
   Entity->ColliderComponent->AABB = OBJGrp->aabb;
-  Entity->ColliderComponent->Mesh = (collider_mesh*) PushStruct(&World->PersistentArena, collider_mesh);
-  SetColliderMeshFromAABB( &World->PersistentArena, Entity->ColliderComponent );
+  Entity->ColliderComponent->Mesh = (collider_mesh*) PushStruct(World->PersistentArena, collider_mesh);
+  SetColliderMeshFromAABB( World->PersistentArena, Entity->ColliderComponent );
 
-  Entity->SurfaceComponent->Material = PushStruct( &World->PersistentArena, material);
+  Entity->SurfaceComponent->Material = PushStruct( World->PersistentArena, material);
   SetMtlMaterialToSurfaceMaterial( OBJGrp->Material, Entity->SurfaceComponent->Material);
 
   return Entity;
@@ -1317,15 +1317,3 @@ void CreateEntitiesFromOBJFile( world* World, obj_loaded_file* ObjFile )
     entity* Entity = CreateEntityFromOBJGroup(World, Grp, ObjFile->MeshData);
   }
 }
-
-#if 0
-#include "mesh.h"
-
-
-ordered_mesh* CreateOrderedMesh( memory_arena* Arena, obj_loaded_file*  LoadedObject )
-{
-  ordered_mesh* Mesh = PushArray(Arena, LoadedObject->ObjectCount, ordered_mesh );
-  return 0;
-}
-
-#endif

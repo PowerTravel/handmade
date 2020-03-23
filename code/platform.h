@@ -1,3 +1,4 @@
+#pragma once
 //  NOTE: Stuff that gets refferenced in the platform layer as well as
 //      the game layer
 
@@ -16,8 +17,6 @@
 
 // Note(Jakob): Compilers
 
-#ifndef HANDMADE_PLATFORM_H
-#define HANDMADE_PLATFORM_H
 
 #ifndef COMPILER_MSVC
 #define COMPILER_MSVC 0
@@ -32,6 +31,7 @@
 #if _MSC_VER
 #undef COMPILER_MSVC
 #define COMPILER_MSVC 1
+#include <intrin.h>
 #else
 // Todo(Jakob): More compilers
 #undef COMPILER_LLVM
@@ -40,14 +40,33 @@
 
 #endif
 
-#if COMPILER_MSVC
-#include <intrin.h>
-#endif
 
 #include <stddef.h> // size_t exists in this header on some platforms
 #include "types.h"
 #include "standalone_utility.h"
 #include "platform_opengl.h"
+#include "render_push_buffer.h"
+
+#if COMPILER_MSVC
+#include <intrin.h>
+inline u32 AtomicCompareExchange(u32 volatile* Value, u32 New, u32 Expected){
+  u32 Result = _InterlockedCompareExchange((long volatile *)Value, New, Expected);
+  return(Result);
+}
+inline u64 AtomicExchangeu64( u64 volatile* Value, u64 New)
+{
+  s64 Result = _InterlockedExchange64( (__int64 volatile *)Value, New);
+  return(Result);
+}
+inline u64 AtomicAddu64( u64 volatile* Value, u64 Added)
+{
+  s64 Result = _InterlockedExchangeAdd64( (__int64 volatile *)Value, Added);
+  return(Result);
+}
+#elif COMPILER_LLVM
+
+#endif
+
 
 struct thread_context
 {
@@ -72,6 +91,7 @@ typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE( debug_platform_write_entire_file );
 
 #define DEBUG_PLATFORM_APPEND_TO_FILE(name) b32 name( thread_context* Thread, char* Filename, u32 MemorySize, void* Memory )
 typedef DEBUG_PLATFORM_APPEND_TO_FILE( debug_platform_append_to_file );
+
 
 #endif // HANDMADE_INTERNAL
 
@@ -105,9 +125,10 @@ struct game_render_commands
   opengl_program2D RenderProgram2D;
   opengl_program3D RenderProgram3D;
 
+  render_group MainRenderGroup;
+  render_group DebugRenderGroup;
+
   utils::push_buffer TemporaryMemory; // Buffer used for temporary storage
-  utils::push_buffer RenderMemory;    // The Render Push Buffer
-  u32 RenderMemoryElementCount;
 };
 
 struct game_sound_output_buffer
@@ -309,7 +330,6 @@ struct platform_api
     platform_allocate_memory*   AllocateMemory;
     platform_deallocate_memory* DeallocateMemory;
 
-#if HANDMADE_INTERNAL
 //     TODO(casey): Get rid of these eventually, make them just go through
 //     the OpenFile/ReadDataFromFile/WriteDataToFile/CloseFile API.
 //     {
@@ -317,57 +337,41 @@ struct platform_api
       debug_platfrom_free_file_memory*  DEBUGPlatformFreeFileMemory;
       debug_platform_write_entire_file* DEBUGPlatformWriteEntireFile;
       debug_platform_append_to_file*    DEBUGPlatformAppendToFile;
-
 //     }
 
 //    debug_platform_execute_system_command *DEBUGExecuteSystemCommand;
 //    debug_platform_get_process_state *DEBUGGetProcessState;
 //    debug_platform_get_memory_stats *DEBUGGetMemoryStats;
-#endif
 
 };
 
 extern platform_api Platform;
 
-
-#if 0
-enum
-{
-  DebugCycleCounter_GameUpdateAndRender,
-  DebugCycleCounter_OpenGLRenderGroupToOutput,
-  DebugCycleCounter_FillRenderPushBuffer,
-  DebugCycleCounter_DebugCycleCounterCount,
-};
-
-struct debug_cycle_counter
-{
-  u64 CycleCount;
-  u32 HitCount;
-};
-#if _MSC_VER
-#pragma intrinsic(__rdtsc)
-#define BEGIN_TIMED_BLOCK(ID) u64 StartCycleCount##ID = __rdtsc();
-#define END_TIMED_BLOCK(ID) DebugGlobalMemory->Counters[DebugCycleCounter_##ID].CycleCount += __rdtsc();
-#else
-#define BEGIN_TIMED_BLOCK(ID)
-#define END_TIMED_BLOCK(ID)
-#endif
-#endif
+struct debug_state;
 struct game_memory
 {
-    struct game_state* GameState;
-    platform_api PlatformAPI;
+  struct game_state* GameState;
+  debug_state* DebugState;
+  platform_api PlatformAPI;
 };
 
-#define GAME_UPDATE_AND_RENDER(name) void name(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
-typedef GAME_UPDATE_AND_RENDER( game_update_and_render );
+struct debug_frame_end_info
+{
+  r32 GameExecutableLoaded;
+  r32 InputHandled;
+  r32 GameMainLoopDone;
+  r32 GameAudioUpdated;
+  r32 FrameWaitComplete;
+  r32 RenderQueueProcessed;
+};
 
+#define DEBUG_GAME_FRAME_END(name) void name(game_memory* Memory, debug_frame_end_info *Info)
+typedef DEBUG_GAME_FRAME_END(debug_frame_end);
+
+#define GAME_UPDATE_AND_RENDER(name) void name(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
+typedef GAME_UPDATE_AND_RENDER(game_update_and_render);
 
 // Note: At the moment this has to be a very fast function it cannot be more than a millisecond or so.
 // TODO: Reduce the pressure on this  function's preformance by measuring it  or asking about it, etc
-
 #define GAME_GET_SOUND_SAMPLES(name) void name(thread_context* Thread, game_memory* Memory, game_sound_output_buffer* SoundBuffer)
 typedef GAME_GET_SOUND_SAMPLES(game_get_sound_samples);
-
-
-#endif // HANDMADE_PLATFORM_H

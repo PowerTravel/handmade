@@ -88,6 +88,7 @@ memory_index GetPrintableTree( memory_arena* TemporaryArena, aabb_tree* Tree, me
 
 broad_phase_result_stack* GetCollisionPairs( memory_arena* TemporaryArena, aabb_tree* Tree)
 {
+  TIMED_BLOCK()
   if(Tree->Size < 2)
   {
     return 0;
@@ -224,6 +225,7 @@ GetLeastVolumeincreaseBranch(aabb_tree_node* Parent,  aabb3f* LeafAABB)
 
 void AABBTreeInsert( memory_arena* Arena, aabb_tree* Tree, entity* Entity , aabb3f& AABBWorldSpace )
 {
+  TIMED_BLOCK()
   aabb_tree_node* Leaf = (aabb_tree_node*) PushStruct(Arena, aabb_tree_node);
   Leaf->Entity = Entity;
   Leaf->AABB   = AABBWorldSpace;
