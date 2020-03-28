@@ -12,6 +12,7 @@
 
 #include "platform_opengl.h"
 #include "platform.h"
+#include "debug.h"
 
 struct win32_offscreen_buffer
 {

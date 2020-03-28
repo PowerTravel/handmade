@@ -14,7 +14,7 @@ enum class render_buffer_entry_type
   INDEXED_BUFFER,
   PRIMITIVE,
   LIGHT,
-  STRING
+  COLOURED_QUAD
 };
 
 enum data_type
@@ -30,6 +30,13 @@ enum render_state
   RENDER_STATE_POINTS       = 0x2,
   RENDER_STATE_WIREFRAME    = 0x4,
   RENDER_STATE_FILL         = 0x8
+};
+
+struct entry_type_coloured_quad
+{
+  v4 Colour;
+  v3 CenterPosition;
+  v3 Size;
 };
 
 struct entry_type_light
@@ -62,6 +69,7 @@ struct entry_type_indexed_buffer
 {
   u32 DataType;
   render_buffer* Buffer;
+  // Get rid of surface component. Use textures OR colours.
   component_surface* Surface;   // Has textures and render materials
   m4 M;                         // Model Matrix Transform
   m4 NM;                        // Normal Model Matrix Transform Transpose(Inv(ModelMatrix))

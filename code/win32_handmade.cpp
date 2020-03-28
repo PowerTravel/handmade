@@ -15,7 +15,6 @@
 
 #include "win32_handmade.h"
 #include "win32_init_opengl.h"
-#include "debug.h"
 
 platform_api Platform;
 
@@ -26,6 +25,7 @@ global_variable win32_offscreen_buffer GlobalBackBuffer;
 global_variable s64 GlobalPerfCounterFrequency;
 global_variable b32 DEBUGGlobalShowCursor;
 global_variable WINDOWPLACEMENT GlobalWindowPosition = {sizeof(GlobalWindowPosition)};
+
 
 // Note(Jakob): Caseys native screen resolution is 960 by 540 times two
 // Note(Jakob): My native screen resolution is 840 by 525 times two
@@ -1461,6 +1461,14 @@ Win32IsInLoop(win32_state *aState)
     return(Result);
 }
 
+inline void Win32RecordTimeStamp( debug_frame_end_info* Info, char* Name, r32 Seconds)
+{
+  Assert(Info->TimestampCount < ArrayCount(Info->Timestamps));
+  debug_frame_timestamp* Timestamp = Info->Timestamps + Info->TimestampCount++;
+  Timestamp->Name = Name;
+  Timestamp->Seconds = Seconds;
+}
+
 // Signature: platform_memory_block* PLATFORM_ALLOCATE_MEMORY(memory_index aSize, u64 aFlags)
 
 PLATFORM_ALLOCATE_MEMORY(Win32AllocateMemory)
@@ -1640,8 +1648,6 @@ WinMain(  HINSTANCE aInstance,
                       SoundOutput.BufferSizeInBytes,
                       MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
-      //GameMemory.DebugState = DebugState;
-
       // TODO: Implement these functions
       //GameMemory.PlatformAPI.OpenFile = Win32OpenFile;
       //GameMemory.PlatformAPI.ReadDataFromFile = Win32ReadDataFromFile;
@@ -1667,6 +1673,7 @@ WinMain(  HINSTANCE aInstance,
       Platform = GameMemory.PlatformAPI;
 
       debug_state* DebugState = BootstrapPushStruct(debug_state, Memory);
+      GameMemory.DebugState = DebugState;
 
       for(s32 ReplayIndex = 0;
         ReplayIndex < ArrayCount(GlobalWin32State.ReplayBuffer);
@@ -1753,8 +1760,10 @@ WinMain(  HINSTANCE aInstance,
         while(GlobalRunning)
         {
           debug_frame_end_info FrameEndInfo = {};
-          //Game.DEBUGFrameBegin(&GameMemory, &FrameEndInfo);
+          Win32RecordTimeStamp(&FrameEndInfo, "DebugEndFrameProcessed", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
+
           NewInput->dt = TargetSecondsPerFrame;
+
           NewInput->ExecutableReloaded = false;
 
           //TODO: Find out why we need a 2-3 sec wait for loop live code editing to work
@@ -1766,11 +1775,10 @@ WinMain(  HINSTANCE aInstance,
             Game = Win32LoadGameCode(SourceGameCodeDLLFullPath,
                           TempGameCodeDLLFullPath,
                           TempGameCodeLockFullPath);
-            Sleep(2000);
             NewInput->ExecutableReloaded = true;
           }
 
-          FrameEndInfo.GameExecutableLoaded = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+          Win32RecordTimeStamp(&FrameEndInfo, "GameExecutableLoaded", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 
           game_controller_input* OldKeyboardController = GetController(OldInput,0);
           game_controller_input* NewKeyboardController = GetController(NewInput,0);
@@ -1792,7 +1800,7 @@ WinMain(  HINSTANCE aInstance,
             Win32ProcessKeyboardMessage(&NewInput->MouseButton[4], GetKeyState(VK_XBUTTON2) & (1<<15));
           }
 
-          FrameEndInfo.InputHandled = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+          Win32RecordTimeStamp(&FrameEndInfo, "InputHandled", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 
           thread_context Thread = {};
           if (!GlobalPause)
@@ -1807,14 +1815,13 @@ WinMain(  HINSTANCE aInstance,
             {
               Win32PlayBackInput(&GlobalWin32State, NewInput);
             }
-
             if (Game.UpdateAndRender)
             {
               Game.UpdateAndRender(&Thread, &GameMemory, &RenderCommands, NewInput);
             }
           }
 
-          FrameEndInfo.GameMainLoopDone = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+          Win32RecordTimeStamp(&FrameEndInfo, "GameMainLoopDone", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 
           if (!GlobalPause)
           {
@@ -1930,7 +1937,7 @@ WinMain(  HINSTANCE aInstance,
               SoundIsValid = false;
             }
 
-            FrameEndInfo.GameAudioUpdated = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+            Win32RecordTimeStamp(&FrameEndInfo, "GameAudioUpdated", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 
             LARGE_INTEGER WorkCounter = Win32GetWallClock();
             r32 WorkSecondsElapsed = Win32GetSecondsElapsed(LastCounter, WorkCounter);
@@ -1971,7 +1978,7 @@ WinMain(  HINSTANCE aInstance,
               // TODO: Logging
             }
 
-            FrameEndInfo.FrameWaitComplete = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+            Win32RecordTimeStamp(&FrameEndInfo, "FrameWaitComplete", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 
             // Update Window
             win32_window_dimension Dimension = Win32GetWindowDimension(  WindowHandle );
@@ -1979,7 +1986,7 @@ WinMain(  HINSTANCE aInstance,
             Win32DisplayBufferInWindow(&RenderCommands, DeviceContext, Dimension.Width, Dimension.Height);
             ReleaseDC( WindowHandle, DeviceContext);
 
-            FrameEndInfo.RenderQueueProcessed = Win32GetSecondsElapsed(LastCounter, Win32GetWallClock());
+            Win32RecordTimeStamp(&FrameEndInfo, "RenderQueueProcessed", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
 
             FlipWallClock = Win32GetWallClock();
 
@@ -2051,6 +2058,3 @@ WinMain(  HINSTANCE aInstance,
 
   return 0;
 }
-
-extern const u32 DebugRecordsRenderCount = __COUNTER__;
-debug_record DebugRecords_Render[DebugRecordsRenderCount] = {};

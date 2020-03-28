@@ -55,12 +55,17 @@ inline u32 AtomicCompareExchange(u32 volatile* Value, u32 New, u32 Expected){
 }
 inline u64 AtomicExchangeu64( u64 volatile* Value, u64 New)
 {
-  s64 Result = _InterlockedExchange64( (__int64 volatile *)Value, New);
+  u64 Result = _InterlockedExchange64( (__int64 volatile *)Value, New);
   return(Result);
 }
 inline u64 AtomicAddu64( u64 volatile* Value, u64 Added)
 {
-  s64 Result = _InterlockedExchangeAdd64( (__int64 volatile *)Value, Added);
+  u64 Result = _InterlockedExchangeAdd64( (__int64 volatile *)Value, Added);
+  return(Result);
+}
+inline u32 AtomicAddu32( u32 volatile* Value, u32 Added)
+{
+  u32 Result = _InterlockedExchangeAdd( (long volatile *)Value, Added);
   return(Result);
 }
 #elif COMPILER_LLVM
@@ -116,6 +121,12 @@ SafeTruncateReal32( u32 Value )
 /*
   NOTE: Services that the game provides to the platform layer.
 */
+
+
+
+
+
+
 
 struct game_render_commands
 {
@@ -347,6 +358,7 @@ struct platform_api
 
 extern platform_api Platform;
 
+struct debug_frame_end_info;
 struct debug_state;
 struct game_memory
 {
@@ -355,15 +367,6 @@ struct game_memory
   platform_api PlatformAPI;
 };
 
-struct debug_frame_end_info
-{
-  r32 GameExecutableLoaded;
-  r32 InputHandled;
-  r32 GameMainLoopDone;
-  r32 GameAudioUpdated;
-  r32 FrameWaitComplete;
-  r32 RenderQueueProcessed;
-};
 
 #define DEBUG_GAME_FRAME_END(name) void name(game_memory* Memory, debug_frame_end_info *Info)
 typedef DEBUG_GAME_FRAME_END(debug_frame_end);

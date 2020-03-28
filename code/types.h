@@ -2,10 +2,15 @@
 #define TYPES_H
 
 #include <stdint.h>
+#include <float.h>
 
-#ifndef UINT32_MAX
-#define UINT32_MAX 0xffffffff
-#endif
+#define U16Max 65535
+#define S32Min ((s32)0x80000000)
+#define S32Max ((s32)0x7fffffff)
+#define U32Max ((u32)-1)
+#define U64Max ((u64)-1)
+#define R32Max FLT_MAX
+#define R32Min -FLT_MAX
 
 #define Kilobytes(Value)  ((Value)*1024LL)
 #define Megabytes(Value)  (Kilobytes(Value)*1024LL)
@@ -45,8 +50,6 @@ typedef double r64;
 
 #define Maximum(A, B) ((A > B) ? (A) : (B))
 #define Minimum(A, B) ((A < B) ? (A) : (B))
-
-#define U32Max ( (u32)-1 )
 
 // NOTE(casey): Added (Value-Value) here to force integral promotion to the size of Value
 #define AlignPow2(Value, Alignment) ((Value + ((Alignment) - 1)) & ~((Value - Value) + (Alignment) - 1))

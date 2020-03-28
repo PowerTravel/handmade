@@ -335,7 +335,7 @@ reverse(char* str, s32 len)
 internal s32
 intToStr(s32 x, char str[], s32 d)
 {
-  Assert(x>=0);
+   Assert(x>=0);
   s32 i = 0;
   while(x)
   {

@@ -7,7 +7,7 @@
 #include "component_camera.h"
 #include "string.h"
 #include "bitmap.h"
-#include "debug.h"
+//#include "debug.h"
 
 global_variable u32 TextureBindCount = 0;
 
@@ -123,7 +123,7 @@ void main() \n\
 }
 
 
-opengl_program3D OpenGLCreateTextOverlayShader()
+opengl_program3D OpenGLCreateTexturedQuadOverlayShader()
 {
   char VertexShaderCode[] = {
 "#version  330 core\n\
@@ -148,10 +148,11 @@ out vec4 fragColor;\n\
 \n\
 in vec2 texCoord;\n\
 uniform sampler2D ourTexture;\n\
+uniform vec4 ambientProduct;\n\
 \n\
 void main() \n\
 {\n\
-  fragColor = texture(ourTexture, texCoord);\n\
+  fragColor = texture(ourTexture, texCoord) * ambientProduct;\n\
 }\n\
 "};
 
@@ -160,6 +161,7 @@ void main() \n\
   glUseProgram(Result.Program);
   Result.M =  glGetUniformLocation(Result.Program, "M");
   Result.TM = glGetUniformLocation(Result.Program, "TM");
+  Result.ambientProduct  = glGetUniformLocation(Result.Program, "ambientProduct");
   glUseProgram(0);
 
   return Result;
@@ -191,7 +193,7 @@ uniform vec4 cameraPosition; // World space\n\
 uniform float shininess; // Shininess of material\n\
 \n\
 out vec4 vertexColor;\n\
-out vec2  texCoord;\n\
+out vec2 texCoord;\n\
 \n\
 void main()\n\
 {\n\
@@ -477,12 +479,12 @@ void LoadOrBindTexture( bitmap* Bitmap, utils::push_buffer TemporaryMemory)
     // and stays with the texture object until changed.
 
     // How to resize textures
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR ); // Just take nearest
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR ); // Just take nearest
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 
     // Wrapping textures, (Mirror. Repeat border color, clamp, repeat etc... )
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT );
 
     // Send a Texture to GPU referenced to the enabled texture slot
     if(RenderTarget->BPP == 8)
@@ -665,7 +667,6 @@ internal void setOpenGLState(u32 State)
 internal void
 OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 WindowHeight )
 {
-  TIMED_BLOCK();
   Assert(Commands->TemporaryMemory.IsEmpty());
 
   render_group* RenderGroup = &Commands->MainRenderGroup;
@@ -835,13 +836,12 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
   RenderGroup->ElementCount = 0;
   RenderGroup->First = 0;
 
-
   // DEBUG OVERLAY
 
   local_persist opengl_program3D TextOverlay = {};
   if(!TextOverlay.Program)
   {
-    TextOverlay = OpenGLCreateTextOverlayShader();
+    TextOverlay = OpenGLCreateTexturedQuadOverlayShader();
   }
 
   glUseProgram(TextOverlay.Program);
@@ -885,10 +885,10 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
         }
         glUniformMatrix4fv((u32) TextOverlay.M,  1, GL_TRUE, Primitive->M.E);
         glUniformMatrix4fv((u32) TextOverlay.TM, 1, GL_TRUE, Primitive->TM.E);
-
         component_surface* Surface = Primitive->Surface;
         material* Material =  Surface->Material;
         LoadOrBindTexture(Material->DiffuseMap, Commands->TemporaryMemory);
+        glUniform4fv( TextOverlay.ambientProduct,  1,  Material->AmbientColor.E);
 
         OpenGLDraw( VAO, ElementType, NrIndeces, 0 );
         Assert(Commands->TemporaryMemory.IsEmpty());

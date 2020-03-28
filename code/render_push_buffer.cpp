@@ -11,6 +11,7 @@
 
 push_buffer_header* PushNewHeader(render_group* RenderGroup)
 {
+  TIMED_BLOCK();
   utils::push_buffer* Buffer = &RenderGroup->Buffer;
   RenderGroup->ElementCount++;
 
@@ -38,15 +39,38 @@ LinearTransform(const r32 OutputMin, const r32 OutputMax, const r32 InputMin, co
   return Result;
 }
 
+void DEBUGPushQuad(render_group* DebugRenderGroup, aabb2f Rect, v4 Color = V4(1,1,1,1))
+{
+  TIMED_BLOCK();
+  component_surface* Surface = (component_surface*) DebugRenderGroup->Buffer.GetMemory(sizeof(component_surface));
+  Surface->Material = (material*) DebugRenderGroup->Buffer.GetMemory(sizeof(material));
+  Surface->Material->AmbientColor = Color;
+
+  // Todo: Find a better API So you don't need this BS all the time
+  push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( DebugRenderGroup );
+  Header->Type = render_buffer_entry_type::PRIMITIVE;
+  Header->RenderState = RENDER_STATE_FILL;
+  entry_type_primitive* Body = (entry_type_primitive*) DebugRenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+  Body->PrimitiveType = primitive_type::QUAD;
+  Body->Surface = Surface;
+  Body->TM = M4Identity();
+  r32 Width  = (Rect.P1.X-Rect.P0.X);
+  r32 Height = (Rect.P1.Y-Rect.P0.Y);
+  r32 X0  = Rect.P0.X + Width/2;
+  r32 Y0 = Rect.P0.Y + Height/2;
+  Body->M  = GetTranslationMatrix(V4(X0, Y0,0,1)) * GetScaleMatrix(V4(Width, Height,1,0));
+}
+
 void DEBUGAddTextSTB( render_group* DebugRenderGroup, c8* String, r32 cornerOffset, r32 LineNumber)
 {
+  TIMED_BLOCK();
   stb_font_map* FontMap = &DebugRenderGroup->Assets->STBFontMap;
 
-  component_surface* GreenSurface = (component_surface*) DebugRenderGroup->Buffer.GetMemory(sizeof(component_surface));
-  GreenSurface->Material = (material*) DebugRenderGroup->Buffer.GetMemory(sizeof(material));
-  SetMaterial(GreenSurface->Material, MATERIAL_RED);
+  component_surface* BitMapFont = (component_surface*) DebugRenderGroup->Buffer.GetMemory(sizeof(component_surface));
+  BitMapFont->Material = (material*) DebugRenderGroup->Buffer.GetMemory(sizeof(material));
+  SetMaterial(BitMapFont->Material, MATERIAL_RED);
 
-  GreenSurface->Material->DiffuseMap = &FontMap->BitMap;
+  BitMapFont->Material->DiffuseMap = &FontMap->BitMap;
   stbtt_aligned_quad Quad = {};
   r32 xPos = cornerOffset;
   r32 yPos = DebugRenderGroup->ScreenHeight - (LineNumber) * FontMap->FontHeightPx-FontMap->FontHeightPx;
@@ -74,24 +98,28 @@ void DEBUGAddTextSTB( render_group* DebugRenderGroup, c8* String, r32 cornerOffs
 
     xPos += CH->xadvance;
 
-    const r32 s0 = CH->x0 * Ks;
-    const r32 s1 = CH->x1 * Ks;
-    const r32 t0 = CH->y0 * Kt;
-    const r32 t1 = CH->y1 * Kt;
+    if(*String != ' ')
+    {
+      const r32 s0 = CH->x0 * Ks;
+      const r32 s1 = CH->x1 * Ks;
+      const r32 t0 = CH->y0 * Kt;
+      const r32 t1 = CH->y1 * Kt;
 
-    // Todo: Find a better API for scale and translation that doesnt need a full 4x4 matrix multiplication
-    const m4 TextureTranslate = GetTranslationMatrix(V4(s0, t1,0,1)) * GetScaleMatrix(V4(s1-s0, t0-t1,1,0));
-    const m4 QuadTranslate    = GetTranslationMatrix(V4(x0u + xoff - 0.5f, y0u - yoff + 0.5f,0,1)) * GetScaleMatrix(V4(GlyphWidth, GlyphHeight,1,0));
+      // Todo: Find a better API for scale and translation that doesnt need a full 4x4 matrix multiplication
+      const m4 TextureTranslate = GetTranslationMatrix(V4(s0, t1,0,1)) * GetScaleMatrix(V4(s1-s0, t0-t1,1,0));
+      const m4 QuadTranslate    = GetTranslationMatrix(V4(x0u + xoff - 0.5f, y0u - yoff + 0.5f,0,1)) * GetScaleMatrix(V4(GlyphWidth, GlyphHeight,1,0));
 
-    // Todo: Find a better API So you don't need this BS all the time
-    push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( DebugRenderGroup );
-    Header->Type = render_buffer_entry_type::PRIMITIVE;
-    Header->RenderState = RENDER_STATE_FILL;
-    entry_type_primitive* Body = (entry_type_primitive*) DebugRenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
-    Body->PrimitiveType = primitive_type::QUAD;
-    Body->Surface = GreenSurface;
-    Body->TM = TextureTranslate;
-    Body->M  = QuadTranslate;
+      // Todo: Find a better API So you don't need this BS all the time
+      push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( DebugRenderGroup );
+      Header->Type = render_buffer_entry_type::PRIMITIVE;
+      Header->RenderState = RENDER_STATE_FILL;
+      entry_type_primitive* Body = (entry_type_primitive*) DebugRenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+      Body->PrimitiveType = primitive_type::QUAD;
+      Body->Surface = BitMapFont;
+      Body->TM = TextureTranslate;
+      Body->M  = QuadTranslate;
+
+    }
 
     ++String;
   }
@@ -102,6 +130,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 {
   Assert(RenderCommands);
 
+  TIMED_BLOCK();
   render_group* RenderGroup = &RenderCommands->MainRenderGroup;
 
   RenderGroup->Buffer.Clear();

@@ -87,6 +87,10 @@
 #define GL_PROGRAM_POINT_SIZE             0x8642
 #define GL_ELEMENT_ARRAY_BUFFER_BINDING   0x8895
 
+#define GL_CLAMP_TO_BORDER                0x812D
+#define GL_CLAMP_TO_EDGE                  0x812F
+#define GL_MIRRORED_REPEAT                0x8370
+
 #include "math/vector_math.h"
 
 struct opengl_vertex
@@ -119,6 +123,7 @@ struct opengl_program3D
 	s32 V;
 
 	// Todo: Create hash-map for these with strings as keys
+	//hash_map<s32> Uniforms
 	s32 lightPosition;
 	s32 cameraPosition;
 	s32 ambientProduct;

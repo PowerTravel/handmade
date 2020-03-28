@@ -143,7 +143,6 @@ v3 ClosestPointOnEdge(const v3& EdgeStart, const v3& EdgeEnd, const v3& Point)
 void SpatialSystemUpdate( world* World, platform_api* API)
 {
   r32 dt =  World->dtForFrame;
-  local_persist v3 CollisionPoint = {};
   memory_arena* PersistentArena = World->PersistentArena;
   memory_arena* TransientArena = World->TransientArena;
   tile_map* TileMap = &World->TileMap;

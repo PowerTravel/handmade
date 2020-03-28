@@ -1,9 +1,17 @@
-#ifndef HANDMADE_INTRINSIC_H
-#define HANDMADE_INTRINSIC_H
+#pragma once
 
 // TODO: Replace math.h with cpu specific instructions
 #include <math.h>
 #include "types.h"
+
+inline u32 GetThreadID()
+{
+  // Read the pointer to thread local storage.
+  u8* ThreadLocalStorage = (u8*) __readgsqword(0x30);
+  u32 ThreadID = *(u32*) (ThreadLocalStorage + 0x40);
+  return ThreadID;
+}
+
 
 inline u32
 SafeTruncateToU32( u64 Value )
@@ -119,6 +127,3 @@ FindLeastSignificantSetBit( u32 Value )
 #endif
   return Result;
 }
-
-
-#endif // HANDMADE_INTRINSIC_H

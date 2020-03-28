@@ -1,5 +1,4 @@
-#ifndef MEMORY_H
-#define MEMORY_H
+#pragma once
 
 #include "platform.h"
 #include "utility_macros.h"
@@ -285,6 +284,3 @@ BootstrapPushSize_( uintptr_t StructSize, uintptr_t OffsetToArena,
 
   return(Struct);
 }
-
-
-#endif
