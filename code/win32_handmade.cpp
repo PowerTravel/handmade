@@ -2058,3 +2058,7 @@ WinMain(  HINSTANCE aInstance,
 
   return 0;
 }
+
+
+
+const u32 DebugRecrods_Platform_Count = __COUNTER__;

@@ -40,7 +40,6 @@
 
 #endif
 
-
 #include <stddef.h> // size_t exists in this header on some platforms
 #include "types.h"
 #include "standalone_utility.h"
@@ -71,7 +70,6 @@ inline u32 AtomicAddu32( u32 volatile* Value, u32 Added)
 #elif COMPILER_LLVM
 
 #endif
-
 
 struct thread_context
 {
@@ -122,10 +120,88 @@ SafeTruncateReal32( u32 Value )
   NOTE: Services that the game provides to the platform layer.
 */
 
+struct debug_record
+{
+  char* FileName;
+  char* FunctionName;
+
+  u32 LineNumber;
+  u64 HitCount_CycleCount;
+  u32 Padding;
+};
+
+enum debug_event_type
+{
+  DebugEvent_BeginBlock,
+  DebugEvent_EndBlock,
+};
+
+struct debug_event
+{
+  u64 Clock;
+  u32 ThreadIndex;
+  u16 CoreIndex;
+  u16 DebugRecordIndex;
+  u8 TranslationUnit;
+  u8 Type;
+};
 
 
+#if HANDMADE_INTERNAL
+#define TIMED_BLOCK__(Number, ... ) timed_block TimedBlock_##Number(__COUNTER__, __FILE__, __LINE__, __FUNCTION__);
+#define TIMED_BLOCK_(Number, ... ) TIMED_BLOCK__(Number, ##_VA_ARGS__)
+#define TIMED_BLOCK(...) TIMED_BLOCK_(__LINE__, ##_VA_ARGS__)
+#else
+#define TIMED_BLOCK;
+#endif
 
+#define MAX_DEBUG_TRANSLATION_UNITS (3)
+#define MAX_DEBUG_EVENT_COUNT (65536)
+#define MAX_DEBUG_RECORD_COUNT (65536)
+struct debug_table
+{
+  // TODO: Were never ensure that writes to the debugevents is complete
+  //       before we swap them
+  u64 volatile EventArrayIndex_EventIndex;
+  u32 CurrentEventArrayIndex;
+  debug_record Records[MAX_DEBUG_TRANSLATION_UNITS][MAX_DEBUG_RECORD_COUNT];
+  debug_event Events[2][MAX_DEBUG_EVENT_COUNT];
+};
 
+extern debug_table GlobalDebugTable;
+
+#define RecordDebugEvent( RecordIndex, EventType) \
+  u64 ArrayIndex_EventIndex = AtomicAddu64(&GlobalDebugTable.EventArrayIndex_EventIndex, 1); \
+  u32 EventIndex = ArrayIndex_EventIndex & 0xFFFFFFFF; \
+  u32 ArrayIndex = ArrayIndex_EventIndex >> 32; \
+  debug_event* Event = GlobalDebugTable.Events[ArrayIndex] + EventIndex; \
+  Event->Clock = __rdtsc(); \
+  Event->ThreadIndex = GetThreadID(); \
+  Event->CoreIndex = 0; \
+  Event->DebugRecordIndex = (u16) RecordIndex; \
+  Event->TranslationUnit = TRANSLATION_UNIT_INDEX; \
+  Event->Type = (u8) EventType;\
+
+struct timed_block
+{
+  u32 RecordIndex;
+  timed_block(const u32 RecordIndexInit, const char* FileName, const u32 LineNumber, const char* FunctionName)
+  : RecordIndex(RecordIndexInit)
+  {
+    // Todo: Make work with several translation units (handmade and win32 for now)
+    debug_record* Record = GlobalDebugTable.Records[TRANSLATION_UNIT_INDEX] + RecordIndex;
+    Record->FileName     = (char*) FileName;
+    Record->FunctionName = (char*) FunctionName;
+    Record->LineNumber   = LineNumber;
+
+    RecordDebugEvent(RecordIndex, DebugEvent_BeginBlock);
+  };
+
+  ~timed_block()
+  {
+    RecordDebugEvent(RecordIndex, DebugEvent_EndBlock);
+  };
+};
 
 
 struct game_render_commands
