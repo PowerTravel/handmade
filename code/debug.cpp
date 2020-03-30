@@ -1,7 +1,7 @@
 
-void PushDebugOverlay(debug_state* DebugState, debug_frame_end_info *Info )
+void PushDebugOverlay(debug_state* DebugState)
 {
-  TIMED_BLOCK();
+  TIMED_FUNCTION();
   r32 Line = 0;
   r32 CornerPaddingPx = 30;
 
@@ -92,6 +92,7 @@ void PushDebugOverlay(debug_state* DebugState, debug_frame_end_info *Info )
                      V4(0,0,0,1)};
 
 
+#if 0
   r32 xMin = GraphLeft;
   for(u32 i = 0; i<SNAPSHOT_COUNT; ++i)
   {
@@ -120,15 +121,17 @@ void PushDebugOverlay(debug_state* DebugState, debug_frame_end_info *Info )
   aabb2f Rect = AABB2f( V2(GraphLeft,yMin), V2(GraphRight,yMax));
 
   DEBUGPushQuad(GlobalDebugRenderGroup, Rect, V4(0,0,0,1));
+#endif
 
 }
 
 #define DebugRecords_Main_Count __COUNTER__
 extern u32 DebugRecrods_Platform_Count;
-debug_table GlobalDebugTable;
+global_variable debug_table GlobalDebugTable_;
+debug_table* GlobalDebugTable = &GlobalDebugTable_;
 
 
-void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArrayIndex, debug_table* DebugTabe)
+void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArrayIndex, debug_table* DebugTable)
 {
   #define DebugRecrods_Platform_Count 0
   DebugState->CounterStateCount = DebugRecords_Main_Count + DebugRecrods_Platform_Count;
@@ -148,7 +151,7 @@ void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArray
     DebugState->CounterStates + DebugRecords_Main_Count
   };
 
-  debug_event* Events = DebugTabe->Events[EventArrayIndex];
+  debug_event* Events = DebugTable->Events[EventArrayIndex];
   for(u32 EventIndex = 0; EventIndex<EventCount; ++EventIndex)
   {
     const debug_event* Event = Events + EventIndex;
@@ -156,10 +159,10 @@ void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArray
     const u32 TranslationUnit = Event->TranslationUnit;
     debug_counter_state* Dst = CounterArray[TranslationUnit] + DebugRecordIndex;
 
-    debug_record* Src = GlobalDebugTable.Records[TranslationUnit] + DebugRecordIndex;
+    debug_record* Src = DebugTable->Records[TranslationUnit] + DebugRecordIndex;
 
     Dst->FileName = Src->FileName;
-    Dst->FunctionName = Src->FunctionName;
+    Dst->FunctionName = Src->BlockName;
     Dst->LineNumber = Src->LineNumber;
     if(Event->Type == DebugEvent_BeginBlock)
     {

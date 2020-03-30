@@ -50,8 +50,6 @@ struct debug_state
   u32 SnapShotIndex;
   u32 CounterStateCount;
   debug_counter_state CounterStates[512];
-
-  debug_frame_end_info FrameEndInfos[SNAPSHOT_COUNT];
 };
 
 

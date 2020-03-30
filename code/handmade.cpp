@@ -29,16 +29,7 @@ platform_api Platform;
 #include "system_spatial.cpp"
 #include "system_camera.cpp"
 
-
 #include "debug.h"
-//u64 Global_DebugEventArrayIndex_DebugEventIndex;
-//debug_event GlobalDebugEventArray[2][MAX_DEBUG_EVENT_COUNT];
-
-
-// STBTT_DEF int stbtt_FindGlyphIndex(const stbtt_fontinfo *info, int unicode_codepoint);
-// STBTT_DEF void stbtt_GetGlyphHMetrics(const stbtt_fontinfo *info, int glyph_index, int *advanceWidth, int *leftSideBearing);
-// STBTT_DEF int  stbtt_GetGlyphKernAdvance(const stbtt_fontinfo *info, int glyph1, int glyph2);
-// STBTT_DEF int  stbtt_GetGlyphBox(const stbtt_fontinfo *info, int glyph_index, int *x0, int *y0, int *x1, int *y1);
 
 internal stb_font_map STBBakeFont(memory_arena* Memory)
 {
@@ -510,7 +501,7 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
   GlobalDebugRenderGroup = &RenderCommands->DebugRenderGroup;
-  TIMED_BLOCK()
+  TIMED_FUNCTION();
   Platform = Memory->PlatformAPI;
   InitiateGame(Thread, Memory, RenderCommands, Input);
   game_state* GameState = Memory->GameState;
@@ -518,15 +509,10 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   World->dtForFrame = Input->dt;
   World->GlobalTimeSec += Input->dt;
 
-  v2 StringScreenPos = V2(0.1,0.1);
-
   ControllerSystemUpdate(GameState->World);
-
   SpatialSystemUpdate(GameState->World, &Memory->PlatformAPI);
   CameraSystemUpdate(GameState->World);
-
   SpriteAnimationSystemUpdate(GameState->World);
-
   FillRenderPushBuffer( World, RenderCommands );
   CheckArena(&GameState->TransientArena);
 }
@@ -586,9 +572,10 @@ void AccumulateStatistic(debug_statistics* Statistic, r32 Value)
 
 extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 {
-  GlobalDebugTable.CurrentEventArrayIndex = !GlobalDebugTable.CurrentEventArrayIndex;
-  u64 ArrayIndex_EventIndex = AtomicExchangeu64(&GlobalDebugTable.EventArrayIndex_EventIndex,
-                                               ((u64)GlobalDebugTable.CurrentEventArrayIndex << 32));
+  #if 1
+  GlobalDebugTable->CurrentEventArrayIndex = !GlobalDebugTable->CurrentEventArrayIndex;
+  u64 ArrayIndex_EventIndex = AtomicExchangeu64(&GlobalDebugTable->EventArrayIndex_EventIndex,
+                                               ((u64)GlobalDebugTable->CurrentEventArrayIndex << 32));
 
   u32 EventArrayIndex = (ArrayIndex_EventIndex >> 32);
   u32 EventCount = (ArrayIndex_EventIndex & 0xFFFFFFFF);
@@ -598,8 +585,7 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
   {
     DebugState->CounterStateCount = 0;
 
-    CollateDebugRecords(DebugState, EventCount, EventArrayIndex, &GlobalDebugTable);
-    DebugState->FrameEndInfos[DebugState->SnapShotIndex] = *Info;
+    CollateDebugRecords(DebugState, EventCount, EventArrayIndex, GlobalDebugTable);
 
     ++DebugState->SnapShotIndex;
     if(DebugState->SnapShotIndex >= SNAPSHOT_COUNT)
@@ -607,6 +593,8 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
       DebugState->SnapShotIndex = 0;
     }
 
-    PushDebugOverlay(DebugState, Info);
+    PushDebugOverlay(DebugState);
   }
+#endif
+  return GlobalDebugTable;
 }

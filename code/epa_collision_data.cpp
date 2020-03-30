@@ -95,7 +95,7 @@ struct epa_mesh
 internal inline v3
 GetFaceNormal(const epa_face* Face)
 {
-  TIMED_BLOCK();
+  TIMED_FUNCTION();
   return GetPlaneNormal(Face->Edge->TargetVertex->P.S,
                         Face->Edge->NextEdge->TargetVertex->P.S,
                         Face->Edge->NextEdge->NextEdge->TargetVertex->P.S);
@@ -202,7 +202,7 @@ internal void DebugPrintEdges(memory_arena* Arena, epa_mesh* Mesh, b32 Append, p
  */
 void FixWindingCCW(gjk_support Support[4])
 {
-  TIMED_BLOCK();
+  TIMED_FUNCTION();
   // Fix Winding so that all triangles go ccw
   v3 v01 = Support[1].S - Support[0].S;
   v3 v02 = Support[2].S - Support[0].S;
@@ -257,7 +257,7 @@ PushFace(epa_mesh* Mesh)
 internal epa_mesh *
 CreateInitialMesh(memory_arena* Arena, gjk_support* a,  gjk_support* b,  gjk_support* c)
 {
-  TIMED_BLOCK();
+  TIMED_FUNCTION();
   epa_mesh* Result = PushStruct(Arena,epa_mesh);
   Result->Arena    = Arena;
 
@@ -347,7 +347,7 @@ GetPreviousEdge( epa_halfedge* Edge )
 internal void
 FillHole(epa_mesh* Mesh, epa_halfedge* MeshEdge, gjk_support* NewPoint)
 {
-  TIMED_BLOCK();
+  TIMED_FUNCTION();
   Assert( IsBorderEdge(MeshEdge) );
   MeshEdge = !MeshEdge->LeftFace ? MeshEdge : MeshEdge->OppositeEdge;
 
@@ -471,7 +471,7 @@ internal inline void getFacePoints(epa_face* Face, v3* P0, v3* P1, v3* P2)
 internal epa_halfedge *
 RemoveFacesSeenByPoint(epa_mesh* Mesh, const v3& Point)
 {
-  TIMED_BLOCK();
+  TIMED_FUNCTION();
   epa_face** FaceListEntry = &Mesh->Faces;
   epa_face* FacesToDissconnect = 0;
   while(*FaceListEntry)
@@ -569,7 +569,7 @@ RemoveFacesSeenByPoint(epa_mesh* Mesh, const v3& Point)
 internal b32
 IsPointOnMeshSurface(epa_mesh* Mesh, const v3& Point)
 {
-  TIMED_BLOCK();
+  TIMED_FUNCTION();
   epa_face* Face = Mesh->Faces;
   while(Face)
   {
@@ -638,7 +638,7 @@ GetCLosestFaceToOrigin(epa_mesh* Mesh, r32* ResultDistance )
 
 void RecordFrame(epa_mesh* Mesh, component_gjk_epa_visualizer* Vis, epa_face* ClosestFaceToOrigin, v3 SupportPoint = V3(0,0,0), b32 RenderFilled = false)
 {
-  TIMED_BLOCK();
+  TIMED_FUNCTION();
   if(!Vis) return;
   if(!Vis->TriggerRecord)
   {
@@ -707,7 +707,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
                                     const m4* BModelMat, const collider_mesh* BMesh,
                                     gjk_simplex* Simplex, component_gjk_epa_visualizer* Vis)
 {
-  TIMED_BLOCK()
+  TIMED_FUNCTION();
   temporary_memory TempMem = BeginTemporaryMemory(TemporaryArena);
 
   BlowUpSimplex(AModelMat, AMesh,

@@ -11,7 +11,7 @@
 
 push_buffer_header* PushNewHeader(render_group* RenderGroup)
 {
-  TIMED_BLOCK();
+  TIMED_FUNCTION();
   utils::push_buffer* Buffer = &RenderGroup->Buffer;
   RenderGroup->ElementCount++;
 
@@ -41,7 +41,7 @@ LinearTransform(const r32 OutputMin, const r32 OutputMax, const r32 InputMin, co
 
 void DEBUGPushQuad(render_group* DebugRenderGroup, aabb2f Rect, v4 Color = V4(1,1,1,1))
 {
-  TIMED_BLOCK();
+  TIMED_FUNCTION();
   component_surface* Surface = (component_surface*) DebugRenderGroup->Buffer.GetMemory(sizeof(component_surface));
   Surface->Material = (material*) DebugRenderGroup->Buffer.GetMemory(sizeof(material));
   Surface->Material->AmbientColor = Color;
@@ -63,7 +63,7 @@ void DEBUGPushQuad(render_group* DebugRenderGroup, aabb2f Rect, v4 Color = V4(1,
 
 void DEBUGAddTextSTB( render_group* DebugRenderGroup, c8* String, r32 cornerOffset, r32 LineNumber)
 {
-  TIMED_BLOCK();
+  TIMED_FUNCTION();
   stb_font_map* FontMap = &DebugRenderGroup->Assets->STBFontMap;
 
   component_surface* BitMapFont = (component_surface*) DebugRenderGroup->Buffer.GetMemory(sizeof(component_surface));
@@ -130,7 +130,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 {
   Assert(RenderCommands);
 
-  TIMED_BLOCK();
+  TIMED_FUNCTION();
   render_group* RenderGroup = &RenderCommands->MainRenderGroup;
 
   RenderGroup->Buffer.Clear();

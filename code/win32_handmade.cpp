@@ -1515,7 +1515,11 @@ PLATFORM_ALLOCATE_MEMORY(Win32AllocateMemory)
     Block->Next     = Sentinel;
     Block->Block.Size   = aSize;
     Block->Block.Flags  = aFlags;
-    Block->LoopingFlags = Win32IsInLoop(&GlobalWin32State) ? Win32Mem_AllocatedDuringLooping : 0;
+    Block->LoopingFlags = 0;
+    if(Win32IsInLoop(&GlobalWin32State) && !(aFlags & PlatformMemory_NotRestored))
+    {
+        Block->LoopingFlags = Win32Mem_AllocatedDuringLooping;
+    }
 
     //TODO: add Mutex support
  //   BeginTicketMutex(&GlobalWin32State.MemoryMutex);
@@ -1546,6 +1550,9 @@ PLATFORM_DEALLOCATE_MEMORY(Win32DeallocateMemory)
         }
     }
 }
+
+global_variable debug_table GlobalDebugTable_;
+debug_table* GlobalDebugTable = &GlobalDebugTable_;
 
 s32 CALLBACK
 WinMain(  HINSTANCE aInstance,
@@ -1759,52 +1766,61 @@ WinMain(  HINSTANCE aInstance,
         u64 LastCycleCount = __rdtsc();
         while(GlobalRunning)
         {
-          debug_frame_end_info FrameEndInfo = {};
-          Win32RecordTimeStamp(&FrameEndInfo, "DebugEndFrameProcessed", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
-
           NewInput->dt = TargetSecondsPerFrame;
 
           NewInput->ExecutableReloaded = false;
 
+
+          BEGIN_BLOCK(LoadGameCode);
           //TODO: Find out why we need a 2-3 sec wait for loop live code editing to work
           //      Are we not properly waiting to see if the lock file dissapears
           FILETIME NewDLLWriteTime = Win32GetLastWriteTime(SourceGameCodeDLLFullPath);
           if (CompareFileTime(&NewDLLWriteTime, &Game.LastDLLWriteTime))
           {
             Win32UnloadGameCode(&Game);
+            GlobalDebugTable = &GlobalDebugTable_;
             Game = Win32LoadGameCode(SourceGameCodeDLLFullPath,
                           TempGameCodeDLLFullPath,
                           TempGameCodeLockFullPath);
             NewInput->ExecutableReloaded = true;
           }
 
-          Win32RecordTimeStamp(&FrameEndInfo, "GameExecutableLoaded", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
+          END_BLOCK(LoadGameCode);
+
+          //
+          //
+          //
+
+          BEGIN_BLOCK(ProcessInput);
 
           game_controller_input* OldKeyboardController = GetController(OldInput,0);
           game_controller_input* NewKeyboardController = GetController(NewInput,0);
 
-          if (!GlobalPause)
-          {
-            Win32ProcessKeyboard(&GlobalWin32State, OldKeyboardController, NewKeyboardController);
-            Win32ProcessControllerInput( OldInput, NewInput);
-            POINT MouseP;
-            GetCursorPos(&MouseP);
-            ScreenToClient( WindowHandle, &MouseP);
-            NewInput->MouseX = MouseP.x;
-            NewInput->MouseY = MouseP.y;
-            NewInput->MouseZ = 0;
-            Win32ProcessKeyboardMessage(&NewInput->MouseButton[0], GetKeyState(VK_LBUTTON)  & (1<<15));
-            Win32ProcessKeyboardMessage(&NewInput->MouseButton[1], GetKeyState(VK_MBUTTON)  & (1<<15));
-            Win32ProcessKeyboardMessage(&NewInput->MouseButton[2], GetKeyState(VK_RBUTTON)  & (1<<15));
-            Win32ProcessKeyboardMessage(&NewInput->MouseButton[3], GetKeyState(VK_XBUTTON1) & (1<<15));
-            Win32ProcessKeyboardMessage(&NewInput->MouseButton[4], GetKeyState(VK_XBUTTON2) & (1<<15));
-          }
+          Win32ProcessKeyboard(&GlobalWin32State, OldKeyboardController, NewKeyboardController);
+          Win32ProcessControllerInput( OldInput, NewInput);
+          POINT MouseP;
+          GetCursorPos(&MouseP);
+          ScreenToClient( WindowHandle, &MouseP);
+          NewInput->MouseX = MouseP.x;
+          NewInput->MouseY = MouseP.y;
+          NewInput->MouseZ = 0;
+          Win32ProcessKeyboardMessage(&NewInput->MouseButton[0], GetKeyState(VK_LBUTTON)  & (1<<15));
+          Win32ProcessKeyboardMessage(&NewInput->MouseButton[1], GetKeyState(VK_MBUTTON)  & (1<<15));
+          Win32ProcessKeyboardMessage(&NewInput->MouseButton[2], GetKeyState(VK_RBUTTON)  & (1<<15));
+          Win32ProcessKeyboardMessage(&NewInput->MouseButton[3], GetKeyState(VK_XBUTTON1) & (1<<15));
+          Win32ProcessKeyboardMessage(&NewInput->MouseButton[4], GetKeyState(VK_XBUTTON2) & (1<<15));
 
-          Win32RecordTimeStamp(&FrameEndInfo, "InputHandled", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
+          END_BLOCK(ProcessInput);
+
+          //
+          //
+          //
 
           thread_context Thread = {};
           if (!GlobalPause)
           {
+
+            BEGIN_BLOCK(GameMainLoop);
 
             if (GlobalWin32State.RecordingIndex)
             {
@@ -1819,12 +1835,15 @@ WinMain(  HINSTANCE aInstance,
             {
               Game.UpdateAndRender(&Thread, &GameMemory, &RenderCommands, NewInput);
             }
-          }
 
-          Win32RecordTimeStamp(&FrameEndInfo, "GameMainLoopDone", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
+            END_BLOCK(GameMainLoop);
 
-          if (!GlobalPause)
-          {
+            //
+            //
+            //
+
+            BEGIN_BLOCK(ProcessSound);
+
             LARGE_INTEGER AudioWallClock = Win32GetWallClock();
             r32 FromBeginToAudioSeconds = Win32GetSecondsElapsed(FlipWallClock, AudioWallClock);
             r32 SecondsLeftUntillFlip = TargetSecondsPerFrame - FromBeginToAudioSeconds;
@@ -1937,7 +1956,13 @@ WinMain(  HINSTANCE aInstance,
               SoundIsValid = false;
             }
 
-            Win32RecordTimeStamp(&FrameEndInfo, "GameAudioUpdated", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
+            END_BLOCK(ProcessSound);
+
+            //
+            //
+            //
+
+            BEGIN_BLOCK(FrameWait);
 
             LARGE_INTEGER WorkCounter = Win32GetWallClock();
             r32 WorkSecondsElapsed = Win32GetSecondsElapsed(LastCounter, WorkCounter);
@@ -1978,7 +2003,13 @@ WinMain(  HINSTANCE aInstance,
               // TODO: Logging
             }
 
-            Win32RecordTimeStamp(&FrameEndInfo, "FrameWaitComplete", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
+            END_BLOCK(FrameWait);
+
+            //
+            //
+            //
+
+            BEGIN_BLOCK(ProcessRenderQueue);
 
             // Update Window
             win32_window_dimension Dimension = Win32GetWindowDimension(  WindowHandle );
@@ -1986,7 +2017,7 @@ WinMain(  HINSTANCE aInstance,
             Win32DisplayBufferInWindow(&RenderCommands, DeviceContext, Dimension.Width, Dimension.Height);
             ReleaseDC( WindowHandle, DeviceContext);
 
-            Win32RecordTimeStamp(&FrameEndInfo, "RenderQueueProcessed", Win32GetSecondsElapsed(LastCounter, Win32GetWallClock()));
+            END_BLOCK(ProcessRenderQueue);
 
             FlipWallClock = Win32GetWallClock();
 
@@ -2023,9 +2054,9 @@ WinMain(  HINSTANCE aInstance,
 
             if(Game.DEBUGGameFrameEnd)
             {
-              Game.DEBUGGameFrameEnd(&GameMemory, &FrameEndInfo);
+              GlobalDebugTable = Game.DEBUGGameFrameEnd(&GameMemory);
             }
-
+            GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
 #if 0
             r64 FPS = 0.0f;
             r64 MCFP =  ((r32)CyclesElapsed /(1000.0f*1000.0f));
@@ -2044,7 +2075,7 @@ WinMain(  HINSTANCE aInstance,
 #endif
 #endif
           } // Global Pause
-        }
+        } // Global Running
       }else{
 
         //  TODO: Logging

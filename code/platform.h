@@ -47,7 +47,6 @@
 #include "render_push_buffer.h"
 
 #if COMPILER_MSVC
-#include <intrin.h>
 inline u32 AtomicCompareExchange(u32 volatile* Value, u32 New, u32 Expected){
   u32 Result = _InterlockedCompareExchange((long volatile *)Value, New, Expected);
   return(Result);
@@ -123,7 +122,7 @@ SafeTruncateReal32( u32 Value )
 struct debug_record
 {
   char* FileName;
-  char* FunctionName;
+  char* BlockName;
 
   u32 LineNumber;
   u64 HitCount_CycleCount;
@@ -146,15 +145,6 @@ struct debug_event
   u8 Type;
 };
 
-
-#if HANDMADE_INTERNAL
-#define TIMED_BLOCK__(Number, ... ) timed_block TimedBlock_##Number(__COUNTER__, __FILE__, __LINE__, __FUNCTION__);
-#define TIMED_BLOCK_(Number, ... ) TIMED_BLOCK__(Number, ##_VA_ARGS__)
-#define TIMED_BLOCK(...) TIMED_BLOCK_(__LINE__, ##_VA_ARGS__)
-#else
-#define TIMED_BLOCK;
-#endif
-
 #define MAX_DEBUG_TRANSLATION_UNITS (3)
 #define MAX_DEBUG_EVENT_COUNT (65536)
 #define MAX_DEBUG_RECORD_COUNT (65536)
@@ -168,41 +158,67 @@ struct debug_table
   debug_event Events[2][MAX_DEBUG_EVENT_COUNT];
 };
 
-extern debug_table GlobalDebugTable;
 
+// Note: Needs to be a macro so that it gets expanded in every translation unit
+//       Even if inline the linker may chose one specific implementation and every
+//       translation unit will get the implementations TRANSLATION_UNIT_INDEX
 #define RecordDebugEvent( RecordIndex, EventType) \
-  u64 ArrayIndex_EventIndex = AtomicAddu64(&GlobalDebugTable.EventArrayIndex_EventIndex, 1); \
+{ \
+  u64 ArrayIndex_EventIndex = AtomicAddu64(&GlobalDebugTable->EventArrayIndex_EventIndex, 1); \
   u32 EventIndex = ArrayIndex_EventIndex & 0xFFFFFFFF; \
   u32 ArrayIndex = ArrayIndex_EventIndex >> 32; \
-  debug_event* Event = GlobalDebugTable.Events[ArrayIndex] + EventIndex; \
+  debug_event* Event = GlobalDebugTable->Events[ArrayIndex] + EventIndex; \
   Event->Clock = __rdtsc(); \
   Event->ThreadIndex = GetThreadID(); \
   Event->CoreIndex = 0; \
   Event->DebugRecordIndex = (u16) RecordIndex; \
   Event->TranslationUnit = TRANSLATION_UNIT_INDEX; \
   Event->Type = (u8) EventType;\
+}
+
+extern debug_table* GlobalDebugTable;
+
+#define BEGIN_BLOCK_(RecordIndex, FileNameArg, LineNumberArg, BlockNameArg) \
+{\
+  debug_record* Record = &GlobalDebugTable->Records[TRANSLATION_UNIT_INDEX][RecordIndex]; \
+  Record->FileName = (char*) FileNameArg; \
+  Record->BlockName = (char*) BlockNameArg; \
+  Record->LineNumber = LineNumberArg; \
+  RecordDebugEvent(RecordIndex, DebugEvent_BeginBlock); \
+}
+
+#define END_BLOCK_(RecordIndex) \
+  RecordDebugEvent(RecordIndex, DebugEvent_EndBlock);
+
+#define BEGIN_BLOCK(Name) \
+  int RecordIndex_##Name = __COUNTER__; \
+  BEGIN_BLOCK_(RecordIndex_##Name, __FILE__, __LINE__, #Name);
+
+#define END_BLOCK(Name) \
+  END_BLOCK_(RecordIndex_##Name);
 
 struct timed_block
 {
   u32 RecordIndex;
-  timed_block(const u32 RecordIndexInit, const char* FileName, const u32 LineNumber, const char* FunctionName)
+  timed_block(const u32 RecordIndexInit, const char* FileName, const u32 LineNumber, const char* BlockName)
   : RecordIndex(RecordIndexInit)
   {
-    // Todo: Make work with several translation units (handmade and win32 for now)
-    debug_record* Record = GlobalDebugTable.Records[TRANSLATION_UNIT_INDEX] + RecordIndex;
-    Record->FileName     = (char*) FileName;
-    Record->FunctionName = (char*) FunctionName;
-    Record->LineNumber   = LineNumber;
-
-    RecordDebugEvent(RecordIndex, DebugEvent_BeginBlock);
+    BEGIN_BLOCK_(RecordIndex, FileName, LineNumber, BlockName);
   };
 
   ~timed_block()
   {
-    RecordDebugEvent(RecordIndex, DebugEvent_EndBlock);
+    END_BLOCK_(RecordIndex);
   };
 };
 
+
+#define TIMED_BLOCK__(BlockName, Number, ... ) timed_block TimedBlock_##Number(__COUNTER__, __FILE__, __LINE__, BlockName, ## __VA_ARGS__)
+#define TIMED_BLOCK_(BlockName, Number, ... ) TIMED_BLOCK__(BlockName, Number, ## __VA_ARGS__)
+// Used to time a {CodeBlock} with a specific name
+#define TIMED_BLOCK(BlockName, ...) TIMED_BLOCK_(#BlockName, __LINE__, ## __VA_ARGS__)
+// Used same as TIMED_BLOCK but automatically gives the function name.
+#define TIMED_FUNCTION() TIMED_BLOCK_(__FUNCTION__, __LINE__, ## __VA_ARGS__)
 
 struct game_render_commands
 {
@@ -444,7 +460,7 @@ struct game_memory
 };
 
 
-#define DEBUG_GAME_FRAME_END(name) void name(game_memory* Memory, debug_frame_end_info *Info)
+#define DEBUG_GAME_FRAME_END(name) debug_table* name(game_memory* Memory)
 typedef DEBUG_GAME_FRAME_END(debug_frame_end);
 
 #define GAME_UPDATE_AND_RENDER(name) void name(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
