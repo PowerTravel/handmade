@@ -5,20 +5,6 @@
 #include "handmade.h"
 #include "entity_components.h"
 
-void ControllerSystemUpdate( world* World )
-{
-  for(u32 Index = 0;  Index < World->NrEntities; ++Index )
-  {
-    entity* E = &World->Entities[Index];
-    if(E->Types & COMPONENT_TYPE_CONTROLLER)
-    {
-      Assert(E->ControllerComponent->ControllerMappingFunction);
-
-      E->ControllerComponent->ControllerMappingFunction(E);
-    }
-  }
-}
-
 void CameraController( entity* CameraEntity )
 {
   component_camera* Camera = CameraEntity->CameraComponent;
@@ -232,4 +218,31 @@ void HeroController( entity* HeroEntity )
     LookAt(Camera, from, to);
   }
 
+}
+
+
+void ControllerSystemUpdate( world* World )
+{
+  for (u32 Index = 0;  Index < World->NrEntities; ++Index )
+  {
+    entity* E = &World->Entities[Index];
+    if (E->ControllerComponent)
+    {
+      switch (E->ControllerComponent->Type)
+      {
+        case ControllerType_FlyingCamera:
+        {
+          FlyingCameraController(E);
+        }break;
+        case ControllerType_EpaGjkVisualizer:
+        {
+          EpaGjkVisualizerController(E);
+        }break;
+        case ControllerType_Hero:
+        {
+          HeroController(E);
+        }break;
+      }
+    }
+  }
 }

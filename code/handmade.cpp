@@ -178,7 +178,7 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
   CubeA->GjkEpaVisualizerComponent->EPA = (epa_index*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->MaxEPACount, epa_index);;
 
   CubeA->ControllerComponent->Controller = GetController(Input, 1);
-  CubeA->ControllerComponent->ControllerMappingFunction = EpaGjkVisualizerController;
+  CubeA->ControllerComponent->Type = ControllerType_EpaGjkVisualizer;
 
   entity* ControllableCamera = NewEntity( World );
   NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
@@ -188,7 +188,7 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
   SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
   LookAt(ControllableCamera->CameraComponent, 1*V3(0,3,8), V3(0,3,0));
   ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
-  ControllableCamera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
+  ControllableCamera->ControllerComponent->Type = ControllerType_FlyingCamera;
 }
 
 void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input)
@@ -257,8 +257,10 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   floor->GjkEpaVisualizerComponent->EPA = (epa_index*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->MaxEPACount, epa_index);
 
   floor->ControllerComponent->Controller = GetController(Input, 1);
-  floor->ControllerComponent->ControllerMappingFunction = EpaGjkVisualizerController;
+  floor->ControllerComponent->Type = ControllerType_EpaGjkVisualizer;
 #endif
+
+
   entity* ControllableCamera = NewEntity( World );
   NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
 
@@ -267,8 +269,12 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
   LookAt(ControllableCamera->CameraComponent, 1*V3(3,3,3), V3(0,0,0));
 
+  // TODO Jakob: Any function pointers that gets assigned at game initialization
+  //             will become invalid when game code is recompiled.
+  //             Make it so that any permanent function pointers get reinitialized after
+  //             gameCode is updated
   ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
-  ControllableCamera->ControllerComponent->ControllerMappingFunction = FlyingCameraController;
+  ControllableCamera->ControllerComponent->Type = ControllerType_FlyingCamera;
 }
 
 void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
@@ -301,7 +307,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
   LookAt(Player->CameraComponent, 3*V3(0,0,1), V3(0,0,0));
 
   Player->ControllerComponent->Controller = GetController(Input, 1);
-  Player->ControllerComponent->ControllerMappingFunction = HeroController;
+  Player->ControllerComponent->Type = ControllerType_Hero;
 
   Put( V3(0,3,0), 0, V3(0,1,0), Player->SpatialComponent );
   Player->ColliderComponent->AABB = AABB3f( V3(-0.5,-0.5,0), V3(0.5,0.5,0) );
@@ -572,7 +578,6 @@ void AccumulateStatistic(debug_statistics* Statistic, r32 Value)
 
 extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 {
-  #if 1
   GlobalDebugTable->CurrentEventArrayIndex = !GlobalDebugTable->CurrentEventArrayIndex;
   u64 ArrayIndex_EventIndex = AtomicExchangeu64(&GlobalDebugTable->EventArrayIndex_EventIndex,
                                                ((u64)GlobalDebugTable->CurrentEventArrayIndex << 32));
@@ -595,6 +600,5 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 
     PushDebugOverlay(DebugState);
   }
-#endif
   return GlobalDebugTable;
 }

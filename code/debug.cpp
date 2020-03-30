@@ -65,7 +65,7 @@ void PushDebugOverlay(debug_state* DebugState)
     s32 CyPerHit = (HitCount->Avg == 0) ? 0 : (s32) (CycleCount->Avg / HitCount->Avg);
     c8 StringBuffer[256] = {};
     _snprintf_s( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
-  "(%3d)%-28s:%8dCy:%4dh:%8dcy/h",
+  "(%5d)%-25s:%10dCy:%5dh:%10dcy/h",
       CounterState->LineNumber, CounterState->FunctionName, (u32) CycleCount->Avg, (u32) HitCount->Avg,
       (u32) CyPerHit);
 
@@ -152,7 +152,7 @@ void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArray
   };
 
   debug_event* Events = DebugTable->Events[EventArrayIndex];
-  for(u32 EventIndex = 0; EventIndex<EventCount; ++EventIndex)
+  for (u32 EventIndex = 0; EventIndex<EventCount; ++EventIndex)
   {
     const debug_event* Event = Events + EventIndex;
     const u32 DebugRecordIndex = Event->DebugRecordIndex;
@@ -161,10 +161,16 @@ void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArray
 
     debug_record* Src = DebugTable->Records[TranslationUnit] + DebugRecordIndex;
 
-    Dst->FileName = Src->FileName;
-    Dst->FunctionName = Src->BlockName;
+    if (!Dst->FileName)
+    {
+      Dst->FileName = (char*) PushCopy(&DebugState->Memory, str::StringLength(Src->FileName)+1, Src->FileName);
+    }
+    if (!Dst->FunctionName)
+    {
+      Dst->FunctionName = (char*) PushCopy(&DebugState->Memory, str::StringLength(Src->BlockName)+1, Src->BlockName);
+    }
     Dst->LineNumber = Src->LineNumber;
-    if(Event->Type == DebugEvent_BeginBlock)
+    if (Event->Type == DebugEvent_BeginBlock)
     {
       ++Dst->Snapshots[DebugState->SnapShotIndex].HitCount;
       Dst->Snapshots[DebugState->SnapShotIndex].CycleCount -= Event->Clock;
