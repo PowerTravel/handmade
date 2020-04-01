@@ -44,8 +44,19 @@
 
 
 #if COMPILER_MSVC
-inline u32 AtomicCompareExchange(u32 volatile* Value, u32 New, u32 Expected){
+inline u32 AtomicCompareExchange(u32 volatile* Value, u32 New, u32 Expected)
+{
   u32 Result = _InterlockedCompareExchange((long volatile *)Value, New, Expected);
+  return(Result);
+}
+inline u32 AtomicExchangeu32( u32 volatile* Value, u32 New)
+{
+  u32 Result = _InterlockedExchange( (long volatile *)Value, New);
+  return(Result);
+}
+inline u32 AtomicIncrementu32( u32 volatile* Value )
+{
+  u32 Result = _InterlockedIncrement( (long volatile *)Value);
   return(Result);
 }
 inline u64 AtomicExchangeu64( u64 volatile* Value, u64 New)
@@ -66,6 +77,12 @@ inline u32 AtomicAddu32( u32 volatile* Value, u32 Added)
 #elif COMPILER_LLVM
 
 #endif
+
+struct ticket_mutex
+{
+  volatile u64 Ticket;
+  volatile u64 Serving;
+};
 
 struct thread_context
 {
@@ -227,6 +244,26 @@ struct timed_block
 #define TIMED_BLOCK(BlockName, ...) TIMED_BLOCK_(#BlockName, __LINE__, ## __VA_ARGS__)
 // Used same as TIMED_BLOCK but automatically gives the function name.
 #define TIMED_FUNCTION() TIMED_BLOCK_(__FUNCTION__, __LINE__, ## __VA_ARGS__)
+
+
+inline void
+BeginTicketMutex(ticket_mutex* Mutex)
+{
+  TIMED_FUNCTION();
+  u64 Ticket = AtomicAddu64(&Mutex->Ticket, 1);
+  while(Ticket != Mutex->Serving) {_mm_pause();}
+}
+
+inline void
+EndTicketMutex(ticket_mutex* Mutex)
+{
+  AtomicAddu64(&Mutex->Serving, 1);
+}
+
+
+#include "standalone_utility.h"
+#include "platform_opengl.h"
+#include "render_push_buffer.h"
 
 struct game_render_commands
 {

@@ -140,7 +140,38 @@ v3 ClosestPointOnEdge(const v3& EdgeStart, const v3& EdgeEnd, const v3& Point)
   return ClosestPointOnEdge;
 }
 
-void SpatialSystemUpdate( world* World, platform_api* API)
+struct collision_detection_work
+{
+  memory_arena* TransientArena;
+  entity* A;
+  entity* B;
+  b32 InContact;
+  contact_data NewContact;
+};
+
+internal void
+DoCollisionDetectionWork(void* Data)
+{
+  collision_detection_work* Work = (collision_detection_work*) Data;
+  m4 ModelMatrixA = GetModelMatrix(Work->A->SpatialComponent);
+  m4 ModelMatrixB = GetModelMatrix(Work->B->SpatialComponent);
+  gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
+      &ModelMatrixA, Work->A->ColliderComponent->Mesh,
+      &ModelMatrixB, Work->B->ColliderComponent->Mesh);
+
+  Work->InContact = NarrowPhaseResult.ContainsOrigin;
+  if (Work->InContact)
+  {
+    Work->NewContact = EPACollisionResolution(Work->TransientArena, &ModelMatrixA, Work->A->ColliderComponent->Mesh,
+                                                                    &ModelMatrixB, Work->B->ColliderComponent->Mesh,
+                                                                    &NarrowPhaseResult.Simplex);
+  }
+}
+
+
+#define DO_GET_CONTACT_NONSENSE_LINEARLY(i) ((contact_data_list*) ((u8*) ( World->Contacts ) + i * ( sizeof(contact_data_list) + 4*sizeof(contact_data))));
+
+void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/ platform_api* API)
 {
   r32 dt =  World->dtForFrame;
   memory_arena* PersistentArena = World->PersistentArena;
@@ -153,6 +184,7 @@ void SpatialSystemUpdate( world* World, platform_api* API)
   char* const DebugPrintMemory = (char*) PushArray(TransientArena, DebugPrintMemorySize, char);
   char* Scanner = DebugPrintMemory;
 
+#if 0
   u8* TmpList = (u8*) PushSize(TransientArena, World->NrContacts * ( sizeof(contact_data_list) + 4*sizeof(contact_data) ));
   u32 ManifoldIndex = 0;
   u8* MemoryLocation = TmpList;
@@ -208,7 +240,12 @@ void SpatialSystemUpdate( world* World, platform_api* API)
 
   utils::Copy(MemoryLocation-TmpList, TmpList, World->Contacts);
   World->NrContacts = ManifoldIndex;
-
+#else
+  u32 MemCount = World->NrContacts * ( sizeof(contact_data_list) + 4*sizeof(contact_data) );
+  u8* TmpList = (u8*) PushSize(TransientArena, MemCount);
+  utils::Copy(World->NrContacts, TmpList, World->Contacts);
+  World->NrContacts = 0;
+#endif
   aabb_tree BroadPhaseTree = {};
 
   for(u32 Index = 0;  Index < World->NrEntities; ++Index )
@@ -250,9 +287,9 @@ void SpatialSystemUpdate( world* World, platform_api* API)
     if( E->Types & COMPONENT_TYPE_COLLIDER )
     {
       aabb3f AABBWorldSpace = {};
-      GetTransformedAABBFromColliderMesh( E->ColliderComponent, E->SpatialComponent->ModelMatrix, &AABBWorldSpace );
+      GetTransformedAABBFromColliderMesh( E->ColliderComponent, GetModelMatrix(E->SpatialComponent), &AABBWorldSpace );
       AABBTreeInsert( TransientArena, &BroadPhaseTree, E, AABBWorldSpace );
-
+#if 0
       if(API)
       {
         // Print Tree
@@ -265,12 +302,57 @@ void SpatialSystemUpdate( world* World, platform_api* API)
         Scanner += AABBToString(&zero, 64, Scanner);
         *Scanner++ = '\n';
       }
+#endif
     }
   }
 
   broad_phase_result_stack* const BroadPhaseResult = GetCollisionPairs( TransientArena, &BroadPhaseTree );
   broad_phase_result_stack* ColliderPair = BroadPhaseResult;
 
+#if 1
+  collision_detection_work WorkArray[8] = {};
+  collision_detection_work* Work = WorkArray;
+  u32 CollisionCount = 0;
+  while( ColliderPair )
+  {
+    Work->TransientArena = TransientArena;
+    Work->A = ColliderPair->A;
+    Work->B = ColliderPair->B;
+//    CollisionQueue->AddEntry(CollisionQueue, DoCollisionDetectionWork, Work);
+
+    ColliderPair = ColliderPair->Previous;
+    ++Work;
+    ++CollisionCount;
+  }
+
+//  CollisionQueue->PlatformCompleteWorkQueue(CollisionQueue);
+  u32 CollisionIndex = 0;
+  while(CollisionIndex < CollisionCount)
+  {
+    DoCollisionDetectionWork((void*) (WorkArray + CollisionIndex));
+    CollisionIndex++;
+  }
+
+  CollisionIndex = 0;
+  u32 ContactIndex = 0;
+  World->NrContacts = 0;
+  while(CollisionIndex < CollisionCount)
+  {
+    collision_detection_work* CurrentWork = WorkArray + CollisionIndex++;
+    if(CurrentWork->InContact)
+    {
+      contact_data_list* ContactData = DO_GET_CONTACT_NONSENSE_LINEARLY(ContactIndex);
+      World->NrContacts++;
+      ContactData->MaxNrContacts = 4;
+      ContactData->NrContacts = 1;
+      ContactData->A = CurrentWork->A;
+      ContactData->B = CurrentWork->B;
+      ContactData->Contacts = (contact_data*) (ContactData + 1);
+      *ContactData->Contacts = CurrentWork->NewContact;
+      ContactIndex++;
+    }
+  }
+#else
   while( ColliderPair )
   {
     entity* A = ColliderPair->A;
@@ -500,10 +582,11 @@ void SpatialSystemUpdate( world* World, platform_api* API)
     }
     ColliderPair = ColliderPair->Previous;
   }
+#endif
 
   for(u32 i = 0; i < World->NrContacts; ++i)
   {
-    contact_data_list* ContactData = (contact_data_list*) ((u8*) (World->Contacts ) + i * ( sizeof(contact_data_list) + 4*sizeof(contact_data)));
+    contact_data_list* ContactData = DO_GET_CONTACT_NONSENSE_LINEARLY(i);
     entity* A = ContactData->A;
     entity* B = ContactData->B;
     v3 va = {};
@@ -548,60 +631,63 @@ void SpatialSystemUpdate( world* World, platform_api* API)
   }
   for(u32 j = 0; j < World->NrContacts; ++j)
   {
-    contact_data_list* ContactData = (contact_data_list*) ((u8*) (World->Contacts ) + j * ( sizeof(contact_data_list) + 4*sizeof(contact_data)));
+    contact_data_list* ContactData = DO_GET_CONTACT_NONSENSE_LINEARLY(j);
     for(u32 k = 0; k < ContactData->NrContacts; ++k)
     {
         contact_data* Contact = &ContactData->Contacts[k];
         Contact->AccumulatedLambda = 0;
     }
   }
-  for (u32 i = 0; i < 10; ++i)
+  if(World->NrContacts)
   {
-    for(u32 j = 0; j < World->NrContacts; ++j)
+    for (u32 i = 0; i < 4; ++i)
     {
-      contact_data_list* ContactData = (contact_data_list*) ((u8*) (World->Contacts ) + j * ( sizeof(contact_data_list) + 4*sizeof(contact_data)));
-      entity* A = ContactData->A;
-      entity* B = ContactData->B;
-      for(u32 k = 0; k < ContactData->NrContacts; ++k)
+      // TODO: Process Constraints MultiThreaded?
+      for(u32 j = 0; j < World->NrContacts; ++j)
       {
-        v3 V[4] = {};
-        if(A->DynamicsComponent)
+        contact_data_list* ContactData = DO_GET_CONTACT_NONSENSE_LINEARLY(j);
+        entity* A = ContactData->A;
+        entity* B = ContactData->B;
+        for(u32 k = 0; k < ContactData->NrContacts; ++k)
         {
-          V[0] = A->DynamicsComponent->LinearVelocity;
-          V[1] = A->DynamicsComponent->AngularVelocity;
-        }
-        if(B->DynamicsComponent)
-        {
-          V[2] = B->DynamicsComponent->LinearVelocity;
-          V[3] = B->DynamicsComponent->AngularVelocity;
-        }
+          v3 V[4] = {};
+          if(A->DynamicsComponent)
+          {
+            V[0] = A->DynamicsComponent->LinearVelocity;
+            V[1] = A->DynamicsComponent->AngularVelocity;
+          }
+          if(B->DynamicsComponent)
+          {
+            V[2] = B->DynamicsComponent->LinearVelocity;
+            V[3] = B->DynamicsComponent->AngularVelocity;
+          }
+          contact_data* Contact = &ContactData->Contacts[k];
+          r32 PenetrationDepth  = Norm(V3(GetModelMatrix(A->SpatialComponent) * V4( Contact->A_ContactModelSpace,1)) -
+                                       V3(GetModelMatrix(B->SpatialComponent) * V4( Contact->B_ContactModelSpace,1)));
+          v3  ContactNormal     = Contact->ContactNormal;
+          r32 Restitution       = getRestitutionCoefficient(V, 0.25f, ContactNormal, 0.01);
+          r32 Baumgarte         = getBaumgarteCoefficient(dt, 0.25,  PenetrationDepth, 0.01);
+          r32 Lambda            = GetLambda( V, Contact->J, Contact->InvMJ, Baumgarte, Restitution);
+          r32 OldCumulativeLambda = Contact->AccumulatedLambda;
+          Contact->AccumulatedLambda += Lambda;
+          Contact->AccumulatedLambda = Contact->AccumulatedLambda <=0 ? 0 : Contact->AccumulatedLambda;
+          r32 LambdaDiff = Contact->AccumulatedLambda - OldCumulativeLambda;
 
-        contact_data* Contact = &ContactData->Contacts[k];
-        r32 PenetrationDepth  = Norm(V3(A->SpatialComponent->ModelMatrix * V4( Contact->A_ContactModelSpace, 1)) -
-                                     V3(B->SpatialComponent->ModelMatrix * V4( Contact->B_ContactModelSpace,1)));
-        //r32 PenetrationDepth  = Contact->PenetrationDepth;
-        v3  ContactNormal     = Contact->ContactNormal;
-        r32 Baumgarte         = getBaumgarteCoefficient(dt, 0.25, PenetrationDepth, 0.01);
-        r32 Restitution       = getRestitutionCoefficient(V, 0.0f, ContactNormal, 0.00);
-        r32 Lambda            = GetLambda( V, Contact->J, Contact->InvMJ, Baumgarte, Restitution);
+          v3 DeltaV[4] = {};
+          ScaleV12(LambdaDiff, Contact->InvMJ, DeltaV);
 
-        r32 OldCumulativeLambda = Contact->AccumulatedLambda;
-        Contact->AccumulatedLambda += Lambda;
-        Contact->AccumulatedLambda = Contact->AccumulatedLambda <=0 ? 0 : Contact->AccumulatedLambda;
-        r32 LambdaDiff = Contact->AccumulatedLambda - OldCumulativeLambda;
 
-        v3 DeltaV[4] = {};
-        ScaleV12(LambdaDiff, Contact->InvMJ, DeltaV);
-
-        if(A->DynamicsComponent)
-        {
-          A->DynamicsComponent->LinearVelocity  += DeltaV[0];
-          A->DynamicsComponent->AngularVelocity += DeltaV[1];
-        }
-        if(B->DynamicsComponent)
-        {
-          B->DynamicsComponent->LinearVelocity  += DeltaV[2];
-          B->DynamicsComponent->AngularVelocity += DeltaV[3];
+          // TODO: Do rotations directly with Quaternions!
+          if(A->DynamicsComponent)
+          {
+            A->DynamicsComponent->LinearVelocity  += DeltaV[0];
+            A->DynamicsComponent->AngularVelocity += DeltaV[1];
+          }
+          if(B->DynamicsComponent)
+          {
+            B->DynamicsComponent->LinearVelocity  += DeltaV[2];
+            B->DynamicsComponent->AngularVelocity += DeltaV[3];
+          }
         }
       }
     }

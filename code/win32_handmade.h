@@ -112,6 +112,7 @@ struct win32_replay_buffer
 
 struct win32_state
 {
+  ticket_mutex MemoryMutex;
   win32_memory_block MemorySentinel;
 
   u64 TotalSize;

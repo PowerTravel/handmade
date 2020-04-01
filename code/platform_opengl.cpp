@@ -429,30 +429,6 @@ void OpenGLSetViewport( r32 ViewPortAspectRatio, s32 WindowWidth, s32 WindowHeig
 
 }
 
-
-#if 0
-//  Code for transforming an 8-bit texture to a 32 bit texture
-      u8* BitmapMemory = (u8*) TemporaryMemory.GetMemory( sizeof(u32) * RenderTarget->Width * RenderTarget->Height );
-      u32* Pixel = (u32*) BitmapMemory;
-      u8*  SrcPixel =  (u8*) RenderTarget->Pixels;
-      u8*  EndSrcPixel = ((u8*) RenderTarget->Pixels)+ RenderTarget->Width * RenderTarget->Height;
-      while(SrcPixel != EndSrcPixel)
-      {
-        u8 Alpha = *SrcPixel;
-        u8 Blue = 0;
-        u8 Green = 0;
-        u8 Red = 0;
-        u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
-        *Pixel++ = PixelData;
-        SrcPixel++;
-      }
-
-      glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
-        RenderTarget->Width,  RenderTarget->Height,
-        0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
-        BitmapMemory);
-#endif
-
 void LoadOrBindTexture( bitmap* Bitmap, utils::push_buffer TemporaryMemory)
 {
   Assert(TemporaryMemory.IsEmpty());
@@ -489,11 +465,38 @@ void LoadOrBindTexture( bitmap* Bitmap, utils::push_buffer TemporaryMemory)
     // Send a Texture to GPU referenced to the enabled texture slot
     if(RenderTarget->BPP == 8)
     {
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+      #if 1
+      //  Code for transforming an 8-bit texture to a 32 bit mono-color texture
+      u8* BitmapMemory = (u8*) TemporaryMemory.GetMemory( sizeof(u32) * RenderTarget->Width * RenderTarget->Height );
+      u32* Pixel = (u32*) BitmapMemory;
+      u8*  SrcPixel =  (u8*) RenderTarget->Pixels;
+      u8*  EndSrcPixel = ((u8*) RenderTarget->Pixels)+ RenderTarget->Width * RenderTarget->Height;
+      while(SrcPixel != EndSrcPixel)
+      {
+        u8 Alpha = *SrcPixel;
+        u8 Blue = *SrcPixel;
+        u8 Green = *SrcPixel;
+        u8 Red = *SrcPixel;
+        u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
+        *Pixel++ = PixelData;
+        SrcPixel++;
+      }
+
+      glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
+        RenderTarget->Width,  RenderTarget->Height,
+        0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
+        BitmapMemory);
+#else
       glTexImage2D( GL_TEXTURE_2D,  0, GL_ALPHA,
         RenderTarget->Width,  RenderTarget->Height,
         0, GL_ALPHA, GL_UNSIGNED_BYTE,
         RenderTarget->Pixels);
+#endif
   	}else{
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
       glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
                 RenderTarget->Width,  RenderTarget->Height,
                 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
@@ -686,7 +689,10 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
   // Accept fragment if it closer to the camera than the former one
   glDepthFunc(GL_LESS);
 
-  glClearColor(0.7,0.7,0.7,1);
+  r32 R = 0x1E / (r32) 0xFF;
+  r32 G = 0x46 / (r32) 0xFF;
+  r32 B = 0x5A / (r32) 0xFF;
+  glClearColor(R,G,B, 1.f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -931,7 +937,10 @@ void DisplayBitmapViaOpenGL( u32 Width, u32 Height, void* Memory )
   // Enable Texturing
   glEnable( GL_TEXTURE_2D );
 
-  glClearColor(0.7f, 0.7f, 0.f, 0.f);
+  r32 R = 0x1E / (r32) 0xFF;
+  r32 G = 0x46 / (r32) 0xFF;
+  r32 B = 0x5A / (r32) 0xFF;
+  glClearColor(R,G,B, 0.f);
   glClear(GL_COLOR_BUFFER_BIT);
 
   glMatrixMode(GL_TEXTURE);

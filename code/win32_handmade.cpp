@@ -745,11 +745,10 @@ Win32EndRecordingInput(win32_state* aState)
 internal void
 Win32FreeMemoryBlock(win32_memory_block *aBlock)
 {
-  // TODO: Make thread safe
-    //BeginTicketMutex(&GlobalWin32State.MemoryMutex);
+    BeginTicketMutex(&GlobalWin32State.MemoryMutex);
     aBlock->Prev->Next = aBlock->Next;
     aBlock->Next->Prev = aBlock->Prev;
-    //EndTicketMutex(&GlobalWin32State.MemoryMutex);
+    EndTicketMutex(&GlobalWin32State.MemoryMutex);
 
     BOOL Result = VirtualFree(aBlock, 0, MEM_RELEASE);
     Assert(Result);
@@ -1521,12 +1520,11 @@ PLATFORM_ALLOCATE_MEMORY(Win32AllocateMemory)
         Block->LoopingFlags = Win32Mem_AllocatedDuringLooping;
     }
 
-    //TODO: add Mutex support
- //   BeginTicketMutex(&GlobalWin32State.MemoryMutex);
+    BeginTicketMutex(&GlobalWin32State.MemoryMutex);
     Block->Prev     = Sentinel->Prev;
     Block->Prev->Next   = Block;
     Block->Next->Prev   = Block;
-//    EndTicketMutex(&GlobalWin32State.MemoryMutex);
+    EndTicketMutex(&GlobalWin32State.MemoryMutex);
 
     platform_memory_block *PlatBlock = &Block->Block;
     return(PlatBlock);
@@ -1537,22 +1535,124 @@ PLATFORM_ALLOCATE_MEMORY(Win32AllocateMemory)
 
 PLATFORM_DEALLOCATE_MEMORY(Win32DeallocateMemory)
 {
-    if( aBlock)
+  if( aBlock)
+  {
+    win32_memory_block* Win32Block = ( (win32_memory_block*) aBlock);
+    if(Win32IsInLoop(&GlobalWin32State))
     {
-        win32_memory_block* Win32Block = ( (win32_memory_block*) aBlock);
-        if(Win32IsInLoop(&GlobalWin32State))
-        {
-            Win32Block->LoopingFlags = Win32Mem_FreedDuringLooping;
-        }
-        else
-        {
-            Win32FreeMemoryBlock(Win32Block);
-        }
+      Win32Block->LoopingFlags = Win32Mem_FreedDuringLooping;
     }
+    else
+    {
+      Win32FreeMemoryBlock(Win32Block);
+    }
+  }
 }
 
 global_variable debug_table GlobalDebugTable_;
 debug_table* GlobalDebugTable = &GlobalDebugTable_;
+
+
+struct work_queue_entry_storage
+{
+  void* UserPointer;
+};
+
+struct work_queue
+{
+  u32 volatile NextEntryToDo;
+  u32 volatile EntryCompletionCount;
+  u32 volatile EntryCount;
+  HANDLE SemaphoreHandle;
+
+  work_queue_entry_storage Entries[256];
+};
+
+struct work_queue_entry
+{
+  void* Data;
+  b32 IsValid;
+};
+
+internal void
+AddWorkQueueEntry(work_queue* Queue, void* Pointer)
+{
+  Assert(Queue->EntryCount < ArrayCount(Queue->Entries));
+  Queue->Entries[Queue->EntryCount].UserPointer = Pointer;
+  _WriteBarrier();
+  _mm_sfence();
+  ++Queue->EntryCount;
+  ReleaseSemaphore(Queue->SemaphoreHandle, 1, 0);
+}
+
+internal work_queue_entry
+CompleteAndGetNextWorkQueueEntry(work_queue* Queue, work_queue_entry Completed)
+{
+  if(Completed.IsValid)
+  {
+     InterlockedIncrement( (long volatile *)&Queue->EntryCompletionCount );
+  }
+
+  work_queue_entry Result = {};
+  Result.IsValid = false;
+  if (Queue->NextEntryToDo < Queue->EntryCount)
+  {
+    u32 Index =  InterlockedIncrement( (long volatile *)&Queue->NextEntryToDo )-1;
+    Result.Data = Queue->Entries[Index].UserPointer;
+    Result.IsValid = true;
+    _ReadBarrier();
+  }
+  return (Result);
+}
+
+internal b32
+QueueWorkStillInProgress(work_queue* Queue)
+{
+  b32 Result = (Queue->EntryCompletionCount < Queue->EntryCount);
+  return (Result);
+}
+
+// This must be implemented for every Work Queeu
+
+// 1: A way of populating said array with data
+void PushString(work_queue* Queue, c8* String)
+{
+  AddWorkQueueEntry(Queue, String);
+}
+
+// operating on data
+inline void
+DoWorkerWork(work_queue_entry Entry, u32 LogicalThreadIndex)
+{
+  Assert(Entry.IsValid);
+  char Buffer[256];;
+  wsprintf(Buffer, "Thread %u: %s\n", LogicalThreadIndex, (char*) Entry.Data);
+  OutputDebugStringA(Buffer);
+}
+
+struct win32_thread_info
+{
+  work_queue* Queue;
+  int LogicalThreadIndex;
+};
+
+// Entry point for threads (Could be made more generic I guess)
+DWORD WINAPI
+ThreadProc(LPVOID lpParameter)
+{
+  win32_thread_info* ThreadInfo = (win32_thread_info*) lpParameter;
+  work_queue_entry Entry = {};
+  for (;;)
+  {
+    Entry = CompleteAndGetNextWorkQueueEntry(ThreadInfo->Queue, Entry);
+    if(Entry.IsValid){
+      DoWorkerWork(Entry, ThreadInfo->LogicalThreadIndex);
+    }else{
+      WaitForSingleObjectEx( ThreadInfo->Queue->SemaphoreHandle, INFINITE, FALSE);
+    }
+  }
+  return 0;
+}
 
 s32 CALLBACK
 WinMain(  HINSTANCE aInstance,
@@ -1560,6 +1660,53 @@ WinMain(  HINSTANCE aInstance,
       LPSTR aCommandLine,
       s32 aShowCode )
 {
+  win32_thread_info Threads[6];
+  u32 ThreadCount = ArrayCount(Threads);
+  u32 InitialCount = 0;
+  work_queue Queue = {};
+  Queue.SemaphoreHandle = CreateSemaphoreEx(0, InitialCount, ThreadCount, 0, 0, SEMAPHORE_ALL_ACCESS);
+  for (u32 ThreadIndex = 0; ThreadIndex < ArrayCount(Threads); ++ThreadIndex)
+  {
+    win32_thread_info* Info = Threads + ThreadIndex;
+    Info->LogicalThreadIndex = ThreadIndex;
+    Info->Queue = &Queue;
+    DWORD ThreadID;
+    HANDLE ThreadHandle = CreateThread( 0, 0, ThreadProc, Info, 0, &ThreadID);
+    CloseHandle(ThreadHandle);
+  }
+
+  Sleep(50);
+  PushString(&Queue, "A0");
+  PushString(&Queue, "A1");
+  PushString(&Queue, "A2");
+  PushString(&Queue, "A3");
+  PushString(&Queue, "A4");
+  PushString(&Queue, "A5");
+  PushString(&Queue, "A6");
+  PushString(&Queue, "A7");
+  PushString(&Queue, "A8");
+  PushString(&Queue, "A9");
+  PushString(&Queue, "B0");
+  PushString(&Queue, "B1");
+  PushString(&Queue, "B2");
+  PushString(&Queue, "B3");
+  PushString(&Queue, "B4");
+  PushString(&Queue, "B5");
+  PushString(&Queue, "B6");
+  PushString(&Queue, "B7");
+  PushString(&Queue, "B8");
+  PushString(&Queue, "B9");
+
+  work_queue_entry Entry = {};
+  while (QueueWorkStillInProgress(&Queue))
+  {
+    Entry = CompleteAndGetNextWorkQueueEntry(&Queue, Entry);
+    if (Entry.IsValid)
+    {
+      DoWorkerWork(Entry, 7);
+    }
+  }
+
   Win32GetEXEFileName(&GlobalWin32State);
 
   char SourceGameCodeDLLFullPath[WIN32_STATE_FILE_NAME_COUNT];
@@ -2048,7 +2195,7 @@ WinMain(  HINSTANCE aInstance,
             LARGE_INTEGER EndCounter = Win32GetWallClock();
             r32 SecPerFrame = Win32GetSecondsElapsed(LastCounter, EndCounter);
             LastCounter = EndCounter;
-
+#if HANDMADE_INTERNAL
             u64 EndCycleCount = __rdtsc();
             u64 CyclesElapsed = EndCycleCount - LastCycleCount;
             LastCycleCount = EndCycleCount;

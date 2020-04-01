@@ -118,7 +118,6 @@ void DEBUGAddTextSTB( render_group* DebugRenderGroup, c8* String, r32 cornerOffs
       Body->Surface = BitMapFont;
       Body->TM = TextureTranslate;
       Body->M  = QuadTranslate;
-
     }
 
     ++String;
