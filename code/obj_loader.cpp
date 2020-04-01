@@ -1296,8 +1296,7 @@ entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* Me
   Entity->MeshComponent->Indeces = OBJGrp->Indeces;
   Entity->MeshComponent->Data = MeshData;
 
-  Entity->SpatialComponent->ModelMatrix = M4Identity();
-  Translate( -GetAABBCenter(OBJGrp->aabb), Entity->SpatialComponent );
+  Entity->SpatialComponent->Position = -GetAABBCenter(OBJGrp->aabb);
 
   Entity->ColliderComponent->AABB = OBJGrp->aabb;
   Entity->ColliderComponent->Mesh = (collider_mesh*) PushStruct(World->PersistentArena, collider_mesh);

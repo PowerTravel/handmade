@@ -225,12 +225,13 @@ void SpatialSystemUpdate( world* World, platform_api* API)
       component_spatial*   S = E->SpatialComponent;
       component_collider*  C = E->ColliderComponent;
       component_dynamics*  D = E->DynamicsComponent;
-      v3  Position        = GetPosition(S);
+      v3  Position        = S->Position;
       v3  LinearVelocity  = D->LinearVelocity;
       v3  AngularVelocity = D->AngularVelocity;
       r32 Mass            = D->Mass;
 
       v3 Gravity = V3(0,-10,0);
+      //Gravity = V3(0,0,0);
       v3 LinearAcceleration = Gravity * Mass;
       LinearVelocity     = LinearVelocity + dt * LinearAcceleration;
 
@@ -611,35 +612,10 @@ void SpatialSystemUpdate( world* World, platform_api* API)
     entity* E = &World->Entities[Index];
     if( E->Types & COMPONENT_TYPE_DYNAMICS )
     {
-      #if 1
       component_spatial*   S = E->SpatialComponent;
       component_dynamics*  D = E->DynamicsComponent;
-      //v3 Gravity = V3(0,-10,0);
-      //D->LinearVelocity += dt * Gravity / D->Mass;
-      Translate(dt * D->LinearVelocity, S);
-      Rotate(dt*Norm(D->AngularVelocity), Normalize(D->AngularVelocity) ,S);
-	  int a = 10;
-      #else
-      component_spatial*   S = E->SpatialComponent;
-      component_collider*  C = E->ColliderComponent;
-      component_dynamics*  D = E->DynamicsComponent;
-      v3  Position        = GetPosition(S);
-      v3  LinearVelocity  = D->LinearVelocity;
-      v3  AngularVelocity = D->AngularVelocity;
-      r32 Mass            = D->Mass;
-
-      v3 Gravity = V3(0,-10,0);
-      v3 LinearAcceleration = Gravity / Mass;
-      LinearVelocity        = LinearVelocity + dt * LinearAcceleration;
-      Translate(dt * LinearVelocity, S);
-
-      v3 AngularAcceleration = {};
-      AngularVelocity = AngularVelocity + dt * AngularAcceleration;
-      Rotate(Norm(dt*AngularVelocity), Normalize(dt*AngularVelocity) ,S);
-
-      D->LinearVelocity  = LinearVelocity;
-      D->AngularVelocity = AngularVelocity;
-      #endif
+      TimestepVelocity( dt, D->LinearVelocity, D->AngularVelocity, S );
+      S->Rotation = Normalize(S->Rotation);
     }
   }
 #endif

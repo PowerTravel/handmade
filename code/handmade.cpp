@@ -140,7 +140,7 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
   Light->LightComponent->Color = V4(5,5,5,1);
-  Put( V3(0,2,4), 0, V3(0,1,0), Light->SpatialComponent );
+  Light->SpatialComponent->Position = V3(0,2,4);
 
   obj_loaded_file* cube = ReadOBJFile( Thread, GameState,
          Platform.DEBUGPlatformReadEntireFile,
@@ -149,13 +149,14 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
 
   entity* CubeA = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
   SetMaterial(CubeA->SurfaceComponent->Material, MATERIAL_RED_RUBBER);
-  Put( V3( 3,0,0), 0, V3(0,0,0), CubeA->SpatialComponent );
-  Scale( V3(2, 2, 2),  CubeA->SpatialComponent );
+  CubeA->SpatialComponent->Position = V3( 3,0,0);
+  CubeA->SpatialComponent->Scale = V3(2, 2, 2);
 
   entity* CubeB = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
   SetMaterial(CubeB->SurfaceComponent->Material, MATERIAL_BLUE_RUBBER);
-  Put( V3( 3,0,1), Pi32/4, V3(0,0,1), CubeB->SpatialComponent );
-  Scale( V3(1, 1, 1),  CubeB->SpatialComponent );
+  CubeB->SpatialComponent->Position = V3(3,0,1);
+  CubeB->SpatialComponent->Rotation = RotateQuaternion( Pi32/4.f, V3(0,0,1) );
+  CubeB->SpatialComponent->Scale = V3(2, 2, 2);
 
   NewComponents( World, CubeA, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
 
@@ -209,7 +210,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
   Light->LightComponent->Color = V4(3,3,3,1);
-  Put( V3(10,10,10), 0, V3(0,1,0), Light->SpatialComponent );
+  Light->SpatialComponent->Position = V3(10,10,10);
 
   for (s32 i = -0; i < 2; ++i)
   {
@@ -223,7 +224,9 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
         // Uncomment this and set j < 1 in the for loop to reproduce a bug where
         // GJK perodically does not find a collision.
         //Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,2,1), cubeEntity->SpatialComponent );
-        Put( V3(1.1f*i, 1.0f*j, 1.1f*k), 0, V3(1,1,1), cubeEntity->SpatialComponent );
+        cubeEntity->SpatialComponent->Position =  V3(2.f*i, 1.0f*j, 2.f*k);
+        cubeEntity->SpatialComponent->Rotation = RotateQuaternion( 0, V3(0,1,0) );
+        cubeEntity->SpatialComponent->Scale = V3(1, 1, 1);
         cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
         cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0,0);
         cubeEntity->DynamicsComponent->Mass = 1;
@@ -232,9 +235,8 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   }
 
   entity* floor = CreateEntityFromOBJGroup( World, &cube->Objects[1], cube->MeshData );
-
-  Put( V3( 0,-2, 0), 0, V3(0,1,0), floor->SpatialComponent );
-  Scale( V3( 18, 1, 18),  floor->SpatialComponent );
+  floor->SpatialComponent->Position = V3( 0,-2, 0);
+  floor->SpatialComponent->Scale = V3( 18, 1, 18);
 
 #if 1
   NewComponents( World, floor, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
@@ -291,8 +293,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
   Light->LightComponent->Color = V4(1,1,1,1);
-  Light->SpatialComponent->ModelMatrix = M4Identity();
-  Translate( V3(3,3,3), Light->SpatialComponent );
+  Light->SpatialComponent->Position =  V3(3,3,3);
 
   entity* Player = NewEntity( World );
 
@@ -309,7 +310,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
   Player->ControllerComponent->Controller = GetController(Input, 1);
   Player->ControllerComponent->Type = ControllerType_Hero;
 
-  Put( V3(0,3,0), 0, V3(0,1,0), Player->SpatialComponent );
+  Player->SpatialComponent->Position = V3(0,3,0);
   Player->ColliderComponent->AABB = AABB3f( V3(-0.5,-0.5,0), V3(0.5,0.5,0) );
   SetColliderMeshFromAABB(World->PersistentArena, Player->ColliderComponent);
 

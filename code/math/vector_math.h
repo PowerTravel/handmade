@@ -856,6 +856,7 @@ Transpose( const m4& A )
 inline m4
 operator*( const m4& A, const m4& B )
 {
+  //TIMED_FUNCTION();
   m4 BT = Transpose(B);
   m4 Result = M4( A.r0 * BT.r0, A.r0 * BT.r1, A.r0 * BT.r2, A.r0 * BT.r3,
                 A.r1 * BT.r0, A.r1 * BT.r1, A.r1 * BT.r2, A.r1 * BT.r3,

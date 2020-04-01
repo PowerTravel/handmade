@@ -208,12 +208,12 @@ void HeroController( entity* HeroEntity )
 
     if(Controller->X.EndedDown)
     {
-      Put(V3(0,1,0), 0, V3(0,1,0), Spatial);
+      *Spatial = component_spatial(V3(0,1,0));
       Dynamics->ExternalForce  = V3(0,0,0);
       Dynamics->LinearVelocity = V3(0,0,0);
     }
 
-    v3 to = GetPosition(Spatial);
+    v3 to = Spatial->Position;
     v3 from = to + V3(0,0,3);
     LookAt(Camera, from, to);
   }

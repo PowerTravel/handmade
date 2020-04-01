@@ -160,7 +160,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 
       entry_type_light* Body = (entry_type_light*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_light));
       Body->Color  = Entity->LightComponent->Color;
-      Body->M      = Entity->SpatialComponent->ModelMatrix;
+      Body->M      = GetModelMatrix(Entity->SpatialComponent);
     }
   }
 
@@ -194,7 +194,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       Body->Buffer   = Buffer;
       Body->DataType = DATA_TYPE_TRIANGLE;
       Body->Surface  = Entity->SurfaceComponent;
-      Body->M        = Entity->SpatialComponent->ModelMatrix;
+      Body->M        = GetModelMatrix(Entity->SpatialComponent);
       Body->NM       = Transpose(RigidInverse(Body->M));
       Body->ElementStart  = 0;
       Body->ElementLength = Buffer->nvi;
@@ -237,7 +237,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       }
       if( Entity->Types & COMPONENT_TYPE_SPATIAL )
       {
-        Body->M = Entity->SpatialComponent->ModelMatrix;
+        Body->M = GetModelMatrix(Entity->SpatialComponent);
       }
     }
 
@@ -270,7 +270,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         Body->Buffer = Buffer;
         Body->DataType = DATA_TYPE_TRIANGLE;
         Body->Surface = JadeSurface;
-        Body->M = Entity->SpatialComponent->ModelMatrix;
+        Body->M = GetModelMatrix(Entity->SpatialComponent);
         Body->NM = Transpose(RigidInverse(Body->M));
 
         Body->ElementStart  = 0;
@@ -530,7 +530,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         Header->Type = render_buffer_entry_type::PRIMITIVE;
         Header->RenderState = RENDER_STATE_POINTS;
         entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
-        Body->M = GetTranslationMatrix( A->SpatialComponent->ModelMatrix * V4(ContactData->Contacts[j].A_ContactModelSpace,1));
+        Body->M = GetTranslationMatrix( A->SpatialComponent->Position + ContactData->Contacts[j].A_ContactModelSpace);
         Body->TM = M4Identity();
         Body->PrimitiveType = primitive_type::POINT;
         Body->Surface = BlueSurface;
@@ -540,7 +540,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         Header->Type = render_buffer_entry_type::PRIMITIVE;
         Header->RenderState = RENDER_STATE_POINTS;
         entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
-        Body->M = GetTranslationMatrix( B->SpatialComponent->ModelMatrix * V4(ContactData->Contacts[j].B_ContactModelSpace,1));
+        Body->M = GetTranslationMatrix( B->SpatialComponent->Position + ContactData->Contacts[j].B_ContactModelSpace);
         Body->TM = M4Identity();
         Body->PrimitiveType = primitive_type::POINT;
         Body->Surface = WhiteSurface;

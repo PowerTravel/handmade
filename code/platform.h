@@ -40,9 +40,8 @@
 
 #include <stddef.h> // size_t exists in this header on some platforms
 #include "types.h"
-#include "standalone_utility.h"
-#include "platform_opengl.h"
-#include "render_push_buffer.h"
+#include "intrinsics.h"
+
 
 #if COMPILER_MSVC
 inline u32 AtomicCompareExchange(u32 volatile* Value, u32 New, u32 Expected){

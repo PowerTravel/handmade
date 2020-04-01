@@ -52,8 +52,21 @@ RigidInverse( const m4& A )
   return Result;
 }
 
+inline v4
+QuaternionFromMatrix(const m4& M)
+{
+  // Note(Jakob): Untested function, Quaternion representation may be scewy
+  // Q1 = (s,x,y,z) vs Q2 = (x,y,z,s). Q2 is what we should be using
+  r32 qw = Sqrt(1.f + Index(M,0,0) + Index(M,1,1) + Index(M,2,2)) * 0.5f;
+  r32 qx = (Index(M,2,1) - Index(M,1,2))/(4*qw);
+  r32 qy = (Index(M,0,2) - Index(M,2,0))/(4*qw);
+  r32 qz = (Index(M,1,0) - Index(M,0,1))/(4*qw);
+  v4 Result = V4(qx,qy,qz,qw);
+  return (Result);
+}
+
 inline m4
-QuatAsMatrix( const v4& Quaternion )
+QuaternionAsMatrix( const v4& Quaternion )
 {
   r32 x,y,z;
 
@@ -75,7 +88,6 @@ QuatAsMatrix( const v4& Quaternion )
   v4 r_4 = V4(0.0f,0.0f,0.0f,1.0f);
 
   return M4(r_1,r_2,r_3,r_4);
-
 }
 
 inline v4
@@ -103,11 +115,23 @@ RotateQuaternion( const r32 Angle, const v4& Axis )
   return Result;
 }
 
+inline v4
+RotateQuaternion( const r32 Angle, const v3& Axis )
+{
+  return RotateQuaternion( Angle, V4(Axis,0) );
+}
+inline m4
+GetRotationMatrix( const v4& Quaternion )
+{
+  m4 R = QuaternionAsMatrix( Quaternion );
+  return R;
+}
+
 inline m4
 GetRotationMatrix( const r32 Angle, const v4& axis)
 {
   v4 Quaternion  = RotateQuaternion( Angle, axis );
-  m4 R = QuatAsMatrix( Quaternion );
+  m4 R = QuaternionAsMatrix( Quaternion );
 
   return R;
 }
@@ -127,6 +151,13 @@ GetTranslationMatrix( const v4& Translation )
   Translate( Translation, Result );
   return Result;
 }
+
+inline m4
+GetTranslationMatrix( const v3& Translation )
+{
+  return GetTranslationMatrix( V4(Translation,1) );
+}
+
 
 inline v4
 GetTranslationFromMatrix( const m4& M )

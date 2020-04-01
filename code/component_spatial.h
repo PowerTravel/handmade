@@ -4,37 +4,45 @@
 
 struct component_spatial
 {
-  // Specifies location
-  component_spatial() : ModelMatrix(M4Identity()) {}
-  m4 ModelMatrix;
+  component_spatial(v3 PosInit = V3(0,0,0), v3 ScaleInit = V3(1,1,1), v4 RotInit = V4(0,0,0,1) ) :
+        Position(PosInit), Scale(ScaleInit), Rotation(RotInit){};
+  v3 Scale;
+  v3 Position;
+  //  we define the Quaternion as (xi,yj,zk, Scalar)
+  //  Some resources define it as (Scalar,xi,yj,zk)
+  v4 Rotation;
 };
 
-void Put( const v3 position, const r32 angle, const v3 axis, component_spatial* c )
+// TODO: Optimize by doing explicit element multiplication
+m4 GetModelMatrix( const component_spatial* c )
 {
-  c->ModelMatrix = M4Identity();
-  Translate(V4(position,1), c->ModelMatrix);
-  Rotate(angle, V4(axis,0.f), c->ModelMatrix);
+  TIMED_FUNCTION();
+  const m4 Result = M4Identity();
+  const m4 Scale = GetScaleMatrix(V4(c->Scale,1));
+  const m4 Rotation = GetRotationMatrix(c->Rotation);
+  const m4 Translation = GetTranslationMatrix(c->Position);
+  return Translation * Rotation * Scale;
 }
 
-v3 GetPosition(component_spatial* c)
+inline v4
+QuaternionMultiplication(const v4 r, const v4 q)
 {
-  return V3(GetTranslationFromMatrix( c->ModelMatrix ));
+  v4 Result = {};
+  Result.W = r.W*q.W - r.X*q.X - r.Y*q.Y - r.Z*q.Z;  // scalar
+  Result.X = r.W*q.X + r.X*q.W - r.Y*q.Z + r.Z*q.Y;  // x-part (i)
+  Result.Y = r.W*q.Y + r.X*q.Z + r.Y*q.W - r.Z*q.X;  // y-part (j)
+  Result.Z = r.W*q.Z - r.X*q.Y + r.Y*q.X + r.Z*q.W;  // z-part (k)
+  return Result;
 }
 
-void Translate( const v3 dr, component_spatial* c )
+inline void
+TimestepVelocity(const r32 DeltaTime, const v3 LinearVelocity, const v3 AngularVelocity, component_spatial* c )
 {
   Assert(c);
-  Translate(V4(dr,1), c->ModelMatrix);
-}
+  c->Position+=DeltaTime*LinearVelocity;
+  const v4 q0 = c->Rotation;
+  const v4 r = V4(AngularVelocity.X, AngularVelocity.Y, AngularVelocity.Z,0);
+  const v4 q1 = QuaternionMultiplication(r, q0);
 
-void Scale( const v3 ds, component_spatial* c )
-{
-  Assert(c);
-  Scale( V4(ds,0), c->ModelMatrix );
-}
-
-void Rotate( const r32 da, const v3 Axis, component_spatial* c )
-{
-  Assert(c);
-  Rotate( da, V4(Axis,0), c->ModelMatrix );
+  c->Rotation += 0.5f*DeltaTime*q1;
 }
