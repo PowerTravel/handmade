@@ -50,7 +50,7 @@ internal stb_font_map STBBakeFont(memory_arena* Memory)
   stb_font_map Result = {};
   Result.StartChar = Ranges[0];
   Result.NumChars = Ranges[1] - Ranges[0];
-  Result.FontHeightPx = 28.f;
+  Result.FontHeightPx = 24.f;
   Result.CharData = PushArray(Memory, Result.NumChars, stbtt_bakedchar);
 
   stbtt_GetScaledFontVMetrics((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
@@ -578,7 +578,12 @@ void AccumulateStatistic(debug_statistics* Statistic, r32 Value)
 
 extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 {
-  GlobalDebugTable->CurrentEventArrayIndex = !GlobalDebugTable->CurrentEventArrayIndex;
+  GlobalDebugTable->RecordCount[0] = DebugRecords_Main_Count;
+  ++GlobalDebugTable->CurrentEventArrayIndex;
+  if(GlobalDebugTable->CurrentEventArrayIndex >= ArrayCount(GlobalDebugTable->Events))
+  {
+    GlobalDebugTable->CurrentEventArrayIndex=0;
+  }
   u64 ArrayIndex_EventIndex = AtomicExchangeu64(&GlobalDebugTable->EventArrayIndex_EventIndex,
                                                ((u64)GlobalDebugTable->CurrentEventArrayIndex << 32));
 

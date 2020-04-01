@@ -11,7 +11,7 @@
 
 push_buffer_header* PushNewHeader(render_group* RenderGroup)
 {
-  TIMED_FUNCTION();
+  //TIMED_FUNCTION();
   utils::push_buffer* Buffer = &RenderGroup->Buffer;
   RenderGroup->ElementCount++;
 
@@ -41,7 +41,7 @@ LinearTransform(const r32 OutputMin, const r32 OutputMax, const r32 InputMin, co
 
 void DEBUGPushQuad(render_group* DebugRenderGroup, aabb2f Rect, v4 Color = V4(1,1,1,1))
 {
-  TIMED_FUNCTION();
+  //TIMED_FUNCTION();
   component_surface* Surface = (component_surface*) DebugRenderGroup->Buffer.GetMemory(sizeof(component_surface));
   Surface->Material = (material*) DebugRenderGroup->Buffer.GetMemory(sizeof(material));
   Surface->Material->AmbientColor = Color;
@@ -68,7 +68,7 @@ void DEBUGAddTextSTB( render_group* DebugRenderGroup, c8* String, r32 cornerOffs
 
   component_surface* BitMapFont = (component_surface*) DebugRenderGroup->Buffer.GetMemory(sizeof(component_surface));
   BitMapFont->Material = (material*) DebugRenderGroup->Buffer.GetMemory(sizeof(material));
-  SetMaterial(BitMapFont->Material, MATERIAL_RED);
+  SetMaterial(BitMapFont->Material, MATERIAL_WHITE);
 
   BitMapFont->Material->DiffuseMap = &FontMap->BitMap;
   stbtt_aligned_quad Quad = {};

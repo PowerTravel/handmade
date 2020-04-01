@@ -1766,6 +1766,7 @@ WinMain(  HINSTANCE aInstance,
         u64 LastCycleCount = __rdtsc();
         while(GlobalRunning)
         {
+          FRAME_MARKER();
           NewInput->dt = TargetSecondsPerFrame;
 
           NewInput->ExecutableReloaded = false;
@@ -2055,24 +2056,9 @@ WinMain(  HINSTANCE aInstance,
             if(Game.DEBUGGameFrameEnd)
             {
               GlobalDebugTable = Game.DEBUGGameFrameEnd(&GameMemory);
+              GlobalDebugTable->RecordCount[TRANSLATION_UNIT_INDEX] = __COUNTER__;
             }
             GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
-#if 0
-            r64 FPS = 0.0f;
-            r64 MCFP =  ((r32)CyclesElapsed /(1000.0f*1000.0f));
-
-            char FPSBuffer[256];
-            snprintf(FPSBuffer, sizeof(FPSBuffer), "%.02f ms/f, %.02f tmf/s, %.02f SecSlept, %.02f Mc/f \n", SecPerFrame, TargetSecondsPerFrame*1000,(r32) SleepMS, MCFP);
-            OutputDebugString(FPSBuffer);
-#endif
-#if 0
-#if HANDMADE_INTERNAL
-            ++DebugTimeMarkerIndex;
-            if (DebugTimeMarkerIndex == ArrayCount(DebugTimeMarkers))
-            {
-              DebugTimeMarkerIndex = 0;
-            }
-#endif
 #endif
           } // Global Pause
         } // Global Running
@@ -2089,7 +2075,3 @@ WinMain(  HINSTANCE aInstance,
 
   return 0;
 }
-
-
-
-const u32 DebugRecrods_Platform_Count = __COUNTER__;

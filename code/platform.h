@@ -14,9 +14,7 @@
     1: slow code welcome
 */
 
-
 // Note(Jakob): Compilers
-
 
 #ifndef COMPILER_MSVC
 #define COMPILER_MSVC 0
@@ -131,6 +129,7 @@ struct debug_record
 
 enum debug_event_type
 {
+  DebugEvent_FrameMarker,
   DebugEvent_BeginBlock,
   DebugEvent_EndBlock,
 };
@@ -154,8 +153,9 @@ struct debug_table
   //       before we swap them
   u64 volatile EventArrayIndex_EventIndex;
   u32 CurrentEventArrayIndex;
+  u32 RecordCount[MAX_DEBUG_TRANSLATION_UNITS];
   debug_record Records[MAX_DEBUG_TRANSLATION_UNITS][MAX_DEBUG_RECORD_COUNT];
-  debug_event Events[2][MAX_DEBUG_EVENT_COUNT];
+  debug_event Events[64][MAX_DEBUG_EVENT_COUNT];
 };
 
 
@@ -180,7 +180,7 @@ extern debug_table* GlobalDebugTable;
 
 #define BEGIN_BLOCK_(RecordIndex, FileNameArg, LineNumberArg, BlockNameArg) \
 {\
-  debug_record* Record = &GlobalDebugTable->Records[TRANSLATION_UNIT_INDEX][RecordIndex]; \
+  debug_record* Record = GlobalDebugTable->Records[TRANSLATION_UNIT_INDEX] + RecordIndex; \
   Record->FileName = (char*) FileNameArg; \
   Record->BlockName = (char*) BlockNameArg; \
   Record->LineNumber = LineNumberArg; \
@@ -212,6 +212,15 @@ struct timed_block
   };
 };
 
+
+#define FRAME_MARKER() \
+{ \
+  u32 RecordIndex = __COUNTER__; \
+  debug_record* Record = GlobalDebugTable->Records[TRANSLATION_UNIT_INDEX] + RecordIndex; \
+  Record->FileName = __FILE__; \
+  Record->BlockName = "Frame Marker"; \
+  Record->LineNumber = __LINE__; \
+}
 
 #define TIMED_BLOCK__(BlockName, Number, ... ) timed_block TimedBlock_##Number(__COUNTER__, __FILE__, __LINE__, BlockName, ## __VA_ARGS__)
 #define TIMED_BLOCK_(BlockName, Number, ... ) TIMED_BLOCK__(BlockName, Number, ## __VA_ARGS__)

@@ -51,11 +51,10 @@ void PushDebugOverlay(debug_state* DebugState)
 
       if(HitCount->Avg)
       {
-        r32 BarHeightScale = (GraphTop - GraphBot)/(SnapShot->CycleCountStat.Max);
+        r32 BarHeightScale = (GraphTop - GraphBot)/(2.f*SnapShot->CycleCountStat.Avg);
         r32 yMax = GraphBot + BarHeightScale*SnapShot->CycleCount;
-        //PushQuad(GlobalDebugRenderGroup, xMin,yMin,xMax,yMax, 0.5,0.5,0.5);
         aabb2f Rect = AABB2f( V2(xMin,GraphBot), V2(xMax,yMax));
-        v4 Color = Green + ((SnapShot->CycleCount) / (SnapShot->CycleCountStat.Max) ) * (Yellow - Green);
+        v4 Color = Green + ((SnapShot->CycleCountStat.Avg) / (SnapShot->CycleCountStat.Max) ) * (Yellow - Green);
         DEBUGPushQuad(GlobalDebugRenderGroup, Rect,Color);
       }
 
@@ -126,33 +125,34 @@ void PushDebugOverlay(debug_state* DebugState)
 }
 
 #define DebugRecords_Main_Count __COUNTER__
-extern u32 DebugRecrods_Platform_Count;
 global_variable debug_table GlobalDebugTable_;
 debug_table* GlobalDebugTable = &GlobalDebugTable_;
 
 
 void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArrayIndex, debug_table* DebugTable)
 {
-  #define DebugRecrods_Platform_Count 0
-  DebugState->CounterStateCount = DebugRecords_Main_Count + DebugRecrods_Platform_Count;
+  debug_counter_state* CounterArray[MAX_DEBUG_TRANSLATION_UNITS];
+  debug_counter_state* CurrentCounter = DebugState->CounterStates;
+  u32 TotalRecordCount = 0;
+  for(u32 UnitIndex = 0;
+      UnitIndex < MAX_DEBUG_TRANSLATION_UNITS;
+      ++UnitIndex)
+  {
+    CounterArray[UnitIndex] = CurrentCounter;
+    TotalRecordCount += DebugTable->RecordCount[UnitIndex];
+    CurrentCounter += DebugTable->RecordCount[UnitIndex];
+  }
+  DebugState->CounterStateCount = TotalRecordCount;
+
   for(u32 StateIndex = 0; StateIndex < DebugState->CounterStateCount; ++StateIndex)
   {
     debug_counter_state* Dst = DebugState->CounterStates + StateIndex;
-    //Dst->FileName = 0;
-    //Dst->FunctionName = 0;
-    //Dst->LineNumber = 0;
     Dst->Snapshots[DebugState->SnapShotIndex].HitCount = 0;
     Dst->Snapshots[DebugState->SnapShotIndex].CycleCount = 0;
   }
 
-  debug_counter_state* CounterArray[2] =
-  {
-    DebugState->CounterStates,
-    DebugState->CounterStates + DebugRecords_Main_Count
-  };
-
   debug_event* Events = DebugTable->Events[EventArrayIndex];
-  for (u32 EventIndex = 0; EventIndex<EventCount; ++EventIndex)
+  for (u32 EventIndex = 0; EventIndex < EventCount; ++EventIndex)
   {
     const debug_event* Event = Events + EventIndex;
     const u32 DebugRecordIndex = Event->DebugRecordIndex;
@@ -174,8 +174,7 @@ void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArray
     {
       ++Dst->Snapshots[DebugState->SnapShotIndex].HitCount;
       Dst->Snapshots[DebugState->SnapShotIndex].CycleCount -= Event->Clock;
-    }else{
-      Assert(Event->Type == DebugEvent_EndBlock);
+    }else if (Event->Type == DebugEvent_EndBlock){
       Dst->Snapshots[DebugState->SnapShotIndex].CycleCount += Event->Clock;
     }
   }
