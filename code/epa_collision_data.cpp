@@ -127,69 +127,6 @@ Equals(const epa_halfedge* A, const epa_halfedge* B)
          ( TargetA == TargetB   ) && (OutgoingA == OutgoingB );
 }
 
-internal char*
-PaddWithZeros(u32 Count, char* Scanner)
-{
-  for (u32 i = 0; i < Count; ++i)
-  {
-    Scanner += str::itoa(0, 16, Scanner);
-    if(i+1 < Count)
-      *Scanner++ = ' ';
-  }
-  return Scanner;
-}
-
-internal void DebugPrintEdges(memory_arena* Arena, epa_mesh* Mesh, b32 Append, platform_api* API )
-{
-  if(!API) return;
-  char FilePath[] = "..\\handmade\\code\\matlab\\data\\EPAPolytypeEdges.m";
-
-  epa_face* Face = Mesh->Faces;
-  u32 FaceCount = 0;
-  while(Face)
-  {
-    ++FaceCount;
-    Face = Face->Next;
-  }
-
-  temporary_memory TempMem = BeginTemporaryMemory(Arena);
-  char* DebugString = (char*) PushArray(Arena, 3*(FaceCount+2)*64, char);
-  char* Scanner = DebugString;
-
-  Face = Mesh->Faces;
-  while(Face)
-  {
-    epa_halfedge* E[3] = {Face->Edge,
-                          Face->Edge->NextEdge,
-                          Face->Edge->NextEdge->NextEdge};
-
-    //Assert( E[0]->OppositeEdge->TargetVertex->P.S == E[2]->TargetVertex->P.S);
-    for (int i = 0; i < 3; ++i)
-    {
-      b32 Border = (E[i]->OppositeEdge->LeftFace != 0) && (E[i]->LeftFace != 0);
-      v3 From    =  E[i]->OppositeEdge->TargetVertex->P.S;
-      v3 To      =  E[i]->TargetVertex->P.S;
-      Scanner += str::itoa(Border, 64, Scanner);
-      *Scanner++ = ' ';
-      Scanner += str::ToString(From, 4, 64, Scanner);
-      *Scanner++ = ' ';
-      Scanner += str::ToString(To, 4, 64, Scanner);
-      *Scanner++ = '\n';
-    }
-    Face = Face->Next;
-  }
-
-  thread_context Thread = {};
-  if(Append)
-  {
-    API->DEBUGPlatformAppendToFile(&Thread, FilePath, str::StringLength(DebugString), (void*)DebugString);
-  }else{
-    API->DEBUGPlatformWriteEntireFile(&Thread, FilePath, str::StringLength(DebugString), (void*)DebugString);
-  }
-
-  EndTemporaryMemory(TempMem);
-}
-
 /*
  * A Tetrahedron is made up of 4 Points assembling into 4 Triangles.
  * The normals of the triangles should point outwards.
@@ -468,12 +405,13 @@ internal inline void getFacePoints(epa_face* Face, v3* P0, v3* P1, v3* P2)
   *P2 = Face->Edge->NextEdge->NextEdge->TargetVertex->P.S;
 }
 
-internal epa_halfedge *
+internal b32
 RemoveFacesSeenByPoint(epa_mesh* Mesh, const v3& Point)
 {
   TIMED_FUNCTION();
   epa_face** FaceListEntry = &Mesh->Faces;
   epa_face* FacesToDissconnect = 0;
+  b32 Result = false;
   while(*FaceListEntry)
   {
     // Note Jakob(): To check if a given face can be "seen" by the new point
@@ -503,8 +441,10 @@ RemoveFacesSeenByPoint(epa_mesh* Mesh, const v3& Point)
     }
   }
 
+  const epa_face* FacesToDissconnectBase = FacesToDissconnect;
   while(FacesToDissconnect)
   {
+    Result = true;
     // Dissconect face from edges
     epa_halfedge*  Edges[3] = { FacesToDissconnect->Edge,                      // Edge: A->B
                                 FacesToDissconnect->Edge->NextEdge,            // Edge: B->C
@@ -544,26 +484,35 @@ RemoveFacesSeenByPoint(epa_mesh* Mesh, const v3& Point)
     FacesToDissconnect = FacesToDissconnect->Next;
   }
 
-  epa_vertex** VertexListEntry = &Mesh->Vertices;
-  epa_halfedge* BorderEdge = 0;
-  while(*VertexListEntry)
-  {
-    epa_vertex* Vertex = *VertexListEntry;
+  return Result;
+}
 
-    // Check if there is only 1 edge attached to the vertex
-    if( Vertex->OutgoingEdge == Vertex->OutgoingEdge->OppositeEdge->NextEdge)
+epa_halfedge* GetBorderEdge(epa_mesh* Mesh)
+{
+  epa_halfedge* Result = 0;
+
+  epa_face* FaceList = Mesh->Faces;
+  while(FaceList)
+  {
+    epa_halfedge*  Edges[3] = { FaceList->Edge,                      // Edge: A->B
+                                FaceList->Edge->NextEdge,            // Edge: B->C
+                                FaceList->Edge->NextEdge->NextEdge}; // Edge: C->A
+    Assert(FaceList->Edge == Edges[2]->NextEdge);
+
+    for (u32 EdgeIndex = 0; EdgeIndex < ArrayCount(Edges); ++EdgeIndex)
     {
-      Assert(!Vertex->OutgoingEdge->LeftFace && !Vertex->OutgoingEdge->OppositeEdge->LeftFace);
-      *VertexListEntry = Vertex->Next;
-    }else{
-      if(!BorderEdge && IsBorderEdge(Vertex->OutgoingEdge))
+      if (IsBorderEdge(Edges[EdgeIndex]))
       {
-        BorderEdge = Vertex->OutgoingEdge;
+        Result = Edges[EdgeIndex];
+        break;
       }
-      VertexListEntry = &(*VertexListEntry)->Next;
     }
+    if(Result) break;
+
+    FaceList = FaceList->Next;
   }
-  return BorderEdge;
+
+  return Result;
 }
 
 internal b32
@@ -578,7 +527,7 @@ IsPointOnMeshSurface(epa_mesh* Mesh, const v3& Point)
 
     // Tripple Dot Product
     r32 Determinant = (Point-p0) * CrossProduct( (p1-p0), (p2-p0) );
-    if( Abs(Determinant) <= 10E-4 )
+    if( Abs(Determinant) <= 0 )
     {
       // Point is in the plane of the face
       v3 Coords = GetBaryocentricCoordinates( p0, p1, p2, Face->Normal, Point);
@@ -749,17 +698,12 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
       break;
     }
 
-    epa_halfedge* BorderEdge = RemoveFacesSeenByPoint(Mesh, SupportPoint.S);
+    b32 HoleWasProduced = RemoveFacesSeenByPoint(Mesh, SupportPoint.S);
+    epa_halfedge* BorderEdge = GetBorderEdge(Mesh);
     if(!BorderEdge)
     {
-      // If BorderEdge is NULL it means the new SupportPoint must be on the border
-      // of the CSO.
-      // It could also be inside the Polytype but I don't think so.
-      // If it's inside it means that there is a point further away in that direction.
-      // But the the Support function should have returned that point instead.
-      // The point SHOULD therefore be on the face of ClosestFace since that was the
-      // direction we were las looking in.
-      // So exit with closest face.
+      Assert(!HoleWasProduced);
+      //TODO: Breaking if we couldn't produce a "hole" is Ad-Hoc
       break;
     }
     FillHole( Mesh, BorderEdge, &SupportPoint);

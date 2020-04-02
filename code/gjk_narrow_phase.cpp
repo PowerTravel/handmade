@@ -17,7 +17,6 @@ gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
   v4 ADirModelSpace =  RigidInverse(*AModelMat) * V4( NormalizedDirection, 0);
   v4 BDirModelSpace = (RigidInverse(*BModelMat) * V4(-NormalizedDirection, 0));
 #else
-
   // This is needed when transforming covectors, Do we need it here?
   // Since what we pass into here is normals to planes and lines I think we need the transpose.
   v4 ADirModelSpace = RigidInverse(Transpose(RigidInverse(*AModelMat))) * V4( NormalizedDirection,0);

@@ -310,7 +310,7 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
   broad_phase_result_stack* ColliderPair = BroadPhaseResult;
 
 #if 1
-  collision_detection_work WorkArray[8] = {};
+  collision_detection_work WorkArray[128] = {};
   collision_detection_work* Work = WorkArray;
   u32 CollisionCount = 0;
   while( ColliderPair )
@@ -662,8 +662,10 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
             V[3] = B->DynamicsComponent->AngularVelocity;
           }
           contact_data* Contact = &ContactData->Contacts[k];
-          r32 PenetrationDepth  = Norm(V3(GetModelMatrix(A->SpatialComponent) * V4( Contact->A_ContactModelSpace,1)) -
-                                       V3(GetModelMatrix(B->SpatialComponent) * V4( Contact->B_ContactModelSpace,1)));
+          //r32 PenetrationDepth  = Norm(V3(GetModelMatrix(A->SpatialComponent) * V4( Contact->A_ContactModelSpace,1)) -
+          //                             V3(GetModelMatrix(B->SpatialComponent) * V4( Contact->B_ContactModelSpace,1)));
+          r32 PenetrationDepth  = Norm(V3(GetModelMatrix(A->SpatialComponent) * V4(Contact->A_ContactModelSpace,1)) -
+                                       V3(GetModelMatrix(B->SpatialComponent) * V4(Contact->B_ContactModelSpace,1)));
           v3  ContactNormal     = Contact->ContactNormal;
           r32 Restitution       = getRestitutionCoefficient(V, 0.25f, ContactNormal, 0.01);
           r32 Baumgarte         = getBaumgarteCoefficient(dt, 0.25,  PenetrationDepth, 0.01);
@@ -676,8 +678,6 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
           v3 DeltaV[4] = {};
           ScaleV12(LambdaDiff, Contact->InvMJ, DeltaV);
 
-
-          // TODO: Do rotations directly with Quaternions!
           if(A->DynamicsComponent)
           {
             A->DynamicsComponent->LinearVelocity  += DeltaV[0];

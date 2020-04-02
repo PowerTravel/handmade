@@ -212,11 +212,28 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   Light->LightComponent->Color = V4(3,3,3,1);
   Light->SpatialComponent->Position = V3(10,10,10);
 
-  for (s32 i = -0; i < 2; ++i)
+#define State2
+#if defined(State1)
+  // Bug - producing state. GetPreviousEdge( epa_halfedge* Edge ) Spins forever
+  s32 iarr[] = {-0,2};
+  s32 jarr[] = {-0,2};
+  s32 karr[] = {-0,2};
+#elif defined(State2)
+  // Bug - producing state. Cant Find EdgeNormal
+  s32 iarr[] = {-0,2};
+  s32 jarr[] = {-0,2};
+  s32 karr[] = {-0,1};
+#else
+  s32 iarr[] = {-0,1};
+  s32 jarr[] = {-0,1};
+  s32 karr[] = {-0,1};
+
+#endif
+  for (s32 i = iarr[0]; i < iarr[1]; ++i)
   {
-    for (s32 j = 0; j < 1; ++j)
+    for (s32 j = jarr[0]; j < jarr[1]; ++j)
     {
-      for (s32 k = -0; k < 2; ++k)
+      for (s32 k = karr[0]; k < karr[1]; ++k)
       {
         entity* cubeEntity = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
         NewComponents( World, cubeEntity, COMPONENT_TYPE_DYNAMICS );
@@ -224,7 +241,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
         // Uncomment this and set j < 1 in the for loop to reproduce a bug where
         // GJK perodically does not find a collision.
         //Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,2,1), cubeEntity->SpatialComponent );
-        cubeEntity->SpatialComponent->Position =  V3(2.f*i, 1.0f*j, 2.f*k);
+        cubeEntity->SpatialComponent->Position =  V3(2.f*i, 2.f*j, 2.f*k);
         cubeEntity->SpatialComponent->Rotation = RotateQuaternion( 0, V3(0,1,0) );
         cubeEntity->SpatialComponent->Scale = V3(1, 1, 1);
         cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
