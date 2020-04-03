@@ -16,6 +16,8 @@
 
 platform_api Platform;
 
+global_variable b32 GlobalFireVic = false;
+
 #include "math/aabb.cpp"
 #include "handmade_tile.cpp"
 #include "obj_loader.cpp"
@@ -212,17 +214,16 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   Light->LightComponent->Color = V4(3,3,3,1);
   Light->SpatialComponent->Position = V3(10,10,10);
 
-#define State2
-#if defined(State1)
-  // Bug - producing state. GetPreviousEdge( epa_halfedge* Edge ) Spins forever
-  s32 iarr[] = {-0,2};
-  s32 jarr[] = {-0,2};
-  s32 karr[] = {-0,2};
-#elif defined(State2)
-  // Bug - producing state. Cant Find EdgeNormal
-  s32 iarr[] = {-0,2};
-  s32 jarr[] = {-0,2};
-  s32 karr[] = {-0,1};
+#define State1
+#if defined(State0)
+  // Bug - producing state. Gets a broken mesh somewhere
+  s32 iarr[] = {-3,3};
+  s32 jarr[] = {-0,3};
+  s32 karr[] = {-3,3};
+#elif defined(State3)
+  s32 iarr[] = {-2,2};
+  s32 jarr[] = {-0,1};
+  s32 karr[] = {-2,2};
 #else
   s32 iarr[] = {-0,1};
   s32 jarr[] = {-0,1};
@@ -242,7 +243,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
         // GJK perodically does not find a collision.
         //Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,2,1), cubeEntity->SpatialComponent );
         cubeEntity->SpatialComponent->Position =  V3(2.f*i, 2.f*j, 2.f*k);
-        cubeEntity->SpatialComponent->Rotation = RotateQuaternion( 0, V3(0,1,0) );
+        cubeEntity->SpatialComponent->Rotation = RotateQuaternion( 0, V3(0,0,0) );
         cubeEntity->SpatialComponent->Scale = V3(1, 1, 1);
         cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
         cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0,0);

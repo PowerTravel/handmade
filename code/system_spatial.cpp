@@ -171,6 +171,32 @@ DoCollisionDetectionWork(void* Data)
 
 #define DO_GET_CONTACT_NONSENSE_LINEARLY(i) ((contact_data_list*) ((u8*) ( World->Contacts ) + i * ( sizeof(contact_data_list) + 4*sizeof(contact_data))));
 
+void FireOnceVic(memory_arena* TransientArena, entity* A, entity* B, b32 condition)
+{
+  local_persist b32 Fired = false;
+  if(!Fired && condition && (A->GjkEpaVisualizerComponent || B->GjkEpaVisualizerComponent))
+  {
+    Fired = true;
+    component_gjk_epa_visualizer* Vis = A->GjkEpaVisualizerComponent;
+    if(B->GjkEpaVisualizerComponent)
+    {
+        Vis = B->GjkEpaVisualizerComponent;
+//      entity* Tmp;
+//      Tmp = A;
+//      A = B;
+//      B = Tmp;
+    }
+    ResetEPA(Vis);
+    m4 ModelMatrixA = GetModelMatrix(A->SpatialComponent);
+    m4 ModelMatrixB = GetModelMatrix(B->SpatialComponent);
+    gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
+                                                &ModelMatrixA, A->ColliderComponent->Mesh,
+                                                &ModelMatrixB, B->ColliderComponent->Mesh, Vis);
+    contact_data apa = EPACollisionResolution(TransientArena, &ModelMatrixA, A->ColliderComponent->Mesh,
+                                                              &ModelMatrixB, B->ColliderComponent->Mesh,
+                                                              &NarrowPhaseResult.Simplex, Vis);
+  }
+}
 void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/ platform_api* API)
 {
   r32 dt =  World->dtForFrame;
@@ -310,7 +336,7 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
   broad_phase_result_stack* ColliderPair = BroadPhaseResult;
 
 #if 1
-  collision_detection_work WorkArray[128] = {};
+  collision_detection_work* WorkArray = PushArray(TransientArena, 1080, collision_detection_work);
   collision_detection_work* Work = WorkArray;
   u32 CollisionCount = 0;
   while( ColliderPair )
@@ -584,11 +610,14 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
   }
 #endif
 
+
   for(u32 i = 0; i < World->NrContacts; ++i)
   {
     contact_data_list* ContactData = DO_GET_CONTACT_NONSENSE_LINEARLY(i);
     entity* A = ContactData->A;
     entity* B = ContactData->B;
+
+    FireOnceVic(TransientArena,  A, B, GlobalFireVic);
     v3 va = {};
     v3 wa = {};
     v3 vb = {};

@@ -4,6 +4,13 @@
 #include "memory.h"
 #include "component_collider.h"
 
+// Todo: (Huff) Re-Write the mesh in such a way that we can always and easily check the
+//              integrity of the mesh. That means:
+//              Mesh should ALWAYS be valid...
+//              Remove halfedges, faces, and vertices from the lists when not in mesh
+//              Bring back PreviousEdge.
+//              I want to be able to spam Assert(IsMeshValid(Mesh)) everywhere
+//              A valid mesh should always give defined behaviour
 
 // Todo: Should we store a void* in the structures to be used for metadata?
 //       Ex, Face Normals, Support points, Makes this a more general mesh datastructure
@@ -25,6 +32,7 @@ struct epa_halfedge
   epa_face*     LeftFace;
   epa_halfedge* NextEdge;
   epa_halfedge* OppositeEdge;
+  // TODO: Add epa_halfedge* PreviousEdge;
 };
 
 struct epa_face
@@ -96,20 +104,38 @@ internal inline v3
 GetFaceNormal(const epa_face* Face)
 {
   TIMED_FUNCTION();
-  return GetPlaneNormal(Face->Edge->TargetVertex->P.S,
-                        Face->Edge->NextEdge->TargetVertex->P.S,
-                        Face->Edge->NextEdge->NextEdge->TargetVertex->P.S);
+  epa_halfedge* E0 = Face->Edge;
+  epa_halfedge* E1 = Face->Edge->NextEdge;
+  epa_halfedge* E2 = Face->Edge->NextEdge->NextEdge;
+  Assert(E0);
+  Assert(E1);
+  Assert(E2);
+  Assert(E0->OppositeEdge);
+  Assert(E1->OppositeEdge);
+  Assert(E2->OppositeEdge);
+  return GetPlaneNormal(E0->TargetVertex->P.S,
+                        E1->TargetVertex->P.S,
+                        E2->TargetVertex->P.S);
 }
 
 internal inline b32
 Equals( epa_vertex* A, epa_vertex* B )
 {
+  Assert(A->OutgoingEdge);
+  Assert(A->OutgoingEdge->OppositeEdge);
+  Assert(A->OutgoingEdge->OppositeEdge->TargetVertex);
+  Assert(A->OutgoingEdge->OppositeEdge->TargetVertex->P.S == A->P.S);
+  Assert(B->OutgoingEdge);
+  Assert(B->OutgoingEdge->OppositeEdge);
+  Assert(B->OutgoingEdge->OppositeEdge->TargetVertex);
+  Assert(B->OutgoingEdge->OppositeEdge->TargetVertex->P.S == B->P.S);
   return A->P.S == B->P.S;
 }
 
 internal inline b32
 IsBorderEdge(epa_halfedge* Edge)
 {
+  Assert(Edge->OppositeEdge);
   return (!Edge->LeftFace &&  Edge->OppositeEdge->LeftFace) ||
          ( Edge->LeftFace && !Edge->OppositeEdge->LeftFace);
 }
@@ -117,6 +143,8 @@ IsBorderEdge(epa_halfedge* Edge)
 internal inline b32
 Equals(const epa_halfedge* A, const epa_halfedge* B)
 {
+  Assert(A->OppositeEdge);
+  Assert(B->OppositeEdge);
   const v3& TargetA   = A->TargetVertex->P.S;
   const v3& OutgoingA = A->OppositeEdge->TargetVertex->P.S;
 
@@ -220,7 +248,6 @@ CreateInitialMesh(memory_arena* Arena, gjk_support* a,  gjk_support* b,  gjk_sup
   NewEdges[2].OppositeEdge = &NewEdges[4];
   NewEdges[2].OppositeEdge->OppositeEdge = &NewEdges[2];
 
-
   // Create Face
   epa_face* NewFace = PushFace(Result);
   //Connect internal edges to Face
@@ -249,6 +276,14 @@ CreateInitialMesh(memory_arena* Arena, gjk_support* a,  gjk_support* b,  gjk_sup
   B->OutgoingEdge = &NewEdges[1];
   C->OutgoingEdge = &NewEdges[2];
 
+  Assert(NewFace->Edge);
+  Assert(NewFace->Edge->NextEdge);
+  Assert(NewFace->Edge->NextEdge->NextEdge);
+  Assert(NewFace->Edge->NextEdge->NextEdge->NextEdge == NewFace->Edge);
+  Assert(NewFace->Edge->OppositeEdge);
+  Assert(NewFace->Edge->OppositeEdge->NextEdge);
+  Assert(NewFace->Edge->OppositeEdge->NextEdge->NextEdge);
+  Assert(NewFace->Edge->OppositeEdge->NextEdge->NextEdge->NextEdge == NewFace->Edge->OppositeEdge);
 
   return Result;
 };
@@ -331,11 +366,12 @@ FillHole(epa_mesh* Mesh, epa_halfedge* MeshEdge, gjk_support* NewPoint)
     v3 v01 = E1->TargetVertex->P.S - E0->TargetVertex->P.S;
     v3 v02 = E2->TargetVertex->P.S - E0->TargetVertex->P.S;
     r32 Area = 0.5f*Norm(CrossProduct(v01,v02));
-    if(Area <= 10e-5)
+    // Todo: Fix this error
+    if(Area < 10e-10)
     {
-      int cc = 10;
+      r32 breakpoint = 10;
+      //Assert(Area > 10e-10);
     }
-
   }
 
   for (u32 i = 0; i < NrHalfEdges; ++i)
@@ -392,9 +428,9 @@ GetNrIncidentEdges( epa_vertex* Vertex )
 internal inline void DissconectEdge( epa_halfedge* Edge )
 {
   epa_halfedge* PreviousEdge = GetPreviousEdge(Edge);
-  PreviousEdge->NextEdge = Edge->OppositeEdge->NextEdge;
-
   epa_halfedge* OppositePreviousEdge = GetPreviousEdge(Edge->OppositeEdge);
+
+  PreviousEdge->NextEdge = Edge->OppositeEdge->NextEdge;
   OppositePreviousEdge->NextEdge = Edge->NextEdge;
 }
 
@@ -560,8 +596,7 @@ CreateSimplexMesh(memory_arena* Arena, gjk_simplex* Simplex )
 internal epa_face *
 GetCLosestFaceToOrigin(epa_mesh* Mesh, r32* ResultDistance )
 {
-  // TODO: Add limit macro for max float value
-  *ResultDistance = 10E30;
+  *ResultDistance = R32Max;
   epa_face* ResultFace = 0;
   epa_face* Face = Mesh->Faces;
   while(Face)
@@ -582,6 +617,7 @@ GetCLosestFaceToOrigin(epa_mesh* Mesh, r32* ResultDistance )
     }
     Face = Face->Next;
   }
+  //Assert(ResultFace);
   return ResultFace;
 }
 
@@ -669,7 +705,18 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
   // Get the first new point
   r32 DistanceClosestToFace = 0;
   epa_face* ClosestFace = GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
-  Assert(ClosestFace);
+
+#if HANDMADE_INTERNAL
+  if(!ClosestFace)
+  {
+    // NOTE: If this happens, investigate
+    GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
+    EndTemporaryMemory(TempMem);
+    GlobalFireVic = true;
+    //Assert(0);
+    return {};
+  }
+#endif
 
   r32 PreviousDistanceClosestToFace = DistanceClosestToFace + 100;
   epa_face* PreviousClosestFace = ClosestFace;
@@ -693,8 +740,9 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
     RecordFrame(Mesh, Vis, ClosestFace, SupportPoint.S);
     if(IsPointOnMeshSurface(Mesh,SupportPoint.S))
     {
-      // If a new point falls on an face in the polytype we return the
+      // If a new point falls on a face in the polytype we return the
       // ClosestFace.
+      ClosestFace = GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
       break;
     }
 
@@ -703,7 +751,10 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
     if(!BorderEdge)
     {
       Assert(!HoleWasProduced);
-      //TODO: Breaking if we couldn't produce a "hole" is Ad-Hoc
+      //NOTE: Breaking if we couldn't produce a "hole" is Ad-Hoc.
+      //      This should be handled in awell motivated manner
+      // Use Vis here to check what is going on!
+      ClosestFace = GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
       break;
     }
     FillHole( Mesh, BorderEdge, &SupportPoint);
@@ -711,13 +762,26 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
     PreviousDistanceClosestToFace = DistanceClosestToFace;
     PreviousClosestFace = ClosestFace;
     ClosestFace = GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
+    if(!ClosestFace)
+    {
+      //NOTE: I have not figured out why sometimes GetCLosestFaceToOrigin returns NULL.
+      //      It should only happen if the origin lies outside the polytype, but how did that happen?
+      local_persist u32 EventCounter = 0;
+      if(EventCounter++>4)
+      {
+        GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
+        GlobalFireVic = true;
+      }
+      ClosestFace = PreviousClosestFace;
+      break;
+    }
+
+    Assert(ClosestFace);
     if(Abs(DistanceClosestToFace - PreviousDistanceClosestToFace) > 10E-4)
     {
       Tries = 0;
     }
   }
-
-  ClosestFace = GetCLosestFaceToOrigin( Mesh, &DistanceClosestToFace );
 
   gjk_support A = ClosestFace->Edge->TargetVertex->P;
   gjk_support B = ClosestFace->Edge->NextEdge->TargetVertex->P;

@@ -9,6 +9,7 @@
 gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
             const m4* BModelMat, const collider_mesh* BMesh, const v3 Direction )
 {
+  // TODO: Implement the hill climbing algorithm CsoSupportFunction.
   TIMED_FUNCTION();
   gjk_support Result = {};
   v3 NormalizedDirection = Normalize(Direction);
