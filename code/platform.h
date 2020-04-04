@@ -44,6 +44,11 @@
 
 
 #if COMPILER_MSVC
+inline void* AtomicExchangePointer(void** volatile Target, void* New)
+{
+  void* Result = _InterlockedExchangePointer(Target,New);
+  return Result;
+}
 inline u32 AtomicCompareExchange(u32 volatile* Value, u32 New, u32 Expected)
 {
   u32 Result = _InterlockedCompareExchange((long volatile *)Value, New, Expected);

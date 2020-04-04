@@ -1,4 +1,4 @@
-#include "component_gjk_epa_visualizer.h"
+#include "gjk_epa_visualizer.h"
 #include "epa_collision_data.h"
 #include "gjk_narrow_phase.h"
 #include "memory.h"
@@ -621,9 +621,12 @@ GetCLosestFaceToOrigin(epa_mesh* Mesh, r32* ResultDistance )
   return ResultFace;
 }
 
-void RecordFrame(epa_mesh* Mesh, component_gjk_epa_visualizer* Vis, epa_face* ClosestFaceToOrigin, v3 SupportPoint = V3(0,0,0), b32 RenderFilled = false)
+extern gjk_epa_visualizer* GlobalVis;
+
+void RecordEPAFrame(epa_mesh* Mesh, epa_face* ClosestFaceToOrigin, v3 SupportPoint = V3(0,0,0), b32 RenderFilled = false)
 {
   TIMED_FUNCTION();
+  gjk_epa_visualizer* Vis = GlobalVis;
   if(!Vis) return;
   if(!Vis->TriggerRecord)
   {
@@ -690,7 +693,7 @@ void RecordFrame(epa_mesh* Mesh, component_gjk_epa_visualizer* Vis, epa_face* Cl
 
 contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AModelMat, const collider_mesh* AMesh,
                                     const m4* BModelMat, const collider_mesh* BMesh,
-                                    gjk_simplex* Simplex, component_gjk_epa_visualizer* Vis)
+                                    gjk_simplex* Simplex)
 {
   TIMED_FUNCTION();
   temporary_memory TempMem = BeginTemporaryMemory(TemporaryArena);
@@ -737,7 +740,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
     gjk_support SupportPoint = CsoSupportFunction( AModelMat, AMesh,
                                                    BModelMat, BMesh,
                                                    ClosestFace->Normal);
-    RecordFrame(Mesh, Vis, ClosestFace, SupportPoint.S);
+    RecordEPAFrame(Mesh, ClosestFace, SupportPoint.S);
     if(IsPointOnMeshSurface(Mesh,SupportPoint.S))
     {
       // If a new point falls on a face in the polytype we return the
@@ -819,7 +822,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
   ContactData.PenetrationDepth    = DistanceClosestToFace;
   EndTemporaryMemory(TempMem);
 
-  RecordFrame(Mesh, Vis, ClosestFace);
+  RecordEPAFrame(Mesh, ClosestFace);
   return ContactData;
 
 }

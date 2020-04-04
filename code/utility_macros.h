@@ -1,6 +1,9 @@
 #pragma once
 
+// Todo: remove intrinsics?
 #include "intrinsics.h"
+
+#define GetCantorPair(a,b) ((u32) ( (1/2.f) * ((a) + (b)) * ((a) + (b) + 1) + (b) ))
 
 #define DoubleLinkListInitiate( Sentinel ) \
 {                                          \

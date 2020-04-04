@@ -49,16 +49,7 @@ struct game_assets
   stb_font_map STBFontMap;
 };
 
-struct contact_data_list
-{
-  entity* A;
-  entity* B;
-
-  u32 MaxNrContacts = 0;
-  u32 NrContacts  = 0;
-  contact_data* Contacts;
-};
-
+struct contact_manifold;
 
 struct world
 {
@@ -74,9 +65,9 @@ struct world
   u32          NrMaxEntities;
   entity*      Entities;
 
-  u32 NrContacts;
-  u32 MaxNrContacts;
-  contact_data_list* Contacts;
+  u32 MaxNrManifolds;
+  contact_manifold* Manifolds;
+  contact_manifold* FirstContactManifold;
 
   game_assets*  Assets;
 };

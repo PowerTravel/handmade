@@ -1,6 +1,6 @@
 #include "gjk_narrow_phase.h"
 #include "epa_collision_data.h"
-#include "component_gjk_epa_visualizer.h"
+#include "gjk_epa_visualizer.h"
 #include "component_collider.h"
 #include "utility_macros.h"
 #include "math/affine_transformations.h"
@@ -424,11 +424,12 @@ IsPointOnSimplexSurface(const gjk_simplex& Simplex, const v3& Point)
   return false;
 }
 
-void RecordGJKFrame( component_gjk_epa_visualizer* Vis,
-                      const m4& AModelMat, const collider_mesh* AMesh,
+void RecordGJKFrame(  const m4& AModelMat, const collider_mesh* AMesh,
                       const m4& BModelMat, const collider_mesh* BMesh, gjk_simplex* Simplex, const v3& ClosestPointOnSurface )
 {
-  TIMED_FUNCTION();;
+  TIMED_FUNCTION();
+  gjk_epa_visualizer* Vis = GlobalVis;
+  if(!Vis) return;
   if(!Vis->TriggerRecord)
   {
     Vis->UpdateVBO = false;
@@ -560,8 +561,7 @@ void RecordGJKFrame( component_gjk_epa_visualizer* Vis,
 }
 
 gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_mesh* AMesh,
-                                           const m4* BModelMat, const collider_mesh* BMesh,
-                                           component_gjk_epa_visualizer* Vis)
+                                           const m4* BModelMat, const collider_mesh* BMesh)
 {
   TIMED_FUNCTION();
   const v3 Origin = V3(0,0,0);
@@ -612,7 +612,7 @@ gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_m
       }
     }
 
-    if(Vis) RecordGJKFrame(Vis, *AModelMat, AMesh, *BModelMat, BMesh, &Simplex, PartialResult.ClosestPoint);
+    RecordGJKFrame(*AModelMat, AMesh, *BModelMat, BMesh, &Simplex, PartialResult.ClosestPoint);
 
     if(PartialResult.Reduced)
     {

@@ -4,6 +4,7 @@
 #include "component_dynamics.h"
 #include "handmade.h"
 #include "entity_components.h"
+#include "gjk_epa_visualizer.h"
 
 void CameraController( entity* CameraEntity )
 {
@@ -220,6 +221,65 @@ void HeroController( entity* HeroEntity )
 
 }
 
+void EpaGjkVisualizerController( entity* Entity )
+{
+  gjk_epa_visualizer* Vis = GlobalVis;
+  game_controller_input* Controller = Entity->ControllerComponent->Controller;
+
+  Assert(Vis);
+  Assert(Controller);
+
+  Vis->TriggerRecord=false;
+  if(Vis->UpdateVBO)
+  {
+    Vis->UpdateVBO=false;
+  }
+
+  if( Controller->IsAnalog )
+  {
+    if(Controller->DPadLeft.EndedDown && !Vis->PreviousLeftButtonState)
+    {
+      if(Vis->ActiveEPAFrame == 0)
+      {
+        if(Vis->ActiveSimplexFrame > 0)
+        {
+          Vis->ActiveSimplexFrame--;
+        }
+      }
+
+      if(Vis->ActiveEPAFrame > 0)
+      {
+        Vis->ActiveEPAFrame--;
+      }
+
+    }else if(Controller->DPadRight.EndedDown && !Vis->PreviousRightButtonState)
+    {
+      if(Vis->ActiveSimplexFrame == (s32) Vis->SimplexCount)
+      {
+        if(Vis->ActiveEPAFrame < (s32) Vis->EPACount-1)
+        {
+          Vis->ActiveEPAFrame++;
+        }
+      }
+
+      if(Vis->ActiveSimplexFrame < (s32) Vis->SimplexCount)
+      {
+        Vis->ActiveSimplexFrame++;
+      }
+    }else if(Controller->Start.EndedDown && !Vis->PreviousStartButtonState)
+    {
+      Vis->Playback = !Vis->Playback;
+    }else if(Controller->Select.EndedDown && !Vis->PreviousSelectButtonState)
+    {
+      ResetEPA(Vis);
+    }
+
+    Vis->PreviousLeftButtonState   = Controller->DPadLeft.EndedDown;
+    Vis->PreviousRightButtonState  = Controller->DPadRight.EndedDown;
+    Vis->PreviousStartButtonState  = Controller->Start.EndedDown;
+    Vis->PreviousSelectButtonState = Controller->Select.EndedDown;
+  }
+}
 
 void ControllerSystemUpdate( world* World )
 {

@@ -6,7 +6,6 @@ struct gjk_simplex;
 struct entity;
 struct memory_arena;
 struct collider_mesh;
-struct component_gjk_epa_visualizer;
 
 struct contact_data
 {
@@ -18,7 +17,10 @@ struct contact_data
   v3 TangentNormalOne;
   v3 TangentNormalTwo;
   r32 PenetrationDepth;
+};
 
+struct contact_data_cache
+{
   v3 J[4];
   v3 InvMJ[4];
   r32 Lambda;
@@ -27,6 +29,18 @@ struct contact_data
   b32 PersistentContact;
 };
 
+struct contact_manifold
+{
+  entity* A;
+  entity* B;
+  u32 WorldArrayIndex;
+  u32 ContactCount;
+  u32 MaxContactCount;
+  contact_data Contacts[4];
+  contact_data_cache CashedData[4];
+  contact_manifold* Next;
+};
+
+
 contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AModelMat, const collider_mesh* AMesh,
-                                    const m4* BModelMat, const collider_mesh* BMesh, gjk_simplex* Simplex,
-                                    component_gjk_epa_visualizer* Vis = 0 );
+                                    const m4* BModelMat, const collider_mesh* BMesh, gjk_simplex* Simplex);

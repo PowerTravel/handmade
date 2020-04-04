@@ -27,10 +27,6 @@ struct gjk_collision_result
   b32 ContainsOrigin;
 };
 
-
-//struct component_gjk_epa_visualizer;
-//void RecordGJKFrame( component_gjk_epa_visualizer* Vis, gjk_simplex* Simplex, const v3& ClosestPointOnSurface );
-
 gjk_support CsoSupportFunction( const m4* AModelMat, const collider_mesh* AMesh,
                                 const m4* BModelMat, const collider_mesh* BMesh, const v3 Direction );
 
@@ -40,5 +36,4 @@ void BlowUpSimplex( const m4* AModelMat, const collider_mesh* AMesh,
                     gjk_simplex* Simplex);
 
 gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_mesh* AMesh,
-                                           const m4* BModelMat, const collider_mesh* BMesh,
-                                           component_gjk_epa_visualizer* Vis = 0);
+                                           const m4* BModelMat, const collider_mesh* BMesh);

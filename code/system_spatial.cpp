@@ -1,7 +1,7 @@
 #include "component_spatial.h"
 #include "component_collider.h"
 #include "component_dynamics.h"
-#include "component_gjk_epa_visualizer.h"
+#include "gjk_epa_visualizer.h"
 #include "entity_components.h"
 #include "handmade_tile.h"
 #include "math/vector_math.h"
@@ -143,321 +143,38 @@ v3 ClosestPointOnEdge(const v3& EdgeStart, const v3& EdgeEnd, const v3& Point)
 struct collision_detection_work
 {
   memory_arena* TransientArena;
-  entity* A;
-  entity* B;
-  b32 InContact;
-  contact_data NewContact;
+  contact_manifold* Manifold;
 };
 
 internal void
 DoCollisionDetectionWork(void* Data)
 {
   collision_detection_work* Work = (collision_detection_work*) Data;
-  m4 ModelMatrixA = GetModelMatrix(Work->A->SpatialComponent);
-  m4 ModelMatrixB = GetModelMatrix(Work->B->SpatialComponent);
+  entity* A = Work->Manifold->A;
+  entity* B = Work->Manifold->B;
+  contact_manifold* Manifold = Work->Manifold;
+  m4 ModelMatrixA = GetModelMatrix(A->SpatialComponent);
+  m4 ModelMatrixB = GetModelMatrix(B->SpatialComponent);
+  collider_mesh* MeshA = A->ColliderComponent->Mesh;
+  collider_mesh* MeshB = B->ColliderComponent->Mesh;
   gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
-      &ModelMatrixA, Work->A->ColliderComponent->Mesh,
-      &ModelMatrixB, Work->B->ColliderComponent->Mesh);
+      &ModelMatrixA, MeshA,
+      &ModelMatrixB, MeshB);
 
-  Work->InContact = NarrowPhaseResult.ContainsOrigin;
-  if (Work->InContact)
+  if (NarrowPhaseResult.ContainsOrigin)
   {
-    Work->NewContact = EPACollisionResolution(Work->TransientArena, &ModelMatrixA, Work->A->ColliderComponent->Mesh,
-                                                                    &ModelMatrixB, Work->B->ColliderComponent->Mesh,
-                                                                    &NarrowPhaseResult.Simplex);
-  }
-}
-
-
-#define DO_GET_CONTACT_NONSENSE_LINEARLY(i) ((contact_data_list*) ((u8*) ( World->Contacts ) + i * ( sizeof(contact_data_list) + 4*sizeof(contact_data))));
-
-void FireOnceVic(memory_arena* TransientArena, entity* A, entity* B, b32 condition)
-{
-  local_persist b32 Fired = false;
-  if(!Fired && condition && (A->GjkEpaVisualizerComponent || B->GjkEpaVisualizerComponent))
-  {
-    Fired = true;
-    component_gjk_epa_visualizer* Vis = A->GjkEpaVisualizerComponent;
-    if(B->GjkEpaVisualizerComponent)
-    {
-        Vis = B->GjkEpaVisualizerComponent;
-//      entity* Tmp;
-//      Tmp = A;
-//      A = B;
-//      B = Tmp;
-    }
-    ResetEPA(Vis);
-    m4 ModelMatrixA = GetModelMatrix(A->SpatialComponent);
-    m4 ModelMatrixB = GetModelMatrix(B->SpatialComponent);
-    gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
-                                                &ModelMatrixA, A->ColliderComponent->Mesh,
-                                                &ModelMatrixB, B->ColliderComponent->Mesh, Vis);
-    contact_data apa = EPACollisionResolution(TransientArena, &ModelMatrixA, A->ColliderComponent->Mesh,
-                                                              &ModelMatrixB, B->ColliderComponent->Mesh,
-                                                              &NarrowPhaseResult.Simplex, Vis);
-  }
-}
-void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/ platform_api* API)
-{
-  r32 dt =  World->dtForFrame;
-  memory_arena* PersistentArena = World->PersistentArena;
-  memory_arena* TransientArena = World->TransientArena;
-  tile_map* TileMap = &World->TileMap;
-
-  temporary_memory TempMem1 = BeginTemporaryMemory( TransientArena );
-
-  memory_index DebugPrintMemorySize = Megabytes(1);
-  char* const DebugPrintMemory = (char*) PushArray(TransientArena, DebugPrintMemorySize, char);
-  char* Scanner = DebugPrintMemory;
-
+    contact_data NewContact = EPACollisionResolution(Work->TransientArena, &ModelMatrixA, A->ColliderComponent->Mesh,
+                                                                           &ModelMatrixB, B->ColliderComponent->Mesh,
+                                                                           &NarrowPhaseResult.Simplex);
+    // For now store only one
+    Manifold->ContactCount  = 1;
+    Manifold->Contacts[0]   = NewContact;
+    Manifold->CashedData[0] = {};
 #if 0
-  u8* TmpList = (u8*) PushSize(TransientArena, World->NrContacts * ( sizeof(contact_data_list) + 4*sizeof(contact_data) ));
-  u32 ManifoldIndex = 0;
-  u8* MemoryLocation = TmpList;
-  // Remove invalid contacts
-  for (u32 i = 0; i < World->NrContacts; ++i)
-  {
-    umm ByteStride  =  i * ( sizeof(contact_data_list) + 4*sizeof(contact_data));
-    contact_data_list* ContactData = (contact_data_list*) ( ( (u8*) World->Contacts ) + ByteStride);
-    Assert(ContactData->MaxNrContacts ==4);
-    contact_data SavedContacts[4] = {};
-    u32 SavedContactIdx = 0;
-    m4 ModelMatA = ContactData->A->SpatialComponent->ModelMatrix;
-    m4 ModelMatB = ContactData->B->SpatialComponent->ModelMatrix;
-    for (u32 j = 0; j < ContactData->NrContacts; ++j)
-    {
-      contact_data* Contact = &ContactData->Contacts[j];
-      const v3 LocalToGlobalA = V3( ModelMatA * V4(Contact->A_ContactModelSpace,1));
-      const v3 LocalToGlobalB = V3( ModelMatB * V4(Contact->B_ContactModelSpace,1));
-
-      const v3 rAB = LocalToGlobalB - LocalToGlobalA;
-
-      const v3 rA  = Contact->A_ContactWorldSpace - LocalToGlobalA;
-      const v3 rB  = Contact->B_ContactWorldSpace - LocalToGlobalB;
-
-      const r32 normDot = Contact->ContactNormal * rAB;
-      const b32 stillPenetrating = normDot <= 0.0f;
-
-      const r32 persistentThresholdSq = 0.01;
-      const r32 lenDiffA = NormSq(rA);
-      const r32 lenDiffB = NormSq(rB);
-
-      // keep contact point if the collision pair is
-      // still colliding at this point, and the local
-      // positions are not too far from the global
-      // positions original acquired from collision detection
-      if (stillPenetrating && (lenDiffA < persistentThresholdSq && lenDiffB < persistentThresholdSq) )
-      {
-        // Persistent contact
-        SavedContacts[SavedContactIdx++] = *Contact;
-      }
-    }
-
-    if(SavedContactIdx)
-    {
-      utils::Copy(sizeof(contact_data_list), ContactData, MemoryLocation);
-      ((contact_data_list*)MemoryLocation)->NrContacts = SavedContactIdx;
-      MemoryLocation+=sizeof(contact_data_list);
-      utils::Copy(sizeof(SavedContacts), SavedContacts, MemoryLocation);
-      MemoryLocation+=sizeof(SavedContacts);
-      ManifoldIndex++;
-    }
-  }
-
-  utils::Copy(MemoryLocation-TmpList, TmpList, World->Contacts);
-  World->NrContacts = ManifoldIndex;
-#else
-  u32 MemCount = World->NrContacts * ( sizeof(contact_data_list) + 4*sizeof(contact_data) );
-  u8* TmpList = (u8*) PushSize(TransientArena, MemCount);
-  utils::Copy(World->NrContacts, TmpList, World->Contacts);
-  World->NrContacts = 0;
-#endif
-  aabb_tree BroadPhaseTree = {};
-
-  for(u32 Index = 0;  Index < World->NrEntities; ++Index )
-  {
-    entity* E = &World->Entities[Index];
-    #if 1
-    if( E->Types & COMPONENT_TYPE_DYNAMICS )
-    {
-      #if 0
-      v3 Gravity = V3(0,-10,0);
-      component_dynamics*  D = E->DynamicsComponent;
-      D->LinearVelocity += dt * Gravity * D->Mass;
-      #else
-      component_spatial*   S = E->SpatialComponent;
-      component_collider*  C = E->ColliderComponent;
-      component_dynamics*  D = E->DynamicsComponent;
-      v3  Position        = S->Position;
-      v3  LinearVelocity  = D->LinearVelocity;
-      v3  AngularVelocity = D->AngularVelocity;
-      r32 Mass            = D->Mass;
-
-      v3 Gravity = V3(0,-10,0);
-      //Gravity = V3(0,0,0);
-      v3 LinearAcceleration = Gravity * Mass;
-      LinearVelocity     = LinearVelocity + dt * LinearAcceleration;
-
-      v3 AngularAcceleration = {};
-      AngularVelocity = AngularVelocity + dt * AngularAcceleration;
-#if 0
-      Translate(dt * LinearVelocity, S);
-
-      Rotate(Norm(dt*AngularVelocity), Normalize(dt*AngularVelocity) ,S);
-#endif
-      D->LinearVelocity  = LinearVelocity;
-      D->AngularVelocity = AngularVelocity;
-      #endif
-    }
-    #endif
-    if( E->Types & COMPONENT_TYPE_COLLIDER )
-    {
-      aabb3f AABBWorldSpace = {};
-      GetTransformedAABBFromColliderMesh( E->ColliderComponent, GetModelMatrix(E->SpatialComponent), &AABBWorldSpace );
-      AABBTreeInsert( TransientArena, &BroadPhaseTree, E, AABBWorldSpace );
-#if 0
-      if(API)
-      {
-        // Print Tree
-        s64 RemainingSize = DebugPrintMemorySize + DebugPrintMemory - Scanner;
-        Scanner += GetPrintableTree( TransientArena, &BroadPhaseTree, RemainingSize, Scanner);
-        RemainingSize = DebugPrintMemorySize + DebugPrintMemory - Scanner;
-        Scanner += str::itoa(-1,RemainingSize,Scanner);
-        *Scanner++ = ' ';
-        aabb3f zero = {};
-        Scanner += AABBToString(&zero, 64, Scanner);
-        *Scanner++ = '\n';
-      }
-#endif
-    }
-  }
-
-  broad_phase_result_stack* const BroadPhaseResult = GetCollisionPairs( TransientArena, &BroadPhaseTree );
-  broad_phase_result_stack* ColliderPair = BroadPhaseResult;
-
-#if 1
-  collision_detection_work* WorkArray = PushArray(TransientArena, 1080, collision_detection_work);
-  collision_detection_work* Work = WorkArray;
-  u32 CollisionCount = 0;
-  while( ColliderPair )
-  {
-    Work->TransientArena = TransientArena;
-    Work->A = ColliderPair->A;
-    Work->B = ColliderPair->B;
-//    CollisionQueue->AddEntry(CollisionQueue, DoCollisionDetectionWork, Work);
-
-    ColliderPair = ColliderPair->Previous;
-    ++Work;
-    ++CollisionCount;
-  }
-
-//  CollisionQueue->PlatformCompleteWorkQueue(CollisionQueue);
-  u32 CollisionIndex = 0;
-  while(CollisionIndex < CollisionCount)
-  {
-    DoCollisionDetectionWork((void*) (WorkArray + CollisionIndex));
-    CollisionIndex++;
-  }
-
-  CollisionIndex = 0;
-  u32 ContactIndex = 0;
-  World->NrContacts = 0;
-  while(CollisionIndex < CollisionCount)
-  {
-    collision_detection_work* CurrentWork = WorkArray + CollisionIndex++;
-    if(CurrentWork->InContact)
-    {
-      contact_data_list* ContactData = DO_GET_CONTACT_NONSENSE_LINEARLY(ContactIndex);
-      World->NrContacts++;
-      ContactData->MaxNrContacts = 4;
-      ContactData->NrContacts = 1;
-      ContactData->A = CurrentWork->A;
-      ContactData->B = CurrentWork->B;
-      ContactData->Contacts = (contact_data*) (ContactData + 1);
-      *ContactData->Contacts = CurrentWork->NewContact;
-      ContactIndex++;
-    }
-  }
-#else
-  while( ColliderPair )
-  {
-    entity* A = ColliderPair->A;
-    entity* B = ColliderPair->B;
-
-    if( (A->Types & COMPONENT_TYPE_DYNAMICS) ||
-        (B->Types & COMPONENT_TYPE_DYNAMICS) ||
-        (A->GjkEpaVisualizerComponent) ||
-        (B->GjkEpaVisualizerComponent) )
-    {
-      component_spatial*   SA = A->SpatialComponent;
-      component_collider*  CA = A->ColliderComponent;
-      component_dynamics*  DA = A->DynamicsComponent;
-
-      component_spatial*   SB = B->SpatialComponent;
-      component_collider*  CB = B->ColliderComponent;
-      component_dynamics*  DB = B->DynamicsComponent;
-
-      component_gjk_epa_visualizer* Vis = A->GjkEpaVisualizerComponent;
-      Vis = Vis ? Vis : B->GjkEpaVisualizerComponent;
-
-      gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
-          &SA->ModelMatrix, CA->Mesh,
-          &SB->ModelMatrix, CB->Mesh,
-          Vis);
-
-      if (NarrowPhaseResult.ContainsOrigin)
-      {
-        contact_data NewContact = EPACollisionResolution(TransientArena, &SA->ModelMatrix, CA->Mesh,
-                                                                         &SB->ModelMatrix, CB->Mesh,
-                                                                         &NarrowPhaseResult.Simplex,
-                                                                         Vis);
-        // TODO: Find a smarter way than to check the relevant collision points instead of looping through all of them
-        // Loop through all existing contacts and see if we have similar boidies already connecting
-        contact_data_list* ContactData = 0;
-        for(u32 i = 0; i < World->NrContacts; ++i)
-        {
-          umm ByteStride  =  i * ( sizeof(contact_data_list) + 4*sizeof(contact_data));
-          contact_data_list* WorldContact = (contact_data_list*) ( ( (u8*) World->Contacts ) + ByteStride);
-          if(WorldContact->A->id == A->id && WorldContact->B->id == B->id )
-          {
-            ContactData = WorldContact;
-          }
-          else if (WorldContact->B->id == A->id && WorldContact->A->id == B->id )
-          {
-            // Note: Jakob, This can be a source of bugs. Check it.
-            contact_data Tmp = {};
-            Tmp.A_ContactWorldSpace =  NewContact.B_ContactWorldSpace;
-            Tmp.B_ContactWorldSpace =  NewContact.A_ContactWorldSpace;
-            Tmp.A_ContactModelSpace =  NewContact.B_ContactModelSpace;
-            Tmp.B_ContactModelSpace =  NewContact.A_ContactModelSpace;
-            Tmp.ContactNormal       = -NewContact.ContactNormal;
-            Tmp.TangentNormalOne    =  NewContact.TangentNormalOne;
-            Tmp.TangentNormalTwo    =  NewContact.TangentNormalTwo;
-            Tmp.PenetrationDepth    =  NewContact.PenetrationDepth;
-            NewContact = Tmp;
-            ContactData = WorldContact;
-          }
-        }
-
-        if(!ContactData)
-        {
-          Assert(World->NrContacts < World->MaxNrContacts);
-          umm ByteStride  =  World->NrContacts * ( sizeof(contact_data_list) + 4*sizeof(contact_data));
-          ContactData = (contact_data_list*) ( ( (u8*) World->Contacts ) + ByteStride);
-          World->NrContacts++;
-          ContactData->A = A;
-          ContactData->B = B;
-
-          ContactData->NrContacts = 0;
-          ContactData->MaxNrContacts = 4;
-          ContactData->Contacts = (contact_data*) (ContactData + 1);
-
-        }
-
         b32 FarEnough = true;
-        for (u32 i = 0; i < ContactData->NrContacts; ++i)
+        for (u32 i = 0; i < CollisionManifold->ContactCount; ++i)
         {
-          const contact_data* OldContact = &ContactData->Contacts[i];
+          const contact_data* OldContact = &CollisionManifold->Contacts[i];
           const v3 rALocal = NewContact.A_ContactModelSpace - OldContact->A_ContactModelSpace;
           const v3 rBLocal = NewContact.B_ContactModelSpace - OldContact->B_ContactModelSpace;
           const v3 rAGlobal = NewContact.A_ContactWorldSpace - OldContact->A_ContactWorldSpace;
@@ -475,32 +192,32 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
           if (NotFarEnoughAG || NotFarEnoughBG)
           {
             FarEnough = false;
-            //ContactData->Contacts[i] = NewContact;
+            //CollisionManifold->Contacts[i] = NewContact;
             break;
           }
         }
 
         if (FarEnough)
         {
-          if (ContactData->NrContacts < ContactData->MaxNrContacts)
+          if (CollisionManifold->ContactCount < CollisionManifold->MaxNrContacts)
           {
-            ContactData->Contacts[ContactData->NrContacts++] = NewContact;
+            CollisionManifold->Contacts[CollisionManifold->ContactCount++] = NewContact;
           }else{
             #if 1
             local_persist u32 idx = 4;
-            ContactData->Contacts[idx % 4] = NewContact;
+            CollisionManifold->Contacts[idx % 4] = NewContact;
             idx++;
             #else
-            Assert(ContactData->MaxNrContacts == 4);
-            Assert(ContactData->NrContacts == ContactData->MaxNrContacts);
+            Assert(CollisionManifold->MaxNrContacts == 4);
+            Assert(CollisionManifold->ContactCount == CollisionManifold->MaxNrContacts);
 
             contact_data PossibleContacts[5] = {};
             v3 ContactPoints[4] = {};
             u32 AddedContacts[4] = {};
-            utils::Copy(4* sizeof(contact_data), ContactData->Contacts, PossibleContacts );
+            utils::Copy(4* sizeof(contact_data), CollisionManifold->Contacts, PossibleContacts );
             PossibleContacts[4] = NewContact;
-            const m4 ModelMatA = ContactData->A->SpatialComponent->ModelMatrix;
-            const m4 ModelMatB = ContactData->B->SpatialComponent->ModelMatrix;
+            const m4 ModelMatA = CollisionManifold->A->SpatialComponent->ModelMatrix;
+            const m4 ModelMatB = CollisionManifold->B->SpatialComponent->ModelMatrix;
             r32 Depth = 0;
             u32 nrAddedContacts = 0;
             for (u32 i = 0; i < ArrayCount(PossibleContacts); ++i)
@@ -511,7 +228,7 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
               if(Depth < PenetrationDepth)
               {
                 AddedContacts[0] = i;
-                ContactData->Contacts[0] = PossibleContacts[i];
+                CollisionManifold->Contacts[0] = PossibleContacts[i];
                 Depth = PenetrationDepth;
                 ContactPoints[0] = PossiblePointA;
               }
@@ -532,7 +249,7 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
               {
                 AddedContacts[1] = i;
                 ContactPoints[1] = PossiblePointA;
-                ContactData->Contacts[1] = PossibleContacts[i];
+                CollisionManifold->Contacts[1] = PossibleContacts[i];
                 Length = TestLength;
               }
             }
@@ -552,7 +269,7 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
               {
                 AddedContacts[2] = i;
                 ContactPoints[2] = PossiblePoint;
-                ContactData->Contacts[2] = PossibleContacts[i];
+                CollisionManifold->Contacts[2] = PossibleContacts[i];
                 Length = TestLength;
               }
             }
@@ -587,14 +304,14 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
               {
                 FinalPointAdded = true;
                 AddedContacts[3] = i;
-                ContactData->Contacts[3] = PossibleContacts[i];
+                CollisionManifold->Contacts[3] = PossibleContacts[i];
               }
             }
 
             if(!FinalPointAdded)
             {
-              ContactData->NrContacts = 3;
-              ContactData->Contacts[3] = {};
+              CollisionManifold->ContactCount = 3;
+              CollisionManifold->Contacts[3] = {};
             }
             #endif
           }
@@ -609,75 +326,286 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
     ColliderPair = ColliderPair->Previous;
   }
 #endif
+  }
+}
 
-
-  for(u32 i = 0; i < World->NrContacts; ++i)
+void FireOnceVic(memory_arena* TransientArena, entity* A, entity* B)
+{
+  local_persist b32 Fired = false;
+  if(!Fired && GlobalFireVic )
   {
-    contact_data_list* ContactData = DO_GET_CONTACT_NONSENSE_LINEARLY(i);
-    entity* A = ContactData->A;
-    entity* B = ContactData->B;
+    Fired = true;
+    ResetEPA(GlobalVis);
+    m4 ModelMatrixA = GetModelMatrix(A->SpatialComponent);
+    m4 ModelMatrixB = GetModelMatrix(B->SpatialComponent);
+    gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
+                                                &ModelMatrixA, A->ColliderComponent->Mesh,
+                                                &ModelMatrixB, B->ColliderComponent->Mesh);
+    contact_data apa = EPACollisionResolution(TransientArena, &ModelMatrixA, A->ColliderComponent->Mesh,
+                                                              &ModelMatrixB, B->ColliderComponent->Mesh,
+                                                              &NarrowPhaseResult.Simplex);
+  }
+}
+void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/ platform_api* API)
+{
+  TIMED_FUNCTION();
+  r32 dt =  World->dtForFrame;
+  memory_arena* TransientArena = World->TransientArena;
 
-    FireOnceVic(TransientArena,  A, B, GlobalFireVic);
-    v3 va = {};
-    v3 wa = {};
-    v3 vb = {};
-    v3 wb = {};
-    r32 ma = 10e37;
-    r32 mb = 10e37; // Solve stationary objects with stationary constraint?
-    if (A->DynamicsComponent)
+  temporary_memory TempMem1 = BeginTemporaryMemory( TransientArena );
+
+#if 1
+  World->FirstContactManifold = 0;
+  for(u32 ManifoldIndex = 0;  ManifoldIndex < World->MaxNrManifolds; ++ManifoldIndex )
+  {
+    contact_manifold* Manifold = World->Manifolds + ManifoldIndex;
+    Manifold->ContactCount=0;
+    Manifold->A=0;
+    Manifold->B=0;
+  }
+#else
+  // Remove invalid contacts
+  u32 ManifoldsCounted = 0;
+  contact_manifold* Manifold = World->FirstContactManifold;
+  while( Manifold )
+  {
+    m4 ModelMatA = GetModelMatrix(Manifolds->A->SpatialComponent);
+    m4 ModelMatB = GetModelMatrix(Manifolds->B->SpatialComponent);
+
+    b32 PersistentContacts = false;
+    for (u32 j = 0; j <CollisionManifold->MaxNrContacts; ++j)
     {
-      va = A->DynamicsComponent->LinearVelocity;
-      wa = A->DynamicsComponent->AngularVelocity;
-      ma = A->DynamicsComponent->Mass;
+      contact_data* Contact = Manifolds->Contacts + j;
+      if(!Contact->Valid)
+      {
+        continue;
+      }
+
+      const v3 LocalToGlobalA = V3( ModelMatA * V4(Contact->A_ContactModelSpace,1));
+      const v3 LocalToGlobalB = V3( ModelMatB * V4(Contact->B_ContactModelSpace,1));
+
+      const v3 rAB = LocalToGlobalB - LocalToGlobalA;
+
+      const v3 rA  = Contact->A_ContactWorldSpace - LocalToGlobalA;
+      const v3 rB  = Contact->B_ContactWorldSpace - LocalToGlobalB;
+
+      const r32 normDot = Contact->ContactNormal * rAB;
+      const b32 stillPenetrating = normDot <= 0.0f;
+
+      const r32 persistentThresholdSq = 0.1;
+      const r32 lenDiffA = NormSq(rA);
+      const r32 lenDiffB = NormSq(rB);
+
+      // keep contact point if the collision pair is still colliding at this point
+      // and the local positions are not too far from the global
+      // positions original acquired from collision detection
+      if (stillPenetrating && ((lenDiffA < persistentThresholdSq) && (lenDiffB < persistentThresholdSq)) )
+      {
+        Contact->Persistent=true;
+      }else{
+        ZeroStruct(*Contact);
+      }
     }
 
-    if (B->DynamicsComponent)
+    if(!PersistentContacts)
     {
-      vb = B->DynamicsComponent->LinearVelocity;
-      wb = B->DynamicsComponent->AngularVelocity;
-      mb = B->DynamicsComponent->Mass;
-    }
-
-    m3 InvM[4] = {};
-    GetAABBInverseMassMatrix( &A->ColliderComponent->AABB, ma, &InvM[0], &InvM[1]);
-    GetAABBInverseMassMatrix( &B->ColliderComponent->AABB, mb, &InvM[2], &InvM[3]);
-
-
-    for(u32 j = 0; j < ContactData->NrContacts; ++j)
-    {
-      contact_data* Contact = &ContactData->Contacts[j];
-      const v3& ra = Contact->A_ContactModelSpace;
-      const v3& rb = Contact->B_ContactModelSpace;
-      const v3& n  = Contact->ContactNormal;
-
-      Contact->J[0] = -n;
-      Contact->J[1] = -CrossProduct(ra, n);
-      Contact->J[2] = n;
-      Contact->J[3] = CrossProduct(rb, n);
-
-      MultiplyDiagonalM12V12(InvM, Contact->J, Contact->InvMJ);
+      Manifolds->Valid = false;
     }
   }
-  for(u32 j = 0; j < World->NrContacts; ++j)
+#endif
+  aabb_tree BroadPhaseTree = {};
+  for(u32 Index = 0;  Index < World->NrEntities; ++Index )
   {
-    contact_data_list* ContactData = DO_GET_CONTACT_NONSENSE_LINEARLY(j);
-    for(u32 k = 0; k < ContactData->NrContacts; ++k)
+    entity* E = &World->Entities[Index];
+    if( E->DynamicsComponent )
     {
-        contact_data* Contact = &ContactData->Contacts[k];
-        Contact->AccumulatedLambda = 0;
+      component_spatial*   S = E->SpatialComponent;
+      component_dynamics*  D = E->DynamicsComponent;
+      v3  Position           = S->Position;
+      v3  LinearVelocity     = D->LinearVelocity;
+      v3  AngularVelocity    = D->AngularVelocity;
+      r32 Mass               = D->Mass;
+
+      // Forward euler
+      // TODO: Investigate other more stable integration methods
+      v3 Gravity = V3(0,-10,0);
+      v3 LinearAcceleration = Gravity * Mass;
+      D->LinearVelocity     += dt * LinearAcceleration;
+
+      // TODO: Can angular acceleration be integrated naively like this?
+      //       Don't think so, use rotor-integration, See paper of Michael Boyle
+      v3 AngularAcceleration = {};
+      D->AngularVelocity += dt * AngularAcceleration;
+    }
+
+    if( E->ColliderComponent )
+    {
+      aabb3f AABBWorldSpace = {};
+      GetTransformedAABBFromColliderMesh( E->ColliderComponent, GetModelMatrix(E->SpatialComponent), &AABBWorldSpace );
+      // TODO: Don't do a insert every timestep. Update an existing tree
+      AABBTreeInsert( TransientArena, &BroadPhaseTree, E, AABBWorldSpace );
     }
   }
-  if(World->NrContacts)
+
+  broad_phase_result_stack* const BroadPhaseResult = GetCollisionPairs( TransientArena, &BroadPhaseTree );
+  broad_phase_result_stack* ColliderPair = BroadPhaseResult;
+
+  // Todo: Get this number straigth from broad_phase_result_stack
+  u32 CollisionWorkCount = 0;
+  while( ColliderPair )
   {
-    for (u32 i = 0; i < 4; ++i)
+    ++CollisionWorkCount;
+    ColliderPair = ColliderPair->Previous;
+  }
+
+  ColliderPair = BroadPhaseResult;
+  collision_detection_work* WorkArray = PushArray(TransientArena, CollisionWorkCount, collision_detection_work);
+  collision_detection_work* WorkSlot = WorkArray;
+  Assert(World->FirstContactManifold==0);
+  u32 Idx = 0;
+  while( ColliderPair )
+  {
+    // Find a manifold memory slot for manifold made up of A and B;
+    r32 a = (r32) ColliderPair->A->id;
+    r32 b = (r32) ColliderPair->B->id;
+
+    r32 CantorPairR32 =(1/2.f) * (a + b)*(a + b + 1) + b;
+    u32 CantorPairA = (u32)CantorPairR32;
+    u32 CantorPair = GetCantorPair(ColliderPair->A->id,  ColliderPair->B->id);
+    Assert(CantorPair == CantorPairA);
+    u32 ManifoldIndex = CantorPair % World->MaxNrManifolds;
+    u32 HashMapCollisions = 0;
+    contact_manifold* Manifold = 0;
+    entity* SrcA = ColliderPair->A;
+    entity* SrcB = ColliderPair->B;
+    while( HashMapCollisions < World->MaxNrManifolds )
+    {
+      contact_manifold* ManifoldArraySlot = World->Manifolds + ManifoldIndex;
+      if(!ManifoldArraySlot->A)
+      {
+        Assert(!ManifoldArraySlot->B)
+        // Slot was empty
+        Manifold = ManifoldArraySlot;
+        ZeroStruct( *Manifold );
+        Manifold->A = ColliderPair->A;
+        Manifold->B = ColliderPair->B;
+        Manifold->MaxContactCount = 4;
+        Manifold->WorldArrayIndex = ManifoldIndex;
+        break;
+      }
+      else if(((SrcA->id == ManifoldArraySlot->A->id) && (SrcB->id == ManifoldArraySlot->B->id)) ||
+              ((SrcA->id == ManifoldArraySlot->B->id) && (SrcB->id == ManifoldArraySlot->A->id)))
+      {
+        Manifold = ManifoldArraySlot;
+        Assert(Manifold->Next != World->FirstContactManifold);
+        Assert(Manifold->MaxContactCount == 4);
+        Assert(Manifold->WorldArrayIndex == ManifoldIndex);
+        Assert(Manifold->ContactCount == 0);
+        Assert(0);
+        break;
+      }else{
+        TIMED_BLOCK("ContactArrayCollisions");
+        ++HashMapCollisions;
+        Assert( !((SrcA->id == ManifoldArraySlot->A->id) && (SrcB->id == ManifoldArraySlot->B->id)) &&
+                !((SrcB->id == ManifoldArraySlot->A->id) && (SrcA->id == ManifoldArraySlot->B->id)) );
+        ManifoldIndex = (ManifoldIndex+1) % World->MaxNrManifolds;
+      }
+    }
+    Assert(Manifold);
+    Assert(HashMapCollisions < World->MaxNrManifolds);
+
+    // Push the contact to the list.
+    Manifold->Next = World->FirstContactManifold;
+    World->FirstContactManifold = Manifold;
+    Assert( Manifold->Next != World->FirstContactManifold);
+    Assert(Manifold != Manifold->Next);
+
+    // Add it to the work array
+    WorkSlot->TransientArena = TransientArena;
+    WorkSlot->Manifold =  Manifold;
+//  CollisionQueue->AddEntry(CollisionQueue, DoCollisionDetectionWork, Work);
+
+    ColliderPair = ColliderPair->Previous;
+    ++WorkSlot;
+  }
+
+//  CollisionQueue->PlatformCompleteWorkQueue(CollisionQueue);
+  u32 CollisionWorkIndex = 0;
+  while(CollisionWorkIndex < CollisionWorkCount)
+  {
+    DoCollisionDetectionWork((void*) (WorkArray + CollisionWorkIndex++));
+  }
+
+  contact_manifold** ManifoldPtr = &World->FirstContactManifold;
+  while(*ManifoldPtr)
+  {
+    contact_manifold* Manifold = *ManifoldPtr;
+    if(Manifold->ContactCount == 0)
+    {
+      // Remove manifolds that are not colliding
+      *ManifoldPtr = Manifold->Next;
+    }else{
+      Assert(Manifold->ContactCount>0);
+      entity* A = Manifold->A;
+      entity* B = Manifold->B;
+
+      v3 va = {};
+      v3 wa = {};
+      v3 vb = {};
+      v3 wb = {};
+      r32 ma = 10e37;
+      r32 mb = 10e37; // Solve stationary objects with stationary constraint?
+      if (A->DynamicsComponent)
+      {
+        va = A->DynamicsComponent->LinearVelocity;
+        wa = A->DynamicsComponent->AngularVelocity;
+        ma = A->DynamicsComponent->Mass;
+      }
+
+      if (B->DynamicsComponent)
+      {
+        vb = B->DynamicsComponent->LinearVelocity;
+        wb = B->DynamicsComponent->AngularVelocity;
+        mb = B->DynamicsComponent->Mass;
+      }
+
+      m3 InvM[4] = {};
+      GetAABBInverseMassMatrix( &A->ColliderComponent->AABB, ma, &InvM[0], &InvM[1]);
+      GetAABBInverseMassMatrix( &B->ColliderComponent->AABB, mb, &InvM[2], &InvM[3]);
+
+      for(u32 j = 0; j < Manifold->ContactCount; ++j)
+      {
+        contact_data* Contact = &Manifold->Contacts[j];
+        contact_data_cache* CashedData = &Manifold->CashedData[j];
+        const v3& ra = Contact->A_ContactModelSpace;
+        const v3& rb = Contact->B_ContactModelSpace;
+        const v3& n  = Contact->ContactNormal;
+
+        CashedData->J[0] = -n;
+        CashedData->J[1] = -CrossProduct(ra, n);
+        CashedData->J[2] = n;
+        CashedData->J[3] = CrossProduct(rb, n);
+
+        MultiplyDiagonalM12V12(InvM, CashedData->J, CashedData->InvMJ);
+      }
+
+      Assert(Manifold != Manifold->Next);
+      ManifoldPtr = &(Manifold->Next);
+    }
+  }
+
+  if(World->FirstContactManifold)
+  {
+    for (u32 i = 0; i < 10; ++i)
     {
       // TODO: Process Constraints MultiThreaded?
-      for(u32 j = 0; j < World->NrContacts; ++j)
+      contact_manifold* Manifold = World->FirstContactManifold;
+      while(Manifold)
       {
-        contact_data_list* ContactData = DO_GET_CONTACT_NONSENSE_LINEARLY(j);
-        entity* A = ContactData->A;
-        entity* B = ContactData->B;
-        for(u32 k = 0; k < ContactData->NrContacts; ++k)
+        Assert(Manifold->ContactCount>0);
+        entity* A = Manifold->A;
+        entity* B = Manifold->B;
+        for(u32 k = 0; k < Manifold->ContactCount; ++k)
         {
           v3 V[4] = {};
           if(A->DynamicsComponent)
@@ -690,22 +618,23 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
             V[2] = B->DynamicsComponent->LinearVelocity;
             V[3] = B->DynamicsComponent->AngularVelocity;
           }
-          contact_data* Contact = &ContactData->Contacts[k];
+          contact_data* Contact = &Manifold->Contacts[k];
+          contact_data_cache* CashedData = &Manifold->CashedData[k];
           //r32 PenetrationDepth  = Norm(V3(GetModelMatrix(A->SpatialComponent) * V4( Contact->A_ContactModelSpace,1)) -
           //                             V3(GetModelMatrix(B->SpatialComponent) * V4( Contact->B_ContactModelSpace,1)));
           r32 PenetrationDepth  = Norm(V3(GetModelMatrix(A->SpatialComponent) * V4(Contact->A_ContactModelSpace,1)) -
                                        V3(GetModelMatrix(B->SpatialComponent) * V4(Contact->B_ContactModelSpace,1)));
           v3  ContactNormal     = Contact->ContactNormal;
-          r32 Restitution       = getRestitutionCoefficient(V, 0.25f, ContactNormal, 0.01);
+          r32 Restitution       = getRestitutionCoefficient(V, 0.1f, ContactNormal, 0.01);
           r32 Baumgarte         = getBaumgarteCoefficient(dt, 0.25,  PenetrationDepth, 0.01);
-          r32 Lambda            = GetLambda( V, Contact->J, Contact->InvMJ, Baumgarte, Restitution);
-          r32 OldCumulativeLambda = Contact->AccumulatedLambda;
-          Contact->AccumulatedLambda += Lambda;
-          Contact->AccumulatedLambda = Contact->AccumulatedLambda <=0 ? 0 : Contact->AccumulatedLambda;
-          r32 LambdaDiff = Contact->AccumulatedLambda - OldCumulativeLambda;
+          r32 Lambda            = GetLambda( V, CashedData->J, CashedData->InvMJ, Baumgarte, Restitution);
+          r32 OldCumulativeLambda = CashedData->AccumulatedLambda;
+          CashedData->AccumulatedLambda += Lambda;
+          CashedData->AccumulatedLambda = CashedData->AccumulatedLambda <=0 ? 0 : CashedData->AccumulatedLambda;
+          r32 LambdaDiff = CashedData->AccumulatedLambda - OldCumulativeLambda;
 
           v3 DeltaV[4] = {};
-          ScaleV12(LambdaDiff, Contact->InvMJ, DeltaV);
+          ScaleV12(LambdaDiff, CashedData->InvMJ, DeltaV);
 
           if(A->DynamicsComponent)
           {
@@ -718,6 +647,7 @@ void SpatialSystemUpdate( world* World,/* platform_work_queue* CollisionQueue,*/
             B->DynamicsComponent->AngularVelocity += DeltaV[3];
           }
         }
+        Manifold = Manifold->Next;
       }
     }
   }

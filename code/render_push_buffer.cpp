@@ -5,7 +5,7 @@
 #include "component_spatial.h"
 #include "component_collider.h"
 #include "component_sprite_animation.h"
-#include "component_gjk_epa_visualizer.h"
+#include "gjk_epa_visualizer.h"
 #include "component_mesh.h"
 #include "epa_collision_data.h"
 
@@ -277,9 +277,9 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       }
     }
 
-    if( Entity->Types & COMPONENT_TYPE_GJK_EPA_VISUALIZER  )
+    if( GlobalVis )
     {
-      component_gjk_epa_visualizer* Vis = Entity->GjkEpaVisualizerComponent;
+      gjk_epa_visualizer* Vis = GlobalVis;
       if(Vis->Playback && Vis->IndexCount>0)
       {
 
@@ -390,8 +390,8 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
             // Todo: This is inefficient, better option would be either instancing
             // http://www.opengl-tutorial.org/intermediate-tutorials/billboards-particles/particles-instancing/
             // Or fill every quad into one big buffer and draw them with one draw call
-            u32* vi = Entity->GjkEpaVisualizerComponent->Indeces;
-            v3* v   = Entity->GjkEpaVisualizerComponent->Vertices;
+            u32* vi = GlobalVis->Indeces;
+            v3* v   = GlobalVis->Vertices;
             for(u32 i = SI->Offset; i < SI->Offset + SI->Length; ++i)
             {
               push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( RenderGroup );
@@ -495,12 +495,13 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
   WhiteSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
   SetMaterial(WhiteSurface->Material, MATERIAL_WHITE);
 
-  for( u32 i = 0; i <World->NrContacts; ++i)
+  contact_manifold* Manifold = World->FirstContactManifold;
+  while(Manifold)
   {
-    contact_data_list* ContactData = (contact_data_list*) ((u8*) (World->Contacts ) + i * ( sizeof(contact_data_list) + 4*sizeof(contact_data)));
-    entity* A = ContactData->A;
-    entity* B = ContactData->B;
-    for( u32 j = 0; j <ContactData->NrContacts; ++j)
+    Assert(Manifold->ContactCount);
+    entity* A = Manifold->A;
+    entity* B = Manifold->B;
+    for( u32 j = 0; j <Manifold->ContactCount; ++j)
     {
       #if 0
       {
@@ -508,7 +509,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         Header->Type = render_buffer_entry_type::PRIMITIVE;
         Header->RenderState = RENDER_STATE_POINTS;
         entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
-        Body->M = GetTranslationMatrix( V4(ContactData->Contacts[j].A_ContactWorldSpace,1));
+        Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].A_ContactWorldSpace,1));
         Body->TM = M4Identity();
         Body->PrimitiveType = primitive_type::POINT;
         Body->Surface = RedSurface;
@@ -518,7 +519,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         Header->Type = render_buffer_entry_type::PRIMITIVE;
         Header->RenderState = RENDER_STATE_POINTS;
         entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
-        Body->M = GetTranslationMatrix( V4(ContactData->Contacts[j].B_ContactWorldSpace,1));
+        Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].B_ContactWorldSpace,1));
         Body->TM = M4Identity();
         Body->PrimitiveType = primitive_type::POINT;
         Body->Surface = GreenSurface;
@@ -529,8 +530,8 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         Header->Type = render_buffer_entry_type::PRIMITIVE;
         Header->RenderState = RENDER_STATE_POINTS;
         entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
-        Body->M = GetModelMatrix( A->SpatialComponent ) * GetTranslationMatrix(ContactData->Contacts[j].A_ContactModelSpace);
-        //Body->M = GetTranslationMatrix( ContactData->Contacts[j].A_ContactWorldSpace);
+        Body->M = GetModelMatrix( A->SpatialComponent ) * GetTranslationMatrix(Manifold->Contacts[j].A_ContactModelSpace);
+        //Body->M = GetTranslationMatrix( Manifold->Contacts[j].A_ContactWorldSpace);
         Body->TM = M4Identity();
         Body->PrimitiveType = primitive_type::POINT;
         Body->Surface = BlueSurface;
@@ -540,13 +541,14 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         Header->Type = render_buffer_entry_type::PRIMITIVE;
         Header->RenderState = RENDER_STATE_POINTS;
         entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
-        Body->M = GetModelMatrix( B->SpatialComponent ) * GetTranslationMatrix(ContactData->Contacts[j].B_ContactModelSpace);
-        //Body->M = GetTranslationMatrix( ContactData->Contacts[j].B_ContactWorldSpace);
+        Body->M = GetModelMatrix( B->SpatialComponent ) * GetTranslationMatrix(Manifold->Contacts[j].B_ContactModelSpace);
+        //Body->M = GetTranslationMatrix( Manifold->Contacts[j].B_ContactWorldSpace);
         Body->TM = M4Identity();
         Body->PrimitiveType = primitive_type::POINT;
         Body->Surface = WhiteSurface;
       }
     }
+    Manifold = Manifold->Next;
   }
 
 }

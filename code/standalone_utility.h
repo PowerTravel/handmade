@@ -6,7 +6,7 @@
 
 namespace utils
 {
-  inline void* Copy(memory_index aSize, void* SourceInit, void* DestInit)
+  inline void* Copy(midx aSize, void* SourceInit, void* DestInit)
   {
     u8 *Source = (u8 *)SourceInit;
     u8 *Dest = (u8 *)DestInit;
@@ -19,7 +19,7 @@ namespace utils
   {
     u8* Base;
     u8* Tail;
-    memory_index Size;
+    midx Size;
 
     public:
 
@@ -29,7 +29,7 @@ namespace utils
         Tail(0)
       {};
 
-      push_buffer(u8* MemStart, memory_index MemSize) :
+      push_buffer(u8* MemStart, midx MemSize) :
         Base(MemStart),
         Size(MemSize),
         Tail(MemStart)
@@ -40,7 +40,7 @@ namespace utils
         return (Base == Tail);
       }
 
-      memory_index Remaining()
+      midx Remaining()
       {
         return (Base + Size) - Tail;
       }
@@ -54,8 +54,8 @@ namespace utils
       {
         return Tail;
       }
-      memory_index GetUsed(){ return Tail - Base;};
-      u8* GetMemory( memory_index MemoryCount )
+      midx GetUsed(){ return Tail - Base;};
+      u8* GetMemory( midx MemoryCount )
       {
         if(MemoryCount >= Remaining()) {return 0;}
         u8* Result = Tail;

@@ -16,7 +16,11 @@
 
 platform_api Platform;
 
+#include "gjk_epa_visualizer.h"
+gjk_epa_visualizer GlobalGjkEpaVisualizer = {};
+gjk_epa_visualizer* GlobalVis;
 global_variable b32 GlobalFireVic = false;
+
 
 #include "math/aabb.cpp"
 #include "handmade_tile.cpp"
@@ -74,7 +78,21 @@ internal stb_font_map STBBakeFont(memory_arena* Memory)
   return Result;
 }
 
-
+void AllocateGlobaklGjkEpaVisualizer(memory_arena* AssetArena)
+{
+  GlobalGjkEpaVisualizer.MaxIndexCount = 1024;
+  GlobalGjkEpaVisualizer.Indeces = (u32*) PushArray(AssetArena, GlobalGjkEpaVisualizer.MaxIndexCount, u32);
+  GlobalGjkEpaVisualizer.MaxVertexCount = 1024;
+  GlobalGjkEpaVisualizer.Vertices = (v3*) PushArray(AssetArena, GlobalGjkEpaVisualizer.MaxVertexCount, v3);
+  GlobalGjkEpaVisualizer.NormalMaxIndexCount = 1024;
+  GlobalGjkEpaVisualizer.NormalIndeces = (u32*) PushArray(AssetArena, GlobalGjkEpaVisualizer.NormalMaxIndexCount, u32);
+  GlobalGjkEpaVisualizer.MaxNormalCount = 1024;
+  GlobalGjkEpaVisualizer.Normals = (v3*) PushArray(AssetArena, GlobalGjkEpaVisualizer.MaxNormalCount, v3);
+  GlobalGjkEpaVisualizer.MaxSimplexCount = 16;
+  GlobalGjkEpaVisualizer.Simplex = (simplex_index*) PushArray(AssetArena, GlobalGjkEpaVisualizer.MaxSimplexCount, simplex_index);
+  GlobalGjkEpaVisualizer.MaxEPACount = 32;
+  GlobalGjkEpaVisualizer.EPA = (epa_index*) PushArray(AssetArena, GlobalGjkEpaVisualizer.MaxEPACount, epa_index);
+}
 
 internal void
 GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
@@ -121,10 +139,9 @@ void AllocateWorld( u32 NrMaxEntities, game_state* GameState )
   GameState->World->NrMaxEntities = NrMaxEntities;
   GameState->World->Entities = (entity*) PushArray( &GameState->PersistentArena, GameState->World->NrMaxEntities, entity );
 
-  GameState->World->NrContacts = 0;
-  GameState->World->MaxNrContacts = NrMaxEntities;
-  GameState->World->Contacts = (contact_data_list*)  PushSize( &GameState->PersistentArena, GameState->World->MaxNrContacts*( sizeof(contact_data_list) + 4*sizeof(contact_data)));
-
+  GameState->World->MaxNrManifolds = 4*NrMaxEntities;
+  GameState->World->Manifolds = (contact_manifold*)  PushSize( &GameState->PersistentArena, GameState->World->MaxNrManifolds*( sizeof(contact_manifold) ));
+  GameState->World->FirstContactManifold = 0;
   GameState->World->Assets = PushStruct(GameState->World->AssetArena, game_assets);
 }
 
@@ -160,25 +177,7 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
   CubeB->SpatialComponent->Rotation = RotateQuaternion( Pi32/4.f, V3(0,0,1) );
   CubeB->SpatialComponent->Scale = V3(2, 2, 2);
 
-  NewComponents( World, CubeA, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
-
-  CubeA->GjkEpaVisualizerComponent->MaxIndexCount = 1024;
-  CubeA->GjkEpaVisualizerComponent->Indeces = (u32*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->MaxIndexCount, u32);
-
-  CubeA->GjkEpaVisualizerComponent->MaxVertexCount = 1024;
-  CubeA->GjkEpaVisualizerComponent->Vertices = (v3*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->MaxVertexCount, v3);
-
-  CubeA->GjkEpaVisualizerComponent->NormalMaxIndexCount = 1024;
-  CubeA->GjkEpaVisualizerComponent->NormalIndeces = (u32*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->NormalMaxIndexCount, u32);
-
-  CubeA->GjkEpaVisualizerComponent->MaxNormalCount = 1024;
-  CubeA->GjkEpaVisualizerComponent->Normals = (v3*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->MaxNormalCount, v3);
-
-  CubeA->GjkEpaVisualizerComponent->MaxSimplexCount = 16;
-  CubeA->GjkEpaVisualizerComponent->Simplex = (simplex_index*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->MaxSimplexCount, simplex_index);
-
-  CubeA->GjkEpaVisualizerComponent->MaxEPACount = 32;
-  CubeA->GjkEpaVisualizerComponent->EPA = (epa_index*) PushArray(AssetArena, CubeA->GjkEpaVisualizerComponent->MaxEPACount, epa_index);;
+  NewComponents( World, CubeA, COMPONENT_TYPE_CONTROLLER );
 
   CubeA->ControllerComponent->Controller = GetController(Input, 1);
   CubeA->ControllerComponent->Type = ControllerType_EpaGjkVisualizer;
@@ -214,18 +213,18 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   Light->LightComponent->Color = V4(3,3,3,1);
   Light->SpatialComponent->Position = V3(10,10,10);
 
-#define State1
+#define State2
 #if defined(State0)
   // Bug - producing state. Gets a broken mesh somewhere
   s32 iarr[] = {-3,3};
   s32 jarr[] = {-0,3};
   s32 karr[] = {-3,3};
-#elif defined(State3)
+#elif defined(State2)
   s32 iarr[] = {-2,2};
   s32 jarr[] = {-0,1};
   s32 karr[] = {-2,2};
 #else
-  s32 iarr[] = {-0,1};
+  s32 iarr[] = {-0,2};
   s32 jarr[] = {-0,1};
   s32 karr[] = {-0,1};
 
@@ -257,25 +256,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   floor->SpatialComponent->Scale = V3( 18, 1, 18);
 
 #if 1
-  NewComponents( World, floor, COMPONENT_TYPE_GJK_EPA_VISUALIZER | COMPONENT_TYPE_CONTROLLER );
-  floor->GjkEpaVisualizerComponent->MaxIndexCount = 1024;
-  floor->GjkEpaVisualizerComponent->Indeces = (u32*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->MaxIndexCount, u32);
-
-  floor->GjkEpaVisualizerComponent->MaxVertexCount = 1024;
-  floor->GjkEpaVisualizerComponent->Vertices = (v3*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->MaxVertexCount, v3);
-
-  floor->GjkEpaVisualizerComponent->NormalMaxIndexCount = 1024;
-  floor->GjkEpaVisualizerComponent->NormalIndeces = (u32*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->NormalMaxIndexCount, u32);
-
-  floor->GjkEpaVisualizerComponent->MaxNormalCount = 1024;
-  floor->GjkEpaVisualizerComponent->Normals = (v3*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->MaxNormalCount, v3);
-
-  floor->GjkEpaVisualizerComponent->MaxSimplexCount = 16;
-  floor->GjkEpaVisualizerComponent->Simplex = (simplex_index*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->MaxSimplexCount, simplex_index);
-
-  floor->GjkEpaVisualizerComponent->MaxEPACount = 32;
-  floor->GjkEpaVisualizerComponent->EPA = (epa_index*) PushArray(AssetArena, floor->GjkEpaVisualizerComponent->MaxEPACount, epa_index);
-
+  NewComponents( World, floor, COMPONENT_TYPE_CONTROLLER );
   floor->ControllerComponent->Controller = GetController(Input, 1);
   floor->ControllerComponent->Type = ControllerType_EpaGjkVisualizer;
 #endif
@@ -485,7 +466,7 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
     RenderCommands->MainRenderGroup.ProjectionMatrix = M4Identity();
     RenderCommands->MainRenderGroup.ViewMatrix = M4Identity();
 
-
+    AllocateGlobaklGjkEpaVisualizer(&Memory->GameState->AssetArena);
 
     RenderCommands->DebugRenderGroup.ElementCount = 0;
     RenderCommands->DebugRenderGroup.Buffer = utils::push_buffer((u8*) PushSize(&Memory->GameState->PersistentArena, RenderMemorySize), RenderMemorySize);
@@ -526,6 +507,7 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
   GlobalDebugRenderGroup = &RenderCommands->DebugRenderGroup;
+  GlobalVis = &GlobalGjkEpaVisualizer;
   TIMED_FUNCTION();
   Platform = Memory->PlatformAPI;
   InitiateGame(Thread, Memory, RenderCommands, Input);
@@ -622,7 +604,7 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
       DebugState->SnapShotIndex = 0;
     }
 
-    PushDebugOverlay(DebugState);
+    //PushDebugOverlay(DebugState);
   }
   return GlobalDebugTable;
 }
