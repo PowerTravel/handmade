@@ -49,9 +49,6 @@ typedef intptr_t smm;
 typedef float  r32;
 typedef double r64;
 
-#define Maximum(A, B) ((A > B) ? (A) : (B))
-#define Minimum(A, B) ((A < B) ? (A) : (B))
-
 // NOTE(casey): Added (Value-Value) here to force integral promotion to the size of Value
 #define AlignPow2(Value, Alignment) ((Value + ((Alignment) - 1)) & ~((Value - Value) + (Alignment) - 1))
 #define Align4(Value) ((Value + 3) & ~3)

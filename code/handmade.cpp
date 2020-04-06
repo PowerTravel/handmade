@@ -199,7 +199,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   memory_arena* AssetArena     = &GameState->AssetArena;
   memory_arena* TransientArena = &GameState->TransientArena;
 
-  AllocateWorld(1000, GameState);
+  AllocateWorld(40, GameState);
   world* World = GameState->World;
   game_assets* Assets = World->Assets;
 
@@ -213,21 +213,26 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   Light->LightComponent->Color = V4(3,3,3,1);
   Light->SpatialComponent->Position = V3(10,10,10);
 
-#define State2
-#if defined(State0)
+#define State3
+#if defined(State1)
   // Bug - producing state. Gets a broken mesh somewhere
-  s32 iarr[] = {-3,3};
-  s32 jarr[] = {-0,3};
-  s32 karr[] = {-3,3};
+  r32 ySpace = 1;
+  r32 xzSpace = 1;
+  s32 iarr[] = {-0,1};
+  s32 jarr[] = {-1,6};
+  s32 karr[] = {-0,1};
 #elif defined(State2)
+  r32 ySpace = 1;
+  r32 xzSpace = 1;
   s32 iarr[] = {-2,2};
-  s32 jarr[] = {-0,1};
+  s32 jarr[] = {-1,3};
   s32 karr[] = {-2,2};
 #else
-  s32 iarr[] = {-0,2};
-  s32 jarr[] = {-0,1};
-  s32 karr[] = {-0,1};
-
+  r32 ySpace = 1;
+  r32 xzSpace = 1.2;
+  s32 iarr[] = {-1,1};
+  s32 jarr[] = {-0,3};
+  s32 karr[] = {-1,1};
 #endif
   for (s32 i = iarr[0]; i < iarr[1]; ++i)
   {
@@ -241,12 +246,12 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
         // Uncomment this and set j < 1 in the for loop to reproduce a bug where
         // GJK perodically does not find a collision.
         //Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,2,1), cubeEntity->SpatialComponent );
-        cubeEntity->SpatialComponent->Position =  V3(2.f*i, 2.f*j, 2.f*k);
+        cubeEntity->SpatialComponent->Position =  V3(xzSpace*i, ySpace*j, xzSpace*k);
         cubeEntity->SpatialComponent->Rotation = RotateQuaternion( 0, V3(0,0,0) );
         cubeEntity->SpatialComponent->Scale = V3(1, 1, 1);
         cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
         cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0,0);
-        cubeEntity->DynamicsComponent->Mass = 1;
+        cubeEntity->DynamicsComponent->Mass = 2;
       }
     }
   }
@@ -517,7 +522,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   World->GlobalTimeSec += Input->dt;
 
   ControllerSystemUpdate(GameState->World);
-  SpatialSystemUpdate(GameState->World, &Memory->PlatformAPI);
+  SpatialSystemUpdate(GameState->World);
   CameraSystemUpdate(GameState->World);
   SpriteAnimationSystemUpdate(GameState->World);
   FillRenderPushBuffer( World, RenderCommands );
@@ -604,7 +609,7 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
       DebugState->SnapShotIndex = 0;
     }
 
-    //PushDebugOverlay(DebugState);
+    PushDebugOverlay(DebugState);
   }
   return GlobalDebugTable;
 }

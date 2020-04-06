@@ -17,16 +17,20 @@ struct contact_data
   v3 TangentNormalOne;
   v3 TangentNormalTwo;
   r32 PenetrationDepth;
+  b32 Persistent;
 };
 
 struct contact_data_cache
 {
   v3 J[4];
+  v3 Jn1[4];
+  v3 Jn2[4];
   v3 InvMJ[4];
-  r32 Lambda;
+  v3 InvMJn1[4];
+  v3 InvMJn2[4];
   r32 AccumulatedLambda;
-  r32 CachedLambda;
-  b32 PersistentContact;
+  r32 AccumulatedLambdaN1;
+  r32 AccumulatedLambdaN2;
 };
 
 struct contact_manifold
@@ -37,7 +41,7 @@ struct contact_manifold
   u32 ContactCount;
   u32 MaxContactCount;
   contact_data Contacts[4];
-  contact_data_cache CashedData[4];
+  contact_data_cache CachedData[4];
   contact_manifold* Next;
 };
 

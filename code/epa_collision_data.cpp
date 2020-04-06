@@ -432,6 +432,7 @@ internal inline void DissconectEdge( epa_halfedge* Edge )
 
   PreviousEdge->NextEdge = Edge->OppositeEdge->NextEdge;
   OppositePreviousEdge->NextEdge = Edge->NextEdge;
+  Assert(Edge->OppositeEdge);
 }
 
 internal inline void getFacePoints(epa_face* Face, v3* P0, v3* P1, v3* P2)

@@ -35,14 +35,4 @@ QuaternionMultiplication(const v4 r, const v4 q)
   return Result;
 }
 
-inline void
-TimestepVelocity(const r32 DeltaTime, const v3 LinearVelocity, const v3 AngularVelocity, component_spatial* c )
-{
-  Assert(c);
-  c->Position+=DeltaTime*LinearVelocity;
-  const v4 q0 = c->Rotation;
-  const v4 r = V4(AngularVelocity.X, AngularVelocity.Y, AngularVelocity.Z,0);
-  const v4 q1 = QuaternionMultiplication(r, q0);
 
-  c->Rotation += 0.5f*DeltaTime*q1;
-}

@@ -86,9 +86,10 @@ memory_index GetPrintableTree( memory_arena* TemporaryArena, aabb_tree* Tree, me
   return Scanner - Memory;
 }
 
-broad_phase_result_stack* GetCollisionPairs( memory_arena* TemporaryArena, aabb_tree* Tree)
+broad_phase_result_stack* GetCollisionPairs( memory_arena* TemporaryArena, aabb_tree* Tree, u32* ResultStackSize)
 {
   TIMED_FUNCTION();
+  *ResultStackSize = 0;
   if(Tree->Size < 2)
   {
     return 0;
@@ -120,6 +121,7 @@ broad_phase_result_stack* GetCollisionPairs( memory_arena* TemporaryArena, aabb_
           NewResult->B = Right->Entity;
           NewResult->Previous = ResultHead;
           ResultHead = NewResult;
+          ++(*ResultStackSize);
         }
         // Pop the leafs
         LeftHead  = Pop2(LeftHead);
