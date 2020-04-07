@@ -19,6 +19,7 @@
 #define SLOP 0.005f
 
 #define SLOVER_ITERATIONS 10
+#define MULTI_THREADED
 
 list< aabb3f > GetOverlappingWallTiles(memory_arena* Arena, tile_map* TileMap, aabb3f* BoundingBox, v3 CollisionEnvelope = {} )
 {
@@ -149,19 +150,11 @@ v3 ClosestPointOnEdge(const v3& EdgeStart, const v3& EdgeEnd, const v3& Point)
   return ClosestPointOnEdge;
 }
 
-struct collision_detection_work
+internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
 {
-  memory_arena* TransientArena;
-  contact_manifold* Manifold;
-};
-
-internal void
-DoCollisionDetectionWork(void* Data)
-{
-  collision_detection_work* Work = (collision_detection_work*) Data;
-  entity* A = Work->Manifold->A;
-  entity* B = Work->Manifold->B;
-  contact_manifold* Manifold = Work->Manifold;
+  contact_manifold* Manifold = (contact_manifold*) Data;
+  entity* A = Manifold->A;
+  entity* B = Manifold->B;
   m4 ModelMatrixA = GetModelMatrix(A->SpatialComponent);
   m4 ModelMatrixB = GetModelMatrix(B->SpatialComponent);
   collider_mesh* MeshA = A->ColliderComponent->Mesh;
@@ -170,9 +163,14 @@ DoCollisionDetectionWork(void* Data)
       &ModelMatrixA, MeshA,
       &ModelMatrixB, MeshB);
 
+
+  // Todo: Should we give each thread it's own Transient Arena?
+  memory_arena Arena = {};
+  temporary_memory TempMem = BeginTemporaryMemory(&Arena);
+
   if (NarrowPhaseResult.ContainsOrigin)
   {
-    contact_data NewContact = EPACollisionResolution(Work->TransientArena, &ModelMatrixA, A->ColliderComponent->Mesh,
+    contact_data NewContact = EPACollisionResolution(&Arena, &ModelMatrixA, A->ColliderComponent->Mesh,
                                                                            &ModelMatrixB, B->ColliderComponent->Mesh,
                                                                            &NarrowPhaseResult.Simplex);
 
@@ -375,6 +373,8 @@ DoCollisionDetectionWork(void* Data)
       }
     }
   }
+
+  EndTemporaryMemory(TempMem);
 }
 
 void FireOnceVic(memory_arena* TransientArena, entity* A, entity* B)
@@ -541,8 +541,8 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
 {
   broad_phase_result_stack* ColliderPair = BroadPhaseResultStack;
   memory_arena* TransientArena = World->TransientArena;
-  collision_detection_work* WorkArray = PushArray(TransientArena, BroadPhaseResultCount, collision_detection_work);
-  collision_detection_work* WorkSlot = WorkArray;
+  contact_manifold** WorkArray = (contact_manifold**) PushArray(TransientArena, BroadPhaseResultCount, contact_manifold* );
+  contact_manifold** WorkSlot = WorkArray;
   World->FirstContactManifold = 0;
   while( ColliderPair )
   {
@@ -599,22 +599,23 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
     Assert(Manifold != Manifold->Next);
 
     // Add it to the work array
-    WorkSlot->TransientArena = TransientArena;
-    WorkSlot->Manifold =  Manifold;
-//  CollisionQueue->AddEntry(CollisionQueue, DoCollisionDetectionWork, Work);
-
+    *WorkSlot = Manifold;
+#if defined(MULTI_THREADED)
+    Platform.PlatformAddEntry(Platform.HighPriorityQueue, DoCollisionDetectionWork, (void*) *WorkSlot);
+#endif
     ColliderPair = ColliderPair->Previous;
     ++WorkSlot;
   }
 
-
-
-//  CollisionQueue->PlatformCompleteWorkQueue(CollisionQueue);
+#if defined(MULTI_THREADED)
+  Platform.PlatformCompleteWorkQueue(Platform.HighPriorityQueue);
+#else
   u32 CollisionWorkIndex = 0;
   while(CollisionWorkIndex < BroadPhaseResultCount)
   {
-    DoCollisionDetectionWork((void*) (WorkArray + CollisionWorkIndex++));
+    DoCollisionDetectionWork(Platform.HighPriorityQueue, (void*) *(WorkArray + CollisionWorkIndex++));
   }
+#endif
 }
 
 internal void RemoveNonIntersectingManifolds(world* World)
@@ -871,16 +872,8 @@ void SpatialSystemUpdate( world* World )
     {
       // TODO: Process Constraints MultiThreaded?
       SolveNonPenetrationConstraints(World);
-#if 0
-      SolveFrictionalConstraints( World );
+      SolveFrictionalConstraints(World);
     }
-#else
-    }
-    for (u32 i = 0; i < SLOVER_ITERATIONS; ++i)
-    {
-      SolveFrictionalConstraints( World );
-    }
-#endif
   }
 
   IntegratePositions(World);

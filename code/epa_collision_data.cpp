@@ -107,12 +107,12 @@ GetFaceNormal(const epa_face* Face)
   epa_halfedge* E0 = Face->Edge;
   epa_halfedge* E1 = Face->Edge->NextEdge;
   epa_halfedge* E2 = Face->Edge->NextEdge->NextEdge;
-  Assert(E0);
-  Assert(E1);
-  Assert(E2);
-  Assert(E0->OppositeEdge);
-  Assert(E1->OppositeEdge);
-  Assert(E2->OppositeEdge);
+  //Assert(E0);
+  //Assert(E1);
+  //Assert(E2);
+  //Assert(E0->OppositeEdge);
+  //Assert(E1->OppositeEdge);
+  //Assert(E2->OppositeEdge);
   return GetPlaneNormal(E0->TargetVertex->P.S,
                         E1->TargetVertex->P.S,
                         E2->TargetVertex->P.S);
@@ -741,7 +741,8 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
     gjk_support SupportPoint = CsoSupportFunction( AModelMat, AMesh,
                                                    BModelMat, BMesh,
                                                    ClosestFace->Normal);
-    RecordEPAFrame(Mesh, ClosestFace, SupportPoint.S);
+    // Todo: Make this multithreaded
+    // RecordEPAFrame(Mesh, ClosestFace, SupportPoint.S);
     if(IsPointOnMeshSurface(Mesh,SupportPoint.S))
     {
       // If a new point falls on a face in the polytype we return the
@@ -823,7 +824,8 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
   ContactData.PenetrationDepth    = DistanceClosestToFace;
   EndTemporaryMemory(TempMem);
 
-  RecordEPAFrame(Mesh, ClosestFace);
+  // Todo: Make this multithreaded
+  //RecordEPAFrame(Mesh, ClosestFace);
   return ContactData;
 
 }

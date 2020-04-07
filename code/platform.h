@@ -472,6 +472,15 @@ typedef PLATFORM_ALLOCATE_MEMORY(platform_allocate_memory);
 #define PLATFORM_DEALLOCATE_MEMORY(name) void name(platform_memory_block *aBlock)
 typedef PLATFORM_DEALLOCATE_MEMORY(platform_deallocate_memory);
 
+
+struct platform_work_queue;
+
+#define PLATFORM_WORK_QUEUE_CALLBACK(name) void name(platform_work_queue* Queue, void* Data)
+typedef PLATFORM_WORK_QUEUE_CALLBACK(platform_work_queue_callback);
+
+typedef void platform_add_entry(platform_work_queue* Queue, platform_work_queue_callback* Callback, void* Data);
+typedef void platform_complete_all_work(platform_work_queue* Queue);
+
 struct platform_api
 {
 //    platform_open_file *OpenFile;
@@ -482,6 +491,11 @@ struct platform_api
 
     platform_allocate_memory*   AllocateMemory;
     platform_deallocate_memory* DeallocateMemory;
+
+    platform_work_queue* HighPriorityQueue;
+
+    platform_add_entry* PlatformAddEntry;
+    platform_complete_all_work* PlatformCompleteWorkQueue;
 
 //     TODO(casey): Get rid of these eventually, make them just go through
 //     the OpenFile/ReadDataFromFile/WriteDataToFile/CloseFile API.
