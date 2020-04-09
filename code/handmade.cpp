@@ -29,6 +29,7 @@ global_variable b32 GlobalFireVic = false;
 #include "dynamic_aabb_tree.cpp"
 #include "gjk_narrow_phase.cpp"
 #include "epa_collision_data.cpp"
+#include "halfedge_mesh.cpp"
 #include "entity_components.cpp"
 #include "system_controller.cpp"
 #include "system_sprite_animation.cpp"

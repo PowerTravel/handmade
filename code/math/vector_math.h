@@ -52,7 +52,7 @@ union m4
 };
 
 inline b32
-Equals(const r32 A, const r32 B, const r32 Tol = 10E-7 )
+Equals(const r32 A, const r32 B, const r32 Tol = 10E-9 )
 {
   return Abs(A-B) < Tol;
 }
