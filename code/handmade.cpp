@@ -231,9 +231,9 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
 #else
   r32 ySpace = 1;
   r32 xzSpace = 1.2;
-  s32 iarr[] = {-1,1};
-  s32 jarr[] = {-0,3};
-  s32 karr[] = {-1,1};
+  s32 iarr[] = {-2,2};
+  s32 jarr[] = {-0,1};
+  s32 karr[] = {-2,2};
 #endif
   for (s32 i = iarr[0]; i < iarr[1]; ++i)
   {

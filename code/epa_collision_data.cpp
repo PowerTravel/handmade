@@ -64,7 +64,7 @@ RemoveFacesSeenByPoint(epa_mesh* Mesh, gjk_support* Point)
   epa_face* Face = 0;
   while((Face = GetFaceSeenByPoint(Mesh, Point)) != NULL)
   {
-    RemoveFace(Face);
+    RemoveFace(Mesh,Face);
   }
 }
 
@@ -147,7 +147,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
     ClosestFace = GetClosestFaceToOrigin( Mesh, &DistanceToClosestFace,  &WasInside );
     Assert(WasInside);
     Tries = (Abs(DistanceToClosestFace - PreviousDistanceToClosestFace) > 10E-7) ? 0 : Tries+1;
-    if(Tries < TriesUntilGivingUp)
+    if(Tries > TriesUntilGivingUp)
     {
       break;
     }
@@ -159,8 +159,10 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
     if(IsPointOnMeshSurface(Mesh, &SupportPoint))
     {
       SubdivideMesh(Mesh, &SupportPoint);
+      break;
     }else{
       RemoveFacesSeenByPoint(Mesh, &SupportPoint);
+      Assert(Mesh->Faces);
       FillHole( Mesh, &SupportPoint);
     }
 

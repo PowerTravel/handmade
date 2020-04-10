@@ -19,7 +19,7 @@
 #define SLOP 0.005f
 
 #define SLOVER_ITERATIONS 100
-#define MULTI_THREADED
+//#define MULTI_THREADED
 
 list< aabb3f > GetOverlappingWallTiles(memory_arena* Arena, tile_map* TileMap, aabb3f* BoundingBox, v3 CollisionEnvelope = {} )
 {
