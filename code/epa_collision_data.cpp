@@ -36,36 +36,22 @@ void FixWindingCCW(gjk_support Support[4])
   }
 }
 
-epa_face* GetClosestFaceToOrigin(epa_mesh* Mesh, r32* ShortestDistance, b32* IsInside)
+epa_face* GetClosestFaceToOrigin(epa_mesh* Mesh, r32* ShortestDistance)
 {
   *ShortestDistance = R32Max;
-  *IsInside = false;
   epa_face* Result = 0;
   epa_face* Face = Mesh->Faces;
   while(Face)
   {
-    r32 Distance = 0;
-    b32 Inside = GetDistanceToFace(Face, &Distance);
+    r32 Distance = GetDistanceToFace(Face);
     if(Distance < *ShortestDistance)
     {
       Result = Face;
       *ShortestDistance = Distance;
-      *IsInside = Inside;
     }
     Face = Face->Next;
   }
   return Result;
-}
-
-internal void
-RemoveFacesSeenByPoint(epa_mesh* Mesh, gjk_support* Point)
-{
-  TIMED_FUNCTION();
-  epa_face* Face = 0;
-  while((Face = GetFaceSeenByPoint(Mesh, Point)) != NULL)
-  {
-    RemoveFace(Mesh,Face);
-  }
 }
 
 internal epa_mesh *
@@ -89,13 +75,9 @@ void PopulateContactData(const m4* AModelMat, const m4* BModelMat, epa_face* Fac
 
   v3 Coords = GetBaryocentricCoordinates(A.S,B.S,C.S,FaceNormal,P);
 
-  // Point Outside the triangle
-  if( !(Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
-      !(Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
-      !(Coords.E[2] >= 0) && (Coords.E[2] <= 1))
-  {
-    Assert(0)
-  }
+  //Assert(((Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
+  //        (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
+  //        (Coords.E[2] >= 0) && (Coords.E[2] <= 1)));
 
   v3 InterpolatedSupportA = Coords.E[0] * A.A + Coords.E[1] * B.A + Coords.E[2] * C.A;
   v3 InterpolatedSupportB = Coords.E[0] * A.B + Coords.E[1] * B.B + Coords.E[2] * C.B;
@@ -143,9 +125,7 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
   for(;;)
   {
     // Todo: Does the line from the origin to the face have to be parallel with the face normal?
-    b32 WasInside = false;
-    ClosestFace = GetClosestFaceToOrigin( Mesh, &DistanceToClosestFace,  &WasInside );
-    Assert(WasInside);
+    ClosestFace = GetClosestFaceToOrigin( Mesh, &DistanceToClosestFace);
     Tries = (Abs(DistanceToClosestFace - PreviousDistanceToClosestFace) > 10E-7) ? 0 : Tries+1;
     if(Tries > TriesUntilGivingUp)
     {
@@ -156,16 +136,22 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
                                                    BModelMat, BMesh,
                                                    GetNormal(ClosestFace));
 
+
+#if 0
     if(IsPointOnMeshSurface(Mesh, &SupportPoint))
     {
-      SubdivideMesh(Mesh, &SupportPoint);
       break;
     }else{
       RemoveFacesSeenByPoint(Mesh, &SupportPoint);
       Assert(Mesh->Faces);
       FillHole( Mesh, &SupportPoint);
     }
-
+#else
+    if(!GrowMesh(Mesh, &SupportPoint))
+    {
+      break;
+    }
+#endif
     PreviousDistanceToClosestFace = DistanceToClosestFace;
 
   };

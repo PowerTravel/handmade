@@ -960,16 +960,48 @@ ProjectPointOntoPlane( const v3& PointToProject, const v3& PointOnPlane, const v
   return ProjectedPoint;
 }
 
+inline b32
+IsPointOnLinesegment(const v3& o, const v3& d, const v3& p)
+{
+  // o = origin of linesegment
+  // d = destination of linesegment
+  // p = point to check
+  Assert(o != d);
+
+  const v3 od = Normalize(d-o);
+  const v3 op = Normalize(p-o);
+
+  r32 LenSq = od*op;
+  if(Abs(LenSq - 1) <= 10E-7)
+  {
+    return true;
+  }
+
+  return false;
+}
+
+v3 GetBaryocentricCoordinatesSlow(const v3& p0, const v3& p1, const v3& p2, const v3& normal, const v3& Point)
+{
+  r32 OneOverFaceArea = 1.f/(normal * CrossProduct( p1 - p0, p2 - p0));
+  r32 SubAreaA = normal * CrossProduct( p2 - p1, Point - p1);
+  r32 SubAreaB = normal * CrossProduct( p0 - p2, Point - p2);
+  r32 SubAreaC = normal * CrossProduct( p1 - p0, Point - p0);
+  r32 LambdaA = SubAreaA * OneOverFaceArea;
+  r32 LambdaB = SubAreaB * OneOverFaceArea;
+  r32 LambdaC = SubAreaC * OneOverFaceArea;
+  v3 Result = V3(LambdaA, LambdaB, LambdaC);
+  return Result;
+}
+
 v3 GetBaryocentricCoordinates(const v3& p0, const v3& p1, const v3& p2, const v3& normal, const v3& Point)
 {
   r32 OneOverFaceArea = 1.f/(normal * CrossProduct( p1 - p0, p2 - p0));
   r32 SubAreaA = normal * CrossProduct( p2 - p1, Point - p1);
   r32 SubAreaB = normal * CrossProduct( p0 - p2, Point - p2);
-  //r32 SubAreaC = Norm( CrossProduct( p1 - p0, Point - p0) );
+
   r32 LambdaA = SubAreaA * OneOverFaceArea;
   r32 LambdaB = SubAreaB * OneOverFaceArea;
   r32 LambdaC = 1.f-(LambdaA + LambdaB);
-  //r32 LambdaC = SubAreaC * OneOverFaceArea;
 
   v3 Result = V3(LambdaA, LambdaB, LambdaC);
   return Result;

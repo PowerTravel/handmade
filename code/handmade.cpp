@@ -28,8 +28,13 @@ global_variable b32 GlobalFireVic = false;
 #include "render_push_buffer.cpp"
 #include "dynamic_aabb_tree.cpp"
 #include "gjk_narrow_phase.cpp"
+#if 1
 #include "epa_collision_data.cpp"
 #include "halfedge_mesh.cpp"
+#else
+#include "epa_collision_data_old.cpp"
+#endif
+
 #include "entity_components.cpp"
 #include "system_controller.cpp"
 #include "system_sprite_animation.cpp"
@@ -129,7 +134,7 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
   }
 }
 
-void AllocateWorld( u32 NrMaxEntities, game_state* GameState )
+void AllocateWorld( u32 NrMaxEntities, game_state* GameState, u32 NumManifolds = 4 )
 {
   GameState->World = (world*) PushStruct(&GameState->PersistentArena, world);
   GameState->World->AssetArena      = &GameState->AssetArena;
@@ -140,7 +145,7 @@ void AllocateWorld( u32 NrMaxEntities, game_state* GameState )
   GameState->World->NrMaxEntities = NrMaxEntities;
   GameState->World->Entities = (entity*) PushArray( &GameState->PersistentArena, GameState->World->NrMaxEntities, entity );
 
-  GameState->World->MaxNrManifolds = 4*NrMaxEntities;
+  GameState->World->MaxNrManifolds = NumManifolds*NrMaxEntities;
   GameState->World->Manifolds = (contact_manifold*)  PushSize( &GameState->PersistentArena, GameState->World->MaxNrManifolds*( sizeof(contact_manifold) ));
   GameState->World->FirstContactManifold = 0;
   GameState->World->Assets = PushStruct(GameState->World->AssetArena, game_assets);
@@ -200,7 +205,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   memory_arena* AssetArena     = &GameState->AssetArena;
   memory_arena* TransientArena = &GameState->TransientArena;
 
-  AllocateWorld(40, GameState);
+  AllocateWorld(120, GameState, 32);
   world* World = GameState->World;
   game_assets* Assets = World->Assets;
 
@@ -226,13 +231,13 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   r32 ySpace = 1;
   r32 xzSpace = 1;
   s32 iarr[] = {-2,2};
-  s32 jarr[] = {-1,3};
+  s32 jarr[] = {-1,5};
   s32 karr[] = {-2,2};
 #else
   r32 ySpace = 1;
   r32 xzSpace = 1.2;
   s32 iarr[] = {-2,2};
-  s32 jarr[] = {-0,1};
+  s32 jarr[] = {-0,3};
   s32 karr[] = {-2,2};
 #endif
   for (s32 i = iarr[0]; i < iarr[1]; ++i)
@@ -602,7 +607,7 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
   {
     DebugState->CounterStateCount = 0;
 
-    CollateDebugRecords(DebugState, EventCount, EventArrayIndex, GlobalDebugTable);
+    //CollateDebugRecords(DebugState, EventCount, EventArrayIndex, GlobalDebugTable);
 
     ++DebugState->SnapShotIndex;
     if(DebugState->SnapShotIndex >= SNAPSHOT_COUNT)
@@ -610,7 +615,7 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
       DebugState->SnapShotIndex = 0;
     }
 
-    PushDebugOverlay(DebugState);
+    //PushDebugOverlay(DebugState);
   }
   return GlobalDebugTable;
 }
