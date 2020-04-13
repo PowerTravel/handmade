@@ -3,7 +3,6 @@
 #include "gjk_narrow_phase.h"
 #include "memory.h"
 #include "component_collider.h"
-
 #include "halfedge_mesh.h"
 
 /*
@@ -137,21 +136,11 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
                                                    GetNormal(ClosestFace));
 
 
-#if 0
-    if(IsPointOnMeshSurface(Mesh, &SupportPoint))
-    {
-      break;
-    }else{
-      RemoveFacesSeenByPoint(Mesh, &SupportPoint);
-      Assert(Mesh->Faces);
-      FillHole( Mesh, &SupportPoint);
-    }
-#else
     if(!GrowMesh(Mesh, &SupportPoint))
     {
       break;
     }
-#endif
+
     PreviousDistanceToClosestFace = DistanceToClosestFace;
 
   };

@@ -968,16 +968,28 @@ IsPointOnLinesegment(const v3& o, const v3& d, const v3& p)
   // p = point to check
   Assert(o != d);
 
-  const v3 od = Normalize(d-o);
-  const v3 op = Normalize(p-o);
-
-  r32 LenSq = od*op;
-  if(Abs(LenSq - 1) <= 10E-7)
+  const v3 od = d-o;
+  const v3 op = p-o;
+  const v3 cross = CrossProduct(od,op);
+  const r32 CrossLenSq = NormSq(cross);
+  if( CrossLenSq > 10E-7)
   {
-    return true;
+    return false;
   }
 
-  return false;
+  r32 dotp = od*op;
+  if(dotp < 0)
+  {
+    return false;
+  }
+
+  r32 LenSq = NormSq(od);
+  if(dotp > LenSq)
+  {
+    return false;
+  }
+
+  return true;
 }
 
 v3 GetBaryocentricCoordinatesSlow(const v3& p0, const v3& p1, const v3& p2, const v3& normal, const v3& Point)

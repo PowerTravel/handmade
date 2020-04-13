@@ -1,7 +1,6 @@
 
 #include "halfedge_mesh.h"
 
-//#define F32_TOL 10E-9
 #define F32_TOL 10E-7
 
 // Todo: Cache the face normal?
@@ -15,36 +14,22 @@ v3 GetNormal(epa_face* Face)
                         E2->TargetVertex->P.S);
 }
 
-
-epa_halfedge* GetBorderEdge(epa_mesh* Mesh)
+internal void
+GetFacePoints(epa_face* Face, v3* P0, v3* P1, v3* P2)
 {
-  epa_face* Face = Mesh->Faces;
-  while(Face)
-  {
-    epa_halfedge* Edge = Face->Edge;
-    while(Edge->Next != Face->Edge)
-    {
-      if(!Edge->Opposite->LeftFace)
-      {
-        Assert(Edge->LeftFace);
-        return Edge->Opposite;
-        break;
-      }
-      Edge = Edge->Next;
-    }
-    Face = Face->Next;
-  }
-  return 0;
-}
+  *P0 = Face->Edge->TargetVertex->P.S;
+  *P1 = Face->Edge->Next->TargetVertex->P.S;
+  *P2 = Face->Edge->Next->Next->TargetVertex->P.S;;
+};
 
-void RemoveFacesSeenByPoint(epa_mesh* Mesh, gjk_support* Point)
+r32 GetFaceArea(epa_face* Face)
 {
-  TIMED_FUNCTION();
-  epa_face* Face = 0;
-  while((Face = GetFaceSeenByPoint(Mesh, Point)) != NULL)
-  {
-    RemoveFace(Mesh,Face);
-  }
+  v3 P0, P1, P2;
+  GetFacePoints(Face, &P0, &P1, &P2);
+  v3 v0 = P1-P0;
+  v3 v1 = P2-P0;
+  r32 Result = Norm(CrossProduct(v0,v1))*0.5f;
+  return Result;
 }
 
 epa_face* GetFaceSeenByPoint(epa_mesh* Mesh, gjk_support* Point)
@@ -71,6 +56,129 @@ epa_face* GetFaceSeenByPoint(epa_mesh* Mesh, gjk_support* Point)
   }
   return Result;
 }
+
+/*
+ *                               ^
+ *                               | |
+ *                        NextB2 | |PrevB1
+ *                               | |
+ *                               | |
+ *                                 v
+ *                             ^ P1  \
+ *                            / /   ^ \
+ *                           / /     \ \
+ *                          / /       \ \
+ *                         / /         \ \
+ *                    B2  / / A2     A1 \ \ B1
+ *                       / /             \ \
+ *                      / /               \ \
+ *                     / /                 \ \
+ *      PrevB2          v        A0           v     NextB1
+ * -----------------> P2-------------------> P0 ---------------->
+ * <----------------    <-------------------    <----------------
+ *                  ^ /          B0           ^ \
+ *                 / / NextB0           PrevB0 \ \
+ *                / /                           \ \
+ *                 v                             v
+ */
+void DissconnectEdge(epa_halfedge* Edge)
+{
+  Assert(!Edge->LeftFace && !Edge->Opposite->LeftFace)
+
+  epa_halfedge* A = Edge;
+  epa_halfedge* PrevA = A->Previous;
+  epa_halfedge* NextA = A->Next;
+
+  epa_halfedge* B = Edge->Opposite;
+  epa_halfedge* PrevB = B->Previous;
+  epa_halfedge* NextB = B->Next;
+
+  epa_vertex* Pa = A->TargetVertex;
+  if(Pa->OutgoingEdge == B)
+  {
+    Pa->OutgoingEdge = NextA;
+  }
+
+  epa_vertex* Pb = B->TargetVertex;
+  if(Pb->OutgoingEdge == A)
+  {
+    Pb->OutgoingEdge = NextB;
+  }
+
+  PrevB->Next = NextA;
+  NextA->Previous = PrevB;
+
+  PrevA->Next = NextB;
+  NextB->Previous = PrevA;
+
+  A->Next = 0;
+  A->Previous = 0;
+  B->Next = 0;
+  B->Previous = 0;
+
+  Assert(Pa->OutgoingEdge);
+  Assert(Pb->OutgoingEdge);
+}
+
+
+void RemoveFace(epa_mesh* Mesh, epa_face* Face)
+{
+  // Disconnect The Face Fron the Mesh list
+  epa_face** FacePtr = &Mesh->Faces;
+  epa_face*  FaceTmp = *FacePtr;
+  while(*FacePtr != Face)
+  {
+    epa_face* Tmp = *FacePtr;
+    FacePtr = &(*FacePtr)->Next;
+  }
+  *FacePtr = Face->Next;
+
+  epa_halfedge* A0 = Face->Edge;
+  epa_halfedge* A1 = Face->Edge->Next;
+  epa_halfedge* A2 = Face->Edge->Previous;
+
+  Assert(A0->LeftFace && A1->LeftFace && A2->LeftFace);
+  A0->LeftFace = 0;
+  A1->LeftFace = 0;
+  A2->LeftFace = 0;
+
+  if((!A0->Opposite->LeftFace) && (!A1->Opposite->LeftFace) && (!A2->Opposite->LeftFace))
+  {
+    // Assert the border edges form a selfcontained loop.
+    Assert(A0->Next->Next->Next == A0);
+    DissconnectEdge(A0);
+    DissconnectEdge(A1);
+    DissconnectEdge(A2);
+  }else{
+    if(!A0->Opposite->LeftFace)
+    {
+      DissconnectEdge(A0);
+    }
+    if(!A1->Opposite->LeftFace)
+    {
+      DissconnectEdge(A1);
+    }
+    if(!A2->Opposite->LeftFace)
+    {
+      DissconnectEdge(A2);
+    }
+  }
+}
+
+void RemoveFacesSeenByPoint(epa_mesh* Mesh, gjk_support* Point)
+{
+  TIMED_FUNCTION();
+  epa_face* Face = 0;
+  while((Face = GetFaceSeenByPoint(Mesh, Point)) != NULL)
+  {
+    #if HANDMADE_SLOW
+      r32 FaceArea = GetFaceArea(Face);
+      Assert(FaceArea > F32_TOL);
+    #endif
+    RemoveFace(Mesh,Face);
+  }
+}
+
 
 
 internal inline epa_face *
@@ -173,34 +281,28 @@ epa_mesh* InitializeMesh(memory_arena* Arena, gjk_support* P0, gjk_support* P1, 
   NewEdges[5].TargetVertex = B;
   NewEdges[3].TargetVertex = A;
 
+  #if HANDMADE_SLOW
+    r32 FaceArea = GetFaceArea(NewFace);
+    Assert(FaceArea > F32_TOL);
+  #endif
+
   return Result;
 };
-
-internal void
-GetFacePoints(epa_face* Face, v3* P0, v3* P1, v3* P2)
-{
-  *P0 = Face->Edge->TargetVertex->P.S;
-  *P1 = Face->Edge->Next->TargetVertex->P.S;
-  *P2 = Face->Edge->Next->Next->TargetVertex->P.S;;
-};
-
-r32 GetFaceArea(epa_face* Face)
-{
-  v3 P0, P1, P2;
-  GetFacePoints(Face, &P0, &P1, &P2);
-  v3 v0 = P1-P0;
-  v3 v1 = P2-P0;
-  r32 Result = Norm(CrossProduct(v0,v1))*0.5f;
-  return Result;
-}
 
 r32 GetDistanceToFace(epa_face* Face)
 {
+  #if HANDMADE_SLOW
+    r32 FaceArea = GetFaceArea(Face);
+    Assert(FaceArea > F32_TOL*F32_TOL);
+  #endif
   v3 P0, P1, P2;
   GetFacePoints(Face, &P0, &P1, &P2);
   const v3 Normal = GetPlaneNormal(P0, P1, P2);
   const v3 ProjectedPoint = ProjectPointOntoPlane( V3(0,0,0), P0, Normal );
   const v3 Coords = GetBaryocentricCoordinates( P0, P1, P2, Normal, ProjectedPoint);
+  // Note: Baryocentric coordinates introduce allot of numerical instability
+  //       especially for excentric triangles (which we have alot of).
+  //       Be careful when using them.
   const b32 InsideTriangle = (Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
                              (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
                              (Coords.E[2] >= 0) && (Coords.E[2] <= 1);
@@ -210,8 +312,8 @@ r32 GetDistanceToFace(epa_face* Face)
     epa_halfedge* Edge = Face->Edge;
     while(Edge->Next != Face->Edge)
     {
-      // Todo: Im pretty sure there is a way to use the GetBaryocentricCoordinates
-      //       to figure out which Edge is closest without looping over all the edges
+      // Todo: Use GetBaryocentricCoordinates to figure out which Edge is closest
+      //       without looping over all the edges?
       const v3 o = Edge->Previous->TargetVertex->P.S;
       const v3 d = Edge->TargetVertex->P.S;
       const v3 u = Normalize(d-o);
@@ -241,34 +343,6 @@ r32 GetDistanceToFace(epa_face* Face)
   }
   return Result;
 }
-
-// Three cases:
-// New point is Outside Mesh (Do as normal)
-// New point is On a face (Subdivide FACE)
-// New point is On a line (Subdivide Line-Face)
-b32 IsPointOnMeshSurface(epa_mesh* Mesh, gjk_support* Point)
-{
-  epa_face* Face = Mesh->Faces;
-  while(Face)
-  {
-    v3 P0, P1, P2;
-    GetFacePoints(Face, &P0, &P1, &P2);
-    const v3 Normal = GetPlaneNormal(P0, P1, P2);
-    const v3 ProjectedPoint = ProjectPointOntoPlane( Point->S, P0, Normal );
-    r32 Diff = NormSq(ProjectedPoint - Point->S);
-    if (Diff <= F32_TOL)
-    {
-      return true;
-    }
-    Face = Face->Next;
-  }
-
-  return false;
-}
-
-// Todo: Hook up macros like this once it works
-#define JoinParallel(Edge0, Edge1) Edge0->Opposite = Edge1; Edge1->Opposite = Edge0;
-#define JoinSerial(Edge0, Edge1) Edge0->Next = Edge1; Edge1->Previous = Edge0;
 
 
 /*
@@ -412,136 +486,6 @@ internal epa_vertex* AddNewPoint(epa_mesh* Mesh, epa_halfedge* BorderEdge, gjk_s
   return P1;
 }
 
-
-/*
- * AddNewEdge(epa_mesh* Mesh, epa_halfedge* BorderEdge)
- * REQURES That:
- *              - A Valid Mesh
- *              - BorderEdge does NOT point to a face
- *              - BorderEdge->Next does NOT point to a face
- *              - BorderEdge and Next are NOT parallell
- *
- * THEN the output is ALSO a valid mesh.
- *
- *            ---------------->
- *            <----------------   P1
- *              NextBorder    ^ /    ^ ^
- *                           / /      \ \
- *                          / /        \ \
- *                         / /          \ \
- *                    Ext2/ /Int2    Int1\ \
- *                       / /              \ \
- *                      / /                \ \
- *                     / /                  \ \
- *   PrevBorder         v        Int0        v
- * -----------------> P2 -------------------> P0
- * <----------------    <--------------------
- *
- */
-b32 AddNewEdgeForward(epa_mesh* Mesh, epa_halfedge* BorderEdge)
-{
-  Assert(!BorderEdge->LeftFace);
-  Assert(BorderEdge->Opposite->LeftFace);
-  Assert(!BorderEdge->Next->LeftFace);
-  Assert(BorderEdge->Next->Opposite->LeftFace);
-
-  epa_face* Face = PushFace(Mesh);
-
-  b32 HoleStillExists = true;
-
-  // If our hole is just 3 edges long
-  if( BorderEdge->Next->Next->Next == BorderEdge )
-  {
-    // Hook up a new Face to the Internal Edges
-    epa_halfedge* InternalEdge0 = BorderEdge;
-    epa_halfedge* InternalEdge1 = BorderEdge->Next;
-    epa_halfedge* InternalEdge2 = InternalEdge1->Next;
-    Assert(!InternalEdge0->LeftFace);
-    Assert(!InternalEdge1->LeftFace);
-    Assert(!InternalEdge2->LeftFace);
-
-    Assert(InternalEdge2->Next == InternalEdge0);
-    Assert(InternalEdge0->Previous == InternalEdge2);
-
-    Face->Edge = InternalEdge0;
-    InternalEdge0->LeftFace = Face;
-    InternalEdge1->LeftFace = Face;
-    InternalEdge2->LeftFace = Face;
-    HoleStillExists = false;
-
-    #if HANDMADE_SLOW
-      r32 FaceArea = GetFaceArea(Face);
-      Assert(FaceArea > F32_TOL*F32_TOL);
-    #endif
-
-    // TODO: It is not necessarily an error to 'fill' a single hole in a mesh with many holes.
-    //       But I don't think we should be able to produce a multi-hole mesh in EPA.
-    //       Therefore this assert is here so we know of it.
-    //Assert(!GetBorderEdge(Mesh));
-  }else{
-    // Store the serial edges of NextBorderEdge before we reconstruct the mesh
-    epa_halfedge* NextBorderEdge = BorderEdge->Next->Next;
-    epa_halfedge* PreviousBorderEdge = BorderEdge->Previous;
-
-    epa_halfedge* InternalEdge0 = BorderEdge;
-    epa_halfedge* InternalEdge1 = BorderEdge->Next;
-    epa_halfedge* InternalEdge2 = PushStruct(Mesh->Arena, epa_halfedge);
-    epa_halfedge* ExternalEdge2 = PushStruct(Mesh->Arena, epa_halfedge);
-
-    Assert(!InternalEdge0->LeftFace);
-    Assert(!InternalEdge1->LeftFace);
-    Assert(!InternalEdge2->LeftFace);
-    Assert(!NextBorderEdge->LeftFace);
-    Assert(!PreviousBorderEdge->LeftFace);
-
-    // Hook up Internal with External Edges (Parallel)
-    ExternalEdge2->Opposite = InternalEdge2;
-    InternalEdge2->Opposite = ExternalEdge2;
-
-    // Hook up Internal Edges (Form the triangle)
-    InternalEdge2->Next = InternalEdge0;
-    InternalEdge2->Previous = InternalEdge1;
-    InternalEdge0->Previous = InternalEdge2;
-    InternalEdge1->Next = InternalEdge2;
-
-    // Hook up External Edges Serial (Connect to the rest of the mesh)
-    ExternalEdge2->Next = NextBorderEdge;
-    ExternalEdge2->Previous = PreviousBorderEdge;
-    NextBorderEdge->Previous = ExternalEdge2;
-    PreviousBorderEdge->Next = ExternalEdge2;
-
-    // Hook up the new Face to the Internal Edges
-    Face->Edge = InternalEdge0;
-    InternalEdge0->LeftFace = Face;
-    InternalEdge1->LeftFace = Face;
-    InternalEdge2->LeftFace = Face;
-
-    // Pick out the relevant points
-    epa_vertex* P0 = InternalEdge0->TargetVertex;
-    epa_vertex* P1 = InternalEdge1->TargetVertex;
-    epa_vertex* P2 = PreviousBorderEdge->TargetVertex;
-
-    Assert(P0->P.S != P1->P.S);
-    Assert(P1->P.S != P2->P.S);
-    Assert(P2->P.S != P0->P.S);
-
-    // Make our edges point to the points
-    Assert(InternalEdge0->TargetVertex == P0);
-    Assert(InternalEdge1->TargetVertex == P1);
-    InternalEdge2->TargetVertex = P2;
-    ExternalEdge2->TargetVertex = P1;
-
-    HoleStillExists = true;
-
-    #if HANDMADE_SLOW
-      r32 FaceArea = GetFaceArea(Face);
-      Assert(FaceArea > F32_TOL*F32_TOL);
-    #endif
-  }
-
-  return HoleStillExists;
-}
-
 /*
  * AddNewEdge(epa_mesh* Mesh, epa_halfedge* BorderEdge)
  * REQURES That:
@@ -680,28 +624,52 @@ void AddNewEdge(epa_mesh* Mesh, epa_halfedge* BorderEdge, v3 DebugAssertVertex)
 
 }
 
-// The he returned will always point away from vertex
+
+epa_halfedge* GetBorderEdge(epa_mesh* Mesh)
+{
+  epa_face* Face = Mesh->Faces;
+  while(Face)
+  {
+    epa_halfedge* Edge = Face->Edge;
+    while(Edge->Next != Face->Edge)
+    {
+      if(!Edge->Opposite->LeftFace)
+      {
+        Assert(Edge->LeftFace);
+        return Edge->Opposite;
+      }
+      Edge = Edge->Next;
+    }
+    Face = Face->Next;
+  }
+  return 0;
+}
+
+
+// The halfedge returned will always point away from vertex
 epa_halfedge* GetBorderEdge(epa_vertex* Vertex)
 {
   epa_halfedge* Edge = Vertex->OutgoingEdge;
+  epa_halfedge* Result = 0;
   for(;;)
   {
     if(!Edge->LeftFace)
     {
-      return Edge;
+      Result = Edge;
+      break;
     }
 
     Edge = Edge->Opposite->Next;
 
     if(Edge == Vertex->OutgoingEdge)
     {
-      return 0;
+      break;
     }
   }
 
-  return 0;
+  return Result;
 }
-#if 1
+
 void FillHole(epa_mesh* Mesh, gjk_support* NewPoint)
 {
   epa_halfedge* BorderEdge = GetBorderEdge(Mesh);
@@ -715,181 +683,46 @@ void FillHole(epa_mesh* Mesh, gjk_support* NewPoint)
 
     AddNewEdge(Mesh, BorderEdge, Vertex->P.S);
   }
-
-
-// TODO: REmove this debug code
-#if HANDMADE_SLOW
-  epa_face* Face = Mesh->Faces;
-  while(Face)
-  {
-    r32 FaceArea = GetFaceArea(Face);
-    Assert(FaceArea > F32_TOL);
-    Face = Face->Next;
-  }
-#endif
 }
-#else
-void FillHole(epa_mesh* Mesh, gjk_support* NewPoint)
-{
-  epa_halfedge* BorderEdge = GetBorderEdge(Mesh);
-  Assert(BorderEdge);
 
-  epa_halfedge* PreviousBorderEdge = BorderEdge->Previous;
-  AddNewPoint(Mesh, BorderEdge, NewPoint);
-  b32 HoleStillExists = false;
-  do
-  {
-    epa_face* Face = Mesh->Faces;
-    while(Face)
-    {
-      v3 P0,P1,P2;
-      GetFacePoints(Face, &P0,&P1,&P2);
 
-      Assert(P0 != P1);
-      Assert(P1 != P2);
-      Assert(P2 != P0);
-      Face = Face->Next;
-    }
-
-    BorderEdge = PreviousBorderEdge;
-    PreviousBorderEdge = PreviousBorderEdge->Previous;
-    Assert(BorderEdge->Next->TargetVertex->P.S == NewPoint->S);
-    HoleStillExists = AddNewEdgeForward(Mesh, BorderEdge);
-  }while( HoleStillExists );
-
-// TODO: REmove this debug code
-#if HANDMADE_SLOW
-  epa_face* Face = Mesh->Faces;
-  while(Face)
-  {
-    r32 FaceArea = GetFaceArea(Face);
-    Assert(FaceArea > F32_TOL*F32_TOL);
-    Face = Face->Next;
-  }
-  #endif
-}
-#endif
-
-/*
- *                               ^
- *                               | |
- *                        NextB2 | |PrevB1
- *                               | |
- *                               | |
- *                                 v
- *                             ^ P1  \
- *                            / /   ^ \
- *                           / /     \ \
- *                          / /       \ \
- *                         / /         \ \
- *                    B2  / / A2     A1 \ \ B1
- *                       / /             \ \
- *                      / /               \ \
- *                     / /                 \ \
- *      PrevB2          v        A0           v     NextB1
- * -----------------> P2-------------------> P0 ---------------->
- * <----------------    <-------------------    <----------------
- *                  ^ /          B0           ^ \
- *                 / / NextB0           PrevB0 \ \
- *                / /                           \ \
- *                 v                             v
+/* Checks the area of the 4 triangles that result from splitting 2 triangles in the middle
+ *     p1           p1
+ *     /\          /|\
+ *    / 0\        /1|0\
+ *  p2----p0 -> p2--|--p0
+ *    \1 /        \2|3/
+ *     \/          \|/
+ *     p3          p3
  */
-void DissconnectEdge(epa_halfedge* Edge)
+void DEBUGCheckAreasOfSegmentedTriangle(epa_halfedge* Edge, v3 p)
 {
-  Assert(!Edge->LeftFace && !Edge->Opposite->LeftFace)
+  b32 OnSegment = IsPointOnLinesegment(Edge->Opposite->TargetVertex->P.S,
+                                       Edge->TargetVertex->P.S, p);
+  v3 p00 = Edge->TargetVertex->P.S;
+  v3 p01 = Edge->Next->TargetVertex->P.S;
+  v3 n0 = GetPlaneNormal(p00,p01,p);
+  r32 NewSignedSubArea0 = n0 * CrossProduct( p01 - p00, p - p00);
 
-  epa_halfedge* A = Edge;
-  epa_halfedge* PrevA = A->Previous;
-  epa_halfedge* NextA = A->Next;
+  v3 p10 = Edge->Next->TargetVertex->P.S;
+  v3 p11 = Edge->Previous->TargetVertex->P.S;
+  v3 n1 = GetPlaneNormal(p10,p11,p);
+  r32 NewSignedSubArea1 = n1 * CrossProduct( p11 - p10, p - p10);
 
-  epa_halfedge* B = Edge->Opposite;
-  epa_halfedge* PrevB = B->Previous;
-  epa_halfedge* NextB = B->Next;
+  v3 p20 = Edge->Opposite->TargetVertex->P.S;
+  v3 p21 = Edge->Opposite->Next->TargetVertex->P.S;
+  v3 n2 = GetPlaneNormal(p20,p21,p);
+  r32 NewSignedSubArea2 = n2 * CrossProduct( p21 - p20, p - p20);
 
-  epa_vertex* Pa = A->TargetVertex;
-  if(Pa->OutgoingEdge == B)
-  {
-    Pa->OutgoingEdge = NextA;
-  }
+  v3 p30 = Edge->Opposite->Next->TargetVertex->P.S;
+  v3 p31 = Edge->Opposite->Previous->TargetVertex->P.S;
+  v3 n3 = GetPlaneNormal(p30,p31,p);
+  r32 NewSignedSubArea3 = n3 * CrossProduct( p31 - p30, p - p30);
 
-  epa_vertex* Pb = B->TargetVertex;
-  if(Pb->OutgoingEdge == A)
-  {
-    Pb->OutgoingEdge = NextB;
-  }
-
-  PrevB->Next = NextA;
-  NextA->Previous = PrevB;
-
-  PrevA->Next = NextB;
-  NextB->Previous = PrevA;
-
-  A->Next = 0;
-  A->Previous = 0;
-  B->Next = 0;
-  B->Previous = 0;
-
-  Assert(Pa->OutgoingEdge);
-  //Assert(Pa->OutgoingEdge->Next);
-  //Assert(Pa->OutgoingEdge->Previous);
-  Assert(Pb->OutgoingEdge);
-  //Assert(Pb->OutgoingEdge->Next);
-  //Assert(Pb->OutgoingEdge->Previous);
-}
-void RemoveFace(epa_mesh* Mesh, epa_face* Face)
-{
-  r32 FaceArea = GetFaceArea(Face);
-  Assert(FaceArea > F32_TOL);
-  // Disconnect The Face Fron the Mesh list
-  epa_face** FacePtr = &Mesh->Faces;
-  epa_face*  FaceTmp = *FacePtr;
-  while(*FacePtr != Face)
-  {
-    epa_face* Tmp = *FacePtr;
-    FacePtr = &(*FacePtr)->Next;
-  }
-  *FacePtr = Face->Next;
-
-  epa_halfedge* A0 = Face->Edge;
-  epa_halfedge* A1 = Face->Edge->Next;
-  epa_halfedge* A2 = Face->Edge->Previous;
-
-  Assert(A0->LeftFace && A1->LeftFace && A2->LeftFace);
-  A0->LeftFace = 0;
-  A1->LeftFace = 0;
-  A2->LeftFace = 0;
-
-  if((!A0->Opposite->LeftFace) && (!A1->Opposite->LeftFace) && (!A2->Opposite->LeftFace))
-  {
-    // Assert the border edges form a selfcontained loop.
-    Assert(A0->Next->Next->Next == A0);
-    
-    // Assert the outgoing edges of the vertices fall inside the Face (Does not have to be true because they could be attached at a corner)
-      // Assert(A0->Opposite->Next->Next->Next == A0->Opposite);
-      // Assert((A0->TargetVertex->OutgoingEdge == A1) || (A0->TargetVertex->OutgoingEdge == A0->Opposite));
-      // Assert((A1->TargetVertex->OutgoingEdge == A2) || (A1->TargetVertex->OutgoingEdge == A1->Opposite));
-      // Assert((A2->TargetVertex->OutgoingEdge == A0) || (A2->TargetVertex->OutgoingEdge == A2->Opposite));
-    // Assert the vertices are only joined by two edges
-      // Assert((A0->TargetVertex->OutgoingEdge->Opposite->Next->Opposite->Next == A0->TargetVertex->OutgoingEdge))
-      // Assert((A1->TargetVertex->OutgoingEdge->Opposite->Next->Opposite->Next == A1->TargetVertex->OutgoingEdge))
-      // Assert((A2->TargetVertex->OutgoingEdge->Opposite->Next->Opposite->Next == A2->TargetVertex->OutgoingEdge))
-    DissconnectEdge(A0);
-    DissconnectEdge(A1);
-    DissconnectEdge(A2);
-  }else{
-    if(!A0->Opposite->LeftFace)
-    {
-      DissconnectEdge(A0);
-    }
-    if(!A1->Opposite->LeftFace)
-    {
-      DissconnectEdge(A1);
-    }
-    if(!A2->Opposite->LeftFace)
-    {
-      DissconnectEdge(A2);
-    }
-  }
+  // How we may wanna segment a line:
+  // RemoveFace(Mesh, Edge0->LeftFace );
+  // RemoveFace(Mesh, Edge0->Opposite->LeftFace);
+  // FillHole(Mesh, Point);
 }
 
 b32 GrowMesh(epa_mesh* Mesh, gjk_support* Point)
@@ -906,17 +739,7 @@ b32 GrowMesh(epa_mesh* Mesh, gjk_support* Point)
       return false;
     }else if(P == P2){
       return false;
-    }
-    Face = Face->Next;
-  }
-
-  Face = Mesh->Faces;
-  while(Face)
-  {
-    v3 P0, P1, P2;
-    v3 P = Point->S;
-    GetFacePoints(Face, &P0, &P1, &P2);
-    if(IsPointOnLinesegment(P2, P0, P)){
+    }else if(IsPointOnLinesegment(P2, P0, P)){
       return false;
     }else if(IsPointOnLinesegment(P0, P1, P)){
       return false;
@@ -934,14 +757,13 @@ b32 GrowMesh(epa_mesh* Mesh, gjk_support* Point)
     const v3 Normal = GetPlaneNormal(P0, P1, P2);
     const v3 ProjectedPoint = ProjectPointOntoPlane( Point->S, P0, Normal );
     r32 Diff = NormSq(ProjectedPoint-Point->S);
-    // Point Lies on the plane of the Face
-    r32 BigTol = 10E-5;
     v3 P = Point->S;
     r32 SignedSubArea0 = Normal * CrossProduct( P2 - P1, P - P1);
     r32 SignedSubArea1 = Normal * CrossProduct( P0 - P2, P - P2);
     r32 SignedSubArea2 = Normal * CrossProduct( P1 - P0, P - P0);
 
-    if ((Diff <= BigTol) && (SignedSubArea0 > 0) && (SignedSubArea1 > 0) && (SignedSubArea2 > 0))
+    // Point Lies on the plane of the Face
+    if ((Diff <= F32_TOL) && (SignedSubArea0 > F32_TOL) && (SignedSubArea1 > F32_TOL) && (SignedSubArea2 > F32_TOL))
     {
       return false;
     }
@@ -952,236 +774,4 @@ b32 GrowMesh(epa_mesh* Mesh, gjk_support* Point)
   Assert(Mesh->Faces);
   FillHole( Mesh, Point);
   return true;
-
-#if 0
-
-  while(Face)
-  {
-    // Check against ALL faces and find the most suited, Don't just go for the first.
-    epa_halfedge* Edge0 = Face->Edge;
-    epa_halfedge* Edge1 = Face->Edge->Next;
-    epa_halfedge* Edge2 = Face->Edge->Next->Next;
-    v3 P0 = Edge0->TargetVertex->P.S;
-    v3 P1 = Edge1->TargetVertex->P.S;
-    v3 P2 = Edge2->TargetVertex->P.S;
-    const v3 Normal = GetPlaneNormal(P0, P1, P2);
-    const v3 ProjectedPoint = ProjectPointOntoPlane( Point->S, P0, Normal );
-    r32 Diff = NormSq(ProjectedPoint-Point->S);
-    // Point Lies on the plane of the Face
-    r32 BigTol = 10E-5;
-    if (Diff <= BigTol)
-    {
-      v3 P = Point->S;
-      r32 SignedSubArea0 = Normal * CrossProduct( P2 - P1, P - P1);
-      r32 SignedSubArea1 = Normal * CrossProduct( P0 - P2, P - P2);
-      r32 SignedSubArea2 = Normal * CrossProduct( P1 - P0, P - P0);
-
-      if(P == P0){
-        return false;
-      }else if(P == P1){
-        return false;
-      }else if(P == P2){
-        return false;
-      }else if(IsPointOnLinesegment(P2, P0, P)){
-        // ON  Line0
-        v3 p = P;
-        v3 p00 = Edge0->TargetVertex->P.S;
-        v3 p01 = Edge0->Next->TargetVertex->P.S;
-        v3 n0 = GetPlaneNormal(p00,p01,P);
-        r32 NewSignedSubArea0 = n0 * CrossProduct( p01 - p00, p - p00);
-
-        v3 p10 = Edge0->Next->TargetVertex->P.S;
-        v3 p11 = Edge0->Previous->TargetVertex->P.S;
-        v3 n1 = GetPlaneNormal(p10,p11,P);
-        r32 NewSignedSubArea1 = n1 * CrossProduct( p11 - p10, p - p10);
-
-        v3 p20 = Edge0->Opposite->TargetVertex->P.S;
-        v3 p21 = Edge0->Opposite->Next->TargetVertex->P.S;
-        v3 n2 = GetPlaneNormal(p20,p21,P);
-        r32 NewSignedSubArea2 = n2 * CrossProduct( p21 - p20, p - p20);
-
-        v3 p30 = Edge0->Opposite->Next->TargetVertex->P.S;
-        v3 p31 = Edge0->Opposite->Previous->TargetVertex->P.S;
-        v3 n3 = GetPlaneNormal(p30,p31,P);
-        r32 NewSignedSubArea3 = n3 * CrossProduct( p31 - p30, p - p30);
-
-        if(SignedSubArea1 > BigTol)
-        {
-          IsPointOnLinesegment(P2, P0, P);
-        }
-        RemoveFace(Mesh, Edge0->LeftFace );
-        RemoveFace(Mesh, Edge0->Opposite->LeftFace);
-        FillHole(Mesh, Point);
-        return true;
-      }else if(IsPointOnLinesegment(P0, P1, P)){
-        // ON  Line1
-        v3 p = P;
-        v3 p00 = Edge1->TargetVertex->P.S;
-        v3 p01 = Edge1->Next->TargetVertex->P.S;
-        v3 n0 = GetPlaneNormal(p00,p01,P);
-        r32 NewSignedSubArea0 = n0 * CrossProduct( p01 - p00, p - p00);
-
-        v3 p10 = Edge1->Next->TargetVertex->P.S;
-        v3 p11 = Edge1->Previous->TargetVertex->P.S;
-        v3 n1 = GetPlaneNormal(p10,p11,P);
-        r32 NewSignedSubArea1 = n1 * CrossProduct( p11 - p10, p - p10);
-
-        v3 p20 = Edge1->Opposite->TargetVertex->P.S;
-        v3 p21 = Edge1->Opposite->Next->TargetVertex->P.S;
-        v3 n2 = GetPlaneNormal(p20,p21,P);
-        r32 NewSignedSubArea2 = n2 * CrossProduct( p21 - p20, p - p20);
-
-        v3 p30 = Edge1->Opposite->Next->TargetVertex->P.S;
-        v3 p31 = Edge1->Opposite->Previous->TargetVertex->P.S;
-        v3 n3 = GetPlaneNormal(p30,p31,P);
-        r32 NewSignedSubArea3 = n3 * CrossProduct( p31 - p30, p - p30);
-
-        if(SignedSubArea2 > BigTol)
-        {
-          IsPointOnLinesegment(P0, P1, P);
-        }
-        RemoveFace(Mesh, Edge1->LeftFace );
-        RemoveFace(Mesh, Edge1->Opposite->LeftFace);
-        FillHole(Mesh, Point);
-        return true;
-      }else if(IsPointOnLinesegment(P1, P2, P)){
-        // ON  Line2
-        v3 p = P;
-        v3 p00 = Edge2->TargetVertex->P.S;
-        v3 p01 = Edge2->Next->TargetVertex->P.S;
-        v3 n0 = GetPlaneNormal(p00,p01,P);
-        r32 NewSignedSubArea0 = n0 * CrossProduct( p01 - p00, p - p00);
-
-        v3 p10 = Edge2->Next->TargetVertex->P.S;
-        v3 p11 = Edge2->Previous->TargetVertex->P.S;
-        v3 n1 = GetPlaneNormal(p10,p11,P);
-        r32 NewSignedSubArea1 = n1 * CrossProduct( p11 - p10, p - p10);
-
-        v3 p20 = Edge2->Opposite->TargetVertex->P.S;
-        v3 p21 = Edge2->Opposite->Next->TargetVertex->P.S;
-        v3 n2 = GetPlaneNormal(p20,p21,P);
-        r32 NewSignedSubArea2 = n2 * CrossProduct( p21 - p20, p - p20);
-
-        v3 p30 = Edge2->Opposite->Next->TargetVertex->P.S;
-        v3 p31 = Edge2->Opposite->Previous->TargetVertex->P.S;
-        v3 n3 = GetPlaneNormal(p30,p31,P);
-        r32 NewSignedSubArea3 = n3 * CrossProduct( p31 - p30, p - p30);
-
-        if(SignedSubArea0 > BigTol)
-        {
-          IsPointOnLinesegment(P1, P2, P);
-        }
-        RemoveFace(Mesh, Edge2->LeftFace );
-        RemoveFace(Mesh, Edge2->Opposite->LeftFace);
-        FillHole(Mesh, Point);
-        return true;
-      }else if((SignedSubArea0 > 0) && (SignedSubArea1 > 0) && (SignedSubArea2 > 0)){
-        // Inside
-        Assert(Point->S != Face->Edge->TargetVertex->P.S);
-        Assert(Point->S != Face->Edge->Next->TargetVertex->P.S);
-        Assert(Point->S != Face->Edge->Next->Next->TargetVertex->P.S);
-        RemoveFace(Mesh, Face);
-        FillHole(Mesh, Point);
-        return true;
-      }
-    }
-    Face = Face->Next;
-  }
-#endif
-#if 0
-      // TODO: Don't use GetBaryocentricCoordinates. Since we divide with the triangle area the
-      //       Numerical innacuracies seem dangerously close to the penetration-depths.
-      const v3 Coords = GetBaryocentricCoordinates( P0, P1, P2, Normal, ProjectedPoint);
-      if((Coords.E[0] >= -BigTol) && ((Coords.E[0]) <= (1+BigTol)) &&
-         (Coords.E[1] >= -BigTol) && ((Coords.E[1]) <= (1+BigTol)) &&
-         (Coords.E[2] >= -BigTol) && ((Coords.E[2]) <= (1+BigTol)))
-      {
-        PointIsOutsideMesh = false;
-        Assert(Face->Edge->TargetVertex->P.S == Face->Edge->Next->Next->Next->TargetVertex->P.S);
-        //we are inside
-        if((Coords.E[0] > BigTol) && ((Coords.E[0]) < (1-BigTol)) &&
-           (Coords.E[1] > BigTol) && ((Coords.E[1]) < (1-BigTol)) &&
-           (Coords.E[2] > BigTol) && ((Coords.E[2]) < (1-BigTol)))
-        {
-          // Inside
-          Assert(Point->S != Face->Edge->TargetVertex->P.S);
-          Assert(Point->S != Face->Edge->Next->TargetVertex->P.S);
-          Assert(Point->S != Face->Edge->Next->Next->TargetVertex->P.S);
-          RemoveFace(Mesh, Face);
-          FillHole(Mesh, Point);
-          return true;
-        }
-        else if( (Abs(Coords.E[0]) <= BigTol) && (Abs(Coords.E[1]) > BigTol) && (Abs(Coords.E[2]) > BigTol) )
-        {
-          // ON Edge2
-          Assert(Point->S != Edge2->TargetVertex->P.S);
-          Assert(Point->S != Edge2->Opposite->TargetVertex->P.S);
-
-          RemoveFace(Mesh, Edge2->LeftFace );
-          RemoveFace(Mesh, Edge2->Opposite->LeftFace);
-          FillHole(Mesh, Point);
-          return true;
-        }
-        else if( (Abs(Coords.E[0]) > BigTol) && (Abs(Coords.E[1]) <= BigTol) && (Abs(Coords.E[2]) > BigTol) )
-        {
-          // ON  Line0
-
-          Assert(Point->S != Edge0->TargetVertex->P.S);
-          Assert(Point->S != Edge0->Opposite->TargetVertex->P.S);
-
-          RemoveFace(Mesh, Edge0->LeftFace );
-          RemoveFace(Mesh, Edge0->Opposite->LeftFace);
-          FillHole(Mesh, Point);
-          return true;
-        }
-        else if( (Abs(Coords.E[0]) > BigTol) && (Abs(Coords.E[1]) > BigTol) && (Abs(Coords.E[2]) <= BigTol) )
-        {
-          // ON  Line1
-
-          Assert(Point->S != Edge1->TargetVertex->P.S);
-          Assert(Point->S != Edge1->Opposite->TargetVertex->P.S);
-
-          RemoveFace(Mesh, Edge1->LeftFace );
-          RemoveFace(Mesh, Edge1->Opposite->LeftFace);
-          FillHole(Mesh, Point);
-          return true;
-        }
-        else if( (Abs(Coords.E[0]) > BigTol) && (Abs(Coords.E[1]) <= BigTol) && (Abs(Coords.E[2]) <= BigTol) )
-        {
-          // On P0
-          Assert(Abs(Coords.E[0]) >= (1-BigTol));
-          Assert(Point->S == P0);
-          return false;
-        }
-        else if( (Abs(Coords.E[0]) <= BigTol) && (Abs(Coords.E[1]) > BigTol) && (Abs(Coords.E[2]) <= BigTol) )
-        {
-          // On P1
-          Assert(Abs(Coords.E[1]) >= (1-BigTol));
-          Assert(Point->S == P1);
-          return false;
-        }
-        else if( (Abs(Coords.E[0]) <= BigTol) && (Abs(Coords.E[1]) <= BigTol) && (Abs(Coords.E[2]) > BigTol) )
-        {
-          // On P2
-          Assert(Abs(Coords.E[2]) >= (1-BigTol));
-          Assert(Point->S == P2);
-          return false;
-        }
-        Assert(0);
-      }
-    }
-     Face = Face->Next;
-  }
-#endif
-#if 0
-  if(PointIsOutsideMesh)
-  {
-    RemoveFacesSeenByPoint(Mesh, Point);
-    Assert(Mesh->Faces);
-    FillHole( Mesh, Point);
-    return true;
-  }
-#endif
-  Assert(0)
-  return false;
 }

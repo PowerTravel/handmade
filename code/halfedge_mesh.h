@@ -62,6 +62,12 @@ struct epa_face;
  * It has more than one holes (Ditto)
  */
 
+
+// Todo: * Speed up everything when you know it's working correctly (cache normals, vertex list, don't do unecessary looping)
+//       * Right now, if a new CSO-Point is found on the mesh surface
+//         we just return immideately. This may not be the right ting to do.
+//         When we have better debugging tools. (Epa-visualizer using the log-system)
+//         investigate if we need to revise this approach
 struct epa_vertex
 {
   gjk_support P;
@@ -90,14 +96,8 @@ struct epa_mesh
 };
 
 
-epa_halfedge* GetBorderEdge(epa_mesh*);
-epa_face* GetFaceSeenByPoint(epa_mesh* Mesh, gjk_support* Point);
-void AddFace(epa_mesh* Mesh, epa_halfedge* Edge, gjk_support* Point);
-void RemoveFace(epa_mesh* Mesh, epa_face* Face);
 epa_mesh* InitializeMesh(memory_arena* Arena, gjk_support* P0, gjk_support* P1, gjk_support* P2);
 r32 GetDistanceToFace(epa_face* Face);
 v3 GetNormal(epa_face* Face);
-b32 IsPointOnMeshSurface(epa_mesh* Mesh, gjk_support* Point);
 void FillHole(epa_mesh* Mesh, gjk_support* NewPoint);
 b32 GrowMesh(epa_mesh* Mesh, gjk_support* Point);
-void RemoveFacesSeenByPoint(epa_mesh* Mesh, gjk_support* Point);
