@@ -158,16 +158,18 @@ enum debug_event_type
 struct debug_event
 {
   u64 Clock;
-  u32 ThreadIndex;
+  u16 ThreadID;
   u16 CoreIndex;
   u16 DebugRecordIndex;
   u8 TranslationUnit;
   u8 Type;
 };
 
+#define MAX_DEBUG_EVENT_ARRAY_COUNT 64
 #define MAX_DEBUG_TRANSLATION_UNITS (3)
-#define MAX_DEBUG_EVENT_COUNT (65536)
+#define MAX_DEBUG_EVENT_COUNT (16*65536)
 #define MAX_DEBUG_RECORD_COUNT (65536)
+
 struct debug_table
 {
   // TODO: Were never ensure that writes to the debugevents is complete
@@ -176,9 +178,13 @@ struct debug_table
   u32 CurrentEventArrayIndex;
   u32 RecordCount[MAX_DEBUG_TRANSLATION_UNITS];
   debug_record Records[MAX_DEBUG_TRANSLATION_UNITS][MAX_DEBUG_RECORD_COUNT];
-  debug_event Events[64][MAX_DEBUG_EVENT_COUNT];
+  u32 EventCount[MAX_DEBUG_EVENT_ARRAY_COUNT];
+  debug_event Events[MAX_DEBUG_EVENT_ARRAY_COUNT][MAX_DEBUG_EVENT_COUNT];
 };
 
+extern debug_table* GlobalDebugTable;
+
+#if HANDMADE_PROFILE
 
 // Note: Needs to be a macro so that it gets expanded in every translation unit
 //       Even if inline the linker may chose one specific implementation and every
@@ -190,14 +196,31 @@ struct debug_table
   u32 ArrayIndex = ArrayIndex_EventIndex >> 32; \
   debug_event* Event = GlobalDebugTable->Events[ArrayIndex] + EventIndex; \
   Event->Clock = __rdtsc(); \
-  Event->ThreadIndex = GetThreadID(); \
+  Event->ThreadID = (u16)GetThreadID(); \
   Event->CoreIndex = 0; \
   Event->DebugRecordIndex = (u16) RecordIndex; \
   Event->TranslationUnit = TRANSLATION_UNIT_INDEX; \
   Event->Type = (u8) EventType;\
 }
 
-extern debug_table* GlobalDebugTable;
+#define FRAME_MARKER() \
+{ \
+  u32 RecordIndex = __COUNTER__; \
+  debug_record* Record = GlobalDebugTable->Records[TRANSLATION_UNIT_INDEX] + RecordIndex; \
+  Record->FileName = __FILE__; \
+  Record->BlockName = "Frame Marker"; \
+  Record->LineNumber = __LINE__; \
+  RecordDebugEvent(RecordIndex, DebugEvent_FrameMarker);\
+}
+
+
+#define TIMED_BLOCK__(BlockName, Number, ... ) timed_block TimedBlock_##Number(__COUNTER__, __FILE__, __LINE__, BlockName, ## __VA_ARGS__)
+#define TIMED_BLOCK_(BlockName, Number, ... ) TIMED_BLOCK__(BlockName, Number, ## __VA_ARGS__)
+// Used to time a {CodeBlock} with a specific name
+#define TIMED_BLOCK(BlockName, ...) TIMED_BLOCK_(#BlockName, __LINE__, ## __VA_ARGS__)
+// Used same as TIMED_BLOCK but automatically gives the function name.
+#define TIMED_FUNCTION() TIMED_BLOCK_(__FUNCTION__, __LINE__, ## __VA_ARGS__)
+
 
 #define BEGIN_BLOCK_(RecordIndex, FileNameArg, LineNumberArg, BlockNameArg) \
 {\
@@ -234,21 +257,14 @@ struct timed_block
 };
 
 
-#define FRAME_MARKER() \
-{ \
-  u32 RecordIndex = __COUNTER__; \
-  debug_record* Record = GlobalDebugTable->Records[TRANSLATION_UNIT_INDEX] + RecordIndex; \
-  Record->FileName = __FILE__; \
-  Record->BlockName = "Frame Marker"; \
-  Record->LineNumber = __LINE__; \
-}
+#else
+#define BEGIN_BLOCK(Name)
+#define END_BLOCK(Name)
+#define TIMED_BLOCK(BlockName, ...)
+#define TIMED_FUNCTION()
+#define FRAME_MARKER()
 
-#define TIMED_BLOCK__(BlockName, Number, ... ) timed_block TimedBlock_##Number(__COUNTER__, __FILE__, __LINE__, BlockName, ## __VA_ARGS__)
-#define TIMED_BLOCK_(BlockName, Number, ... ) TIMED_BLOCK__(BlockName, Number, ## __VA_ARGS__)
-// Used to time a {CodeBlock} with a specific name
-#define TIMED_BLOCK(BlockName, ...) TIMED_BLOCK_(#BlockName, __LINE__, ## __VA_ARGS__)
-// Used same as TIMED_BLOCK but automatically gives the function name.
-#define TIMED_FUNCTION() TIMED_BLOCK_(__FUNCTION__, __LINE__, ## __VA_ARGS__)
+#endif
 
 
 inline void
@@ -515,6 +531,7 @@ struct platform_api
 extern platform_api Platform;
 
 struct debug_frame_end_info;
+
 struct debug_state;
 struct game_memory
 {

@@ -11,8 +11,8 @@ void PushDebugOverlay(debug_state* DebugState)
   r32 Ky = 1.f / GlobalDebugRenderGroup->ScreenHeight;
   r32 AspectRatio = Kx/Ky;
 
-  Assert(DebugState->SnapShotIndex < SNAPSHOT_COUNT);
-
+  //Assert(DebugState->SnapShotIndex < SNAPSHOT_COUNT);
+#if 0
   u32 TotalCounterStateCount = ArrayCount(DebugState->CounterStates);
   for(u32 i = 0; i<TotalCounterStateCount; ++i)
   {
@@ -21,13 +21,13 @@ void PushDebugOverlay(debug_state* DebugState)
 
     stb_font_map* FontMap = &GlobalDebugRenderGroup->Assets->STBFontMap;
 
-    r32 GraphLeft = 1/4.f;
-    r32 GraphRight = 4/8.f;
-    r32 BarSegmentWidth = (GraphRight - GraphLeft)/SNAPSHOT_COUNT;
+    r32 ChartLeft = 1/4.f;
+    r32 ChartRight = 4/8.f;
+    r32 BarSegmentWidth = (ChartRight - ChartLeft)/SNAPSHOT_COUNT;
 
     r32 BaselinePixels = GlobalDebugRenderGroup->ScreenHeight - (Line+1) * FontMap->FontHeightPx;
-    r32 GraphBot = Ky*BaselinePixels;
-    r32 GraphTop = GraphBot + Ky*FontMap->Ascent;
+    r32 ChartBot = Ky*BaselinePixels;
+    r32 ChartTop = ChartBot + Ky*FontMap->Ascent;
 
     debug_frame_snapshot* SnapShotStat = &CounterState->Snapshots[DebugState->SnapShotIndex];
     debug_statistics* HitCount   = &SnapShotStat->HitCountStat;
@@ -43,7 +43,7 @@ void PushDebugOverlay(debug_state* DebugState)
     EndDebugStatistics(HitCount);
     EndDebugStatistics(CycleCount);
 
-    r32 xMin = GraphLeft;
+    r32 xMin = ChartLeft;
     for(u32 j = 0; j<SNAPSHOT_COUNT; ++j)
     {
       debug_frame_snapshot* SnapShot = &CounterState->Snapshots[j];
@@ -51,14 +51,14 @@ void PushDebugOverlay(debug_state* DebugState)
 
       if(HitCount->Avg)
       {
-        r32 BarHeightScale = (GraphTop - GraphBot)/(2.f*SnapShot->CycleCountStat.Avg);
-        r32 yMax = GraphBot + BarHeightScale*SnapShot->CycleCount;
-        aabb2f Rect = AABB2f( V2(xMin,GraphBot), V2(xMax,yMax));
+        r32 BarHeightScale = (ChartTop - ChartBot)/(2.f*SnapShot->CycleCountStat.Avg);
+        r32 yMax = ChartBot + BarHeightScale*SnapShot->CycleCount;
+        aabb2f Rect = AABB2f( V2(xMin,ChartBot), V2(xMax,yMax));
         v4 Color = Green + ((SnapShot->CycleCountStat.Avg) / (SnapShot->CycleCountStat.Max) ) * (Yellow - Green);
         DEBUGPushQuad(GlobalDebugRenderGroup, Rect,Color);
       }
 
-      xMin = GraphLeft + j * BarSegmentWidth;
+      xMin = ChartLeft + j * BarSegmentWidth;
     }
 
     s32 CyPerHit = (HitCount->Avg == 0) ? 0 : (s32) (CycleCount->Avg / HitCount->Avg);
@@ -71,66 +71,207 @@ void PushDebugOverlay(debug_state* DebugState)
     DEBUGAddTextSTB(GlobalDebugRenderGroup, StringBuffer, CornerPaddingPx, Line);
     Line++;
   }
-
-  const r32 GraphLeft = -7/8.f;
-  const r32 GraphBot = -7/8.f;
-  const r32 GraphWidth = 1.7;
-  const r32 GraphHeight = 1/2.f;
-  const r32 GraphRight = GraphLeft + GraphWidth;
-  const r32 GraphTop = GraphBot + GraphHeight;
-  const r32 BarHeightScale = (GraphTop - GraphBot)/(1/60.f);
-  const r32 BarSegmentWidth = (GraphRight - GraphLeft)/(r32)SNAPSHOT_COUNT;
-
-  v4 ColorTable[] = {V4(1,0,0,1),
-                     V4(0,1,0,1),
-                     V4(0,0,1,1),
-                     V4(1,1,0,1),
-                     V4(1,0,1,1),
-                     V4(0,1,1,1),
-                     V4(1,1,1,1),
-                     V4(0,0,0,1)};
-
-
-#if 0
-  r32 xMin = GraphLeft;
-  for(u32 i = 0; i<SNAPSHOT_COUNT; ++i)
-  {
-    debug_frame_end_info* TimeStamp = DebugState->FrameEndInfos + i;
-    r32 xMax = xMin + BarSegmentWidth - BarSegmentWidth/2.f;
-    r32 yMin = GraphBot;
-    for(u32 j = 0; j<TimeStamp->TimestampCount; ++j)
-    {
-      debug_frame_timestamp* Time = TimeStamp->Timestamps + j;
-      r32 Seconds = Time->Seconds;
-
-      r32 yMax = GraphBot + BarHeightScale*Seconds;
-
-      aabb2f Rect = AABB2f( V2(xMin, yMin), V2(xMax,yMax));
-      v4 Color = ColorTable[(u32)(j%ArrayCount(ColorTable))];
-      DEBUGPushQuad(GlobalDebugRenderGroup, Rect, Color);
-
-      yMin = yMax;
-    }
-    xMin = GraphLeft + i * BarSegmentWidth;
-  }
-
-  r32 LineWidth = 0.005;
-  r32 yMin = GraphBot + BarHeightScale*(1/60.f)+LineWidth/2.f;
-  r32 yMax = GraphBot + BarHeightScale*(1/60.f)-LineWidth/2.f;
-  aabb2f Rect = AABB2f( V2(GraphLeft,yMin), V2(GraphRight,yMax));
-
-  DEBUGPushQuad(GlobalDebugRenderGroup, Rect, V4(0,0,0,1));
 #endif
 
+  r32 ChartLeft = -1.f;
+  r32 ChartBot = -1.f;
+  r32 ChartWidth = 2.f;
+  r32 ChartHeight = 1.f;
+
+  r32 BarWidth = ChartWidth/(r32)DebugState->FrameCount;
+  r32 LaneWidth = BarWidth/(r32)DebugState->FrameBarLaneCount;
+
+  r32 BarHeightScale = ChartHeight/(r32)DebugState->FrameBarRange;
+
+
+  v4 ColorTable[] = {V4(1,0,0,1)};
+//                     V4(0,1,0,1),
+//                     V4(0,0,1,1),
+//                     V4(1,1,0,1),
+//                     V4(1,0,1,1),
+//                     V4(0,1,1,1),
+//                     V4(1,1,1,1),
+//                     V4(0,0,0,1)};
+//
+  for(u32 FrameIndex = 0; FrameIndex < DebugState->FrameCount; ++FrameIndex)
+  {
+    debug_frame* Frame = DebugState->Frames + FrameIndex;
+    r32 StackX = ChartLeft + (r32)FrameIndex*BarWidth;
+    r32 StackY = ChartBot;
+    for(u32 RegionIndex = 0; RegionIndex < Frame->RegionCount; ++RegionIndex)
+    {
+      debug_frame_region* Region = Frame->Regions + RegionIndex;
+      v4 Color = ColorTable[(u32)(RegionIndex%ArrayCount(ColorTable))];
+      r32 MinY = StackY + BarHeightScale*Region->MinT;
+      r32 MaxY = StackY + BarHeightScale*Region->MaxT;
+      r32 MinX = StackX + LaneWidth*Region->LaneIndex;
+      r32 MaxX = MinX + LaneWidth;
+      aabb2f Rect = AABB2f( V2(MinX, MinY),
+                            V2(MaxX, MaxY));
+      DEBUGPushQuad(GlobalDebugRenderGroup, Rect, Color);
+    }
+  }
 }
 
 #define DebugRecords_Main_Count __COUNTER__
+
+#if HANDMADE_PROFILE
 global_variable debug_table GlobalDebugTable_;
 debug_table* GlobalDebugTable = &GlobalDebugTable_;
-
-
-void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArrayIndex, debug_table* DebugTable)
+#else
+debug_table* GlobalDebugTable = 0;
+#endif
+internal debug_thread* GetDebugThread( debug_state* DebugState, u32 ThreadID)
 {
+  debug_thread* Result = 0;
+  for(debug_thread* Thread = DebugState->FirstThread;
+      Thread;
+      Thread = Thread->Next)
+  {
+    if(Thread->ID == ThreadID)
+    {
+      Result = Thread;
+      break;
+    }
+  }
+
+  if(!Result)
+  {
+    Result = PushStruct(&DebugState->Arena, debug_thread );
+    Result->ID = ThreadID;
+    Result->LaneIndex = DebugState->FrameBarLaneCount++;
+    Result->FirstOpenBlock = 0;
+    Result->Next = DebugState->FirstThread;
+    DebugState->FirstThread = Result;
+  }
+
+  return Result;
+}
+
+internal debug_frame_region*
+AddRegion( debug_state* DebugState, debug_frame* CurrentFrame)
+{
+  debug_frame_region* Result = CurrentFrame->Regions + CurrentFrame->RegionCount;
+  if(CurrentFrame->RegionCount < MAX_REGIONS_PER_FRAME-1)
+  {
+    CurrentFrame->RegionCount++;
+  }
+  return Result;
+}
+
+void CollateDebugRecords(debug_state* DebugState, u32 InvalidEventArrayIndex)
+{
+  DebugState->Frames = PushArray(&DebugState->Arena, MAX_DEBUG_EVENT_ARRAY_COUNT*4, debug_frame);
+  DebugState->FrameBarLaneCount = 0;
+  DebugState->FrameCount = 0;
+  DebugState->FrameBarRange = 0.0f;
+  debug_frame* CurrentFrame = 0;
+  for(u32 EventArrayIndex = InvalidEventArrayIndex+1;
+      ; // No break
+      ++EventArrayIndex)
+  {
+    if(EventArrayIndex == MAX_DEBUG_EVENT_ARRAY_COUNT)
+    {
+      EventArrayIndex=0;
+    }
+
+    if(EventArrayIndex == InvalidEventArrayIndex)
+    {
+      break;
+    }
+
+    for(u32 EventIndex = 0;
+            EventIndex < GlobalDebugTable->EventCount[EventArrayIndex];
+            ++EventIndex)
+    {
+      debug_event*  Event = GlobalDebugTable->Events[EventArrayIndex] + EventIndex;
+      debug_record* Source = (GlobalDebugTable->Records[Event->TranslationUnit] + Event->DebugRecordIndex);
+
+      if(Event->Type == DebugEvent_FrameMarker)
+      {
+        if(CurrentFrame)
+        {
+          CurrentFrame->EndClock = Event->Clock;
+          r32 ClockRange = (r32)(CurrentFrame->EndClock - CurrentFrame->BeginClock);
+          if(ClockRange > 0.0f)
+          {
+            r32 FrameBarRange = ClockRange;
+            if(DebugState->FrameBarRange < FrameBarRange)
+            {
+              DebugState->FrameBarRange = FrameBarRange;
+            }
+          }
+        }
+        CurrentFrame = DebugState->Frames + DebugState->FrameCount++;
+        CurrentFrame->BeginClock = Event->Clock;
+        CurrentFrame->EndClock = 0;
+        CurrentFrame->RegionCount = 0;
+        CurrentFrame->Regions = PushArray(&DebugState->Arena, MAX_REGIONS_PER_FRAME, debug_frame_region);
+      }else if(CurrentFrame){
+        u32 FrameIndex = DebugState->FrameCount - 1;
+        debug_thread* Thread = GetDebugThread(DebugState, Event->ThreadID);
+        u64 RelativeClock = Event->Clock - CurrentFrame->BeginClock;
+
+        if(Event->Type == DebugEvent_BeginBlock)
+        {
+          open_debug_block* DebugBlock = DebugState->FirstFreeBlock;
+          if(DebugBlock)
+          {
+            DebugState->FirstFreeBlock = DebugBlock->NextFree;
+          }else{
+            DebugBlock = PushStruct(&DebugState->Arena, open_debug_block);
+          }
+
+          DebugBlock->FrameIndex = FrameIndex;
+          DebugBlock->OpeningEvent = Event;
+          DebugBlock->Parent = Thread->FirstOpenBlock;
+          Thread->FirstOpenBlock = DebugBlock;
+          DebugBlock->NextFree = 0;
+        }else if( Event->Type == DebugEvent_EndBlock){
+          if(Thread->FirstOpenBlock && CurrentFrame->Regions)
+          {
+            open_debug_block* MatchingBlock = Thread->FirstOpenBlock;
+            debug_event* OpeningEvent = MatchingBlock->OpeningEvent;
+            if((OpeningEvent->ThreadID         == Event->ThreadID)         &&
+               (OpeningEvent->DebugRecordIndex == Event->DebugRecordIndex) &&
+               (OpeningEvent->TranslationUnit  == Event->TranslationUnit))
+            {
+              if(MatchingBlock->FrameIndex == FrameIndex)
+              {
+                if(MatchingBlock->Parent == 0)
+                {
+                  r32 MinT = (r32)(OpeningEvent->Clock - CurrentFrame->BeginClock);
+                  r32 MaxT = (r32)(Event->Clock -  CurrentFrame->BeginClock);
+                  r32 ThresholdT = 2000;
+                  if((MaxT-MinT) > ThresholdT )
+                  {
+                    debug_frame_region* Region = AddRegion(DebugState, CurrentFrame);
+                    Region->LaneIndex = Thread->LaneIndex;
+                    Region->MinT = (r32)(OpeningEvent->Clock - CurrentFrame->BeginClock);
+                    Region->MaxT = (r32)(Event->Clock -  CurrentFrame->BeginClock);
+                  }
+                }
+              }else{
+                // Record All frames in between and begin/end spans
+              }
+
+              Thread->FirstOpenBlock->NextFree = DebugState->FirstFreeBlock;
+              DebugState->FirstFreeBlock = Thread->FirstOpenBlock;
+              Thread->FirstOpenBlock = MatchingBlock->Parent;
+            }else{
+              // Record span that goes to the beginning of the frame
+            }
+          }
+        }else{
+          Assert(!"Invalid event type");
+        }
+      }
+
+
+
+    }
+  }
+  #if 0
   debug_counter_state* CounterArray[MAX_DEBUG_TRANSLATION_UNITS];
   debug_counter_state* CurrentCounter = DebugState->CounterStates;
   u32 TotalRecordCount = 0;
@@ -139,8 +280,8 @@ void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArray
       ++UnitIndex)
   {
     CounterArray[UnitIndex] = CurrentCounter;
-    TotalRecordCount += DebugTable->RecordCount[UnitIndex];
-    CurrentCounter += DebugTable->RecordCount[UnitIndex];
+    TotalRecordCount += GlobalDebugTable->RecordCount[UnitIndex];
+    CurrentCounter += GlobalDebugTable->RecordCount[UnitIndex];
   }
   DebugState->CounterStateCount = TotalRecordCount;
 
@@ -151,7 +292,7 @@ void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArray
     Dst->Snapshots[DebugState->SnapShotIndex].CycleCount = 0;
   }
 
-  debug_event* Events = DebugTable->Events[EventArrayIndex];
+  debug_event* Events = GlobalDebugTable->Events[EventArrayIndex];
   for (u32 EventIndex = 0; EventIndex < EventCount; ++EventIndex)
   {
     const debug_event* Event = Events + EventIndex;
@@ -159,7 +300,7 @@ void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArray
     const u32 TranslationUnit = Event->TranslationUnit;
     debug_counter_state* Dst = CounterArray[TranslationUnit] + DebugRecordIndex;
 
-    debug_record* Src = DebugTable->Records[TranslationUnit] + DebugRecordIndex;
+    debug_record* Src = GlobalDebugTable->Records[TranslationUnit] + DebugRecordIndex;
 
     if (!Dst->FileName)
     {
@@ -178,4 +319,44 @@ void CollateDebugRecords(debug_state* DebugState, u32 EventCount, u32 EventArray
       Dst->Snapshots[DebugState->SnapShotIndex].CycleCount += Event->Clock;
     }
   }
+  #endif
+}
+
+
+extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
+{
+  if(!GlobalDebugTable) return 0;
+  GlobalDebugTable->RecordCount[0] = DebugRecords_Main_Count;
+
+  ++GlobalDebugTable->CurrentEventArrayIndex;
+  if(GlobalDebugTable->CurrentEventArrayIndex >= ArrayCount(GlobalDebugTable->Events))
+  {
+    GlobalDebugTable->CurrentEventArrayIndex=0;
+  }
+  u64 ArrayIndex_EventIndex = AtomicExchangeu64(&GlobalDebugTable->EventArrayIndex_EventIndex,
+                                               ((u64)GlobalDebugTable->CurrentEventArrayIndex << 32));
+
+  u32 EventArrayIndex = (ArrayIndex_EventIndex >> 32);
+  u32 EventCount = (ArrayIndex_EventIndex & 0xFFFFFFFF);
+  GlobalDebugTable->EventCount[EventArrayIndex] = EventCount;
+  debug_state* DebugState = Memory->DebugState;
+  if(DebugState)
+  {
+    if(!DebugState->Initialized)
+    {
+      DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->Arena);
+      DebugState->Initialized = true;
+    }
+
+    EndTemporaryMemory(DebugState->CollateTemp);
+    DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->Arena);
+
+    DebugState->FirstThread = 0;
+    DebugState->FirstFreeBlock = 0;
+
+    CollateDebugRecords(DebugState, GlobalDebugTable->CurrentEventArrayIndex);
+
+    PushDebugOverlay(DebugState);
+  }
+  return GlobalDebugTable;
 }

@@ -16,7 +16,7 @@
 #define FRICTIONAL_COEFFICIENT 0.15f
 #define BAUMGARTE_COEFFICIENT  0.25f
 #define RESTITUTION_COEFFICIENT 0.0f
-#define SLOP 0.005f
+#define SLOP 0.01f
 
 #define SLOVER_ITERATIONS 4
 #define MULTI_THREADED
@@ -152,6 +152,7 @@ v3 ClosestPointOnEdge(const v3& EdgeStart, const v3& EdgeEnd, const v3& Point)
 
 internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
 {
+  TIMED_FUNCTION();
   contact_manifold* Manifold = (contact_manifold*) Data;
   entity* A = Manifold->A;
   entity* B = Manifold->B;

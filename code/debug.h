@@ -14,42 +14,58 @@ struct debug_statistics
   r32 Avg;
 };
 
-struct debug_frame_snapshot
-{
-  debug_statistics HitCountStat;
-  debug_statistics CycleCountStat;
-  u32 HitCount;
-  u64 CycleCount;
-};
-
 struct debug_frame_timestamp
 {
   char* Name;
   r32 Seconds;
 };
 
-struct debug_frame_end_info
+struct debug_frame_region
 {
-  r32 TotalSeconds;
-  u32 TimestampCount;
-  debug_frame_timestamp Timestamps[64];
+  u32 LaneIndex;
+  r32 MinT;
+  r32 MaxT;
 };
 
-#define SNAPSHOT_COUNT 128
-struct debug_counter_state
+#define MAX_REGIONS_PER_FRAME 128
+struct debug_frame
 {
-  char* FileName;
-  char* FunctionName;
-  u32 LineNumber;
-  debug_frame_snapshot Snapshots[SNAPSHOT_COUNT];
+  u64 BeginClock;
+  u64 EndClock;
+  u32 RegionCount;
+  debug_frame_region* Regions;
+};
+
+struct open_debug_block
+{
+  u32 FrameIndex;
+  debug_event* OpeningEvent;
+  open_debug_block* Parent;
+  open_debug_block* NextFree;
+};
+
+struct debug_thread
+{
+  u32 ID;
+  u32 LaneIndex;
+  open_debug_block* Parent;
+  open_debug_block* FirstOpenBlock;
+  debug_thread* Next;
 };
 
 struct debug_state
 {
-  memory_arena Memory;
-  u32 SnapShotIndex;
-  u32 CounterStateCount;
-  debug_counter_state CounterStates[512];
+  b32 Initialized;
+  memory_arena Arena;
+  temporary_memory CollateTemp;
+
+  u32 FrameCount;
+  u32 FrameBarLaneCount;
+  r32 FrameBarRange;
+
+  debug_frame* Frames;
+  debug_thread* FirstThread;
+  open_debug_block* FirstFreeBlock;
 };
 
 

@@ -8,7 +8,7 @@ inline u32 GetThreadID()
 {
   // Read the pointer to thread local storage.
   u8* ThreadLocalStorage = (u8*) __readgsqword(0x30);
-  u32 ThreadID = *(u32*) (ThreadLocalStorage + 0x40);
+  u32 ThreadID = *(u32*) (ThreadLocalStorage + 0x48);
   return ThreadID;
 }
 

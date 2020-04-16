@@ -696,7 +696,8 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  const r32 DesiredAspectRatio = 1.77968526f;
+  r32 DesiredAspectRatio = 1.77968526f;
+  DesiredAspectRatio = (r32)WindowWidth / (r32)WindowHeight;
   OpenGLSetViewport( DesiredAspectRatio, WindowWidth, WindowHeight );
 
   // OpenGL uses Column major convention.

@@ -1460,13 +1460,6 @@ Win32IsInLoop(win32_state *aState)
     return(Result);
 }
 
-inline void Win32RecordTimeStamp( debug_frame_end_info* Info, char* Name, r32 Seconds)
-{
-  Assert(Info->TimestampCount < ArrayCount(Info->Timestamps));
-  debug_frame_timestamp* Timestamp = Info->Timestamps + Info->TimestampCount++;
-  Timestamp->Name = Name;
-  Timestamp->Seconds = Seconds;
-}
 
 // Signature: platform_memory_block* PLATFORM_ALLOCATE_MEMORY(memory_index aSize, u64 aFlags)
 
@@ -1859,7 +1852,7 @@ WinMain(  HINSTANCE aInstance,
 
       Platform = GameMemory.PlatformAPI;
 
-      debug_state* DebugState = BootstrapPushStruct(debug_state, Memory);
+      debug_state* DebugState = BootstrapPushStruct(debug_state, Arena);
       GameMemory.DebugState = DebugState;
 
       for(s32 ReplayIndex = 0;
@@ -1888,7 +1881,7 @@ WinMain(  HINSTANCE aInstance,
 
         // NOTE: We start indexing from 1 as 0 means no recording  / playing
         Win32GetInputFileLocation(&GlobalWin32State, false, ReplayIndex+1,
-              sizeof(ReplayBuffer->FileName), ReplayBuffer-> FileName);
+              sizeof(ReplayBuffer->FileName), ReplayBuffer->FileName);
 
         ReplayBuffer->FileHandle = CreateFileA(ReplayBuffer->FileName,
                     GENERIC_WRITE|GENERIC_READ, 0, 0, CREATE_ALWAYS,0,0);
@@ -1943,10 +1936,9 @@ WinMain(  HINSTANCE aInstance,
         RenderCommands.Width  = GlobalBackBuffer.Width;
         RenderCommands.Height = GlobalBackBuffer.Height;
 
-        u64 LastCycleCount = __rdtsc();
+
         while(GlobalRunning)
         {
-          FRAME_MARKER();
           NewInput->dt = TargetSecondsPerFrame;
 
           NewInput->ExecutableReloaded = false;
@@ -2239,18 +2231,18 @@ WinMain(  HINSTANCE aInstance,
             LARGE_INTEGER EndCounter = Win32GetWallClock();
             r32 SecPerFrame = Win32GetSecondsElapsed(LastCounter, EndCounter);
             LastCounter = EndCounter;
-#if HANDMADE_INTERNAL
-            u64 EndCycleCount = __rdtsc();
-            u64 CyclesElapsed = EndCycleCount - LastCycleCount;
-            LastCycleCount = EndCycleCount;
+            FRAME_MARKER();
 
             if(Game.DEBUGGameFrameEnd)
             {
               GlobalDebugTable = Game.DEBUGGameFrameEnd(&GameMemory);
-              GlobalDebugTable->RecordCount[TRANSLATION_UNIT_INDEX] = __COUNTER__;
+              if(GlobalDebugTable)
+              {
+                GlobalDebugTable->RecordCount[TRANSLATION_UNIT_INDEX] = __COUNTER__;
+              }
             }
             GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
-#endif
+
           } // Global Pause
         } // Global Running
       }else{

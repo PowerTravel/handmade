@@ -583,39 +583,4 @@ void AccumulateStatistic(debug_statistics* Statistic, r32 Value)
   ++Statistic->Count;
 }
 
-// Signature is
-// void debug_frame_end (game_memory* Memory, debug_frame_end_info* Timestamps)
-
 #include "debug.cpp"
-
-extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
-{
-  GlobalDebugTable->RecordCount[0] = DebugRecords_Main_Count;
-  ++GlobalDebugTable->CurrentEventArrayIndex;
-  if(GlobalDebugTable->CurrentEventArrayIndex >= ArrayCount(GlobalDebugTable->Events))
-  {
-    GlobalDebugTable->CurrentEventArrayIndex=0;
-  }
-  u64 ArrayIndex_EventIndex = AtomicExchangeu64(&GlobalDebugTable->EventArrayIndex_EventIndex,
-                                               ((u64)GlobalDebugTable->CurrentEventArrayIndex << 32));
-
-  u32 EventArrayIndex = (ArrayIndex_EventIndex >> 32);
-  u32 EventCount = (ArrayIndex_EventIndex & 0xFFFFFFFF);
-
-  debug_state* DebugState = Memory->DebugState;
-  if(DebugState)
-  {
-    DebugState->CounterStateCount = 0;
-
-    //CollateDebugRecords(DebugState, EventCount, EventArrayIndex, GlobalDebugTable);
-
-    ++DebugState->SnapShotIndex;
-    if(DebugState->SnapShotIndex >= SNAPSHOT_COUNT)
-    {
-      DebugState->SnapShotIndex = 0;
-    }
-
-    //PushDebugOverlay(DebugState);
-  }
-  return GlobalDebugTable;
-}
