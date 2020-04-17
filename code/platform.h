@@ -154,18 +154,25 @@ enum debug_event_type
   DebugEvent_BeginBlock,
   DebugEvent_EndBlock,
 };
-
+struct threadid_coreindex
+{
+  u16 ThreadID;
+  u16 CoreIndex;
+};
 struct debug_event
 {
   u64 Clock;
-  u16 ThreadID;
-  u16 CoreIndex;
+  union
+  {
+    threadid_coreindex TC;
+    r32 SecondsElapsed;
+  };
   u16 DebugRecordIndex;
   u8 TranslationUnit;
   u8 Type;
 };
 
-#define MAX_DEBUG_EVENT_ARRAY_COUNT 64
+#define MAX_DEBUG_EVENT_ARRAY_COUNT 8
 #define MAX_DEBUG_TRANSLATION_UNITS (3)
 #define MAX_DEBUG_EVENT_COUNT (16*65536)
 #define MAX_DEBUG_RECORD_COUNT (65536)
@@ -186,31 +193,32 @@ extern debug_table* GlobalDebugTable;
 
 #if HANDMADE_PROFILE
 
-// Note: Needs to be a macro so that it gets expanded in every translation unit
-//       Even if inline the linker may chose one specific implementation and every
-//       translation unit will get the implementations TRANSLATION_UNIT_INDEX
-#define RecordDebugEvent( RecordIndex, EventType) \
-{ \
+#define RecordDebugEventCommon(RecordIndex, EventType) \
   u64 ArrayIndex_EventIndex = AtomicAddu64(&GlobalDebugTable->EventArrayIndex_EventIndex, 1); \
   u32 EventIndex = ArrayIndex_EventIndex & 0xFFFFFFFF; \
   u32 ArrayIndex = ArrayIndex_EventIndex >> 32; \
   debug_event* Event = GlobalDebugTable->Events[ArrayIndex] + EventIndex; \
   Event->Clock = __rdtsc(); \
-  Event->ThreadID = (u16)GetThreadID(); \
-  Event->CoreIndex = 0; \
   Event->DebugRecordIndex = (u16) RecordIndex; \
   Event->TranslationUnit = TRANSLATION_UNIT_INDEX; \
   Event->Type = (u8) EventType;\
+
+#define RecordDebugEvent( RecordIndex, EventType) \
+{\
+  RecordDebugEventCommon( RecordIndex, EventType); \
+  Event->TC.ThreadID = (u16)GetThreadID(); \
+  Event->TC.CoreIndex = 0; \
 }
 
-#define FRAME_MARKER() \
+#define FRAME_MARKER(SecondsElapsed) \
 { \
   u32 RecordIndex = __COUNTER__; \
+  RecordDebugEventCommon(RecordIndex, DebugEvent_FrameMarker);\
+  Event->SecondsElapsed = SecondsElapsed; \
   debug_record* Record = GlobalDebugTable->Records[TRANSLATION_UNIT_INDEX] + RecordIndex; \
   Record->FileName = __FILE__; \
   Record->BlockName = "Frame Marker"; \
   Record->LineNumber = __LINE__; \
-  RecordDebugEvent(RecordIndex, DebugEvent_FrameMarker);\
 }
 
 
@@ -288,8 +296,10 @@ EndTicketMutex(ticket_mutex* Mutex)
 
 struct game_render_commands
 {
-  s32 Width;
-  s32 Height;
+  s32 ResolutionWidthPixels;
+  s32 ResolutionHeightPixels;
+  s32 ScreenWidthPixels;
+  s32 ScreenHeightPixels;
 
   opengl_program2D RenderProgram2D;
   opengl_program3D RenderProgram3D;
@@ -384,7 +394,7 @@ struct game_input
   b32 ExecutableReloaded;
 
   game_button_state MouseButton[5];
-  s32 MouseX, MouseY, MouseZ;
+  r32 MouseX, MouseY, MouseZ;
 
   // Todo: handle keyboard like this? Use raw input?
   //game_button_state KeyboardButton[104];

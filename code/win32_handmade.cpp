@@ -445,7 +445,7 @@ Win32ResizeDIBSection( win32_offscreen_buffer* aBuffer, s32 aWidth, s32 aHeight 
 u32 GlobalOpenVAO = 0;
 
 internal void
-Win32DisplayBufferInWindow( game_render_commands* Commands, HDC aDeviceContext, s32 aWindowWidth, s32 aWindowHeight )
+Win32DisplayBufferInWindow( game_render_commands* Commands, HDC aDeviceContext )
 {
 
   b32 InHardware = true;
@@ -454,7 +454,7 @@ Win32DisplayBufferInWindow( game_render_commands* Commands, HDC aDeviceContext, 
 
   if(InHardware)
   {
-    OpenGLRenderGroupToOutput( Commands, aWindowWidth, aWindowHeight );
+    OpenGLRenderGroupToOutput( Commands );
 
     SwapBuffers(aDeviceContext);
 
@@ -484,13 +484,14 @@ Win32DisplayBufferInWindow( game_render_commands* Commands, HDC aDeviceContext, 
 
       SwapBuffers(aDeviceContext);
     }else{
-
-      if( (aWindowWidth  >= GlobalBackBuffer.Width*2 ) &&
-          (aWindowHeight >= GlobalBackBuffer.Height*2) )
+      s32 WindowWidth = Commands->ScreenWidthPixels;
+      s32 WindowHeight = Commands->ScreenHeightPixels;
+      if( (WindowWidth  >= GlobalBackBuffer.Width*2 ) &&
+          (WindowHeight >= GlobalBackBuffer.Height*2) )
       {
         // Note: No Stretching for prorotyping purposes.
         StretchDIBits(  aDeviceContext,
-                0,0, aWindowWidth,aWindowHeight,
+                0,0, WindowWidth,WindowHeight,
                 0,0, GlobalBackBuffer.Width, GlobalBackBuffer.Height,
                 GlobalBackBuffer.Memory,
                 &GlobalBackBuffer.Info,
@@ -498,13 +499,13 @@ Win32DisplayBufferInWindow( game_render_commands* Commands, HDC aDeviceContext, 
       }else{
         s32 OffsetX = 10;
         s32 OffsetY = 10;
-        PatBlt(aDeviceContext, GlobalBackBuffer.Width+OffsetX,  0, aWindowWidth, aWindowHeight, BLACKNESS);
-        PatBlt(aDeviceContext, 0, GlobalBackBuffer.Height+OffsetY, aWindowWidth, aWindowHeight, BLACKNESS);
-        PatBlt(aDeviceContext, 0, 0, OffsetX, aWindowHeight, BLACKNESS);
-        PatBlt(aDeviceContext, 0, 0, aWindowWidth, OffsetY,  BLACKNESS);
+        PatBlt(aDeviceContext, GlobalBackBuffer.Width+OffsetX,  0, WindowWidth, WindowHeight, BLACKNESS);
+        PatBlt(aDeviceContext, 0, GlobalBackBuffer.Height+OffsetY, WindowWidth, WindowHeight, BLACKNESS);
+        PatBlt(aDeviceContext, 0, 0, OffsetX, WindowHeight, BLACKNESS);
+        PatBlt(aDeviceContext, 0, 0, WindowWidth, OffsetY,  BLACKNESS);
         /*
         StretchDIBits(  aDeviceContext,
-                0,0, aWindowWidth, aWindowHeight,
+                0,0, WindowWidth, WindowHeight,
                 0,0, GlobalBackBuffer->Width, GlobalBackBuffer->Height,
                 GlobalBackBuffer->Memory,
                 &GlobalBackBuffer->Info,
@@ -585,6 +586,7 @@ MainWindowCallback( HWND aWindow,
       PAINTSTRUCT Paint;
       HDC DeviceContext = BeginPaint(aWindow, &Paint);
       #if 0
+      // TODO: Resize Render Push Buffer Here?
       win32_window_dimension Dimension = Win32GetWindowDimension(aWindow);
       Win32DisplayBufferInWindow(DeviceContext, Dimension.Width, Dimension.Height);
       #endif
@@ -922,9 +924,6 @@ Win32ToggleFullscreen(HWND aWindow)
   }
 }
 
-
-// TODO: Handle keyboard separately from gamepad as a key-map
-// TODO: Handle Mouse input
 internal void
 Win32ProcessKeyboard(win32_state* aState,  game_controller_input*  aOldKeyboardController, game_controller_input* aKeyboardController)
 {
@@ -1300,6 +1299,13 @@ Win32GetWallClock(void)
 {
   LARGE_INTEGER Result;
   QueryPerformanceCounter(&Result);
+  return Result;
+}
+
+inline r32
+Win32GetWallClockSeconds()
+{
+  r32 Result = (r32) ((r64) Win32GetWallClock().QuadPart / (r64)GlobalPerfCounterFrequency);
   return Result;
 }
 
@@ -1933,16 +1939,20 @@ WinMain(  HINSTANCE aInstance,
                                                  TempGameCodeLockFullPath);
 
         game_render_commands RenderCommands = {};
-        RenderCommands.Width  = GlobalBackBuffer.Width;
-        RenderCommands.Height = GlobalBackBuffer.Height;
 
-
+        LARGE_INTEGER FrameMarkerClock = {};
         while(GlobalRunning)
         {
-          NewInput->dt = TargetSecondsPerFrame;
 
           NewInput->ExecutableReloaded = false;
 
+          HDC DeviceContext = GetDC(WindowHandle);
+          win32_window_dimension Dimension = Win32GetWindowDimension(  WindowHandle );
+          RenderCommands.ResolutionWidthPixels  = GlobalBackBuffer.Width;
+          RenderCommands.ResolutionHeightPixels = GlobalBackBuffer.Height;
+          RenderCommands.ScreenWidthPixels = Dimension.Width;
+          RenderCommands.ScreenHeightPixels = Dimension.Height;
+          ReleaseDC( WindowHandle, DeviceContext);
 
           BEGIN_BLOCK(LoadGameCode);
           //TODO: Find out why we need a 2-3 sec wait for loop live code editing to work
@@ -1974,8 +1984,9 @@ WinMain(  HINSTANCE aInstance,
           POINT MouseP;
           GetCursorPos(&MouseP);
           ScreenToClient( WindowHandle, &MouseP);
-          NewInput->MouseX = MouseP.x;
-          NewInput->MouseY = MouseP.y;
+          // Transforms from Pixel Space [0,Height: Width,0] to OpenGL Viewport Space [-1,-1 : 1,1]
+          NewInput->MouseX = (r32)2*MouseP.x/(r32)RenderCommands.ScreenWidthPixels-1;
+          NewInput->MouseY = (r32)-2*MouseP.y/(r32)RenderCommands.ScreenHeightPixels+1;
           NewInput->MouseZ = 0;
           Win32ProcessKeyboardMessage(&NewInput->MouseButton[0], GetKeyState(VK_LBUTTON)  & (1<<15));
           Win32ProcessKeyboardMessage(&NewInput->MouseButton[1], GetKeyState(VK_MBUTTON)  & (1<<15));
@@ -2196,9 +2207,8 @@ WinMain(  HINSTANCE aInstance,
             BEGIN_BLOCK(ProcessRenderQueue);
 
             // Update Window
-            win32_window_dimension Dimension = Win32GetWindowDimension(  WindowHandle );
-            HDC DeviceContext = GetDC(WindowHandle);
-            Win32DisplayBufferInWindow(&RenderCommands, DeviceContext, Dimension.Width, Dimension.Height);
+            DeviceContext = GetDC(WindowHandle);
+            Win32DisplayBufferInWindow(&RenderCommands, DeviceContext);
             ReleaseDC( WindowHandle, DeviceContext);
 
             END_BLOCK(ProcessRenderQueue);
@@ -2228,21 +2238,27 @@ WinMain(  HINSTANCE aInstance,
             }
 #endif
 #endif
-            LARGE_INTEGER EndCounter = Win32GetWallClock();
-            r32 SecPerFrame = Win32GetSecondsElapsed(LastCounter, EndCounter);
-            LastCounter = EndCounter;
-            FRAME_MARKER();
 
+            r32 FrameMarkerSecondsElapsed = 0;
+            NewInput->dt = TargetSecondsPerFrame;
+
+#if HANDMADE_INTERNAL
+            BEGIN_BLOCK(DebugCollation);
             if(Game.DEBUGGameFrameEnd)
             {
               GlobalDebugTable = Game.DEBUGGameFrameEnd(&GameMemory);
-              if(GlobalDebugTable)
-              {
-                GlobalDebugTable->RecordCount[TRANSLATION_UNIT_INDEX] = __COUNTER__;
-              }
             }
             GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
-
+            END_BLOCK(DebugCollation);
+#endif
+            LARGE_INTEGER EndCounter = Win32GetWallClock();
+            r32 SecondsElapsed = Win32GetSecondsElapsed(LastCounter, EndCounter);
+            FRAME_MARKER(SecondsElapsed);
+            LastCounter = EndCounter;
+            if(GlobalDebugTable)
+            {
+              GlobalDebugTable->RecordCount[TRANSLATION_UNIT_INDEX] = __COUNTER__;
+            }
           } // Global Pause
         } // Global Running
       }else{

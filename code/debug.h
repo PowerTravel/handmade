@@ -22,6 +22,7 @@ struct debug_frame_timestamp
 
 struct debug_frame_region
 {
+  debug_record Record;
   u32 LaneIndex;
   r32 MinT;
   r32 MaxT;
@@ -32,6 +33,7 @@ struct debug_frame
 {
   u64 BeginClock;
   u64 EndClock;
+  r32 WallSecondsElapsed;
   u32 RegionCount;
   debug_frame_region* Regions;
 };
@@ -56,6 +58,8 @@ struct debug_thread
 struct debug_state
 {
   b32 Initialized;
+  b32 Paused;
+
   memory_arena Arena;
   temporary_memory CollateTemp;
 
@@ -68,5 +72,7 @@ struct debug_state
   open_debug_block* FirstFreeBlock;
 };
 
+
+void PushDebugOverlay(debug_state* DebugState, game_input* GameInput);
 
 global_variable render_group* GlobalDebugRenderGroup;

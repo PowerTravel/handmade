@@ -62,7 +62,7 @@ internal stb_font_map STBBakeFont(memory_arena* Memory)
   stb_font_map Result = {};
   Result.StartChar = Ranges[0];
   Result.NumChars = Ranges[1] - Ranges[0];
-  Result.FontHeightPx = 24.f;
+  Result.FontHeightPx = 32.f;
   Result.CharData = PushArray(Memory, Result.NumChars, stbtt_bakedchar);
 
   stbtt_GetScaledFontVMetrics((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
@@ -191,7 +191,7 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
   entity* ControllableCamera = NewEntity( World );
   NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
 
-  r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
+  r32 AspectRatio = (r32)RenderCommands->ResolutionWidthPixels / (r32) RenderCommands->ResolutionHeightPixels;
   r32 FieldOfView =  90;
   SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
   LookAt(ControllableCamera->CameraComponent, 1*V3(0,3,8), V3(0,3,0));
@@ -276,7 +276,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   entity* ControllableCamera = NewEntity( World );
   NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
 
-  r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
+  r32 AspectRatio = (r32)RenderCommands->ResolutionWidthPixels / (r32) RenderCommands->ResolutionHeightPixels;
   r32 FieldOfView =  90;
   SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
   LookAt(ControllableCamera->CameraComponent, 1*V3(3,3,3), V3(0,0,0));
@@ -312,7 +312,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
                                 COMPONENT_TYPE_SPRITE_ANIMATION |
                                 COMPONENT_TYPE_CAMERA);
 
-  r32 AspectRatio = (r32)RenderCommands->Width / (r32) RenderCommands->Height;
+  r32 AspectRatio = (r32)RenderCommands->ResolutionWidthPixels / (r32) RenderCommands->ResolutionHeightPixels;
   r32 FieldOfView =  90;
   SetCameraComponent(Player->CameraComponent, FieldOfView, AspectRatio );
   LookAt(Player->CameraComponent, 3*V3(0,0,1), V3(0,0,0));
@@ -472,8 +472,8 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
     RenderCommands->MainRenderGroup.ElementCount = 0;
     RenderCommands->MainRenderGroup.Buffer = utils::push_buffer((u8*) PushSize(&Memory->GameState->PersistentArena, RenderMemorySize), RenderMemorySize);
     RenderCommands->MainRenderGroup.Assets = Memory->GameState->World->Assets;
-    RenderCommands->MainRenderGroup.ScreenWidth  = (r32) RenderCommands->Width;
-    RenderCommands->MainRenderGroup.ScreenHeight = (r32) RenderCommands->Height;
+    RenderCommands->MainRenderGroup.ScreenWidth  = (r32) RenderCommands->ScreenWidthPixels;
+    RenderCommands->MainRenderGroup.ScreenHeight = (r32) RenderCommands->ScreenHeightPixels;
     RenderCommands->MainRenderGroup.ProjectionMatrix = M4Identity();
     RenderCommands->MainRenderGroup.ViewMatrix = M4Identity();
 
@@ -482,8 +482,8 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
     RenderCommands->DebugRenderGroup.ElementCount = 0;
     RenderCommands->DebugRenderGroup.Buffer = utils::push_buffer((u8*) PushSize(&Memory->GameState->PersistentArena, RenderMemorySize), RenderMemorySize);
     RenderCommands->DebugRenderGroup.Assets = Memory->GameState->World->Assets;
-    RenderCommands->DebugRenderGroup.ScreenWidth  =  (r32) RenderCommands->Width;
-    RenderCommands->DebugRenderGroup.ScreenHeight =  (r32) RenderCommands->Height;
+    RenderCommands->DebugRenderGroup.ScreenWidth  =  (r32) RenderCommands->ScreenWidthPixels;
+    RenderCommands->DebugRenderGroup.ScreenHeight =  (r32) RenderCommands->ScreenHeightPixels;
     RenderCommands->DebugRenderGroup.ProjectionMatrix = M4Identity();
     RenderCommands->DebugRenderGroup.ViewMatrix = M4Identity();
 
@@ -533,6 +533,11 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   SpriteAnimationSystemUpdate(GameState->World);
   FillRenderPushBuffer( World, RenderCommands );
   CheckArena(&GameState->TransientArena);
+
+  if(Memory->DebugState)
+  {
+    PushDebugOverlay(Memory->DebugState, Input);
+  }
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
@@ -548,39 +553,6 @@ GetTimeBar(r32 TimeValue, r32 MaxTimeValue, r32 BarMaxLength, r32 BarWidth)
   v2 P1 = V2(-1 + TimeFraction * BarMaxLength, 1);
   aabb2f Result = AABB2f(P0,P1);
   return Result;
-}
-
-void BeginDebugStatistics(debug_statistics* Statistic)
-{
-  Statistic->Count = 0;
-  Statistic->Min =  R32Max;
-  Statistic->Max = -R32Max;
-  Statistic->Avg = 0;
-}
-
-void EndDebugStatistics(debug_statistics* Statistic)
-{
-  if(Statistic->Count != 0)
-  {
-    Statistic->Avg /= Statistic->Count;
-  }else{
-    Statistic->Min = 0;
-    Statistic->Max = 0;
-  }
-}
-
-void AccumulateStatistic(debug_statistics* Statistic, r32 Value)
-{
-  if(Statistic->Min > Value)
-  {
-    Statistic->Min = Value;
-  }
-  if(Statistic->Max < Value)
-  {
-    Statistic->Max = Value;
-  }
-  Statistic->Avg += Value;
-  ++Statistic->Count;
 }
 
 #include "debug.cpp"

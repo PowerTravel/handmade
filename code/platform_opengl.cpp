@@ -668,7 +668,7 @@ internal void setOpenGLState(u32 State)
 }
 
 internal void
-OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 WindowHeight )
+OpenGLRenderGroupToOutput( game_render_commands* Commands)
 {
   Assert(Commands->TemporaryMemory.IsEmpty());
 
@@ -696,9 +696,10 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands, s32 WindowWidth, s32 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  // TODO: Screen Width is now also used for the resolution. Should we decouple ScreenHeightPixels and ResolutionHeightPixels?
   r32 DesiredAspectRatio = 1.77968526f;
-  DesiredAspectRatio = (r32)WindowWidth / (r32)WindowHeight;
-  OpenGLSetViewport( DesiredAspectRatio, WindowWidth, WindowHeight );
+  DesiredAspectRatio = (r32)Commands->ScreenWidthPixels / (r32)Commands->ScreenHeightPixels;
+  OpenGLSetViewport( DesiredAspectRatio, Commands->ScreenWidthPixels, Commands->ScreenHeightPixels );
 
   // OpenGL uses Column major convention.
   // Our math library uses Row major convention which means we need to transpose the
