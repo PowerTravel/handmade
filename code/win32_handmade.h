@@ -5,8 +5,6 @@
 #include <xinput.h>
 #include <dsound.h>
 
-
-
 #include "platform.h"
 #include "debug.h"
 #include "types.h"

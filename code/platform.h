@@ -142,10 +142,8 @@ struct debug_record
 {
   char* FileName;
   char* BlockName;
-
   u32 LineNumber;
-  u64 HitCount_CycleCount;
-  u32 Padding;
+  u32 Reserved;
 };
 
 enum debug_event_type
@@ -174,7 +172,7 @@ struct debug_event
 
 #define MAX_DEBUG_EVENT_ARRAY_COUNT 8
 #define MAX_DEBUG_TRANSLATION_UNITS (3)
-#define MAX_DEBUG_EVENT_COUNT (16*65536)
+#define MAX_DEBUG_EVENT_COUNT (4*65536)
 #define MAX_DEBUG_RECORD_COUNT (65536)
 
 struct debug_table
@@ -322,6 +320,8 @@ struct game_button_state
 {
   s32 HalfTransitionCount;
   b32 EndedDown;
+  b32 Pushed;
+  b32 Released;
 };
 
 struct game_controller_input
@@ -384,7 +384,15 @@ struct game_controller_input
       game_button_state Terminator;
     };
   };
+};
 
+enum mouse_button{
+  PlatformMouseButton_Left,
+  PlatformMouseButton_Middle,
+  PlatformMouseButton_Right,
+  PlatformMouseButton_ExtraOne,
+  PlatformMouseButton_ExtraTwo,
+  PlatformMouseButton_Count
 };
 
 struct game_input

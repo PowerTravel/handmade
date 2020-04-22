@@ -21,6 +21,7 @@ void UpdateViewMatrixAngularMovement(  component_camera* Camera )
 
 void CameraSystemUpdate( world* World )
 {
+  TIMED_FUNCTION();
 	for(u32 Index = 0;  Index < World->NrEntities; ++Index )
 	{
 		entity* Entity = &World->Entities[Index];

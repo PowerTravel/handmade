@@ -61,19 +61,15 @@ void DEBUGPushQuad(render_group* DebugRenderGroup, aabb2f Rect, v4 Color = V4(1,
   Body->M  = GetTranslationMatrix(V4(X0, Y0,0,1)) * GetScaleMatrix(V4(Width, Height,1,0));
 }
 
-void DEBUGAddTextSTB( render_group* DebugRenderGroup, c8* String, r32 cornerOffset, r32 LineNumber)
+void DEBUGTextOutAtPx(r32 xPos, r32 yPos, render_group* DebugRenderGroup, c8* String)
 {
-  TIMED_FUNCTION();
   stb_font_map* FontMap = &DebugRenderGroup->Assets->STBFontMap;
 
   component_surface* BitMapFont = (component_surface*) DebugRenderGroup->Buffer.GetMemory(sizeof(component_surface));
   BitMapFont->Material = (material*) DebugRenderGroup->Buffer.GetMemory(sizeof(material));
   SetMaterial(BitMapFont->Material, MATERIAL_WHITE);
-
   BitMapFont->Material->DiffuseMap = &FontMap->BitMap;
   stbtt_aligned_quad Quad = {};
-  r32 xPos = cornerOffset;
-  r32 yPos = DebugRenderGroup->ScreenHeight - (LineNumber) * FontMap->FontHeightPx-FontMap->FontHeightPx;
 
   const r32 M = -0.5f;
   const r32 Kx = 1.f / DebugRenderGroup->ScreenWidth;
@@ -122,6 +118,25 @@ void DEBUGAddTextSTB( render_group* DebugRenderGroup, c8* String, r32 cornerOffs
 
     ++String;
   }
+}
+
+// Todo: Decide on one coordinate system to work with!
+void DEBUGTextOutAt(r32 xPos, r32 yPos, render_group* DebugRenderGroup, c8* String)
+{
+  r32 X = ((xPos+1))*GlobalDebugRenderGroup->ScreenWidth;
+  r32 Y = ((yPos))*GlobalDebugRenderGroup->ScreenHeight;
+  DEBUGTextOutAtPx(X, Y, DebugRenderGroup, String);
+}
+
+void DEBUGAddTextSTB(render_group* DebugRenderGroup, c8* String, r32 cornerOffset, r32 LineNumber)
+{
+  TIMED_FUNCTION();
+
+  stb_font_map* FontMap = &DebugRenderGroup->Assets->STBFontMap;
+  r32 xPos = cornerOffset;
+  r32 yPos = DebugRenderGroup->ScreenHeight - (LineNumber) * FontMap->FontHeightPx-FontMap->FontHeightPx;
+
+  DEBUGTextOutAtPx(xPos, yPos,  DebugRenderGroup, String);
 }
 
 

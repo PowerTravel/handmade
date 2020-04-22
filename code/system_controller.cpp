@@ -283,6 +283,7 @@ void EpaGjkVisualizerController( entity* Entity )
 
 void ControllerSystemUpdate( world* World )
 {
+  TIMED_FUNCTION();
   for (u32 Index = 0;  Index < World->NrEntities; ++Index )
   {
     entity* E = &World->Entities[Index];

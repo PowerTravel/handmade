@@ -1,6 +1,4 @@
-#ifndef PLATFORM_OPENGL_H
-#define PLATFORM_OPENGL_H
-
+#pragma once
 
 #define GL_FRAMEBUFFER_SRGB               0x8DB9
 #define GL_SRGB8_ALPHA8                   0x8C43
@@ -154,5 +152,3 @@ struct opengl_buffer_object
 };
 
 void OpenGLInitExtensions();
-
-#endif // PLATFORM_OPENGL_H

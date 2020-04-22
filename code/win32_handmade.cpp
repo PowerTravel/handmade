@@ -25,7 +25,7 @@ global_variable win32_offscreen_buffer GlobalBackBuffer;
 global_variable s64 GlobalPerfCounterFrequency;
 global_variable b32 DEBUGGlobalShowCursor;
 global_variable WINDOWPLACEMENT GlobalWindowPosition = {sizeof(GlobalWindowPosition)};
-
+global_variable game_input GlobalInput[2] = {};
 
 // Note(Jakob): Caseys native screen resolution is 960 by 540 times two
 // Note(Jakob): My native screen resolution is 840 by 525 times two
@@ -851,11 +851,24 @@ Win32ProcessXInputDigitalButton(DWORD aXInputButtonState, game_button_state* aOl
 internal void
 Win32ProcessKeyboardMessage( game_button_state* aNewState, b32 IsDown)
 {
+  aNewState->Pushed = false;
+  aNewState->Released = false;
   if(aNewState->EndedDown != IsDown)
   {
     aNewState->EndedDown = IsDown;
     ++aNewState->HalfTransitionCount;
+    if(IsDown)
+    {
+      aNewState->Pushed = true;
+    }else{
+      aNewState->Released = true;
+    }
   }
+  Assert( ( aNewState->Pushed   &&  aNewState->EndedDown)    || !aNewState->Pushed );
+  Assert( ( aNewState->Released && !aNewState->EndedDown) || !aNewState->Released );
+  Assert( ( aNewState->Pushed && !aNewState->Released) ||
+          (!aNewState->Pushed &&  aNewState->Released) ||
+          (!aNewState->Pushed && !aNewState->Released));
 }
 
 internal r32
@@ -956,11 +969,10 @@ Win32ProcessKeyboard(win32_state* aState,  game_controller_input*  aOldKeyboardC
         #define KeyMessageWasDownBit (1<<30)
         #define KeyMessageIsDownBit (1<<31)
         bool WasDown = ((Message.lParam & KeyMessageWasDownBit) != 0);
-        bool IsDown = ((Message.lParam &  KeyMessageIsDownBit) == 0);
+        bool IsDown  = ((Message.lParam &  KeyMessageIsDownBit) == 0);
 
-
-                b32 AltKeyWasDown   = ( Message.lParam & (1 << 29));
-                b32 ShiftKeyWasDown = ( GetKeyState(VK_SHIFT) & (1 << 15));
+        b32 AltKeyWasDown   = ( Message.lParam & (1 << 29));
+        b32 ShiftKeyWasDown = ( GetKeyState(VK_SHIFT) & (1 << 15));
 
         if(WasDown != IsDown)
         {
@@ -1709,8 +1721,8 @@ WinMain(  HINSTANCE aInstance,
       LPSTR aCommandLine,
       s32 aShowCode )
 {
-  win32_thread_info Threads[7];
-  u32 ThreadCount = ArrayCount(Threads);
+  win32_thread_info Threads[3] = {};
+  u32 ThreadCount = 3;
   u32 InitialCount = 0;
   platform_work_queue HighPriorityQueue = {};
   HighPriorityQueue.SemaphoreHandle = CreateSemaphoreEx(0, InitialCount, ThreadCount, 0, 0, SEMAPHORE_ALL_ACCESS);
@@ -1858,9 +1870,6 @@ WinMain(  HINSTANCE aInstance,
 
       Platform = GameMemory.PlatformAPI;
 
-      debug_state* DebugState = BootstrapPushStruct(debug_state, Arena);
-      GameMemory.DebugState = DebugState;
-
       for(s32 ReplayIndex = 0;
         ReplayIndex < ArrayCount(GlobalWin32State.ReplayBuffer);
         ++ReplayIndex)
@@ -1918,9 +1927,8 @@ WinMain(  HINSTANCE aInstance,
 
       if( SoundSamples )
       {
-        game_input Input[2] = {};
-        game_input* NewInput = &Input[0];
-        game_input* OldInput = &Input[1];
+        game_input* NewInput = &GlobalInput[0];
+        game_input* OldInput = &GlobalInput[1];
 
         LARGE_INTEGER LastCounter = Win32GetWallClock();
         LARGE_INTEGER FlipWallClock = Win32GetWallClock();
@@ -1976,6 +1984,8 @@ WinMain(  HINSTANCE aInstance,
 
           BEGIN_BLOCK(ProcessInput);
 
+          // Todo: Unify controller and keyboad input into something that makes a bit more sense
+
           game_controller_input* OldKeyboardController = GetController(OldInput,0);
           game_controller_input* NewKeyboardController = GetController(NewInput,0);
 
@@ -1988,11 +1998,24 @@ WinMain(  HINSTANCE aInstance,
           NewInput->MouseX = (r32)2*MouseP.x/(r32)RenderCommands.ScreenWidthPixels-1;
           NewInput->MouseY = (r32)-2*MouseP.y/(r32)RenderCommands.ScreenHeightPixels+1;
           NewInput->MouseZ = 0;
-          Win32ProcessKeyboardMessage(&NewInput->MouseButton[0], GetKeyState(VK_LBUTTON)  & (1<<15));
-          Win32ProcessKeyboardMessage(&NewInput->MouseButton[1], GetKeyState(VK_MBUTTON)  & (1<<15));
-          Win32ProcessKeyboardMessage(&NewInput->MouseButton[2], GetKeyState(VK_RBUTTON)  & (1<<15));
-          Win32ProcessKeyboardMessage(&NewInput->MouseButton[3], GetKeyState(VK_XBUTTON1) & (1<<15));
-          Win32ProcessKeyboardMessage(&NewInput->MouseButton[4], GetKeyState(VK_XBUTTON2) & (1<<15));
+
+          DWORD WinButtonID[PlatformMouseButton_Count] =
+          {
+              VK_LBUTTON,
+              VK_MBUTTON,
+              VK_RBUTTON,
+              VK_XBUTTON1,
+              VK_XBUTTON2,
+          };
+
+          for(s32 ButtonIndex = 0;
+            ButtonIndex < PlatformMouseButton_Count;
+            ++ButtonIndex)
+          {
+            NewInput->MouseButton[ButtonIndex].HalfTransitionCount = OldInput->MouseButton[ButtonIndex].HalfTransitionCount;
+            NewInput->MouseButton[ButtonIndex].EndedDown = OldInput->MouseButton[ButtonIndex].EndedDown;
+            Win32ProcessKeyboardMessage(&NewInput->MouseButton[ButtonIndex], GetKeyState(WinButtonID[ButtonIndex])  & (1<<15));
+          }
 
           END_BLOCK(ProcessInput);
 

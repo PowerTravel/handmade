@@ -22,13 +22,13 @@ struct debug_frame_timestamp
 
 struct debug_frame_region
 {
-  debug_record Record;
   u32 LaneIndex;
   r32 MinT;
   r32 MaxT;
+  debug_record* Record;
 };
 
-#define MAX_REGIONS_PER_FRAME 128
+#define MAX_REGIONS_PER_FRAME 4096
 struct debug_frame
 {
   u64 BeginClock;
@@ -40,7 +40,8 @@ struct debug_frame
 
 struct open_debug_block
 {
-  u32 FrameIndex;
+  u32 StartingFrameIndex;
+  debug_record* Record;
   debug_event* OpeningEvent;
   open_debug_block* Parent;
   open_debug_block* NextFree;
@@ -59,13 +60,20 @@ struct debug_state
 {
   b32 Initialized;
   b32 Paused;
+  b32 Resumed;
+
+  debug_record* ScopeToRecord;
 
   memory_arena Arena;
   temporary_memory CollateTemp;
 
+  u32 CollationArrayIndex;
+  debug_frame* CollationFrame;
   u32 FrameCount;
   u32 FrameBarLaneCount;
   r32 FrameBarRange;
+
+  render_group RenderGroup;
 
   debug_frame* Frames;
   debug_thread* FirstThread;

@@ -509,7 +509,9 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
   i the build directory.
 */
 
-
+#if HANDMADE_INTERNAL
+game_memory* DebugGlobalMemory = 0;
+#endif
 // Signature is
 //void game_update_and_render (thread_context* Thread,
 //                game_memory* Memory,
@@ -519,6 +521,10 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
   GlobalDebugRenderGroup = &RenderCommands->DebugRenderGroup;
   GlobalVis = &GlobalGjkEpaVisualizer;
+#if HANDMADE_INTERNAL
+  DebugGlobalMemory = Memory;
+#endif
+
   TIMED_FUNCTION();
   Platform = Memory->PlatformAPI;
   InitiateGame(Thread, Memory, RenderCommands, Input);
@@ -536,6 +542,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
   if(Memory->DebugState)
   {
+    TIMED_BLOCK(PushDebugOverlay);
     PushDebugOverlay(Memory->DebugState, Input);
   }
 }

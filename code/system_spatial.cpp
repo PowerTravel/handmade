@@ -398,6 +398,7 @@ void FireOnceVic(memory_arena* TransientArena, entity* A, entity* B)
 
 internal void RemoveInvalidContactPoints( world* World )
 {
+  TIMED_FUNCTION();
   contact_manifold* Manifold = World->FirstContactManifold;
   while (Manifold)
   {
@@ -454,6 +455,7 @@ internal void RemoveInvalidContactPoints( world* World )
 
 internal void DoWarmStarting( world* World )
 {
+  TIMED_FUNCTION();
   contact_manifold* Manifold = World->FirstContactManifold;
   while (Manifold)
   {
@@ -495,6 +497,7 @@ internal void DoWarmStarting( world* World )
 
 inline void IntegrateVelocities(world* World)
 {
+  TIMED_FUNCTION();
   r32 dt =  World->dtForFrame;
   for(u32 Index = 0;  Index < World->NrEntities; ++Index )
   {
@@ -520,6 +523,7 @@ inline void IntegrateVelocities(world* World)
 
 internal aabb_tree BuildBroadPhaseTree( world* World )
 {
+  TIMED_FUNCTION();
   aabb_tree Result = {};
   memory_arena* TransientArena = World->TransientArena;
   for(u32 Index = 0;  Index < World->NrEntities; ++Index )
@@ -540,6 +544,7 @@ internal aabb_tree BuildBroadPhaseTree( world* World )
 internal void
 CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_stack* const BroadPhaseResultStack )
 {
+  TIMED_FUNCTION();
   broad_phase_result_stack* ColliderPair = BroadPhaseResultStack;
   memory_arena* TransientArena = World->TransientArena;
   contact_manifold** WorkArray = (contact_manifold**) PushArray(TransientArena, BroadPhaseResultCount, contact_manifold* );
@@ -621,6 +626,7 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
 
 internal void RemoveNonIntersectingManifolds(world* World)
 {
+  TIMED_FUNCTION();
   contact_manifold** ManifoldPtr = &World->FirstContactManifold;
   while(*ManifoldPtr)
   {
@@ -640,6 +646,7 @@ internal void RemoveNonIntersectingManifolds(world* World)
 internal void
 SolveNonPenetrationConstraints(world* World)
 {
+  TIMED_FUNCTION();
   contact_manifold* Manifold = World->FirstContactManifold;
   while(Manifold)
   {
@@ -697,6 +704,7 @@ SolveNonPenetrationConstraints(world* World)
 internal void
 SolveFrictionalConstraints( world* World )
 {
+  TIMED_FUNCTION();
   contact_manifold* Manifold = World->FirstContactManifold;
   while(Manifold)
   {
@@ -827,6 +835,7 @@ TimestepVelocityRungeKutta4(const r32 DeltaTime, const v3 LinearVelocity, const 
 inline internal void
 IntegratePositions(world* World)
 {
+  TIMED_FUNCTION();
   for(u32 Index = 0;  Index < World->NrEntities; ++Index )
   {
     entity* E = &World->Entities[Index];
@@ -867,6 +876,7 @@ void SpatialSystemUpdate( world* World )
 
   RemoveNonIntersectingManifolds(World);
 
+  BEGIN_BLOCK(SolveConstraints);
   if(World->FirstContactManifold)
   {
     for (u32 i = 0; i < SLOVER_ITERATIONS; ++i)
@@ -876,6 +886,7 @@ void SpatialSystemUpdate( world* World )
       SolveFrictionalConstraints(World);
     }
   }
+  END_BLOCK(SolveConstraints);
 
   IntegratePositions(World);
 
