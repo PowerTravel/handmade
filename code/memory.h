@@ -2,6 +2,7 @@
 
 #include "platform.h"
 #include "utility_macros.h"
+
 struct memory_arena
 {
   platform_memory_block *CurrentBlock;

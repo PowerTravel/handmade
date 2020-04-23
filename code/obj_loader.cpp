@@ -1,3 +1,4 @@
+#include "standalone_utility.h"
 #include "obj_loader.h"
 #include "math/vector_math.h"
 #include "bitmap.h"

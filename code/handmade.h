@@ -1,4 +1,5 @@
 #pragma once
+
 #include "platform.h"
 #include "debug.h"
 #include "memory.h"

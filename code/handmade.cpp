@@ -460,34 +460,22 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
   if (!Memory->GameState)
   {
     Memory->GameState = BootstrapPushStruct(game_state, PersistentArena);
-
-    u32 RenderMemorySize = Megabytes(128);
-    u32 TempMemorySize   = Megabytes(16);
-    RenderCommands->TemporaryMemory = utils::push_buffer((u8*) PushSize(&Memory->GameState->PersistentArena, TempMemorySize), TempMemorySize);
-
     //Create2DScene(Thread, Memory, RenderCommands, Input );
     CreateCollisionTestScene(Thread, Memory, RenderCommands, Input );
     //CreateEpaVisualizerTestScene(Thread, Memory, RenderCommands, Input );
 
-    RenderCommands->MainRenderGroup.ElementCount = 0;
-    RenderCommands->MainRenderGroup.Buffer = utils::push_buffer((u8*) PushSize(&Memory->GameState->PersistentArena, RenderMemorySize), RenderMemorySize);
-    RenderCommands->MainRenderGroup.Assets = Memory->GameState->World->Assets;
-    RenderCommands->MainRenderGroup.ScreenWidth  = (r32) RenderCommands->ScreenWidthPixels;
-    RenderCommands->MainRenderGroup.ScreenHeight = (r32) RenderCommands->ScreenHeightPixels;
-    RenderCommands->MainRenderGroup.ProjectionMatrix = M4Identity();
-    RenderCommands->MainRenderGroup.ViewMatrix = M4Identity();
-
     AllocateGlobaklGjkEpaVisualizer(&Memory->GameState->AssetArena);
 
-    RenderCommands->DebugRenderGroup.ElementCount = 0;
-    RenderCommands->DebugRenderGroup.Buffer = utils::push_buffer((u8*) PushSize(&Memory->GameState->PersistentArena, RenderMemorySize), RenderMemorySize);
-    RenderCommands->DebugRenderGroup.Assets = Memory->GameState->World->Assets;
-    RenderCommands->DebugRenderGroup.ScreenWidth  =  (r32) RenderCommands->ScreenWidthPixels;
-    RenderCommands->DebugRenderGroup.ScreenHeight =  (r32) RenderCommands->ScreenHeightPixels;
-    RenderCommands->DebugRenderGroup.ProjectionMatrix = M4Identity();
-    RenderCommands->DebugRenderGroup.ViewMatrix = M4Identity();
-
     Memory->GameState->World->Assets->STBFontMap = STBBakeFont(&Memory->GameState->AssetArena);
+
+    RenderCommands->MainRenderGroup = InitiateRenderGroup(Memory->GameState->World, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
+
+    // TODO: Right now DebugRenderGroup just solves the problem of drawing the overlay on top of everything else with a special shader.
+    //       This should be supported by just one RenderGroup with sorting capabilities and shaderswitching.
+    //       Maybe DebugRenderGroup is something we want to move away from and consolidate into the DebugRenderGroup.
+    //       Is there a problem with the debug system piping it's drawing through the GameRenderingPipeline?
+    //       I mean it already sort of does since it all gets drawn in RenderGroupToOutput.
+    RenderCommands->DebugRenderGroup = InitiateRenderGroup(Memory->GameState->World, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
 
     for (s32 ControllerIndex = 0;
     ControllerIndex < ArrayCount(Input->Controllers);
@@ -519,9 +507,9 @@ game_memory* DebugGlobalMemory = 0;
 //                game_input* Input )
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
-  GlobalDebugRenderGroup = &RenderCommands->DebugRenderGroup;
   GlobalVis = &GlobalGjkEpaVisualizer;
 #if HANDMADE_INTERNAL
+  GlobalDebugRenderGroup =  RenderCommands->DebugRenderGroup;
   DebugGlobalMemory = Memory;
 #endif
 
@@ -537,13 +525,12 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   SpatialSystemUpdate(GameState->World);
   CameraSystemUpdate(GameState->World);
   SpriteAnimationSystemUpdate(GameState->World);
-  FillRenderPushBuffer( World, RenderCommands );
+  FillRenderPushBuffer( World, RenderCommands->MainRenderGroup );
   CheckArena(&GameState->TransientArena);
 
   if(Memory->DebugState)
   {
-    TIMED_BLOCK(PushDebugOverlay);
-    PushDebugOverlay(Memory->DebugState, Input);
+    PushDebugOverlay(Input);
   }
 }
 

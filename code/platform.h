@@ -1,4 +1,5 @@
 #pragma once
+
 //  NOTE: Stuff that gets refferenced in the platform layer as well as
 //      the game layer
 
@@ -41,6 +42,7 @@
 #include <stddef.h> // size_t exists in this header on some platforms
 #include "types.h"
 #include "intrinsics.h"
+#include "platform_opengl.h"
 
 
 #if COMPILER_MSVC
@@ -287,11 +289,7 @@ EndTicketMutex(ticket_mutex* Mutex)
   AtomicAddu64(&Mutex->Serving, 1);
 }
 
-
-#include "standalone_utility.h"
-#include "platform_opengl.h"
-#include "render_push_buffer.h"
-
+struct render_group;
 struct game_render_commands
 {
   s32 ResolutionWidthPixels;
@@ -302,10 +300,8 @@ struct game_render_commands
   opengl_program2D RenderProgram2D;
   opengl_program3D RenderProgram3D;
 
-  render_group MainRenderGroup;
-  render_group DebugRenderGroup;
-
-  utils::push_buffer TemporaryMemory; // Buffer used for temporary storage
+  render_group* MainRenderGroup;
+  render_group* DebugRenderGroup;
 };
 
 struct game_sound_output_buffer
@@ -419,8 +415,8 @@ inline game_controller_input* GetController(game_input* Input, s32 ControllerInd
 
 struct platform_file_handle
 {
-    b32 NoErrors;
-    void *Platform;
+  b32 NoErrors;
+  void *Platform;
 };
 /*
 struct platform_file_info
@@ -447,11 +443,12 @@ enum platform_file_type
     PlatformFileType_Count,
 };
 */
+
 enum platform_memory_block_flags
 {
-    PlatformMemory_NotRestored = 0x1,
-    PlatformMemory_OverflowCheck = 0x2,
-    PlatformMemory_UnderflowCheck = 0x4,
+  PlatformMemory_NotRestored = 0x1,
+  PlatformMemory_OverflowCheck = 0x2,
+  PlatformMemory_UnderflowCheck = 0x4,
 };
 
 /*
@@ -470,17 +467,17 @@ enum platform_memory_block_flags
  */
 struct platform_memory_block
 {
-    u64 Flags;
-    u64 Size;
-    u8* Base;           // Pointer to the beginning of the memory block
-    uintptr_t Used;           // Pointer to the end of the used data
-    platform_memory_block *ArenaPrev;
+  u64 Flags;
+  u64 Size;
+  u8* Base;           // Pointer to the beginning of the memory block
+  uintptr_t Used;           // Pointer to the end of the used data
+  platform_memory_block *ArenaPrev;
 };
 
 enum platform_open_file_mode_flags
 {
-    OpenFile_Read = 0x1,
-    OpenFile_Write = 0x2,
+  OpenFile_Read = 0x1,
+  OpenFile_Write = 0x2,
 };
 
 //#define PLATFORM_OPEN_FILE(name) platform_file_handle name(platform_file_group *FileGroup, platform_file_info *Info, u32 ModeFlags)

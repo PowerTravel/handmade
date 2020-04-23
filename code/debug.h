@@ -62,7 +62,6 @@ struct debug_state
   b32 Paused;
   b32 Resumed;
 
-  debug_record* ScopeToRecord;
 
   memory_arena Arena;
   temporary_memory CollateTemp;
@@ -73,14 +72,14 @@ struct debug_state
   u32 FrameBarLaneCount;
   r32 FrameBarRange;
 
-  render_group RenderGroup;
+  render_group* RenderGroup;
 
   debug_frame* Frames;
   debug_thread* FirstThread;
   open_debug_block* FirstFreeBlock;
+  debug_record* ScopeToRecord;
+
 };
 
-
-void PushDebugOverlay(debug_state* DebugState, game_input* GameInput);
-
+void PushDebugOverlay(game_input* GameInput);
 global_variable render_group* GlobalDebugRenderGroup;

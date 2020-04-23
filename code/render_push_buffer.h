@@ -1,9 +1,11 @@
 #pragma once
 
+#include "memory.h"
 #include "entity_components.h"
 #include "primitive_meshes.h"
 #include "math/vector_math.h"
 #include "standalone_utility.h"
+
 
 struct component_mesh;
 struct component_surface;
@@ -99,14 +101,19 @@ struct render_group
 {
   r32 ScreenWidth;
   r32 ScreenHeight;
+  b32 Initialized;
 
   m4 ProjectionMatrix;
   m4 ViewMatrix;
 
   u32 ElementCount;
-  utils::push_buffer Buffer;
+  memory_arena Arena;
+  temporary_memory PushBufferMemory;
 
   game_assets* Assets;
   push_buffer_header* First;
   push_buffer_header* Last;
 };
+
+void InitiateRenderGroup(render_group* RenderGroup, world* World, r32 ScreenWidth, r32 ScreenHeight);
+void ResetRenderGroup(render_group* RenderGroup);

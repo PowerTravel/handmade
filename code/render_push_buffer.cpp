@@ -12,11 +12,9 @@
 push_buffer_header* PushNewHeader(render_group* RenderGroup)
 {
   //TIMED_FUNCTION();
-  utils::push_buffer* Buffer = &RenderGroup->Buffer;
   RenderGroup->ElementCount++;
 
-  push_buffer_header* NewEntryHeader = (push_buffer_header*) Buffer->GetMemory(sizeof(push_buffer_header));
-  Assert( NewEntryHeader );
+  push_buffer_header* NewEntryHeader = PushStruct(&RenderGroup->Arena, push_buffer_header);
   NewEntryHeader->Next = 0;
 
   if( !RenderGroup->First )
@@ -39,18 +37,17 @@ LinearTransform(const r32 OutputMin, const r32 OutputMax, const r32 InputMin, co
   return Result;
 }
 
-void DEBUGPushQuad(render_group* DebugRenderGroup, aabb2f Rect, v4 Color = V4(1,1,1,1))
+void DEBUGPushQuad(render_group* RenderGroup, aabb2f Rect, v4 Color = V4(1,1,1,1))
 {
   //TIMED_FUNCTION();
-  component_surface* Surface = (component_surface*) DebugRenderGroup->Buffer.GetMemory(sizeof(component_surface));
-  Surface->Material = (material*) DebugRenderGroup->Buffer.GetMemory(sizeof(material));
+  component_surface* Surface = PushStruct(&RenderGroup->Arena, component_surface);
+  Surface->Material = PushStruct(&RenderGroup->Arena, material);
   Surface->Material->AmbientColor = Color;
 
-  // Todo: Find a better API So you don't need this BS all the time
-  push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( DebugRenderGroup );
+  push_buffer_header*  Header = PushNewHeader( RenderGroup );
   Header->Type = render_buffer_entry_type::PRIMITIVE;
   Header->RenderState = RENDER_STATE_FILL;
-  entry_type_primitive* Body = (entry_type_primitive*) DebugRenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+  entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
   Body->PrimitiveType = primitive_type::QUAD;
   Body->Surface = Surface;
   Body->TM = M4Identity();
@@ -61,19 +58,19 @@ void DEBUGPushQuad(render_group* DebugRenderGroup, aabb2f Rect, v4 Color = V4(1,
   Body->M  = GetTranslationMatrix(V4(X0, Y0,0,1)) * GetScaleMatrix(V4(Width, Height,1,0));
 }
 
-void DEBUGTextOutAtPx(r32 xPos, r32 yPos, render_group* DebugRenderGroup, c8* String)
+void DEBUGTextOutAtPx(r32 xPos, r32 yPos, render_group* RenderGroup, c8* String)
 {
-  stb_font_map* FontMap = &DebugRenderGroup->Assets->STBFontMap;
+  stb_font_map* FontMap = &RenderGroup->Assets->STBFontMap;
 
-  component_surface* BitMapFont = (component_surface*) DebugRenderGroup->Buffer.GetMemory(sizeof(component_surface));
-  BitMapFont->Material = (material*) DebugRenderGroup->Buffer.GetMemory(sizeof(material));
+  component_surface* BitMapFont = PushStruct(&RenderGroup->Arena, component_surface);
+  BitMapFont->Material = PushStruct(&RenderGroup->Arena, material);
   SetMaterial(BitMapFont->Material, MATERIAL_WHITE);
   BitMapFont->Material->DiffuseMap = &FontMap->BitMap;
   stbtt_aligned_quad Quad = {};
 
   const r32 M = -0.5f;
-  const r32 Kx = 1.f / DebugRenderGroup->ScreenWidth;
-  const r32 Ky = 1.f / DebugRenderGroup->ScreenHeight;
+  const r32 Kx = 1.f / RenderGroup->ScreenWidth;
+  const r32 Ky = 1.f / RenderGroup->ScreenHeight;
 
   const r32 Ks = 1.f / FontMap->BitMap.Width;
   const r32 Kt = 1.f / FontMap->BitMap.Height;
@@ -106,10 +103,10 @@ void DEBUGTextOutAtPx(r32 xPos, r32 yPos, render_group* DebugRenderGroup, c8* St
       const m4 QuadTranslate    = GetTranslationMatrix(V4(x0u + xoff - 0.5f, y0u - yoff + 0.5f,0,1)) * GetScaleMatrix(V4(GlyphWidth, GlyphHeight,1,0));
 
       // Todo: Find a better API So you don't need this BS all the time
-      push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( DebugRenderGroup );
+      push_buffer_header* Header = PushNewHeader( RenderGroup );
       Header->Type = render_buffer_entry_type::PRIMITIVE;
       Header->RenderState = RENDER_STATE_FILL;
-      entry_type_primitive* Body = (entry_type_primitive*) DebugRenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+      entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
       Body->PrimitiveType = primitive_type::QUAD;
       Body->Surface = BitMapFont;
       Body->TM = TextureTranslate;
@@ -121,40 +118,59 @@ void DEBUGTextOutAtPx(r32 xPos, r32 yPos, render_group* DebugRenderGroup, c8* St
 }
 
 // Todo: Decide on one coordinate system to work with!
-void DEBUGTextOutAt(r32 xPos, r32 yPos, render_group* DebugRenderGroup, c8* String)
+void DEBUGTextOutAt(r32 xPos, r32 yPos, render_group* RenderGroup, c8* String)
 {
   r32 X = ((xPos+1))*GlobalDebugRenderGroup->ScreenWidth;
   r32 Y = ((yPos))*GlobalDebugRenderGroup->ScreenHeight;
-  DEBUGTextOutAtPx(X, Y, DebugRenderGroup, String);
+  DEBUGTextOutAtPx(X, Y, RenderGroup, String);
 }
 
-void DEBUGAddTextSTB(render_group* DebugRenderGroup, c8* String, r32 cornerOffset, r32 LineNumber)
+void DEBUGAddTextSTB(render_group* RenderGroup, c8* String, r32 cornerOffset, r32 LineNumber)
 {
   TIMED_FUNCTION();
 
-  stb_font_map* FontMap = &DebugRenderGroup->Assets->STBFontMap;
+  stb_font_map* FontMap = &RenderGroup->Assets->STBFontMap;
   r32 xPos = cornerOffset;
-  r32 yPos = DebugRenderGroup->ScreenHeight - (LineNumber) * FontMap->FontHeightPx-FontMap->FontHeightPx;
+  r32 yPos = RenderGroup->ScreenHeight - (LineNumber) * FontMap->FontHeightPx-FontMap->FontHeightPx;
 
-  DEBUGTextOutAtPx(xPos, yPos,  DebugRenderGroup, String);
+  DEBUGTextOutAtPx(xPos, yPos,  RenderGroup, String);
 }
 
-
-void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
+void ResetRenderGroup(render_group* RenderGroup)
 {
-  Assert(RenderCommands);
+  EndTemporaryMemory(RenderGroup->PushBufferMemory);
+  RenderGroup->PushBufferMemory = BeginTemporaryMemory(&RenderGroup->Arena);
 
-  TIMED_FUNCTION();
-  render_group* RenderGroup = &RenderCommands->MainRenderGroup;
-
-  RenderGroup->Buffer.Clear();
+  RenderGroup->ProjectionMatrix = M4Identity();
+  RenderGroup->ViewMatrix = M4Identity();
   RenderGroup->ElementCount = 0;
   RenderGroup->First = 0;
+  RenderGroup->Last = 0;
+}
+
+render_group* InitiateRenderGroup(world* World, r32 ScreenWidth, r32 ScreenHeight)
+{
+  render_group* Result = BootstrapPushStruct(render_group, Arena);
+  Result->PushBufferMemory = BeginTemporaryMemory(&Result->Arena);
+  Result->Assets = World->Assets;
+  Result->ScreenWidth = ScreenWidth;
+  Result->ScreenHeight = ScreenHeight;
+  ResetRenderGroup(Result);
+
+  Result->Initialized = true;
+
+  return Result;
+}
+
+
+void FillRenderPushBuffer( world* World, render_group* RenderGroup )
+{
+  TIMED_FUNCTION();
+
+  ResetRenderGroup(RenderGroup);
 
   // TODO: Make a proper entity library so we can extracl for example ALL Lights efficiently
   //       So we don't have to loop over ALL entitis several times
-
-  // Then push all the lights and camera
   for(u32 Index = 0; Index <  World->NrEntities; ++Index )
   {
     entity* Entity = &World->Entities[Index];
@@ -166,13 +182,12 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       break;
     }
 
-    if( (Entity->Types & COMPONENT_TYPE_LIGHT) &&
-      (Entity->Types & COMPONENT_TYPE_SPATIAL) )
+    if( Entity->LightComponent && Entity->SpatialComponent )
     {
       push_buffer_header* Header = PushNewHeader( RenderGroup );
       Header->Type = render_buffer_entry_type::LIGHT;
 
-      entry_type_light* Body = (entry_type_light*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_light));
+      entry_type_light* Body = PushStruct(&RenderGroup->Arena, entry_type_light);
       Body->Color  = Entity->LightComponent->Color;
       Body->M      = GetModelMatrix(Entity->SpatialComponent);
     }
@@ -185,7 +200,15 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
     if( (Entity->Types & COMPONENT_TYPE_MESH ) &&
         (Entity->Types & COMPONENT_TYPE_SPATIAL) )
     {
-      render_buffer* Buffer = (render_buffer*) RenderGroup->Buffer.GetMemory(sizeof(render_buffer));
+      // Todo: Move this to its own asset system. I have no idea what that should look like
+      //       All i Know is that I would like to do something like:
+      //       Body->MeshID   = Entity->MeshComponent->ID;
+      //       And have the opengl-render code be able to access the Asset library and load
+      //       the mesh into the GUP via the ID
+
+      // This also gives each mesh it's own BVO even though they may use the same mesh.
+      // (Same mesh gets sent to the gpu multiple times)
+      render_buffer* Buffer = PushStruct(&RenderGroup->Arena, render_buffer);
       Buffer->VAO  = &Entity->MeshComponent->VAO;
       Buffer->VBO  = &Entity->MeshComponent->VBO;
       Buffer->Fill = *Buffer->VAO==0;
@@ -200,11 +223,11 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       Buffer->ti   = Entity->MeshComponent->Indeces.ti;
       Buffer->ni   = Entity->MeshComponent->Indeces.ni;
 
-      push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+      push_buffer_header* Header = PushNewHeader( RenderGroup );
       Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
       Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
 
-      entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_indexed_buffer));
+      entry_type_indexed_buffer* Body = PushStruct(&RenderGroup->Arena, entry_type_indexed_buffer);
       Body->Buffer   = Buffer;
       Body->DataType = DATA_TYPE_TRIANGLE;
       Body->Surface  = Entity->SurfaceComponent;
@@ -216,15 +239,15 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 
     if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
     {
-      component_surface* WhiteSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-      WhiteSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+      component_surface* WhiteSurface = PushStruct(&RenderGroup->Arena, component_surface);
+      WhiteSurface->Material = PushStruct(&RenderGroup->Arena, material);
       SetMaterial(WhiteSurface->Material, MATERIAL_WHITE);
 
-      push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+      push_buffer_header* Header = PushNewHeader( RenderGroup );
       Header->Type = render_buffer_entry_type::PRIMITIVE;
       Header->RenderState = RENDER_STATE_FILL;
 
-      entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+      entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
       Body->Surface = WhiteSurface;
       Body->Surface->Material->DiffuseMap = Entity->SpriteAnimationComponent->Bitmap;
       Body->PrimitiveType = primitive_type::QUAD;
@@ -258,7 +281,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
     // Here we wanna do a wire frame and collision points
     if( Entity->Types & COMPONENT_TYPE_COLLIDER  )
     {
-      render_buffer* Buffer = (render_buffer*) RenderGroup->Buffer.GetMemory(sizeof(render_buffer));
+      render_buffer* Buffer = PushStruct(&RenderGroup->Arena, render_buffer);
       Buffer->VAO  = &Entity->ColliderComponent->Mesh->VAO;
       Buffer->VBO  = &Entity->ColliderComponent->Mesh->VBO;
       Buffer->Fill =  *Buffer->VAO==0;
@@ -267,20 +290,20 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       Buffer->v    =  Entity->ColliderComponent->Mesh->v;
       Buffer->vi   =  Entity->ColliderComponent->Mesh->vi;
 
-      component_surface* JadeSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-      JadeSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+      component_surface* JadeSurface = PushStruct(&RenderGroup->Arena, component_surface);
+      JadeSurface->Material = PushStruct(&RenderGroup->Arena, material);
       SetMaterial(JadeSurface->Material, MATERIAL_JADE);
 
-      component_surface* GreenSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-      GreenSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+      component_surface* GreenSurface = PushStruct(&RenderGroup->Arena, component_surface);
+      GreenSurface->Material = PushStruct(&RenderGroup->Arena, material);
       SetMaterial(GreenSurface->Material, MATERIAL_GREEN);
 
       {
-        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+        push_buffer_header* Header = PushNewHeader( RenderGroup );
         Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
         Header->RenderState = RENDER_STATE_WIREFRAME;
 
-        entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_indexed_buffer));
+        entry_type_indexed_buffer* Body = PushStruct(&RenderGroup->Arena, entry_type_indexed_buffer);
         Body->Buffer = Buffer;
         Body->DataType = DATA_TYPE_TRIANGLE;
         Body->Surface = JadeSurface;
@@ -298,7 +321,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       if(Vis->Playback && Vis->IndexCount>0)
       {
 
-        render_buffer* Buffer = (render_buffer*) RenderGroup->Buffer.GetMemory(sizeof(render_buffer));
+        render_buffer* Buffer = PushStruct(&RenderGroup->Arena, render_buffer);
         Buffer->VAO  = &Vis->VAO;
         Buffer->VBO  = &Vis->VBO;
         Buffer->Fill = Vis->UpdateVBO;
@@ -311,37 +334,37 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         Buffer->nvn  = Vis->NormalCount;
         Buffer->vn   = Vis->Normals;
 
-        component_surface* BlueRubberSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-        BlueRubberSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+        component_surface* BlueRubberSurface = PushStruct(&RenderGroup->Arena, component_surface);
+        BlueRubberSurface->Material = PushStruct(&RenderGroup->Arena, material);
         SetMaterial(BlueRubberSurface->Material, MATERIAL_BLUE_RUBBER);
 
-        component_surface* GreenRubberSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-        GreenRubberSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+        component_surface* GreenRubberSurface = PushStruct(&RenderGroup->Arena, component_surface);
+        GreenRubberSurface->Material = PushStruct(&RenderGroup->Arena, material);
         SetMaterial(GreenRubberSurface->Material, MATERIAL_GREEN_RUBBER);
 
-        component_surface* RedRubberSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-        RedRubberSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+        component_surface* RedRubberSurface = PushStruct(&RenderGroup->Arena, component_surface);
+        RedRubberSurface->Material = PushStruct(&RenderGroup->Arena, material);
         SetMaterial(RedRubberSurface->Material, MATERIAL_RED_RUBBER);
 
-        component_surface* WhiteSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-        WhiteSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+        component_surface* WhiteSurface = PushStruct(&RenderGroup->Arena, component_surface);
+        WhiteSurface->Material = PushStruct(&RenderGroup->Arena, material);
         SetMaterial(WhiteSurface->Material, MATERIAL_WHITE);
 
-        component_surface* RedSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-        RedSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+        component_surface* RedSurface = PushStruct(&RenderGroup->Arena, component_surface);
+        RedSurface->Material = PushStruct(&RenderGroup->Arena, material);
         SetMaterial(RedSurface->Material, MATERIAL_RED);
 
-        component_surface* GreenSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-        GreenSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+        component_surface* GreenSurface = PushStruct(&RenderGroup->Arena, component_surface);
+        GreenSurface->Material = PushStruct(&RenderGroup->Arena, material);
         SetMaterial(GreenSurface->Material, MATERIAL_GREEN);
 
         // Show Origin
         {
-          push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+          push_buffer_header* Header = PushNewHeader( RenderGroup );
           Header->Type = render_buffer_entry_type::PRIMITIVE;
           Header->RenderState = RENDER_STATE_FILL;
 
-          entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+          entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
           Body->Surface = WhiteSurface;
           Body->M = GetTranslationMatrix( V4(0,0,0,1)) * GetScaleMatrix( V4(0.1,0.1,0.1,1));
           Body->TM = M4Identity();
@@ -358,11 +381,12 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
           // Or fill every quad into one big buffer and draw them with one draw call
           for(u32 i = Vis->CSOMeshOffset; i < Vis->CSOMeshOffset + Vis->CSOMeshLength; ++i)
           {
-            push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+
+            push_buffer_header* Header = PushNewHeader( RenderGroup );
             Header->Type = render_buffer_entry_type::PRIMITIVE;
             Header->RenderState = RENDER_STATE_FILL;
 
-            entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+            entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
             v3 Vertex = v[vi[i]];
             Body->M = GetTranslationMatrix(V4(Vertex,1)) * GetScaleMatrix(V4(0.05,0.05,0.05,1));
             Body->TM = M4Identity();
@@ -378,10 +402,10 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 
           // GJK WireFrame
           {
-            push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+            push_buffer_header* Header = PushNewHeader( RenderGroup );
             Header->RenderState = RENDER_STATE_WIREFRAME;
             Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
-            entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_indexed_buffer));
+            entry_type_indexed_buffer* Body = PushStruct(&RenderGroup->Arena, entry_type_indexed_buffer);
             Body->Buffer = Buffer;
             Body->Surface = GreenRubberSurface;
             Body->M  = M4Identity();
@@ -409,10 +433,10 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
             v3* v   = GlobalVis->Vertices;
             for(u32 i = SI->Offset; i < SI->Offset + SI->Length; ++i)
             {
-              push_buffer_header*  Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+              push_buffer_header* Header = PushNewHeader( RenderGroup );
               Header->Type = render_buffer_entry_type::PRIMITIVE;
               Header->RenderState = RENDER_STATE_FILL;
-              entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+              entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
               v3 Vertex = v[vi[i]];
               Body->M = GetTranslationMatrix(V4(Vertex,1)) * GetScaleMatrix(V4(0.1,0.1,0.1,1));
               Body->TM = M4Identity();
@@ -423,11 +447,11 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
 
           // GJK Closset Point
           {
-            push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+            push_buffer_header* Header = PushNewHeader( RenderGroup );
             Header->Type = render_buffer_entry_type::PRIMITIVE;
             Header->RenderState = RENDER_STATE_FILL;
 
-            entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+            entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
             Body->Surface = RedRubberSurface;
             Body->M = GetTranslationMatrix( V4(SI->ClosestPoint,1)) * GetScaleMatrix( V4(0.09,0.12,0.09,1));
             Body->TM = M4Identity();
@@ -440,11 +464,11 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
           epa_index* EPA = &Vis->EPA[Vis->ActiveEPAFrame];
 
           {
-            push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+            push_buffer_header* Header = PushNewHeader( RenderGroup );
             Header->RenderState = EPA->FillMesh ? RENDER_STATE_FILL : RENDER_STATE_WIREFRAME;
             Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
 
-            entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_indexed_buffer));
+            entry_type_indexed_buffer* Body = PushStruct(&RenderGroup->Arena, entry_type_indexed_buffer);
             Body->Buffer = Buffer;
             Body->Surface = BlueRubberSurface;
             Body->M  = M4Identity();
@@ -455,11 +479,11 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
           }
           if(!EPA->FillMesh)
           {
-            push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+            push_buffer_header* Header = PushNewHeader( RenderGroup );
             Header->RenderState = RENDER_STATE_FILL;
             Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
 
-            entry_type_indexed_buffer* Body = (entry_type_indexed_buffer*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_indexed_buffer));
+            entry_type_indexed_buffer* Body = PushStruct(&RenderGroup->Arena, entry_type_indexed_buffer);
             Body->Buffer   = Buffer;
             Body->Surface = GreenRubberSurface;
             Body->M  = M4Identity();
@@ -474,7 +498,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
             Header->Type = render_buffer_entry_type::PRIMITIVE;
             Header->RenderState = RENDER_STATE_FILL;
 
-            entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+            entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
             Body->Surface = RedSurface;
             Body->M = GetTranslationMatrix( V4(EPA->ClosestPointOnFace,1)) * GetScaleMatrix( V4(0.11,0.11,0.11,1));
             Body->TM = M4Identity();
@@ -485,7 +509,7 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
             Header->Type = render_buffer_entry_type::PRIMITIVE;
             Header->RenderState = RENDER_STATE_FILL;
 
-            entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+            entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
             Body->Surface = GreenSurface;
             Body->M = GetTranslationMatrix( V4(EPA->SupportPoint,1)) * GetScaleMatrix( V4(0.11,0.11,0.11,1));
             Body->TM = M4Identity();
@@ -496,18 +520,18 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
     }
   }
 
-  component_surface* GreenSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-  GreenSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+  component_surface* GreenSurface = PushStruct(&RenderGroup->Arena, component_surface);
+  GreenSurface->Material = PushStruct(&RenderGroup->Arena, material);
   SetMaterial(GreenSurface->Material, MATERIAL_GREEN);
-  component_surface* RedSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-  RedSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+  component_surface* RedSurface = PushStruct(&RenderGroup->Arena, component_surface);
+  RedSurface->Material = PushStruct(&RenderGroup->Arena, material);
   SetMaterial(RedSurface->Material, MATERIAL_RED);
 
-  component_surface* BlueSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-  BlueSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+  component_surface* BlueSurface = PushStruct(&RenderGroup->Arena, component_surface);
+  BlueSurface->Material = PushStruct(&RenderGroup->Arena, material);
   SetMaterial(BlueSurface->Material, MATERIAL_BLUE);
-  component_surface* WhiteSurface = (component_surface*) RenderGroup->Buffer.GetMemory(sizeof(component_surface));
-  WhiteSurface->Material = (material*) RenderGroup->Buffer.GetMemory(sizeof(material));
+  component_surface* WhiteSurface = PushStruct(&RenderGroup->Arena, component_surface);
+  WhiteSurface->Material = PushStruct(&RenderGroup->Arena, material);
   SetMaterial(WhiteSurface->Material, MATERIAL_WHITE);
 
   contact_manifold* Manifold = World->FirstContactManifold;
@@ -520,20 +544,20 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
     {
       #if 0
       {
-        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+        push_buffer_header* Header = PushNewHeader( RenderGroup );
         Header->Type = render_buffer_entry_type::PRIMITIVE;
         Header->RenderState = RENDER_STATE_POINTS;
-        entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+        entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
         Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].A_ContactWorldSpace,1));
         Body->TM = M4Identity();
         Body->PrimitiveType = primitive_type::POINT;
         Body->Surface = RedSurface;
       }
       {
-        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+        push_buffer_header* Header = PushNewHeader( RenderGroup );
         Header->Type = render_buffer_entry_type::PRIMITIVE;
         Header->RenderState = RENDER_STATE_POINTS;
-        entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+        entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
         Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].B_ContactWorldSpace,1));
         Body->TM = M4Identity();
         Body->PrimitiveType = primitive_type::POINT;
@@ -541,10 +565,10 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
       }
       #endif
       {
-        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+        push_buffer_header* Header = PushNewHeader( RenderGroup );
         Header->Type = render_buffer_entry_type::PRIMITIVE;
         Header->RenderState = RENDER_STATE_POINTS;
-        entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+        entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
         Body->M = GetModelMatrix( A->SpatialComponent ) * GetTranslationMatrix(Manifold->Contacts[j].A_ContactModelSpace);
         //Body->M = GetTranslationMatrix( Manifold->Contacts[j].A_ContactWorldSpace);
         Body->TM = M4Identity();
@@ -552,10 +576,10 @@ void FillRenderPushBuffer( world* World, game_render_commands* RenderCommands )
         Body->Surface = BlueSurface;
       }
       {
-        push_buffer_header* Header = (push_buffer_header*) PushNewHeader( RenderGroup );
+        push_buffer_header* Header = PushNewHeader( RenderGroup );
         Header->Type = render_buffer_entry_type::PRIMITIVE;
         Header->RenderState = RENDER_STATE_POINTS;
-        entry_type_primitive* Body = (entry_type_primitive*) RenderGroup->Buffer.GetMemory(sizeof(entry_type_primitive));
+        entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
         Body->M = GetModelMatrix( B->SpatialComponent ) * GetTranslationMatrix(Manifold->Contacts[j].B_ContactModelSpace);
         //Body->M = GetTranslationMatrix( Manifold->Contacts[j].B_ContactWorldSpace);
         Body->TM = M4Identity();

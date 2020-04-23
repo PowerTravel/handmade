@@ -429,9 +429,10 @@ void OpenGLSetViewport( r32 ViewPortAspectRatio, s32 WindowWidth, s32 WindowHeig
 
 }
 
-void LoadOrBindTexture( bitmap* Bitmap, utils::push_buffer TemporaryMemory)
+internal void
+LoadOrBindTexture( memory_arena* TemporaryMemory, bitmap* Bitmap )
 {
-  Assert(TemporaryMemory.IsEmpty());
+  temporary_memory TempMem = BeginTemporaryMemory(TemporaryMemory);
   local_persist bitmap EmptyBitmap = {};
   u8 WhitePixel[4] = {255,255,255,255};
   EmptyBitmap.BPP  = 32;
@@ -469,7 +470,7 @@ void LoadOrBindTexture( bitmap* Bitmap, utils::push_buffer TemporaryMemory)
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
       #if 1
       //  Code for transforming an 8-bit texture to a 32 bit mono-color texture
-      u8* BitmapMemory = (u8*) TemporaryMemory.GetMemory( sizeof(u32) * RenderTarget->Width * RenderTarget->Height );
+      u8* BitmapMemory = (u8*) PushArray(TemporaryMemory, RenderTarget->Width * RenderTarget->Height, u32);
       u32* Pixel = (u32*) BitmapMemory;
       u8*  SrcPixel =  (u8*) RenderTarget->Pixels;
       u8*  EndSrcPixel = ((u8*) RenderTarget->Pixels)+ RenderTarget->Width * RenderTarget->Height;
@@ -508,6 +509,8 @@ void LoadOrBindTexture( bitmap* Bitmap, utils::push_buffer TemporaryMemory)
   // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
 
   glBindTexture( GL_TEXTURE_2D, RenderTarget->Handle );
+
+  EndTemporaryMemory(TempMem);
 }
 
 v4 Blend(v4* A, v4* B)
@@ -566,16 +569,15 @@ struct gl_vertex_buffer
   opengl_vertex* VertexData;
 };
 
-gl_vertex_buffer CreateGLVertexBuffer( game_render_commands* Commands,
+internal gl_vertex_buffer
+CreateGLVertexBuffer( memory_arena* TemporaryMemory,
   const u32 IndexCount,
   const u32* VerticeIndeces, const u32* TextureIndeces, const u32* NormalIndeces,
   const v3* VerticeData,     const v2* TextureData,     const v3* NormalData)
 {
   Assert(VerticeIndeces && VerticeData);
-  u32 MemoryNeeded = IndexCount * (sizeof(opengl_vertex) + 4*sizeof(u32));
-  Assert( MemoryNeeded <= Commands->TemporaryMemory.Remaining() );
-  u32* GLVerticeIndexArray = (u32*) Commands->TemporaryMemory.GetMemory(3*IndexCount*sizeof(u32));
-  u32* GLIndexArray        = (u32*) Commands->TemporaryMemory.GetMemory(  IndexCount*sizeof(u32));
+  u32* GLVerticeIndexArray  = PushArray(TemporaryMemory, 3*IndexCount, u32);
+  u32* GLIndexArray         = PushArray(TemporaryMemory, IndexCount, u32);
 
   u32 VerticeArrayCount = 0;
   for( u32 i = 0; i < IndexCount; ++i )
@@ -605,7 +607,7 @@ gl_vertex_buffer CreateGLVertexBuffer( game_render_commands* Commands,
   	GLIndexArray[i] = Index;
   }
 
-  opengl_vertex* VertexData = (opengl_vertex*) Commands->TemporaryMemory.GetMemory(VerticeArrayCount * sizeof(opengl_vertex));
+  opengl_vertex* VertexData = PushArray(TemporaryMemory, VerticeArrayCount, opengl_vertex);
   opengl_vertex* Vertice = VertexData;
   for( u32 i = 0; i < VerticeArrayCount; ++i )
   {
@@ -626,14 +628,15 @@ gl_vertex_buffer CreateGLVertexBuffer( game_render_commands* Commands,
   return Result;
 }
 
-void OpenGLPushBufferData(game_render_commands* Commands, render_buffer* Buffer)
+void OpenGLPushBufferData(memory_arena* TemporaryMemory, render_buffer* Buffer)
 {
+  temporary_memory TempMem = BeginTemporaryMemory(TemporaryMemory);
   if(!Buffer->Fill)
   {
     return;
   }
 
-  gl_vertex_buffer GLBuffer =  CreateGLVertexBuffer(Commands,
+  gl_vertex_buffer GLBuffer =  CreateGLVertexBuffer(TemporaryMemory,
     Buffer->nvi, Buffer->vi, Buffer->ti, Buffer->ni,
     Buffer->v, Buffer->vt, Buffer->vn);
 
@@ -641,7 +644,7 @@ void OpenGLPushBufferData(game_render_commands* Commands, render_buffer* Buffer)
   u32* VBO = Buffer->VBO;
   OpenGLSendMeshToGPU(VAO, VBO, GLBuffer.IndexCount, GLBuffer.Indeces, GLBuffer.VertexCount, GLBuffer.VertexData);
 
-  Commands->TemporaryMemory.Clear();
+  EndTemporaryMemory(TempMem);
 }
 
 internal void setOpenGLState(u32 State)
@@ -670,9 +673,7 @@ internal void setOpenGLState(u32 State)
 internal void
 OpenGLRenderGroupToOutput( game_render_commands* Commands)
 {
-  Assert(Commands->TemporaryMemory.IsEmpty());
-
-  render_group* RenderGroup = &Commands->MainRenderGroup;
+  render_group* RenderGroup = Commands->MainRenderGroup;
 
   if(!Commands->RenderProgram3D.Program)
   {
@@ -742,12 +743,12 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         glUniformMatrix4fv(Prog->M,  1, GL_TRUE, IndexedBuffer->M.E);
         glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, IndexedBuffer->NM.E);;
 
-        OpenGLPushBufferData(Commands, IndexedBuffer->Buffer);
+        OpenGLPushBufferData(&RenderGroup->Arena, IndexedBuffer->Buffer);
 
         Assert(IndexedBuffer->Surface);
         component_surface* Surface = IndexedBuffer->Surface;
         material* Material = Surface->Material;
-        LoadOrBindTexture(Material->DiffuseMap,Commands->TemporaryMemory);
+        LoadOrBindTexture(&RenderGroup->Arena, Material->DiffuseMap);
 
         u32 SurfaceSmoothnes = 3;
         v4 AmbientColor   = Material->DiffuseMap ? V4(0,0,0,1) : Blend(&LightColor, &Material->AmbientColor);
@@ -829,7 +830,8 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         v4 AmbientColor   = Material->DiffuseMap ? V4(0,0,0,1) : Blend(&LightColor, &Material->AmbientColor);
         v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
         v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
-        LoadOrBindTexture(Material->DiffuseMap, Commands->TemporaryMemory);
+
+        LoadOrBindTexture(&RenderGroup->Arena, Material->DiffuseMap);
         glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
         glUniform4fv( Prog->diffuseProduct,  1, DiffuseColor.E);
         glUniform4fv( Prog->specularProduct, 1, SpecularColor.E);
@@ -839,10 +841,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
       }break;
     }
   }
-
-  RenderGroup->Buffer.Clear();
-  RenderGroup->ElementCount = 0;
-  RenderGroup->First = 0;
 
   // DEBUG OVERLAY
 
@@ -854,7 +852,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
 
   glUseProgram(TextOverlay.Program);
 
-  RenderGroup = &Commands->DebugRenderGroup;
+  RenderGroup = Commands->DebugRenderGroup;
   // No need to clearh the depth buffer if we disable depth test
   glDisable(GL_DEPTH_TEST);
   // Enable Textures
@@ -895,18 +893,13 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         glUniformMatrix4fv((u32) TextOverlay.TM, 1, GL_TRUE, Primitive->TM.E);
         component_surface* Surface = Primitive->Surface;
         material* Material =  Surface->Material;
-        LoadOrBindTexture(Material->DiffuseMap, Commands->TemporaryMemory);
+        LoadOrBindTexture(&RenderGroup->Arena, Material->DiffuseMap);
         glUniform4fv( TextOverlay.ambientProduct,  1,  Material->AmbientColor.E);
 
         OpenGLDraw( VAO, ElementType, NrIndeces, 0 );
-        Assert(Commands->TemporaryMemory.IsEmpty());
       }
     }
-
   }
-  RenderGroup->Buffer.Clear();
-  RenderGroup->ElementCount = 0;
-  RenderGroup->First = 0;
 }
 #if 1
 
