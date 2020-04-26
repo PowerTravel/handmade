@@ -11,7 +11,6 @@
 
 push_buffer_header* PushNewHeader(render_group* RenderGroup)
 {
-  //TIMED_FUNCTION();
   RenderGroup->ElementCount++;
 
   push_buffer_header* NewEntryHeader = PushStruct(&RenderGroup->Arena, push_buffer_header);
@@ -26,15 +25,6 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup)
     RenderGroup->Last = NewEntryHeader;
   }
   return NewEntryHeader;
-}
-
-internal inline r32
-LinearTransform(const r32 OutputMin, const r32 OutputMax, const r32 InputMin, const r32 InputMax, const r32 Input)
-{
-  const r32 M = OutputMin;
-  const r32 K = (InputMax - InputMin) / (OutputMax - OutputMin);
-  const r32 Result = K * Input + M;
-  return Result;
 }
 
 void DEBUGPushQuad(render_group* RenderGroup, aabb2f Rect, v4 Color = V4(1,1,1,1))
@@ -56,6 +46,29 @@ void DEBUGPushQuad(render_group* RenderGroup, aabb2f Rect, v4 Color = V4(1,1,1,1
   r32 X0  = Rect.P0.X + Width/2;
   r32 Y0 = Rect.P0.Y + Height/2;
   Body->M  = GetTranslationMatrix(V4(X0, Y0,0,1)) * GetScaleMatrix(V4(Width, Height,1,0));
+}
+
+rect2f DEBUGTextSize(render_group* RenderGroup, c8* String)
+{
+  stb_font_map* FontMap = &RenderGroup->Assets->STBFontMap;
+  rect2f Result = {};
+
+  const r32 Kx = 1.f / RenderGroup->ScreenWidth;
+  const r32 Ky = 1.f / RenderGroup->ScreenHeight;
+
+  Result.X = 0;
+  Result.W = 0;
+  Result.Y = Ky*FontMap->Descent;
+  Result.H = Ky*(FontMap->Ascent - FontMap->Descent);
+
+  while (*String != '\0')
+  {
+    stbtt_bakedchar* CH = &FontMap->CharData[*String-0x20];
+    Result.W += Kx*CH->xadvance;
+    ++String;
+  }
+
+  return Result;
 }
 
 void DEBUGTextOutAtPx(r32 xPos, r32 yPos, render_group* RenderGroup, c8* String)
@@ -133,7 +146,7 @@ void DEBUGAddTextSTB(render_group* RenderGroup, c8* String, r32 cornerOffset, r3
   r32 xPos = cornerOffset;
   r32 yPos = RenderGroup->ScreenHeight - (LineNumber) * FontMap->FontHeightPx-FontMap->FontHeightPx;
 
-  DEBUGTextOutAtPx(xPos, yPos,  RenderGroup, String);
+  DEBUGTextOutAtPx(xPos, yPos, RenderGroup, String);
 }
 
 void ResetRenderGroup(render_group* RenderGroup)

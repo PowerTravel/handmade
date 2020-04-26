@@ -1018,3 +1018,12 @@ v3 GetBaryocentricCoordinates(const v3& p0, const v3& p1, const v3& p2, const v3
   v3 Result = V3(LambdaA, LambdaB, LambdaC);
   return Result;
 }
+
+inline r32
+LinearTransform(const r32 OutputMin, const r32 OutputMax, const r32 InputMin, const r32 InputMax, const r32 Input)
+{
+  const r32 M = OutputMin;
+  const r32 K = (InputMax - InputMin) / (OutputMax - OutputMin);
+  const r32 Result = K * Input + M;
+  return Result;
+}

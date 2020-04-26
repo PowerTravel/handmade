@@ -42,7 +42,7 @@ struct open_debug_block
 {
   u32 StartingFrameIndex;
   debug_record* Record;
-  debug_event* OpeningEvent;
+  debug_event OpeningEvent;
   open_debug_block* Parent;
   open_debug_block* NextFree;
 };
@@ -55,6 +55,7 @@ struct debug_thread
   open_debug_block* FirstOpenBlock;
   debug_thread* Next;
 };
+
 
 struct debug_state
 {
@@ -79,6 +80,17 @@ struct debug_state
   open_debug_block* FirstFreeBlock;
   debug_record* ScopeToRecord;
 
+
+  r32 IsVisible;
+  r32 ChartLeft;
+  r32 ChartBot;
+  r32 ChartWidth;
+  r32 ChartHeight;
+
+  b32 MainMenu;
+  u32 HotMenuItem;
+  r32 RadialMenuX;
+  r32 RadialMenuY;
 };
 
 void PushDebugOverlay(game_input* GameInput);

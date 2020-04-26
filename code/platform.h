@@ -270,7 +270,7 @@ struct timed_block
 #define END_BLOCK(Name)
 #define TIMED_BLOCK(BlockName, ...)
 #define TIMED_FUNCTION()
-#define FRAME_MARKER()
+#define FRAME_MARKER(SecondsElapsed)
 
 #endif
 

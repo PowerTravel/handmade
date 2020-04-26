@@ -5,8 +5,6 @@
     - Easy API to add new assets
     - Just ask interface, I want a Cube with blue surface.
     - Render States. I want to render the cube filled with wire-mesh
-  TODO: Multi Threading
-
 */
 
 #include "handmade.h"
@@ -281,10 +279,6 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
   LookAt(ControllableCamera->CameraComponent, 1*V3(3,3,3), V3(0,0,0));
 
-  // TODO Jakob: Any function pointers that gets assigned at game initialization
-  //             will become invalid when game code is recompiled.
-  //             Make it so that any permanent function pointers get reinitialized after
-  //             gameCode is updated
   ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
   ControllableCamera->ControllerComponent->Type = ControllerType_FlyingCamera;
 }
