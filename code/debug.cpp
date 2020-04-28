@@ -40,8 +40,8 @@ RestartCollation()
     DebugState->CollationArrayIndex = GlobalDebugTable->CurrentEventArrayIndex+1;
     DebugState->CollationFrame = 0;
 
-    DebugState->ChartLeft = -0.5f;
-    DebugState->ChartBot = -0.5f;
+    DebugState->ChartLeft = 0.5f;
+    DebugState->ChartBot = 0.f;
     DebugState->ChartWidth = 1.f;
     DebugState->ChartHeight = 1.f;
 }
@@ -322,8 +322,13 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
   return GlobalDebugTable;
 }
 
+
+
 void DebugMainWindow(game_input* GameInput)
 {
+  c8 buff[255] = {};
+  _snprintf_s(buff, sizeof(buff), sizeof(buff)-1, "ABCDefg(%2.2f, %2.2f)", GameInput->MouseX, GameInput->MouseY);
+  DEBUGTextOutAt(GameInput->MouseX, GameInput->MouseY, GlobalDebugRenderGroup, buff);
   char* MenuItems[] =
   {
     "Functions",
@@ -343,20 +348,20 @@ void DebugMainWindow(game_input* GameInput)
 
   if(GameInput->MouseButton[PlatformMouseButton_Right].Pushed)
   {
-    DebugState->RadialMenuX = GameInput->MouseX / AspectRatio;
+    DebugState->RadialMenuX = GameInput->MouseX;
     DebugState->RadialMenuY = GameInput->MouseY;
-    if(DebugState->RadialMenuX > 1-Radius)
+    if(DebugState->RadialMenuX < Radius)
     {
-      DebugState->RadialMenuX = 1-Radius;
-    }else if(DebugState->RadialMenuX < Radius-1){
-      DebugState->RadialMenuX = Radius-1;
+      DebugState->RadialMenuX = Radius;
+    }else if(DebugState->RadialMenuX > AspectRatio - Radius){
+      DebugState->RadialMenuX = AspectRatio - Radius;
     }
 
-    if(DebugState->RadialMenuY > 1-Radius-0.05f)
+    if(DebugState->RadialMenuY < Radius)
     {
-      DebugState->RadialMenuY = 1-Radius-0.05f;
-    }else if(DebugState->RadialMenuY < Radius - 1){
-      DebugState->RadialMenuY = Radius - 1;
+      DebugState->RadialMenuY = Radius;
+    }else if(DebugState->RadialMenuY > 1-Radius){
+      DebugState->RadialMenuY = 1-Radius;
     }
   }
 
@@ -374,10 +379,10 @@ void DebugMainWindow(game_input* GameInput)
   {
     r32 Angle = MenuItemIdx * 2*Pi32/(r32)ArrayCount(MenuItems) + Pi32/2.f;
 
-    v2 MouseButtonPos = V2(GameInput->MouseX/AspectRatio, GameInput->MouseY);
-    v2 MenuItemPos = V2(DebugState->RadialMenuX + Radius*Cos(Angle) / AspectRatio,
+    v2 MouseButtonPos = V2(GameInput->MouseX, GameInput->MouseY);
+    v2 MenuItemPos = V2(DebugState->RadialMenuX + Radius*Cos(Angle),
                         DebugState->RadialMenuY + Radius*Sin(Angle));
-    v2 MenuOrigin = V2(DebugState->RadialMenuX/AspectRatio, DebugState->RadialMenuY);
+    v2 MenuOrigin = V2(DebugState->RadialMenuX, DebugState->RadialMenuY);
 
     r32 LenSqMenuItem   = NormSq(MouseButtonPos - MenuItemPos);
     // Todo: I think we want aspect ratio baked into the "canonical coordinate system somehow"
@@ -391,7 +396,6 @@ void DebugMainWindow(game_input* GameInput)
     }
   }
 
-
   if(DebugState->MainMenu)
   {
     for(u32 MenuItemIdx = 0; MenuItemIdx < ArrayCount(MenuItems); ++MenuItemIdx)
@@ -399,7 +403,7 @@ void DebugMainWindow(game_input* GameInput)
       rect2f TextSize = DEBUGTextSize(GlobalDebugRenderGroup, MenuItems[MenuItemIdx]);
 
       r32 Angle = MenuItemIdx * 2*Pi32/(r32)ArrayCount(MenuItems) + Pi32/2.f;
-      r32 xPos = DebugState->RadialMenuX + Radius*Cos(Angle) / AspectRatio;
+      r32 xPos = DebugState->RadialMenuX + Radius*Cos(Angle);
       r32 yPos = DebugState->RadialMenuY + Radius*Sin(Angle);
       aabb2f TextBox = AABB2f(V2(xPos-TextSize.W/2.f, yPos + TextSize.Y),
                               V2(xPos+TextSize.W/2.f, yPos + TextSize.H + TextSize.Y));
@@ -409,8 +413,8 @@ void DebugMainWindow(game_input* GameInput)
       {
         Color = V4(0,0.5f,0,1);
       }
-      DEBUGPushQuad(GlobalDebugRenderGroup, TextBox, Color);
-      DEBUGTextOutAt(TextBox.P0.X, yPos, GlobalDebugRenderGroup, MenuItems[MenuItemIdx]);
+      //DEBUGPushQuad(GlobalDebugRenderGroup, TextBox, Color);
+      //DEBUGTextOutAt(TextBox.P0.X, TextBox.P0.Y, GlobalDebugRenderGroup, MenuItems[MenuItemIdx]);
     }
   }
 

@@ -1995,8 +1995,9 @@ WinMain(  HINSTANCE aInstance,
           GetCursorPos(&MouseP);
           ScreenToClient( WindowHandle, &MouseP);
           // Transforms from Pixel Space [0,Height: Width,0] to OpenGL Viewport Space [-1,-1 : 1,1]
-          NewInput->MouseX = (r32)2*MouseP.x/(r32)RenderCommands.ScreenWidthPixels-1;
-          NewInput->MouseY = (r32)-2*MouseP.y/(r32)RenderCommands.ScreenHeightPixels+1;
+          r32 AspectRatio = (r32)RenderCommands.ScreenWidthPixels / (r32)RenderCommands.ScreenHeightPixels;
+          NewInput->MouseX = (r32) MouseP.x * AspectRatio/RenderCommands.ScreenWidthPixels;
+          NewInput->MouseY = (r32) 1.f-MouseP.y/(r32)RenderCommands.ScreenHeightPixels;
           NewInput->MouseZ = 0;
 
           DWORD WinButtonID[PlatformMouseButton_Count] =
