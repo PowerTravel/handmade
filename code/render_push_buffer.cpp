@@ -27,28 +27,8 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup)
   return NewEntryHeader;
 }
 
-
-internal v2
-CanonicalToRender(v2 CanonicalPoint, r32 ScreenWidthPx, r32 ScreenHeightPx)
+void DEBUGPushQuad(render_group* RenderGroup, rect2f Rect, v4 Color = V4(1,1,1,1))
 {
-  // X: 0 -> -1
-  // X: AspectRatio -> 1
-  // y: 0 -> -1
-  // y: 1 -> 1
-  v2 Result = {};
-  r32 AspectRatio = ScreenWidthPx / ScreenHeightPx;
-  Result.X = 2*CanonicalPoint.X/AspectRatio - 1.f;
-  Result.Y = 2*CanonicalPoint.Y - 1.f;
-  return Result;
-}
-
-void DEBUGPushQuad(render_group* RenderGroup, aabb2f Rect, v4 Color = V4(1,1,1,1))
-{
-  //TIMED_FUNCTION();
-  v2 P0rc = CanonicalToRender(Rect.P0, RenderGroup->ScreenWidth, RenderGroup->ScreenHeight);
-  v2 P1rc = CanonicalToRender(Rect.P1, RenderGroup->ScreenWidth, RenderGroup->ScreenHeight);
-  Rect = AABB2f(P0rc, P1rc);
-
   component_surface* Surface = PushStruct(&RenderGroup->Arena, component_surface);
   Surface->Material = PushStruct(&RenderGroup->Arena, material);
   Surface->Material->AmbientColor = Color;
@@ -60,34 +40,9 @@ void DEBUGPushQuad(render_group* RenderGroup, aabb2f Rect, v4 Color = V4(1,1,1,1
   Body->PrimitiveType = primitive_type::QUAD;
   Body->Surface = Surface;
   Body->TM = M4Identity();
-  r32 Width  = (Rect.P1.X-Rect.P0.X);
-  r32 Height = (Rect.P1.Y-Rect.P0.Y);
-  r32 X0 = Rect.P0.X + Width/2;
-  r32 Y0 = Rect.P0.Y + Height/2;
-  Body->M  = GetTranslationMatrix(V4(X0, Y0,0,1)) * GetScaleMatrix(V4(Width, Height,1,0));
-}
-
-rect2f DEBUGTextSize(render_group* RenderGroup, c8* String)
-{
-  stb_font_map* FontMap = &RenderGroup->Assets->STBFontMap;
-  rect2f Result = {};
-
-  const r32 Kx = 2.f / RenderGroup->ScreenWidth;
-  const r32 Ky = 2.f / RenderGroup->ScreenHeight;
-
-  Result.X = 0;
-  Result.W = 0;
-  Result.Y = Ky*FontMap->Descent;
-  Result.H = Ky*(FontMap->Ascent + FontMap->Descent);
-
-  while (*String != '\0')
-  {
-    stbtt_bakedchar* CH = &FontMap->CharData[*String-0x20];
-    Result.W += Kx*CH->xadvance;
-    ++String;
-  }
-
-  return Result;
+  r32 X0 = Rect.X + Rect.W/2.f;
+  r32 Y0 = Rect.Y + Rect.H/2.f;
+  Body->M  = GetTranslationMatrix(V4(X0, Y0,0,1)) * GetScaleMatrix(V4(Rect.W, Rect.H,1,0));
 }
 
 component_surface* PushNewSurface(render_group* RenderGroup, bitmap* BitMap, u32 ColorEnum)
@@ -99,9 +54,13 @@ component_surface* PushNewSurface(render_group* RenderGroup, bitmap* BitMap, u32
   return Result;
 }
 
-
-void PushTexturedQuad(render_group* RenderGroup, m4 QuadTranslate, m4 TextureTranslate, component_surface* Surface )
+void PushTexturedQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRect, component_surface* Surface )
 {
+  const m4 TextureTranslate = GetTranslationMatrix(V4(TextureRect.X,TextureRect.Y,0,1));
+  const m4 TextureScale     = GetScaleMatrix(V4(TextureRect.W, TextureRect.H,1,0));
+  const m4 QuadTranslate    = GetTranslationMatrix(V4(QuadRect.X, QuadRect.Y,0,1));
+  const m4 QuadScale        = GetScaleMatrix(V4(QuadRect.W, QuadRect.H,1,0));
+
   // Todo: Find a better API So you don't need this BS all the time
   push_buffer_header* Header = PushNewHeader( RenderGroup );
   Header->Type = render_buffer_entry_type::PRIMITIVE;
@@ -109,18 +68,79 @@ void PushTexturedQuad(render_group* RenderGroup, m4 QuadTranslate, m4 TextureTra
   entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
   Body->PrimitiveType = primitive_type::QUAD;
   Body->Surface = Surface;
-  Body->TM = TextureTranslate;
-  Body->M  = QuadTranslate;
+  Body->TM = TextureTranslate * TextureScale;
+  Body->M  = QuadTranslate * QuadScale;
 }
 
-void DEBUGTextOutAtPx(r32 xPos, r32 yPos, render_group* RenderGroup, c8* String)
+rect2f DEBUGTextSize(r32 x, r32 y, render_group* RenderGroup, c8* String)
 {
   stb_font_map* FontMap = &RenderGroup->Assets->STBFontMap;
-  component_surface* BitMapFont = PushNewSurface(RenderGroup, &FontMap->BitMap, MATERIAL_WHITE);
-  stbtt_aligned_quad Quad = {};
 
-  const r32 Kx = 1.f / RenderGroup->ScreenWidth;
-  const r32 Ky = 1.f / RenderGroup->ScreenHeight;
+  const r32 ScreenScaleFactor = 1.f / RenderGroup->ScreenHeight;
+
+  r32 Width = 0;
+  while (*String != '\0')
+  {
+    stbtt_bakedchar* CH = &FontMap->CharData[*String-0x20];
+    Width += CH->xadvance;
+    ++String;
+  }
+  rect2f Result = {};
+  Result.X = x;
+  Result.Y = y+ScreenScaleFactor*FontMap->Descent;
+  Result.H = ScreenScaleFactor*FontMap->FontHeightPx;
+  Result.W = ScreenScaleFactor*Width;
+  return Result;
+}
+
+
+// The thing about STB is that their bit map has its origin in the top-left
+// Our standard is that the origin is in the bottom right
+inline internal rect2f
+GetSTBBitMapTextureCoords(stbtt_bakedchar* CH, r32 WidthScale, r32 HeightScale)
+{
+  // This transforms from stbtt coordinates to Texture Coordinates
+  // stbtt Bitmap Coordinates:                      Screen Canonical Coodinates
+  // [0,0](top left):[PixelX, PixelY](bot right) -> [0,0](bot left):[1,1](top right)
+  const r32 s0 = CH->x0 * WidthScale;
+  const r32 s1 = CH->x1 * WidthScale;
+  const r32 Width  = s1-s0;
+
+  const r32 t0 = CH->y1 * HeightScale;
+  const r32 t1 = CH->y0 * HeightScale;
+  const r32 Height = t1-t0;
+
+  rect2f Result = Rect2f(s0, t0, Width, Height);
+  return Result;
+}
+
+// The thing about STB is that their bit map has its origin in the top-left
+// Our standard is that the origin is in the bottom right
+// The output is the translation needed to get a Quad properly centered with the
+// base-point at x0, y0
+inline internal rect2f
+GetSTBGlyphRect(r32 xPosPx, r32 yPosPx, stbtt_bakedchar* CH )
+{
+  const r32 GlyphWidth   =  (r32)(CH->x1 - CH->x0); // Width of the symbol
+  const r32 GlyphHeight  =  (r32)(CH->y1 - CH->y0); // Height of the symbol
+  const r32 GlyphOffsetX =  CH->xoff;               // Distance from Left to BasepointX
+  const r32 GlyphOffsetY = -CH->yoff;               // Distance from Top to BasepointY
+
+  const r32 X = Floor(xPosPx + 0.5f) + GlyphWidth*0.5f + GlyphOffsetX;
+  const r32 Y = Floor(yPosPx + 0.5f) - GlyphHeight*0.5f + GlyphOffsetY;
+  rect2f Result = Rect2f(X,Y, GlyphWidth, GlyphHeight);
+  return Result;
+}
+
+void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* String)
+{
+  r32 PixelPosX = CanPosX*RenderGroup->ScreenHeight;
+  r32 PixelPosY = CanPosY*RenderGroup->ScreenHeight;
+  stb_font_map* FontMap = &RenderGroup->Assets->STBFontMap;
+  component_surface* BitMapFont = PushNewSurface(RenderGroup, &FontMap->BitMap, MATERIAL_WHITE);
+  stbtt_aligned_quad Quad  = {};
+
+  const r32 ScreenScaleFactor = 1.f / RenderGroup->ScreenHeight;
 
   const r32 Ks = 1.f / FontMap->BitMap.Width;
   const r32 Kt = 1.f / FontMap->BitMap.Height;
@@ -128,52 +148,29 @@ void DEBUGTextOutAtPx(r32 xPos, r32 yPos, render_group* RenderGroup, c8* String)
   while (*String != '\0')
   {
     stbtt_bakedchar* CH = &FontMap->CharData[*String-0x20];
-
-    v2 GlyphSize     = V2(Kx*(CH->x1 - CH->x0),  Ky*(CH->y1 - CH->y0));
-    v2 GlyphPosition = V2(Kx*Floor(xPos + 0.5f), Ky*Floor(yPos + 0.5f));
-    v2 GlyphOffset   = V2(Kx*CH->xoff + GlyphSize.X/2.f, -(Ky*CH->yoff + GlyphSize.Y/2.f));
-
-    xPos += CH->xadvance;
-
     if(*String != ' ')
     {
-      const r32 s0 = CH->x0 * Ks;
-      const r32 s1 = CH->x1 * Ks;
-      const r32 t0 = CH->y0 * Kt;
-      const r32 t1 = CH->y1 * Kt;
-
-      // Todo: Find a better API for scale and translation that doesnt need a full 4x4 matrix multiplication
-      const m4 TextureTranslate = GetTranslationMatrix(V4(s0, t1,0,1)) * GetScaleMatrix(V4(s1-s0, t0-t1,1,0));
-      v2 RenPos = CanonicalToRender(GlyphPosition, RenderGroup->ScreenWidth, RenderGroup->ScreenHeight);
-      v4 GlyphTranslate = V4(RenPos.X + GlyphOffset.X, RenPos.Y + GlyphOffset.Y,0,1);
-      v4 GlyphScale = V4(GlyphSize,1,0);
-
-      const m4 QuadTranslate = GetTranslationMatrix(GlyphTranslate) * GetScaleMatrix(GlyphScale);
-
-      PushTexturedQuad(RenderGroup, QuadTranslate, TextureTranslate, BitMapFont );
-
+      rect2f TextureRect = GetSTBBitMapTextureCoords(CH, Ks, Kt);
+      rect2f GlyphOffset = GetSTBGlyphRect(PixelPosX,PixelPosY,CH);
+      GlyphOffset.X *= ScreenScaleFactor;
+      GlyphOffset.Y *= ScreenScaleFactor;
+      GlyphOffset.W *= ScreenScaleFactor;
+      GlyphOffset.H *= ScreenScaleFactor;
+      PushTexturedQuad(RenderGroup, GlyphOffset, TextureRect,  BitMapFont );
     }
-
+    PixelPosX += CH->xadvance;
     ++String;
   }
 }
 
-// Todo: Decide on one coordinate system to work with!
-void DEBUGTextOutAt(r32 xPos, r32 yPos, render_group* RenderGroup, c8* String)
-{
-  //v2 P = CanonicalToRender(V2(xPos,yPos), RenderGroup->ScreenWidth, RenderGroup->ScreenHeight);
-  r32 X = xPos*GlobalDebugRenderGroup->ScreenWidth;
-  r32 Y = yPos*GlobalDebugRenderGroup->ScreenHeight;
-  DEBUGTextOutAtPx(X, Y, RenderGroup, String);
-}
-
-void DEBUGAddTextSTB(render_group* RenderGroup, c8* String, r32 cornerOffset, r32 LineNumber)
+void DEBUGAddTextSTB(c8* String, r32 LineNumber)
 {
   TIMED_FUNCTION();
+  render_group* RenderGroup = GlobalDebugRenderGroup;
   stb_font_map* FontMap = &RenderGroup->Assets->STBFontMap;
-  r32 xPos = cornerOffset;
-  r32 yPos = RenderGroup->ScreenHeight - (LineNumber) * FontMap->FontHeightPx-FontMap->FontHeightPx;
-  DEBUGTextOutAtPx(xPos, yPos, RenderGroup, String);
+  r32 CanPosX = 1/100.f;
+  r32 CanPosY = 1 - ((LineNumber+1) * FontMap->Ascent - LineNumber*FontMap->Descent)/RenderGroup->ScreenHeight;
+  DEBUGTextOutAt(CanPosX, CanPosY, RenderGroup, String);
 }
 
 void ResetRenderGroup(render_group* RenderGroup)

@@ -183,7 +183,7 @@ struct debug_table
   //       before we swap them
   u64 volatile EventArrayIndex_EventIndex;
   u32 CurrentEventArrayIndex;
-  u32 RecordCount[MAX_DEBUG_TRANSLATION_UNITS];
+  u32 RecordCount[MAX_DEBUG_TRANSLATION_UNITS]; // How many records exist per translation unit
   debug_record Records[MAX_DEBUG_TRANSLATION_UNITS][MAX_DEBUG_RECORD_COUNT];
   u32 EventCount[MAX_DEBUG_EVENT_ARRAY_COUNT];
   debug_event Events[MAX_DEBUG_EVENT_ARRAY_COUNT][MAX_DEBUG_EVENT_COUNT];

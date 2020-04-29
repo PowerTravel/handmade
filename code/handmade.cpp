@@ -54,13 +54,15 @@ internal stb_font_map STBBakeFont(memory_arena* Memory)
   };
 
   thread_context Thread;
-  debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\courbd.ttf");
+  //debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\courbd.ttf");
+  debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\arial.ttf");
+  //debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\ITCEDSCR.ttf");
 
   Assert(TTFFile.Contents);
   stb_font_map Result = {};
   Result.StartChar = Ranges[0];
   Result.NumChars = Ranges[1] - Ranges[0];
-  Result.FontHeightPx = 32.f;
+  Result.FontHeightPx = 24.f;
   Result.CharData = PushArray(Memory, Result.NumChars, stbtt_bakedchar);
 
   stbtt_GetScaledFontVMetrics((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
@@ -510,6 +512,13 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   TIMED_FUNCTION();
   Platform = Memory->PlatformAPI;
   InitiateGame(Thread, Memory, RenderCommands, Input);
+
+  RenderCommands->MainRenderGroup->ScreenWidth  = (r32)RenderCommands->ScreenWidthPixels;
+  RenderCommands->MainRenderGroup->ScreenHeight = (r32)RenderCommands->ScreenHeightPixels;
+
+  RenderCommands->DebugRenderGroup->ScreenWidth  = (r32) RenderCommands->ScreenWidthPixels;
+  RenderCommands->DebugRenderGroup->ScreenHeight = (r32) RenderCommands->ScreenHeightPixels;
+
   game_state* GameState = Memory->GameState;
   world* World = GameState->World;
   World->dtForFrame = Input->dt;

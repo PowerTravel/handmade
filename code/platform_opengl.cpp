@@ -130,13 +130,14 @@ opengl_program3D OpenGLCreateTexturedQuadOverlayShader()
 layout (location = 0) in vec3 vertice;\n\
 layout (location = 2) in vec2 textureCoordinate;\n\
 \n\
+uniform mat4 P;  // Projection Matrix - Transforms points from ScreenSpace to UnitQube.\n\
 uniform mat4 M;  // Model Matrix - Transforms points from ModelSpace to WorldSpace.\n\
 uniform mat4 TM; // Texture Model Matrix. Shifts texture coordinates in a bitmap\n\
 out vec2 texCoord;\n\
 \n\
 void main()\n\
 {\n\
-  gl_Position = M*vec4(vertice,1);\n\
+  gl_Position = P*M*vec4(vertice,1);\n\
   vec4 tmpTex = TM*vec4(textureCoordinate,0,1);\n\
   texCoord = vec2(tmpTex.x,tmpTex.y);\n\
 }\n\
@@ -159,6 +160,7 @@ void main() \n\
   opengl_program3D Result = {};
   Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
   glUseProgram(Result.Program);
+  Result.P =  glGetUniformLocation(Result.Program, "P");
   Result.M =  glGetUniformLocation(Result.Program, "M");
   Result.TM = glGetUniformLocation(Result.Program, "TM");
   Result.ambientProduct  = glGetUniformLocation(Result.Program, "ambientProduct");
@@ -853,6 +855,11 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
   glUseProgram(TextOverlay.Program);
 
   RenderGroup = Commands->DebugRenderGroup;
+
+  glUniformMatrix4fv(TextOverlay.P,  1, GL_TRUE, RenderGroup->ProjectionMatrix.E);
+  //glUniformMatrix4fv(TextOverlay.V,  1, GL_TRUE, Identity.E);
+  //glUniformMatrix4fv(TextOverlay.TM, 1, GL_TRUE, Identity.E);
+
   // No need to clearh the depth buffer if we disable depth test
   glDisable(GL_DEPTH_TEST);
   // Enable Textures

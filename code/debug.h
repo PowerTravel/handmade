@@ -63,7 +63,6 @@ struct debug_state
   b32 Paused;
   b32 Resumed;
 
-
   memory_arena Arena;
   temporary_memory CollateTemp;
 
@@ -73,13 +72,12 @@ struct debug_state
   u32 FrameBarLaneCount;
   r32 FrameBarRange;
 
-  render_group* RenderGroup;
+  //render_group* RenderGroup;
 
   debug_frame* Frames;
   debug_thread* FirstThread;
   open_debug_block* FirstFreeBlock;
   debug_record* ScopeToRecord;
-
 
   r32 IsVisible;
   r32 ChartLeft;

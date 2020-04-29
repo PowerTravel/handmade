@@ -28,6 +28,12 @@ internal void
 RestartCollation()
 {
     debug_state* DebugState = DEBUGGetState();
+    // We can store MAX_DEBUG_EVENT_ARRAY_COUNT*4 frames of collated debug records
+    // However, when we change Scope we clear ALL the collated memory.
+    // So when we recollate we only have MAX_DEBUG_EVENT_ARRAY_COUNT frames worth of data
+    // Thus we loose the 3 * MAX_DEBUG_EVENT_ARRAY_COUNT worth of collated data.
+    // One effect of this is that we can display 10 frames, but MAX_DEBUG_EVENT_ARRAY_COUNT is atm 8;
+    // Thus when we klick a function to inspect we suddenly only display 7 frames
     EndTemporaryMemory(DebugState->CollateTemp);
     DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->Arena);
 
@@ -166,7 +172,7 @@ void CollateDebugRecords()
   {
     if( DebugState->CollationArrayIndex  == MAX_DEBUG_EVENT_ARRAY_COUNT)
     {
-       DebugState->CollationArrayIndex =0;
+       DebugState->CollationArrayIndex = 0;
     }
 
     u32 EventArrayIndex = DebugState->CollationArrayIndex;
@@ -323,24 +329,54 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 }
 
 
-
 void DebugMainWindow(game_input* GameInput)
 {
+  r32 Width  = GlobalDebugRenderGroup->ScreenWidth;
+  r32 Height = GlobalDebugRenderGroup->ScreenHeight;  
+
+  m4 ScrenToPx =  M4( Height,        0, 0, 0,
+                             0, Height, 0, 0,
+                             0,      0, 0, 0,
+                             0,      0, 0, 1);
+
+  m4 PxToScreen =  M4( 1/Height,       0, 0, 0,
+                             0, 1/Height, 0, 0,
+                             0,        0, 0, 0,
+                             0,        0, 0, 1);
+
+
+  m4 ScreenToCubeScale =  M4( 2*Height/Width, 0, 0, 0,
+                                           0, 2, 0, 0,
+                                           0, 0, 0, 0,
+                                           0, 0, 0, 1);
+  m4 ScreenToCubeTrans =  M4( 1, 0, 0, -1,
+                              0, 1, 0, -1,
+                              0, 0, 1,  0,
+                              0, 0, 0,  1);
+
+  GlobalDebugRenderGroup->ProjectionMatrix = ScreenToCubeTrans*ScreenToCubeScale;
+
+  r32 MouseXPx = GameInput->MouseX*Height;
+  r32 MouseYPx = GameInput->MouseY*Height;
+
   c8 buff[255] = {};
-  _snprintf_s(buff, sizeof(buff), sizeof(buff)-1, "ABCDefg(%2.2f, %2.2f)", GameInput->MouseX, GameInput->MouseY);
-  DEBUGTextOutAt(GameInput->MouseX, GameInput->MouseY, GlobalDebugRenderGroup, buff);
+  _snprintf_s(buff, sizeof(buff), sizeof(buff)-1, "(%2.2f,%2.2f)->(%2.2f,%2.2f)",
+    GameInput->MouseX, GameInput->MouseY, MouseXPx, MouseYPx);
+ 
+  rect2f TextBox2 = DEBUGTextSize(0, 0, GlobalDebugRenderGroup, buff);
+  DEBUGPushQuad(GlobalDebugRenderGroup, TextBox2, V4(0.3,0.2,0.4,1));
+  DEBUGTextOutAt(0,0, GlobalDebugRenderGroup, buff);
+
   char* MenuItems[] =
   {
     "Functions",
-    "PauseCollation"
-    "Frames",
-    "Memory",
-    "Physics"
+    "Show",
+    "Pause",
+    "ResetZoom",
+    "Back"
   };
-
-  r32 AspectRatio = GlobalDebugRenderGroup->ScreenWidth/GlobalDebugRenderGroup->ScreenHeight;
-
-  r32 ScreenWidth  = AspectRatio;
+  r32 AspectRatio = Width/Height;
+  r32 ScreenWidth = AspectRatio;
   r32 ScreenHeight = 1;
 
   debug_state* DebugState = DEBUGGetState();
@@ -349,20 +385,7 @@ void DebugMainWindow(game_input* GameInput)
   if(GameInput->MouseButton[PlatformMouseButton_Right].Pushed)
   {
     DebugState->RadialMenuX = GameInput->MouseX;
-    DebugState->RadialMenuY = GameInput->MouseY;
-    if(DebugState->RadialMenuX < Radius)
-    {
-      DebugState->RadialMenuX = Radius;
-    }else if(DebugState->RadialMenuX > AspectRatio - Radius){
-      DebugState->RadialMenuX = AspectRatio - Radius;
-    }
-
-    if(DebugState->RadialMenuY < Radius)
-    {
-      DebugState->RadialMenuY = Radius;
-    }else if(DebugState->RadialMenuY > 1-Radius){
-      DebugState->RadialMenuY = 1-Radius;
-    }
+    DebugState->RadialMenuY = GameInput->MouseY;  
   }
 
   if(GameInput->MouseButton[PlatformMouseButton_Right].EndedDown)
@@ -372,24 +395,22 @@ void DebugMainWindow(game_input* GameInput)
     DebugState->MainMenu = false;
   }
 
-
   r32 ClosestMenuItem = R32Max;
   u32 HotMenuItem = ArrayCount(MenuItems);
+
   for(u32 MenuItemIdx = 0; MenuItemIdx < ArrayCount(MenuItems); ++MenuItemIdx)
   {
     r32 Angle = MenuItemIdx * 2*Pi32/(r32)ArrayCount(MenuItems) + Pi32/2.f;
 
     v2 MouseButtonPos = V2(GameInput->MouseX, GameInput->MouseY);
-    v2 MenuItemPos = V2(DebugState->RadialMenuX + Radius*Cos(Angle),
-                        DebugState->RadialMenuY + Radius*Sin(Angle));
+    v2 MenuItemPos    = V2(DebugState->RadialMenuX + Radius*Cos(Angle),
+                           DebugState->RadialMenuY + Radius*Sin(Angle));
     v2 MenuOrigin = V2(DebugState->RadialMenuX, DebugState->RadialMenuY);
 
     r32 LenSqMenuItem   = NormSq(MouseButtonPos - MenuItemPos);
-    // Todo: I think we want aspect ratio baked into the "canonical coordinate system somehow"
-    // Checking distances without it is checking against an ellipse, not a circle
     r32 LenSqMenuOrigin = NormSq(MouseButtonPos - MenuOrigin);
-    if(LenSqMenuItem < ClosestMenuItem)// &&
-       //LenSqMenuOrigin > Radius * Radius / 12.f )
+    if((LenSqMenuItem < ClosestMenuItem ) &&
+       (LenSqMenuOrigin > Radius * Radius / 12.f ))
     {
       ClosestMenuItem = LenSqMenuItem;
       HotMenuItem = MenuItemIdx;
@@ -400,68 +421,74 @@ void DebugMainWindow(game_input* GameInput)
   {
     for(u32 MenuItemIdx = 0; MenuItemIdx < ArrayCount(MenuItems); ++MenuItemIdx)
     {
-      rect2f TextSize = DEBUGTextSize(GlobalDebugRenderGroup, MenuItems[MenuItemIdx]);
-
       r32 Angle = MenuItemIdx * 2*Pi32/(r32)ArrayCount(MenuItems) + Pi32/2.f;
-      r32 xPos = DebugState->RadialMenuX + Radius*Cos(Angle);
-      r32 yPos = DebugState->RadialMenuY + Radius*Sin(Angle);
-      aabb2f TextBox = AABB2f(V2(xPos-TextSize.W/2.f, yPos + TextSize.Y),
-                              V2(xPos+TextSize.W/2.f, yPos + TextSize.H + TextSize.Y));
+      r32 TextPosX = DebugState->RadialMenuX + Radius*Cos(Angle);
+      r32 TextPosY = DebugState->RadialMenuY + Radius*Sin(Angle);
+      rect2f TextBox = DEBUGTextSize(TextPosX, TextPosY, GlobalDebugRenderGroup, MenuItems[MenuItemIdx]);
+      TextBox.Y -=TextBox.H*0.5f;
+      TextBox.X -=TextBox.W*0.5f;
 
       v4 Color = V4(0,0,0.5f,1);
       if(MenuItemIdx == HotMenuItem)
       {
         Color = V4(0,0.5f,0,1);
       }
-      //DEBUGPushQuad(GlobalDebugRenderGroup, TextBox, Color);
-      //DEBUGTextOutAt(TextBox.P0.X, TextBox.P0.Y, GlobalDebugRenderGroup, MenuItems[MenuItemIdx]);
+
+      DEBUGPushQuad(GlobalDebugRenderGroup, TextBox, Color);
+      DEBUGTextOutAt(TextPosX-TextBox.W*0.5f, TextPosY-TextBox.H*0.5f, GlobalDebugRenderGroup, MenuItems[MenuItemIdx]);
     }
   }
 
-  if(GameInput->MouseButton[PlatformMouseButton_Right].Released)
+  b32 RightButtonReleased = GameInput->MouseButton[PlatformMouseButton_Right].Released;
+  if(RightButtonReleased)
   {
     DebugState->HotMenuItem = HotMenuItem;
   }
 
-  if(DebugState->HotMenuItem == 1)
+  if(RightButtonReleased && DebugState->HotMenuItem == 1)
   {
-    DebugState->IsVisible = true;
-  }else{
-    DebugState->IsVisible = false;
+    if(DebugState->IsVisible)
+    {
+      DebugState->IsVisible = false;
+    }else{
+      DebugState->IsVisible = true;
+    }
+    
   }
+
+  if(RightButtonReleased && DebugState->HotMenuItem == 2)
+  {
+    if(!DebugState->Paused){
+      Pause(DebugState);
+    }else{
+      UnPause(DebugState);
+    }
+  }
+
+}
+
+inline internal debug_frame*
+GetActiveDebugFrame(debug_state* DebugState)
+{
+  debug_frame* Result = DebugState->Frames + DebugState->FrameCount-2;
+  return Result;
 }
 
 void PushDebugOverlay(game_input* GameInput)
 {
   TIMED_FUNCTION();
-  debug_state* DebugState = DEBUGGetState();
   ResetRenderGroup(GlobalDebugRenderGroup);
   DebugMainWindow(GameInput);
 
-  r32 Line = 0;
-  r32 CornerPaddingPx = 30;
+  debug_state* DebugState = DEBUGGetState();
+
   if(DebugState->Frames)
   {
-    // First frame is the current one.
     c8 StringBuffer[256] = {};
-    debug_frame* Frame = DebugState->Frames + DebugState->FrameCount-2;
+    debug_frame* Frame = GetActiveDebugFrame(DebugState);
     _snprintf_s(StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
   "%3.1f Hz, %4.2f ms", 1.f/Frame->WallSecondsElapsed, Frame->WallSecondsElapsed*1000);
-    DEBUGAddTextSTB(GlobalDebugRenderGroup, StringBuffer, CornerPaddingPx, Line++);
-  }
-
-  if(GameInput->MouseButton[PlatformMouseButton_Right].Pushed)
-  {
-    #if 1
-
-    #else
-    if(!DebugState->Paused)
-    {
-      Pause(DebugState);
-    }else{
-      UnPause(DebugState);
-    }
-    #endif
+    DEBUGAddTextSTB(StringBuffer, 0);
   }
 
   if(!DebugState->IsVisible) return;
@@ -469,9 +496,7 @@ void PushDebugOverlay(game_input* GameInput)
   u32 MaxFramesToDisplay = DebugState->FrameCount < 10 ? DebugState->FrameCount : 10;
   r32 BarWidth = DebugState->ChartHeight/MaxFramesToDisplay;
   r32 LaneWidth = BarWidth/(r32)DebugState->FrameBarLaneCount;
-
   r32 LaneScale = DebugState->ChartWidth/(r32)DebugState->FrameBarRange;
-
 
   v4 ColorTable[] = {V4(1,0,0,1),
                      V4(0,1,0,1),
@@ -496,18 +521,20 @@ void PushDebugOverlay(game_input* GameInput)
       r32 MaxX = StackX + LaneScale*Region->MaxT;
       r32 MinY = StackY + LaneWidth*Region->LaneIndex;
       r32 MaxY = MinY + LaneWidth;
-      aabb2f Rect = AABB2f( V2(MinX, MinY),
-                            V2(MaxX, MaxY));
+      rect2f Rect = {}; 
+      Rect.X = MinX;
+      Rect.Y = MinY;
+      Rect.W = MaxX-MinX;
+      Rect.H = MaxY-MinY;
+      
       DEBUGPushQuad(GlobalDebugRenderGroup, Rect, Color);
 
-
-      if((GameInput->MouseX >= Rect.P0.X) && (GameInput->MouseX <= Rect.P1.X) &&
-         (GameInput->MouseY >= Rect.P0.Y) && (GameInput->MouseY <= Rect.P1.Y))
+      if((GameInput->MouseX >= Rect.X) && (GameInput->MouseX <= Rect.X+Rect.W) &&
+         (GameInput->MouseY >= Rect.Y) && (GameInput->MouseY <= Rect.Y+Rect.H))
       {
         c8 StringBuffer[256] = {};
         _snprintf_s( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
-        "%s : %2.2f MCy, (%f,%f) -> (%f,%f)", Region->Record->BlockName, (Region->MaxT-Region->MinT)/1000000.f,
-        GameInput->MouseX,GameInput->MouseY, Rect.P0.X, Rect.P0.Y);
+        "%s : %2.2f MCy", Region->Record->BlockName, (Region->MaxT-Region->MinT)/1000000.f);
         DEBUGTextOutAt(GameInput->MouseX, GameInput->MouseY, GlobalDebugRenderGroup, StringBuffer);
         if(GameInput->MouseButton[PlatformMouseButton_Left].Pushed)
         {
@@ -516,10 +543,12 @@ void PushDebugOverlay(game_input* GameInput)
       }
     }
   }
+
+  r32 AspectRatio = GlobalDebugRenderGroup->ScreenWidth/ GlobalDebugRenderGroup->ScreenHeight;
   if(GameInput->MouseButton[PlatformMouseButton_Left].Pushed)
   {
-    if((GameInput->MouseX >= -1) && (GameInput->MouseX <= 1) &&
-       (GameInput->MouseY >= -1) && (GameInput->MouseY <= 1))
+    if((GameInput->MouseX >= 0) && (GameInput->MouseX <= AspectRatio) &&
+       (GameInput->MouseY >= 0) && (GameInput->MouseY <= 1))
     {
       if(HotRecord)
       {
@@ -597,3 +626,4 @@ void PushDebugOverlay(game_input* GameInput)
     Line++;
   }
 #endif
+ 
