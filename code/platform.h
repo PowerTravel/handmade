@@ -1,5 +1,7 @@
 #pragma once
 
+#include "debug_config.h"
+
 //  NOTE: Stuff that gets refferenced in the platform layer as well as
 //      the game layer
 
@@ -98,22 +100,42 @@ struct thread_context
 
 #if HANDMADE_INTERNAL
 
-struct debug_read_file_result{
+struct debug_read_file_result
+{
   u32 ContentSize;
   void* Contents;
+};
+
+struct debug_process_state
+{
+  b32 StartedSuccessfully;
+  b32 IsRunning;
+  s32 ReturnCode;
+};
+
+struct debug_executing_process
+{
+  u64 OSHandle;
 };
 
 #define DEBUG_PLATFORM_FREE_FILE_MEMORY(name) void name( thread_context* Thread, void* Memory )
 typedef DEBUG_PLATFORM_FREE_FILE_MEMORY( debug_platfrom_free_file_memory );
 
-#define DEBUG_PLATFORM_READ_ENTIRE_FILE(name) debug_read_file_result name( thread_context* Thread, char* Filename )
+#define DEBUG_PLATFORM_READ_ENTIRE_FILE(name) debug_read_file_result name( thread_context* Thread, c8* Filename )
 typedef DEBUG_PLATFORM_READ_ENTIRE_FILE( debug_platform_read_entire_file );
 
-#define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) b32 name( thread_context* Thread, char* Filename, u32 MemorySize, void* Memory )
+#define DEBUG_PLATFORM_WRITE_ENTIRE_FILE(name) b32 name( thread_context* Thread, c8* Filename, u32 MemorySize, void* Memory )
 typedef DEBUG_PLATFORM_WRITE_ENTIRE_FILE( debug_platform_write_entire_file );
 
-#define DEBUG_PLATFORM_APPEND_TO_FILE(name) b32 name( thread_context* Thread, char* Filename, u32 MemorySize, void* Memory )
+#define DEBUG_PLATFORM_APPEND_TO_FILE(name) b32 name( thread_context* Thread, c8* Filename, u32 MemorySize, void* Memory )
 typedef DEBUG_PLATFORM_APPEND_TO_FILE( debug_platform_append_to_file );
+
+#define DEBUG_PLATFORM_EXECUTE_SYSTEM_COMMAND(name) debug_executing_process name(c8* Path, c8* Command, c8* CommandLine)
+typedef DEBUG_PLATFORM_EXECUTE_SYSTEM_COMMAND( debug_platform_execute_system_command );
+ 
+#define DEBUG_PLATFORM_GET_PROCESS_STATE(name) debug_process_state name(debug_executing_process Process)
+typedef DEBUG_PLATFORM_GET_PROCESS_STATE( debug_platform_get_process_state );
+
 
 
 #endif // HANDMADE_INTERNAL
@@ -528,16 +550,16 @@ struct platform_api
     platform_add_entry* PlatformAddEntry;
     platform_complete_all_work* PlatformCompleteWorkQueue;
 
-//     TODO(casey): Get rid of these eventually, make them just go through
-//     the OpenFile/ReadDataFromFile/WriteDataToFile/CloseFile API.
 //     {
-      debug_platform_read_entire_file*  DEBUGPlatformReadEntireFile;
-      debug_platfrom_free_file_memory*  DEBUGPlatformFreeFileMemory;
-      debug_platform_write_entire_file* DEBUGPlatformWriteEntireFile;
-      debug_platform_append_to_file*    DEBUGPlatformAppendToFile;
+      debug_platform_read_entire_file*       DEBUGPlatformReadEntireFile;
+      debug_platfrom_free_file_memory*       DEBUGPlatformFreeFileMemory;
+      debug_platform_write_entire_file*      DEBUGPlatformWriteEntireFile;
+      debug_platform_append_to_file*         DEBUGPlatformAppendToFile;
+      debug_platform_execute_system_command* DEBUGExecuteSystemCommand;
+      debug_platform_get_process_state*      DEBUGGetProcessState;
 //     }
 
-//    debug_platform_execute_system_command *DEBUGExecuteSystemCommand;
+    
 //    debug_platform_get_process_state *DEBUGGetProcessState;
 //    debug_platform_get_memory_stats *DEBUGGetMemoryStats;
 

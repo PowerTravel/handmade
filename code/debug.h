@@ -25,6 +25,7 @@ struct debug_frame_region
   u32 LaneIndex;
   r32 MinT;
   r32 MaxT;
+  u16 ColorIndex;
   debug_record* Record;
 };
 
@@ -74,21 +75,28 @@ struct debug_state
 
   //render_group* RenderGroup;
 
+  b32 Compiling;
+  debug_executing_process Compiler;
+
   debug_frame* Frames;
   debug_thread* FirstThread;
   open_debug_block* FirstFreeBlock;
   debug_record* ScopeToRecord;
 
-  r32 IsVisible;
+  r32 ChartVisible;
   r32 ChartLeft;
   r32 ChartBot;
   r32 ChartWidth;
   r32 ChartHeight;
 
   b32 MainMenu;
+
   u32 HotMenuItem;
   r32 RadialMenuX;
   r32 RadialMenuY;
+  b32 ConfigMultiThreaded;
+
+  b32 UpdateConfig;
 };
 
 void PushDebugOverlay(game_input* GameInput);

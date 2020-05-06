@@ -1,5 +1,6 @@
 #include "debug.h"
 
+
 internal void
 RestartCollation();
 internal debug_state*
@@ -46,10 +47,10 @@ RestartCollation()
     DebugState->CollationArrayIndex = GlobalDebugTable->CurrentEventArrayIndex+1;
     DebugState->CollationFrame = 0;
 
-    DebugState->ChartLeft = 0.5f;
-    DebugState->ChartBot = 0.f;
-    DebugState->ChartWidth = 1.f;
-    DebugState->ChartHeight = 1.f;
+    DebugState->ChartLeft = 1.f;
+    DebugState->ChartBot = 0.3f;
+    DebugState->ChartWidth = 0.3f;
+    DebugState->ChartHeight = 0.6f;
 }
 
 void BeginDebugStatistics(debug_statistics* Statistic)
@@ -83,32 +84,6 @@ void AccumulateStatistic(debug_statistics* Statistic, r32 Value)
   }
   Statistic->Avg += Value;
   ++Statistic->Count;
-}
-
-internal void
-Pause(debug_state* DebugState)
-{
-  if(DebugState->Paused) return;
-
-  DebugState->Paused = true;
-  DebugState->Resumed = false;
-}
-
-internal void
-UnPause(debug_state* DebugState)
-{
-  if(!DebugState->Paused) return;
-  if(DebugState->Resumed)
-  {
-    DebugState->Resumed = false;
-  }
-
-  if(DebugState->Paused)
-  {
-    DebugState->Resumed = true;
-  }
-
-  DebugState->Paused = false;
 }
 
 
@@ -262,6 +237,7 @@ void CollateDebugRecords()
                     Region->MinT = (r32)(OpeningEvent->Clock - CurrentFrame->BeginClock);
                     Region->MaxT = (r32)(Event->Clock -  CurrentFrame->BeginClock);
                     Region->Record = Source;
+                    Region->ColorIndex = (u16)OpeningEvent->DebugRecordIndex;
                   }
                 }
               }else{
@@ -282,13 +258,33 @@ void CollateDebugRecords()
     }
   }
 }
-
 internal void
 RefreshCollation()
 {
   RestartCollation();
   CollateDebugRecords();
 }
+
+internal inline void
+DebugRewriteConfigFile(game_memory* Memory)
+{
+  debug_state* DebugState = DEBUGGetState();
+  if(DebugState->UpdateConfig)
+  {
+    c8 Buffer[4096] = {};
+    u32 Size = _snprintf_s(Buffer, sizeof(Buffer),
+    "#define MULTI_THREADED %d // b32\n", DebugState->ConfigMultiThreaded);
+    thread_context Dummy = {};
+
+    Memory->PlatformAPI.DEBUGPlatformWriteEntireFile(&Dummy, "W:\\handmade\\code\\debug_config.h", Size, Buffer);
+    int a = 10;
+
+    DebugState->UpdateConfig = false;
+    DebugState->Compiler = Memory->PlatformAPI.DEBUGExecuteSystemCommand("W:\\handmade\\code", "C:\\windows\\system32\\cmd.exe", "/C build_game.bat");
+    DebugState->Compiling = true;
+  }
+}
+
 
 extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 {
@@ -310,12 +306,7 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
   debug_state* DebugState = DEBUGGetState();
   if(DebugState)
   {
-    if(DebugState->Resumed)
-    {
-      DebugState->Resumed = false;
-      RefreshCollation();
-    }
-
+    DebugRewriteConfigFile(Memory);
     if(!DebugState->Paused)
     {
       if(DebugState->FrameCount >= 4*MAX_DEBUG_EVENT_ARRAY_COUNT)
@@ -326,6 +317,30 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
     }
   }
   return GlobalDebugTable;
+}
+
+
+internal void
+TogglePause(debug_state* DebugState)
+{
+  if(!DebugState->Paused)
+  {
+    DebugState->Paused = true;
+    DebugState->Resumed = false;
+  }else{
+    if(DebugState->Resumed)
+    {
+      RefreshCollation();
+      DebugState->Resumed = false;
+    }
+
+    if(DebugState->Paused)
+    {
+      DebugState->Resumed = true;
+    }
+
+    DebugState->Paused = false; 
+  }
 }
 
 
@@ -344,35 +359,11 @@ void DebugMainWindow(game_input* GameInput)
                              0,        0, 0, 0,
                              0,        0, 0, 1);
 
-
-  m4 ScreenToCubeScale =  M4( 2*Height/Width, 0, 0, 0,
-                                           0, 2, 0, 0,
-                                           0, 0, 0, 0,
-                                           0, 0, 0, 1);
-  m4 ScreenToCubeTrans =  M4( 1, 0, 0, -1,
-                              0, 1, 0, -1,
-                              0, 0, 1,  0,
-                              0, 0, 0,  1);
-
-  GlobalDebugRenderGroup->ProjectionMatrix = ScreenToCubeTrans*ScreenToCubeScale;
-
-  r32 MouseXPx = GameInput->MouseX*Height;
-  r32 MouseYPx = GameInput->MouseY*Height;
-
-  c8 buff[255] = {};
-  _snprintf_s(buff, sizeof(buff), sizeof(buff)-1, "(%2.2f,%2.2f)->(%2.2f,%2.2f)",
-    GameInput->MouseX, GameInput->MouseY, MouseXPx, MouseYPx);
- 
-  rect2f TextBox2 = DEBUGTextSize(0, 0, GlobalDebugRenderGroup, buff);
-  DEBUGPushQuad(GlobalDebugRenderGroup, TextBox2, V4(0.3,0.2,0.4,1));
-  DEBUGTextOutAt(0,0, GlobalDebugRenderGroup, buff);
-
   char* MenuItems[] =
   {
-    "Functions",
-    "Show",
-    "Pause",
-    "ResetZoom",
+    "Toggle Multi Threaded",
+    "Toggle Show",
+    "Toggle Pause",
     "Back"
   };
   r32 AspectRatio = Width/Height;
@@ -445,24 +436,20 @@ void DebugMainWindow(game_input* GameInput)
     DebugState->HotMenuItem = HotMenuItem;
   }
 
+  if(RightButtonReleased && DebugState->HotMenuItem == 0)
+  {
+    DebugState->ConfigMultiThreaded = !DebugState->ConfigMultiThreaded;
+    DebugState->UpdateConfig = true;
+  }
+
   if(RightButtonReleased && DebugState->HotMenuItem == 1)
   {
-    if(DebugState->IsVisible)
-    {
-      DebugState->IsVisible = false;
-    }else{
-      DebugState->IsVisible = true;
-    }
-    
+     DebugState->ChartVisible = !DebugState->ChartVisible;
   }
 
   if(RightButtonReleased && DebugState->HotMenuItem == 2)
   {
-    if(!DebugState->Paused){
-      Pause(DebugState);
-    }else{
-      UnPause(DebugState);
-    }
+    TogglePause(DebugState);
   }
 
 }
@@ -477,21 +464,47 @@ GetActiveDebugFrame(debug_state* DebugState)
 void PushDebugOverlay(game_input* GameInput)
 {
   TIMED_FUNCTION();
-  ResetRenderGroup(GlobalDebugRenderGroup);
-  DebugMainWindow(GameInput);
 
   debug_state* DebugState = DEBUGGetState();
+
+  ResetRenderGroup(GlobalDebugRenderGroup);
+
+  r32 AspectRatio = GlobalDebugRenderGroup->ScreenWidth/GlobalDebugRenderGroup->ScreenHeight;
+  m4 ScreenToCubeScale =  M4( 2/AspectRatio, 0, 0, 0,
+                                           0, 2, 0, 0,
+                                           0, 0, 0, 0,
+                                           0, 0, 0, 1);
+  m4 ScreenToCubeTrans =  M4( 1, 0, 0, -1,
+                              0, 1, 0, -1,
+                              0, 0, 1,  0,
+                              0, 0, 0,  1);
+
+  GlobalDebugRenderGroup->ProjectionMatrix = ScreenToCubeTrans*ScreenToCubeScale;
+
+  DebugMainWindow(GameInput);
+
+  r32 LineNumber = 0;
+  if(DebugState->Compiling)
+  {
+    debug_process_state ProcessState = Platform.DEBUGGetProcessState(DebugState->Compiler);
+    DebugState->Compiling = ProcessState.IsRunning;
+    if(DebugState->Compiling)
+    {
+      DEBUGAddTextSTB("Compiling", LineNumber++);
+    }
+  }
+
 
   if(DebugState->Frames)
   {
     c8 StringBuffer[256] = {};
-    debug_frame* Frame = GetActiveDebugFrame(DebugState);
+     debug_frame* Frame = GetActiveDebugFrame(DebugState);
     _snprintf_s(StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
   "%3.1f Hz, %4.2f ms", 1.f/Frame->WallSecondsElapsed, Frame->WallSecondsElapsed*1000);
-    DEBUGAddTextSTB(StringBuffer, 0);
+    DEBUGAddTextSTB(StringBuffer, LineNumber++);
   }
 
-  if(!DebugState->IsVisible) return;
+  if(!DebugState->ChartVisible) return;
 
   u32 MaxFramesToDisplay = DebugState->FrameCount < 10 ? DebugState->FrameCount : 10;
   r32 BarWidth = DebugState->ChartHeight/MaxFramesToDisplay;
@@ -516,7 +529,7 @@ void PushDebugOverlay(game_input* GameInput)
     for(u32 RegionIndex = 0; RegionIndex < Frame->RegionCount; ++RegionIndex)
     {
       debug_frame_region* Region = Frame->Regions + RegionIndex;
-      v4 Color = ColorTable[(u32)(RegionIndex%ArrayCount(ColorTable))];
+      v4 Color = ColorTable[(u32)(Region->ColorIndex%ArrayCount(ColorTable))];
       r32 MinX = StackX + LaneScale*Region->MinT;
       r32 MaxX = StackX + LaneScale*Region->MaxT;
       r32 MinY = StackY + LaneWidth*Region->LaneIndex;
@@ -525,7 +538,7 @@ void PushDebugOverlay(game_input* GameInput)
       Rect.X = MinX;
       Rect.Y = MinY;
       Rect.W = MaxX-MinX;
-      Rect.H = MaxY-MinY;
+      Rect.H = (MaxY-MinY)*0.9f;
       
       DEBUGPushQuad(GlobalDebugRenderGroup, Rect, Color);
 
@@ -535,7 +548,7 @@ void PushDebugOverlay(game_input* GameInput)
         c8 StringBuffer[256] = {};
         _snprintf_s( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
         "%s : %2.2f MCy", Region->Record->BlockName, (Region->MaxT-Region->MinT)/1000000.f);
-        DEBUGTextOutAt(GameInput->MouseX, GameInput->MouseY, GlobalDebugRenderGroup, StringBuffer);
+        DEBUGTextOutAt(GameInput->MouseX, GameInput->MouseY+0.02f, GlobalDebugRenderGroup, StringBuffer);
         if(GameInput->MouseButton[PlatformMouseButton_Left].Pushed)
         {
           HotRecord = Region->Record;
@@ -544,7 +557,7 @@ void PushDebugOverlay(game_input* GameInput)
     }
   }
 
-  r32 AspectRatio = GlobalDebugRenderGroup->ScreenWidth/ GlobalDebugRenderGroup->ScreenHeight;
+  
   if(GameInput->MouseButton[PlatformMouseButton_Left].Pushed)
   {
     if((GameInput->MouseX >= 0) && (GameInput->MouseX <= AspectRatio) &&

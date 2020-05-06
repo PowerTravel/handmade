@@ -65,6 +65,63 @@ typedef DIRECT_SOUND_CREATE(direct_sound_create );
 #include "primitive_meshes.cpp"
 #include "platform_opengl.cpp"
 
+DEBUG_PLATFORM_EXECUTE_SYSTEM_COMMAND(DEBUGExecuteSystemCommand)
+{
+  debug_executing_process Result = {};
+  
+  STARTUPINFO StartupInfo = {};
+  StartupInfo.cb = sizeof(StartupInfo);
+  StartupInfo.dwFlags = STARTF_USESHOWWINDOW;
+  StartupInfo.wShowWindow = SW_HIDE;
+  
+  PROCESS_INFORMATION ProcessInfo = {};
+  if(CreateProcess(Command,
+                   CommandLine,
+                   0,
+                   0,
+                   FALSE,
+                   0,
+                   0,
+                   Path,
+                   &StartupInfo,
+                   &ProcessInfo))
+  {
+    Assert(sizeof(Result.OSHandle) >= sizeof(ProcessInfo.hProcess));
+    *(HANDLE *)&Result.OSHandle = ProcessInfo.hProcess;
+  }
+  else
+  {
+    DWORD ErrorCode = GetLastError();
+    *(HANDLE *)&Result.OSHandle = INVALID_HANDLE_VALUE;
+  }
+
+  return Result;
+}
+
+DEBUG_PLATFORM_GET_PROCESS_STATE(DEBUGGetProcessState)
+{
+  debug_process_state Result = {};
+
+  HANDLE hProcess = *(HANDLE *)&Process.OSHandle;
+  if(hProcess != INVALID_HANDLE_VALUE)
+  {
+    Result.StartedSuccessfully = true;
+    if(WaitForSingleObject(hProcess, 0) == WAIT_OBJECT_0 )
+    {
+      DWORD ReturnCode = 0;
+      GetExitCodeProcess(hProcess, &ReturnCode);
+      Result.ReturnCode = ReturnCode;
+      CloseHandle(hProcess);
+    }
+    else
+    {
+      Result.IsRunning = true;
+    }
+  }
+
+  return(Result);
+}
+
 DEBUG_PLATFORM_FREE_FILE_MEMORY(DEBUGPlatformFreeFileMemory)
 {
   if(Memory)
@@ -1857,6 +1914,8 @@ WinMain(  HINSTANCE aInstance,
       GameMemory.PlatformAPI.DEBUGPlatformReadEntireFile  = DEBUGPlatformReadEntireFile;
       GameMemory.PlatformAPI.DEBUGPlatformWriteEntireFile = DEBUGPlatformWriteEntireFile;
       GameMemory.PlatformAPI.DEBUGPlatformAppendToFile    = DEBUGPlatformAppendToFile;
+      GameMemory.PlatformAPI.DEBUGExecuteSystemCommand    = DEBUGExecuteSystemCommand;
+      GameMemory.PlatformAPI.DEBUGGetProcessState         = DEBUGGetProcessState;
 
       GameMemory.PlatformAPI.HighPriorityQueue = &HighPriorityQueue;
 
@@ -1951,7 +2010,6 @@ WinMain(  HINSTANCE aInstance,
         LARGE_INTEGER FrameMarkerClock = {};
         while(GlobalRunning)
         {
-
           NewInput->ExecutableReloaded = false;
 
           HDC DeviceContext = GetDC(WindowHandle);

@@ -19,7 +19,7 @@
 #define SLOP 0.01f
 
 #define SLOVER_ITERATIONS 4
-#define MULTI_THREADED
+
 
 list< aabb3f > GetOverlappingWallTiles(memory_arena* Arena, tile_map* TileMap, aabb3f* BoundingBox, v3 CollisionEnvelope = {} )
 {
@@ -606,14 +606,14 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
 
     // Add it to the work array
     *WorkSlot = Manifold;
-#if defined(MULTI_THREADED)
+#if MULTI_THREADED
     Platform.PlatformAddEntry(Platform.HighPriorityQueue, DoCollisionDetectionWork, (void*) *WorkSlot);
 #endif
     ColliderPair = ColliderPair->Previous;
     ++WorkSlot;
   }
 
-#if defined(MULTI_THREADED)
+#if MULTI_THREADED
   Platform.PlatformCompleteWorkQueue(Platform.HighPriorityQueue);
 #else
   u32 CollisionWorkIndex = 0;
