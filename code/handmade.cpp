@@ -38,6 +38,7 @@ global_variable b32 GlobalFireVic = false;
 #include "system_sprite_animation.cpp"
 #include "system_spatial.cpp"
 #include "system_camera.cpp"
+#include "assets.cpp"
 
 #include "debug.h"
 
@@ -151,6 +152,7 @@ void AllocateWorld( u32 NrMaxEntities, game_state* GameState, u32 NumManifolds =
   GameState->World->Assets = PushStruct(GameState->World->AssetArena, game_assets);
 }
 
+#if 0
 void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
 {
   game_state* GameState = Memory->GameState;
@@ -198,6 +200,7 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
   ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
   ControllableCamera->ControllerComponent->Type = ControllerType_FlyingCamera;
 }
+#endif
 
 void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input)
 {
@@ -209,10 +212,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   world* World = GameState->World;
   game_assets* Assets = World->Assets;
 
-  obj_loaded_file* cube = ReadOBJFile( Thread, GameState,
-         Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-         Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-         "..\\handmade\\data\\cube\\cube.obj");
+  LoadCubeAsset( GameState  );
 
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
@@ -233,12 +233,18 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   s32 iarr[] = {-2,2};
   s32 jarr[] = {-1,5};
   s32 karr[] = {-2,2};
-#else
+#elif defined(State3)
   r32 ySpace = 1;
   r32 xzSpace = 1.2;
   s32 iarr[] = {-2,2};
   s32 jarr[] = {-0,3};
   s32 karr[] = {-2,2};
+#else
+  r32 ySpace = 1;
+  r32 xzSpace = 1.2;
+  s32 iarr[] = {-0,1};
+  s32 jarr[] = {-0,1};
+  s32 karr[] = {-0,1};
 #endif
   for (s32 i = iarr[0]; i < iarr[1]; ++i)
   {
@@ -246,12 +252,16 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
     {
       for (s32 k = karr[0]; k < karr[1]; ++k)
       {
-        entity* cubeEntity = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
-        NewComponents( World, cubeEntity, COMPONENT_TYPE_DYNAMICS );
+        entity* cubeEntity = NewEntity( World );
+        NewComponents( World, cubeEntity,  COMPONENT_TYPE_RENDER   |
+                                       COMPONENT_TYPE_SPATIAL  |
+                                       COMPONENT_TYPE_COLLIDER |
+                                       COMPONENT_TYPE_DYNAMICS);
 
-        // Uncomment this and set j < 1 in the for loop to reproduce a bug where
-        // GJK perodically does not find a collision.
-        //Put( V3(2.1f*i, 2.f*j, 2.1f*k), (Pi32/4), V3(1,2,1), cubeEntity->SpatialComponent );
+        SetRenderAsset(GameState->AssetManager, cubeEntity->RenderComponent, 1, 0);
+        cubeEntity->ColliderComponent->AABB = GetObjectAABB(GameState->AssetManager, 1);
+        cubeEntity->ColliderComponent->Mesh = (collider_mesh*) PushStruct(World->PersistentArena, collider_mesh);
+        SetColliderMeshFromAABB( World->PersistentArena, cubeEntity->ColliderComponent );
         cubeEntity->SpatialComponent->Position =  V3(xzSpace*i, ySpace*j, xzSpace*k);
         cubeEntity->SpatialComponent->Rotation = RotateQuaternion( 0, V3(0,0,0) );
         cubeEntity->SpatialComponent->Scale = V3(1, 1, 1);
@@ -262,16 +272,23 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
     }
   }
 
-  entity* floor = CreateEntityFromOBJGroup( World, &cube->Objects[1], cube->MeshData );
+  entity* floor = NewEntity( World );
+  NewComponents( World, floor,  COMPONENT_TYPE_RENDER   |
+                                     COMPONENT_TYPE_RENDER   |
+                                     COMPONENT_TYPE_SPATIAL  |
+                                     COMPONENT_TYPE_COLLIDER);
+  SetRenderAsset(GameState->AssetManager, floor->RenderComponent, 0, 0);
+  floor->ColliderComponent->AABB = GetObjectAABB(GameState->AssetManager, 0);
+  floor->ColliderComponent->Mesh = (collider_mesh*) PushStruct(World->PersistentArena, collider_mesh);
+  SetColliderMeshFromAABB( World->PersistentArena, floor->ColliderComponent );
   floor->SpatialComponent->Position = V3( 0,-2, 0);
   floor->SpatialComponent->Scale = V3( 18, 1, 18);
 
-#if 1
+#if 0
   NewComponents( World, floor, COMPONENT_TYPE_CONTROLLER );
   floor->ControllerComponent->Controller = GetController(Input, 1);
   floor->ControllerComponent->Type = ControllerType_EpaGjkVisualizer;
 #endif
-
 
   entity* ControllableCamera = NewEntity( World );
   NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
@@ -285,6 +302,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   ControllableCamera->ControllerComponent->Type = ControllerType_FlyingCamera;
 }
 
+#if 0
 void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
 {
   game_state* GameState = Memory->GameState;
@@ -450,6 +468,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
   }
 
 }
+#endif
 
 void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
 {
@@ -464,14 +483,14 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
 
     Memory->GameState->World->Assets->STBFontMap = STBBakeFont(&Memory->GameState->AssetArena);
 
-    RenderCommands->MainRenderGroup = InitiateRenderGroup(Memory->GameState->World, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
+    RenderCommands->MainRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
 
     // TODO: Right now DebugRenderGroup just solves the problem of drawing the overlay on top of everything else with a special shader.
     //       This should be supported by just one RenderGroup with sorting capabilities and shaderswitching.
     //       Maybe DebugRenderGroup is something we want to move away from and consolidate into the DebugRenderGroup.
     //       Is there a problem with the debug system piping it's drawing through the GameRenderingPipeline?
     //       I mean it already sort of does since it all gets drawn in RenderGroupToOutput.
-    RenderCommands->DebugRenderGroup = InitiateRenderGroup(Memory->GameState->World, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
+    RenderCommands->DebugRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
 
     for (s32 ControllerIndex = 0;
     ControllerIndex < ArrayCount(Input->Controllers);
@@ -480,7 +499,6 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
       game_controller_input* Controller = GetController(Input, ControllerIndex);
       Controller->IsAnalog = true;
     }
-
   }
 }
 

@@ -15,6 +15,12 @@ struct component_surface;
 struct component_sprite_animation;
 struct world;
 
+struct component_render
+{
+  u32 Object;
+  u32 Texture;
+};
+
 struct entity
 {
   u32 id;
@@ -29,6 +35,7 @@ struct entity
   component_dynamics*         DynamicsComponent;
   component_surface*          SurfaceComponent;
   component_sprite_animation* SpriteAnimationComponent;
+  component_render*           RenderComponent;
 };
 
 enum component_types
@@ -43,7 +50,8 @@ enum component_types
   COMPONENT_TYPE_DYNAMICS           = 0x0040,
   COMPONENT_TYPE_SURFACE            = 0x0080,
   COMPONENT_TYPE_SPRITE_ANIMATION   = 0x0100,
-  COMPONENT_TYPE_FINAL              = 0x0200
+  COMPONENT_TYPE_RENDER             = 0x0200,
+  COMPONENT_TYPE_FINAL              = 0x0400
 };
 
 

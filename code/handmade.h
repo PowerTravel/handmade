@@ -73,11 +73,13 @@ struct world
   game_assets*  Assets;
 };
 
+struct game_asset_manager;
 struct game_state
 {
   memory_arena AssetArena;
   memory_arena PersistentArena;
   memory_arena TransientArena;
+  game_asset_manager* AssetManager;
   world* World;
   b32 IsInitialized;
 };

@@ -8,7 +8,9 @@
 #include "component_surface.h"
 #include "component_spatial.h"
 #include "component_collider.h"
+#include "component_mesh.h"
 #include "entity_components.h"
+#include "assets.h"
 
 
 v4 ParseNumbers(char* String)
@@ -555,13 +557,14 @@ void ReadRunLengthEncodedRGB( const u32 NrPixels, const u32 BytesPerPixel, u32* 
 }
 
 
-bitmap* LoadTGA( thread_context* Thread, memory_arena* AssetArena,
+bitmap* LoadTGA(memory_arena* AssetArena,
          debug_platform_read_entire_file* ReadEntireFile,
          debug_platfrom_free_file_memory* FreeEntireFile,
          char* FileName)
 {
 
-  debug_read_file_result ReadResult = ReadEntireFile(Thread, FileName);
+  thread_context Thread{};
+  debug_read_file_result ReadResult = ReadEntireFile(&Thread, FileName);
 
   if( !ReadResult.ContentSize ) { return {}; }
 
@@ -614,8 +617,7 @@ bitmap* LoadTGA( thread_context* Thread, memory_arena* AssetArena,
     INVALID_CODE_PATH
   }
 
-
-  FreeEntireFile(Thread, ReadResult.Contents);
+  FreeEntireFile(&Thread, ReadResult.Contents);
 
   return Result;
 }
@@ -685,28 +687,24 @@ void CreateNewFilePath(char* BaseFilePath, char* NewFileName, u32 NewFilePathLen
 }
 
 
-
-obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
+obj_mtl_data* ReadMTLFile(memory_arena* AssetArena, memory_arena* TempArena,
          debug_platform_read_entire_file* ReadEntireFile,
          debug_platfrom_free_file_memory* FreeEntireFile,
          char* FileName)
 {
-  debug_read_file_result ReadResult = ReadEntireFile(Thread, FileName);
+  thread_context Thread{};
+  debug_read_file_result ReadResult = ReadEntireFile(&Thread, FileName);
 
   if( !ReadResult.ContentSize ) { return 0; }
 
   char LineBuffer[STR_MAX_LINE_LENGTH];
 
-  memory_arena* AssetArena = &aGameState->AssetArena;
-  memory_arena* TransientArena = &aGameState->TransientArena;
-
-  temporary_memory TempMem = BeginTemporaryMemory(TransientArena);
-
+  temporary_memory TempMem = BeginTemporaryMemory(TempArena);
 
   char* ScanPtr = ( char* ) ReadResult.Contents;
   char* FileEnd =  ( char* ) ReadResult.Contents + ReadResult.ContentSize;
 
-  fifo_queue<mtl_material*> ParsedMaterialQueue = fifo_queue<mtl_material*>(TransientArena);
+  fifo_queue<mtl_material*> ParsedMaterialQueue = fifo_queue<mtl_material*>(TempArena);
   mtl_material* ActieveMaterial = 0;
 
   while( ScanPtr < FileEnd )
@@ -833,7 +831,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
         char TGAFilePath[STR_MAX_LINE_LENGTH] = {};
         CreateNewFilePath( FileName, DataType.String, sizeof(TGAFilePath), TGAFilePath );
 
-        ActieveMaterial->MapKd = LoadTGA( Thread, AssetArena,
+        ActieveMaterial->MapKd = LoadTGA( AssetArena,
                            ReadEntireFile, FreeEntireFile,
                            TGAFilePath);
       }break;
@@ -873,7 +871,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
         char TGAFilePath[STR_MAX_LINE_LENGTH] = {};
         CreateNewFilePath( FileName, DataType.String, sizeof(TGAFilePath), TGAFilePath );
 
-        ActieveMaterial->MapKs = LoadTGA( Thread, AssetArena,
+        ActieveMaterial->MapKs = LoadTGA( AssetArena,
                            ReadEntireFile, FreeEntireFile,
                            TGAFilePath);
       }break;
@@ -934,7 +932,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
 
         char LeftoverString[STR_MAX_LINE_LENGTH] = {};
 
-        fifo_queue<char*> SettingQueue = ExtractMTLSettings( TransientArena, 1, "-bm ",  " \t",  DataType.String,  LeftoverString );
+        fifo_queue<char*> SettingQueue = ExtractMTLSettings( TempArena, 1, "-bm ",  " \t",  DataType.String,  LeftoverString );
         Assert(SettingQueue.GetSize() == 1);
 
         ActieveMaterial->BumpMapBM = (r32) str::StringToReal64( SettingQueue.Pop() );
@@ -943,7 +941,7 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
         char TGAFilePath[STR_MAX_LINE_LENGTH] = {};
         CreateNewFilePath( FileName, LeftoverString, sizeof(TGAFilePath), TGAFilePath );
 
-        ActieveMaterial->BumpMap = LoadTGA( Thread, AssetArena,
+        ActieveMaterial->BumpMap = LoadTGA( AssetArena,
                            ReadEntireFile, FreeEntireFile,
                            TGAFilePath);
       }break;
@@ -972,22 +970,22 @@ obj_mtl_data* ReadMTLFile(thread_context* Thread, game_state* aGameState,
   }
 
   EndTemporaryMemory(TempMem);
-  FreeEntireFile(Thread, ReadResult.Contents);
+  FreeEntireFile(&Thread, ReadResult.Contents);
 
   return Result;
 }
 
-void SetBoundingBox( obj_loaded_file* OBJFile, memory_arena* TransientArena )
+void SetBoundingBox( obj_loaded_file* OBJFile, memory_arena* TempArena )
 {
   mesh_data* MeshData = OBJFile->MeshData;
   for( u32 GroupIndex = 0; GroupIndex < OBJFile->ObjectCount; ++GroupIndex )
   {
-    temporary_memory TempMem = BeginTemporaryMemory(TransientArena);
-    b32* IsVertexCounted = (b32*) PushArray(TransientArena,  MeshData->nv, u32 );
+    temporary_memory TempMem = BeginTemporaryMemory(TempArena);
+    b32* IsVertexCounted = (b32*) PushArray(TempArena,  MeshData->nv, u32 );
 
     obj_group& OBJGroup = OBJFile->Objects[GroupIndex];
 
-    mesh_indeces* Indeces = &OBJGroup.Indeces;
+    mesh_indeces* Indeces = OBJGroup.Indeces;
 
     v3  Max = MeshData->v[Indeces->vi[0]];
     v3  Min = MeshData->v[Indeces->vi[0]];
@@ -1020,18 +1018,19 @@ void SetBoundingBox( obj_loaded_file* OBJFile, memory_arena* TransientArena )
   }
 }
 
-obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
+obj_loaded_file* ReadOBJFile(memory_arena* AssetArena, memory_arena* TempArena,
          debug_platform_read_entire_file* ReadEntireFile,
          debug_platfrom_free_file_memory* FreeEntireFile,
          char* FileName)
 {
-  debug_read_file_result ReadResult = ReadEntireFile(Thread, FileName);
+
+  thread_context Thread{};
+  debug_read_file_result ReadResult = ReadEntireFile(&Thread, FileName);
 
   char LineBuffer[STR_MAX_LINE_LENGTH];
 
   if( !ReadResult.ContentSize ){ return {}; }
 
-  memory_arena* TempArena = &aGameState->TransientArena;
   temporary_memory TempMem = BeginTemporaryMemory(TempArena);
 
 
@@ -1130,7 +1129,7 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
         if(!MaterialFile)
         {
           // Stores materials to Asset Arena
-          MaterialFile =  ReadMTLFile(Thread, aGameState, ReadEntireFile, FreeEntireFile, MTLFileName);
+          MaterialFile =  ReadMTLFile(AssetArena, TempArena, ReadEntireFile, FreeEntireFile, MTLFileName);
         }
 
 
@@ -1168,9 +1167,7 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
     GroupToParse.Push( DefaultGroup );
   }
 
-  FreeEntireFile(Thread, ReadResult.Contents);
-
-  memory_arena* AssetArena = &aGameState->AssetArena;
+  FreeEntireFile(&Thread, ReadResult.Contents);
 
   obj_loaded_file* Result = (obj_loaded_file*) PushStruct( AssetArena, obj_loaded_file );
 
@@ -1216,7 +1213,7 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
     NewGroup->GroupNameLength = ParsedGroup->GroupNameLength;
     NewGroup->GroupName = (char*) PushArray( AssetArena, ParsedGroup->GroupNameLength+1, char );
     str::CopyStrings( ParsedGroup->GroupNameLength, ParsedGroup->GroupName, NewGroup->GroupNameLength, NewGroup->GroupName );
-
+    NewGroup->Indeces =  PushStruct(AssetArena, mesh_indeces);
     if(Result->MaterialData && ParsedGroup->MaterialName )
     {
       for( u32 MaterialIndex = 0; MaterialIndex < Result->MaterialData->MaterialCount; ++MaterialIndex)
@@ -1230,7 +1227,7 @@ obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
       }
     }
 
-    mesh_indeces* Indeces = &NewGroup->Indeces;
+    mesh_indeces* Indeces = NewGroup->Indeces;
     Indeces->Count = ParsedGroup->vi.GetSize();
 
     Indeces->vi    = (u32*) PushArray( AssetArena, Indeces->Count, u32 );

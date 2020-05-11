@@ -311,6 +311,7 @@ EndTicketMutex(ticket_mutex* Mutex)
   AtomicAddu64(&Mutex->Serving, 1);
 }
 
+
 struct render_group;
 struct game_render_commands
 {
@@ -559,7 +560,6 @@ struct platform_api
       debug_platform_get_process_state*      DEBUGGetProcessState;
 //     }
 
-    
 //    debug_platform_get_process_state *DEBUGGetProcessState;
 //    debug_platform_get_memory_stats *DEBUGGetMemoryStats;
 

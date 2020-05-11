@@ -91,6 +91,14 @@
 
 #include "math/vector_math.h"
 
+struct opengl_handles
+{
+	u32 VAO;
+	u32 VBO;
+	u32 EBO;
+	u32 TextureHandle;
+};
+
 struct opengl_vertex
 {
 	v3 v;

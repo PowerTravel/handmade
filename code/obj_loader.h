@@ -2,7 +2,6 @@
 
 #include "math/vector_math.h"
 #include "math/aabb.h"
-#include "component_mesh.h"
 #include "platform.h"
 
 struct bitmap;
@@ -35,18 +34,20 @@ struct obj_mtl_data
   mtl_material* Materials;
 };
 
+struct mesh_indeces;
 struct obj_group
 {
   u32 GroupNameLength;
   char* GroupName;
 
-  mesh_indeces Indeces;
+  mesh_indeces* Indeces;
 
   aabb3f aabb;
 
   mtl_material* Material;
 };
 
+struct mesh_data;
 struct obj_loaded_file
 {
   u32 ObjectCount;
@@ -57,14 +58,15 @@ struct obj_loaded_file
   obj_mtl_data* MaterialData;
 };
 
-obj_loaded_file* ReadOBJFile(thread_context* Thread, game_state* aGameState,
+obj_loaded_file* ReadOBJFile(memory_arena* AssetArena, memory_arena* TempArena,
          debug_platform_read_entire_file* ReadEntireFile,
          debug_platfrom_free_file_memory* FreeEntireFile,
          char* FileName);
 
-bitmap* LoadTGA( thread_context* Thread, memory_arena* AssetArena,
+bitmap* LoadTGA(memory_arena* AssetArena,
          debug_platform_read_entire_file* ReadEntireFile,
          debug_platfrom_free_file_memory* FreeEntireFile,
          char* FileName);
+
 entity* CreateEntityFromOBJGroup( world* World, obj_group* OBJGrp, mesh_data* MeshData );
 void CreateEntitiesFromOBJFile( world* World, obj_loaded_file* ObjFile );

@@ -185,11 +185,12 @@ void ResetRenderGroup(render_group* RenderGroup)
   RenderGroup->Last = 0;
 }
 
-render_group* InitiateRenderGroup(world* World, r32 ScreenWidth, r32 ScreenHeight)
+render_group* InitiateRenderGroup(game_state* GameState, r32 ScreenWidth, r32 ScreenHeight)
 {
   render_group* Result = BootstrapPushStruct(render_group, Arena);
   Result->PushBufferMemory = BeginTemporaryMemory(&Result->Arena);
-  Result->Assets = World->Assets;
+  Result->Assets = GameState->World->Assets;
+  Result->AssetManager = GameState->AssetManager;
   Result->ScreenWidth = ScreenWidth;
   Result->ScreenHeight = ScreenHeight;
   ResetRenderGroup(Result);
@@ -212,7 +213,7 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
   {
     entity* Entity = &World->Entities[Index];
 
-    if( Entity->Types & COMPONENT_TYPE_CAMERA )
+    if( Entity->CameraComponent )
     {
       RenderGroup->ProjectionMatrix = Entity->CameraComponent->P;
       RenderGroup->ViewMatrix       = Entity->CameraComponent->V;
@@ -234,44 +235,23 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
   {
     entity* Entity = &World->Entities[Index];
 
-    if( (Entity->Types & COMPONENT_TYPE_MESH ) &&
-        (Entity->Types & COMPONENT_TYPE_SPATIAL) )
+    if(Entity->RenderComponent)
     {
-      // Todo: Move this to its own asset system. I have no idea what that should look like
-      //       All i Know is that I would like to do something like:
-      //       Body->MeshID   = Entity->MeshComponent->ID;
-      //       And have the opengl-render code be able to access the Asset library and load
-      //       the mesh into the GUP via the ID
-
-      // This also gives each mesh it's own BVO even though they may use the same mesh.
-      // (Same mesh gets sent to the gpu multiple times)
-      render_buffer* Buffer = PushStruct(&RenderGroup->Arena, render_buffer);
-      Buffer->VAO  = &Entity->MeshComponent->VAO;
-      Buffer->VBO  = &Entity->MeshComponent->VBO;
-      Buffer->Fill = *Buffer->VAO==0;
-      Buffer->nvi  = Entity->MeshComponent->Indeces.Count;
-      Buffer->nv   = Entity->MeshComponent->Data->nv;
-      Buffer->nvn  = Entity->MeshComponent->Data->nvn;
-      Buffer->nvt  = Entity->MeshComponent->Data->nvt;
-      Buffer->v    = Entity->MeshComponent->Data->v;
-      Buffer->vn   = Entity->MeshComponent->Data->vn;
-      Buffer->vt   = Entity->MeshComponent->Data->vt;
-      Buffer->vi   = Entity->MeshComponent->Indeces.vi;
-      Buffer->ti   = Entity->MeshComponent->Indeces.ti;
-      Buffer->ni   = Entity->MeshComponent->Indeces.ni;
-
       push_buffer_header* Header = PushNewHeader( RenderGroup );
-      Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
+      Header->Type = render_buffer_entry_type::ASSET_TEST;
       Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
-
-      entry_type_indexed_buffer* Body = PushStruct(&RenderGroup->Arena, entry_type_indexed_buffer);
-      Body->Buffer   = Buffer;
-      Body->DataType = DATA_TYPE_TRIANGLE;
-      Body->Surface  = Entity->SurfaceComponent;
-      Body->M        = GetModelMatrix(Entity->SpatialComponent);
-      Body->NM       = Transpose(RigidInverse(Body->M));
-      Body->ElementStart  = 0;
-      Body->ElementLength = Buffer->nvi;
+      entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
+      Body->Object = Entity->RenderComponent->Object;
+      Body->Texture = Entity->RenderComponent->Texture;
+      if(Entity->SpatialComponent)
+      {
+        Body->M  = GetModelMatrix(Entity->SpatialComponent);
+        Body->NM = Transpose(RigidInverse(Body->M));
+      }else{
+        Body->M  = M4Identity();
+        Body->NM = M4Identity();
+      }
+      Body->TM = M4Identity();
     }
 
     if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
@@ -315,13 +295,12 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
       }
     }
 
-    // Here we wanna do a wire frame and collision points
     if( Entity->Types & COMPONENT_TYPE_COLLIDER  )
     {
       render_buffer* Buffer = PushStruct(&RenderGroup->Arena, render_buffer);
       Buffer->VAO  = &Entity->ColliderComponent->Mesh->VAO;
       Buffer->VBO  = &Entity->ColliderComponent->Mesh->VBO;
-      Buffer->Fill =  *Buffer->VAO==0;
+      Buffer->Fill = *Buffer->VAO==0;
       Buffer->nvi  =  Entity->ColliderComponent->Mesh->nvi;
       Buffer->nv   =  Entity->ColliderComponent->Mesh->nv;
       Buffer->v    =  Entity->ColliderComponent->Mesh->v;

@@ -5,6 +5,7 @@
 #include "primitive_meshes.h"
 #include "math/vector_math.h"
 #include "standalone_utility.h"
+#include "assets.h"
 
 
 struct component_mesh;
@@ -16,6 +17,7 @@ enum class render_buffer_entry_type
   INDEXED_BUFFER,
   PRIMITIVE,
   LIGHT,
+  ASSET_TEST,
   COLOURED_QUAD
 };
 
@@ -46,6 +48,16 @@ struct entry_type_light
   v4 Color;
   m4 M;
 };
+
+struct entry_type_asset_test
+{
+  u32 Object;
+  u32 Texture;
+  m4 M;
+  m4 NM;
+  m4 TM;
+};
+
 
 struct render_buffer
 {
@@ -111,9 +123,10 @@ struct render_group
   temporary_memory PushBufferMemory;
 
   game_assets* Assets;
+  game_asset_manager* AssetManager;
   push_buffer_header* First;
   push_buffer_header* Last;
 };
 
-void InitiateRenderGroup(render_group* RenderGroup, world* World, r32 ScreenWidth, r32 ScreenHeight);
+render_group* InitiateRenderGroup(game_state* GameState, r32 ScreenWidth, r32 ScreenHeight);
 void ResetRenderGroup(render_group* RenderGroup);

@@ -881,7 +881,7 @@ void SpatialSystemUpdate( world* World )
   {
     for (u32 i = 0; i < SLOVER_ITERATIONS; ++i)
     {
-      // TODO: Process Constraints MultiThreaded?
+      // TODO: Process Constraints MultiThreaded
       SolveNonPenetrationConstraints(World);
       SolveFrictionalConstraints(World);
     }

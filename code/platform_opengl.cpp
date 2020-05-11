@@ -7,7 +7,7 @@
 #include "component_camera.h"
 #include "string.h"
 #include "bitmap.h"
-//#include "debug.h"
+#include "assets.h"
 
 global_variable u32 TextureBindCount = 0;
 
@@ -260,11 +260,12 @@ void main() \n\
   return  Result;
 }
 
-void OpenGLSendMeshToGPU( u32* VAO, u32* VBO, const u32 NrIndeces, const u32* IndexData, const u32 NrVertecies, const opengl_vertex* VertexData)
+void OpenGLSendMeshToGPU( u32* VAO, u32* VBO, u32* EBO, const u32 NrIndeces, const u32* IndexData, const u32 NrVertecies, const opengl_vertex* VertexData)
 {
   Assert(VertexData);
   Assert(IndexData);
 
+  u32 EffectiveEBO = 0;
   if(*VAO==0)
   {
     Assert(*VBO == 0);
@@ -273,7 +274,24 @@ void OpenGLSendMeshToGPU( u32* VAO, u32* VBO, const u32 NrIndeces, const u32* In
 
     // Generate a generic buffer
     glGenBuffers(1, VBO);
+
+    // TODO: Have a proper buffer object state containing VAO,VBO and EBO so we don't 'have' to query it
+    if(EBO == NULL)
+    {
+      glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, (GLint*) &EffectiveEBO );
+      if(!EffectiveEBO)
+      {
+        glGenBuffers(1, &EffectiveEBO);
+      }
+    }else{
+      glGenBuffers(1, EBO);
+      EffectiveEBO = *EBO;
+    }
   }
+
+  Assert(*VAO);
+  Assert(*VBO);
+  Assert(EffectiveEBO);
 
   // Bind the VBO to the current glState
   glBindVertexArray(*VAO);
@@ -294,14 +312,7 @@ void OpenGLSendMeshToGPU( u32* VAO, u32* VBO, const u32 NrIndeces, const u32* In
   glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) (2*sizeof(v3))); // Textures
 
 
-  // TODO: Have a proper buffer object state containing VAO,VBO and EBO so we don't 'have' to query it
-  GLuint EBO;
-  glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, (GLint*) &EBO );
-  if(!EBO)
-  {
-    glGenBuffers(1, &EBO);
-  }
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EffectiveEBO);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, NrIndeces * sizeof(u32), IndexData, GL_STATIC_DRAW);
 
   glBindVertexArray(0);
@@ -630,6 +641,107 @@ CreateGLVertexBuffer( memory_arena* TemporaryMemory,
   return Result;
 }
 
+void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memory_arena* TempArena,
+  entry_type_asset_test* AssetTest, v4 LightColor)
+{
+
+  glUniformMatrix4fv(Program->M,  1, GL_TRUE, AssetTest->M.E);
+  glUniformMatrix4fv(Program->NM, 1, GL_TRUE, AssetTest->NM.E);
+  glUniformMatrix4fv(Program->TM, 1, GL_TRUE, AssetTest->TM.E);
+
+  Assert(AssetTest->Object < AssetManager->ObjectCount);
+  mesh_indeces* Object = AssetManager->Objects + AssetTest->Object;
+  book_keeper* ObjectKeeper = &AssetManager->ObjectKeeper[AssetTest->Object];
+  Assert(Object->MeshIndex < AssetManager->MeshCount);
+
+  if(!ObjectKeeper->Loaded)
+  {
+    temporary_memory TempMem = BeginTemporaryMemory(TempArena);
+
+    mesh_data* MeshData = AssetManager->MeshData + Object->MeshIndex;
+
+    u32 nvi = Object->Count;   // Nr Indeces
+    u32* vi = Object->vi;      // Vertex Indeces
+    u32* ti = Object->ti;      // Texture Indeces
+    u32* ni = Object->ni;      // Normal Indeces
+
+    u32 nv = MeshData->nv;    // Nr Verices
+    v3* v  = MeshData->v;     // Vertices
+
+    u32 nvn = MeshData->nvn;   // Nr Vertice Normals
+    v3* vn = MeshData->vn;    // Vertice Normals
+
+    u32 nvt = MeshData->nvt;   // Nr Trxture Vertices
+    v2* vt = MeshData->vt;    // Texture Vertices
+
+    gl_vertex_buffer GLBuffer =  CreateGLVertexBuffer(TempArena, nvi, vi, ti, ni, v, vt, vn);
+
+    OpenGLSendMeshToGPU(&ObjectKeeper->BufferHandle.VAO,
+                        &ObjectKeeper->BufferHandle.VBO,
+                        &ObjectKeeper->BufferHandle.EBO,
+                        GLBuffer.IndexCount, GLBuffer.Indeces,
+                        GLBuffer.VertexCount, GLBuffer.VertexData);
+    ObjectKeeper->Loaded = true;
+
+    EndTemporaryMemory(TempMem);
+  }
+
+  Assert(AssetTest->Texture < AssetManager->MaterialCount);
+  material* Material = AssetManager->Materials + AssetTest->Texture;
+  book_keeper* MaterialKeeper = &AssetManager->MaterialKeeper[AssetTest->Texture];
+
+  u32 SurfaceSmoothnes = 3;
+  v4 AmbientColor   = V4(0,0,0,1);
+  v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
+  v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
+  glUniform4fv( Program->ambientProduct,  1, AmbientColor.E);
+  glUniform4fv( Program->diffuseProduct,  1, DiffuseColor.E);
+  glUniform4fv( Program->specularProduct, 1, SpecularColor.E);
+  glUniform1f(  Program->shininess, Material->Shininess);
+
+  Assert(Material->DiffuseMap);
+
+  bitmap* RenderTarget = Material->DiffuseMap;
+  Assert(Material->DiffuseMap);
+  {
+    if(!MaterialKeeper->Loaded)
+    {
+      Assert(!MaterialKeeper->BufferHandle.TextureHandle);
+      MaterialKeeper->Loaded = true;
+      // Generate a texture slot
+      glGenTextures(1, &MaterialKeeper->BufferHandle.TextureHandle);
+
+      // Enable texture slot
+      glBindTexture( GL_TEXTURE_2D, MaterialKeeper->BufferHandle.TextureHandle );
+
+      // Set texture environment state:
+      // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
+
+      // Parameters set with glTexParameter affects the currently bound texture object,
+      // and stays with the texture object until changed.
+
+      // How to resize textures
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+
+      // Wrapping textures, (Mirror. Repeat border color, clamp, repeat etc... )
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT );
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT );
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+      glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
+                  RenderTarget->Width,  RenderTarget->Height,
+                  0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
+                  RenderTarget->Pixels);
+    }
+  }
+
+  glBindTexture( GL_TEXTURE_2D, MaterialKeeper->BufferHandle.TextureHandle );
+
+  Assert(ObjectKeeper->BufferHandle.VAO);
+  OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
+}
+
 void OpenGLPushBufferData(memory_arena* TemporaryMemory, render_buffer* Buffer)
 {
   temporary_memory TempMem = BeginTemporaryMemory(TemporaryMemory);
@@ -644,7 +756,7 @@ void OpenGLPushBufferData(memory_arena* TemporaryMemory, render_buffer* Buffer)
 
   u32* VAO = Buffer->VAO;
   u32* VBO = Buffer->VBO;
-  OpenGLSendMeshToGPU(VAO, VBO, GLBuffer.IndexCount, GLBuffer.Indeces, GLBuffer.VertexCount, GLBuffer.VertexData);
+  OpenGLSendMeshToGPU(VAO, VBO, NULL, GLBuffer.IndexCount, GLBuffer.Indeces, GLBuffer.VertexCount, GLBuffer.VertexData);
 
   EndTemporaryMemory(TempMem);
 }
@@ -738,12 +850,18 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         LightColor    = Light->Color;
       }break;
 
+      case render_buffer_entry_type::ASSET_TEST:
+      {
+        entry_type_asset_test* AssetTest = (entry_type_asset_test*) Body;
+        DrawAsset(Prog, RenderGroup->AssetManager, &RenderGroup->Arena, AssetTest, LightColor);
+      }break;
+
       case render_buffer_entry_type::INDEXED_BUFFER:
       {
         entry_type_indexed_buffer* IndexedBuffer = (entry_type_indexed_buffer*) Body;
 
         glUniformMatrix4fv(Prog->M,  1, GL_TRUE, IndexedBuffer->M.E);
-        glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, IndexedBuffer->NM.E);;
+        glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, IndexedBuffer->NM.E);
 
         OpenGLPushBufferData(&RenderGroup->Arena, IndexedBuffer->Buffer);
 
@@ -784,7 +902,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
             v.v = V3(0,0,0);
             v.vn = V3(0,0,1);
             v.vt = V2(0,0);
-            OpenGLSendMeshToGPU(&PointVao, &PointVbo, 1, &idx, 1, &v );
+            OpenGLSendMeshToGPU(&PointVao, &PointVbo, NULL, 1, &idx, 1, &v );
           }
 
           VAO = PointVao;
@@ -801,7 +919,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
             opengl_vertex Vertex[4] = {};
             u32 Index[6] = {};
             GetQuad(Index, Vertex);
-            OpenGLSendMeshToGPU(&QuadVAO, &QuadVBO, 6, Index, 4, Vertex );
+            OpenGLSendMeshToGPU(&QuadVAO, &QuadVBO, NULL, 6, Index, 4, Vertex );
           }
           VAO = QuadVAO;
           NrIndeces = 6;
@@ -815,7 +933,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
             opengl_vertex Vertex[36] = {};
             u32 Index[36] = {};
             GetVoxel(Index, Vertex);
-            OpenGLSendMeshToGPU(&VoxelVAO, &VoxelVBO, 36, Index, 36, Vertex );
+            OpenGLSendMeshToGPU(&VoxelVAO, &VoxelVBO, NULL, 36, Index, 36, Vertex );
           }
           VAO = VoxelVAO;
           NrIndeces = 36;
@@ -890,7 +1008,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
             opengl_vertex Vertex[4] = {};
             u32 Index[6] = {};
             GetQuad(Index, Vertex);
-            OpenGLSendMeshToGPU(&QuadVAO, &QuadVBO, 6, Index, 4, Vertex );
+            OpenGLSendMeshToGPU(&QuadVAO, &QuadVBO, NULL, 6, Index, 4, Vertex );
           }
           VAO = QuadVAO;
           NrIndeces = 6;
