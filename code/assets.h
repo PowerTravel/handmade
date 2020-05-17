@@ -25,6 +25,15 @@ struct mesh_data
   v2* vt;    // Texture Vertices
 };
 
+struct collider_mesh
+{
+  u32 nv;   // Nr Vertices
+  u32 nvi;  // 3 times nr Vertice Indeces (CCW Triangles)
+
+  v3* v;    // Vertices
+  u32* vi;  // Vertex Indeces
+};
+
 struct mesh_indeces
 {
   u32 MeshIndex;
@@ -46,29 +55,43 @@ struct material
 
 struct game_asset_manager
 {
+  u32 MaxObjectCount;
   u32 ObjectCount;
   mesh_indeces* Objects;
 
+  u32 MaxMeshCount;
   u32 MeshCount;
   mesh_data* MeshData;
 
+  u32 MaxMaterialCount;
   u32 MaterialCount;
   material* Materials;
 
   book_keeper* ObjectKeeper;
   book_keeper* MaterialKeeper;
+
+  memory_arena* AssetArena;
 };
 
-
+struct collider_mesh;
 void LoadCubeAsset( game_state* State );
-void SetRenderAsset(game_asset_manager* AssetManager, component_render* RenderComponent, u32 ObjectIndex, u32 GeometryIndex, u32 TextureIndex );
-void RemoveRenderAsset(game_asset_manager* AssetManager, component_render* RenderComponent);
-aabb3f GetObjectAABB(game_asset_manager* AssetManager, u32 ObjectIndex)
+void LoadPredefinedMaterials( game_state* State )
 {
-  Assert(ObjectIndex < AssetManager->ObjectCount);
-  aabb3f Result = (AssetManager->Objects+ObjectIndex)->AABB;
-  return Result;
+
 }
+
+// Note: TextureIndex and MeshIndex are not the same as MeshHandle.
+//       TextureIndex and MeshIndex are hardcoded array indeces that
+//       point to an asset. They are only to be used to set up an asset
+//       once in initialization. A handle is then generated which will
+//       be the way the rest of the program references the asset.
+//       TextureIndex and MeshIndex are to be replaced later with enums or
+//       strings or tags or something more human readable but still hardcoded.
+u32 GetTextureAssetHandle( u32 TextureIndex );
+u32 GetMeshAssetHandle( u32 MeshIndex );
+collider_mesh GetColliderMesh(u32 MeshHandle);
+void RemoveRenderAsset( component_render* RenderComponent);
+aabb3f GetMeshAABB(u32 MeshHandle);
 /*
 struct render_buffer
 {
@@ -183,7 +206,6 @@ enum MATERIAL_TYPE
   MATERIAL_WHITE_RUBBER,
   MATERIAL_YELLOW_RUBBER
 };
-
 
 void SetMaterial(material* Material, u32 MaterialType)
 {

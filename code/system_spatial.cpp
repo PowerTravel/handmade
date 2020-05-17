@@ -158,12 +158,12 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
   entity* B = Manifold->B;
   m4 ModelMatrixA = GetModelMatrix(A->SpatialComponent);
   m4 ModelMatrixB = GetModelMatrix(B->SpatialComponent);
-  collider_mesh* MeshA = A->ColliderComponent->Mesh;
-  collider_mesh* MeshB = B->ColliderComponent->Mesh;
-  gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
-      &ModelMatrixA, MeshA,
-      &ModelMatrixB, MeshB);
+  collider_mesh MeshA = GetColliderMesh(A->ColliderComponent->MeshHandle);
+  collider_mesh MeshB = GetColliderMesh(B->ColliderComponent->MeshHandle);
 
+  gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
+      &ModelMatrixA, &MeshA,
+      &ModelMatrixB, &MeshB);
 
   // Todo: Should we give each thread it's own Transient Arena?
   memory_arena Arena = {};
@@ -171,9 +171,9 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
 
   if (NarrowPhaseResult.ContainsOrigin)
   {
-    contact_data NewContact = EPACollisionResolution(&Arena, &ModelMatrixA, A->ColliderComponent->Mesh,
-                                                                           &ModelMatrixB, B->ColliderComponent->Mesh,
-                                                                           &NarrowPhaseResult.Simplex);
+    contact_data NewContact = EPACollisionResolution(&Arena, &ModelMatrixA, &MeshA,
+                                                             &ModelMatrixB, &MeshB,
+                                                             &NarrowPhaseResult.Simplex);
 
     b32 FarEnough = true;
     for (u32 ContactIndex = 0; ContactIndex < Manifold->ContactCount; ++ContactIndex)
@@ -387,11 +387,14 @@ void FireOnceVic(memory_arena* TransientArena, entity* A, entity* B)
     ResetEPA(GlobalVis);
     m4 ModelMatrixA = GetModelMatrix(A->SpatialComponent);
     m4 ModelMatrixB = GetModelMatrix(B->SpatialComponent);
+    collider_mesh MeshA = GetColliderMesh(A->ColliderComponent->MeshHandle);
+    collider_mesh MeshB = GetColliderMesh(B->ColliderComponent->MeshHandle);
+
     gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
-                                                &ModelMatrixA, A->ColliderComponent->Mesh,
-                                                &ModelMatrixB, B->ColliderComponent->Mesh);
-    contact_data apa = EPACollisionResolution(TransientArena, &ModelMatrixA, A->ColliderComponent->Mesh,
-                                                              &ModelMatrixB, B->ColliderComponent->Mesh,
+                                                &ModelMatrixA, &MeshA,
+                                                &ModelMatrixB, &MeshB);
+    contact_data apa = EPACollisionResolution(TransientArena, &ModelMatrixA, &MeshA,
+                                                              &ModelMatrixB, &MeshB,
                                                               &NarrowPhaseResult.Simplex);
   }
 }

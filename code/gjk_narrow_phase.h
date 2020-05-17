@@ -3,8 +3,8 @@
 #include "math/aabb.h"
 #include "data_containers.h"
 
-struct collider_mesh;
 struct component_gjk_epa_visualizer;
+struct collider_mesh;
 
 // Gilbert-Johnson-Keerthi (GJK) collision detection algorithm
 // See: http://www.allenchou.net/2013/12/game-physics-collision-detection-gjk/

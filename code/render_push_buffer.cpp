@@ -241,8 +241,8 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
       Header->Type = render_buffer_entry_type::ASSET_TEST;
       Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
       entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
-      Body->Object = Entity->RenderComponent->Object;
-      Body->Texture = Entity->RenderComponent->Texture;
+      Body->MeshHandle = Entity->RenderComponent->MeshHandle;
+      Body->TextureHandle = Entity->RenderComponent->TextureHandle;
       if(Entity->SpatialComponent)
       {
         Body->M  = GetModelMatrix(Entity->SpatialComponent);
@@ -253,7 +253,7 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
       }
       Body->TM = M4Identity();
     }
-
+    #if 0
     if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
     {
       component_surface* WhiteSurface = PushStruct(&RenderGroup->Arena, component_surface);
@@ -294,43 +294,21 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
         Body->M = GetModelMatrix(Entity->SpatialComponent);
       }
     }
+    #endif
 
     if( Entity->Types & COMPONENT_TYPE_COLLIDER  )
     {
-      render_buffer* Buffer = PushStruct(&RenderGroup->Arena, render_buffer);
-      Buffer->VAO  = &Entity->ColliderComponent->Mesh->VAO;
-      Buffer->VBO  = &Entity->ColliderComponent->Mesh->VBO;
-      Buffer->Fill = *Buffer->VAO==0;
-      Buffer->nvi  =  Entity->ColliderComponent->Mesh->nvi;
-      Buffer->nv   =  Entity->ColliderComponent->Mesh->nv;
-      Buffer->v    =  Entity->ColliderComponent->Mesh->v;
-      Buffer->vi   =  Entity->ColliderComponent->Mesh->vi;
+      push_buffer_header* Header = PushNewHeader( RenderGroup );
+      Header->Type = render_buffer_entry_type::ASSET_TEST;
+      Header->RenderState = RENDER_STATE_WIREFRAME;
 
-      component_surface* JadeSurface = PushStruct(&RenderGroup->Arena, component_surface);
-      JadeSurface->Material = PushStruct(&RenderGroup->Arena, material);
-      SetMaterial(JadeSurface->Material, MATERIAL_JADE);
-
-      component_surface* GreenSurface = PushStruct(&RenderGroup->Arena, component_surface);
-      GreenSurface->Material = PushStruct(&RenderGroup->Arena, material);
-      SetMaterial(GreenSurface->Material, MATERIAL_GREEN);
-
-      {
-        push_buffer_header* Header = PushNewHeader( RenderGroup );
-        Header->Type = render_buffer_entry_type::INDEXED_BUFFER;
-        Header->RenderState = RENDER_STATE_WIREFRAME;
-
-        entry_type_indexed_buffer* Body = PushStruct(&RenderGroup->Arena, entry_type_indexed_buffer);
-        Body->Buffer = Buffer;
-        Body->DataType = DATA_TYPE_TRIANGLE;
-        Body->Surface = JadeSurface;
-        Body->M = GetModelMatrix(Entity->SpatialComponent);
-        Body->NM = Transpose(RigidInverse(Body->M));
-
-        Body->ElementStart  = 0;
-        Body->ElementLength = Buffer->nvi;
-      }
+      entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
+      Body->MeshHandle = Entity->RenderComponent->MeshHandle;
+      Body->TextureHandle = MATERIAL_JADE;
+      Body->M  = GetModelMatrix(Entity->SpatialComponent);
+      Body->NM = Transpose(RigidInverse(Body->M));
     }
-
+    #if 0
     if( GlobalVis )
     {
       gjk_epa_visualizer* Vis = GlobalVis;
@@ -534,6 +512,7 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
         }
       }
     }
+    #endif
   }
 
   component_surface* GreenSurface = PushStruct(&RenderGroup->Arena, component_surface);

@@ -73,7 +73,17 @@ struct world
   game_assets*  Assets;
 };
 
+
 struct game_asset_manager;
+
+// This is to be a ginormous struct where we can set things
+// we wanna access from everywhere. (Except the debug system which is it's own thing)
+struct global_context
+{
+  memory_arena* TransientArena;
+  game_asset_manager* AssetManager;
+};
+
 struct game_state
 {
   memory_arena AssetArena;

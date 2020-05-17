@@ -51,8 +51,8 @@ struct entry_type_light
 
 struct entry_type_asset_test
 {
-  u32 Object;
-  u32 Texture;
+  u32 MeshHandle;
+  u32 TextureHandle;
   m4 M;
   m4 NM;
   m4 TM;

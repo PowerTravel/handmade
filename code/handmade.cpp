@@ -212,7 +212,12 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   world* World = GameState->World;
   game_assets* Assets = World->Assets;
 
-  LoadCubeAsset( GameState  );
+  // TODO: Create a better way to ask for assets than giving known array-indeces
+  //       Maybe Enums?
+  const u32 CubeIndex0 = 0; // CubeIndex0 and CubeIndex1 have different texture indeces
+  const u32 CubeIndex1 = 1;
+  const u32 CubeTextureIndex = 30;
+  LoadCubeAsset( GameState );
 
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
@@ -246,6 +251,7 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
   s32 jarr[] = {-0,1};
   s32 karr[] = {-0,1};
 #endif
+  u32 RollingIndex = 0;
   for (s32 i = iarr[0]; i < iarr[1]; ++i)
   {
     for (s32 j = jarr[0]; j < jarr[1]; ++j)
@@ -253,18 +259,22 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
       for (s32 k = karr[0]; k < karr[1]; ++k)
       {
         entity* cubeEntity = NewEntity( World );
-        NewComponents( World, cubeEntity,  COMPONENT_TYPE_RENDER   |
-                                       COMPONENT_TYPE_SPATIAL  |
-                                       COMPONENT_TYPE_COLLIDER |
-                                       COMPONENT_TYPE_DYNAMICS);
+        NewComponents( World, cubeEntity,
+          COMPONENT_TYPE_RENDER   |
+          COMPONENT_TYPE_SPATIAL  |
+          COMPONENT_TYPE_COLLIDER |
+          COMPONENT_TYPE_DYNAMICS);
 
-        SetRenderAsset(GameState->AssetManager, cubeEntity->RenderComponent, 1, 0);
-        cubeEntity->ColliderComponent->AABB = GetObjectAABB(GameState->AssetManager, 1);
-        cubeEntity->ColliderComponent->Mesh = (collider_mesh*) PushStruct(World->PersistentArena, collider_mesh);
-        SetColliderMeshFromAABB( World->PersistentArena, cubeEntity->ColliderComponent );
+        cubeEntity->RenderComponent->MeshHandle    = GetMeshAssetHandle(CubeIndex0);
+        cubeEntity->RenderComponent->TextureHandle = GetTextureAssetHandle(RollingIndex++ % CubeTextureIndex);
+
+        cubeEntity->ColliderComponent->MeshHandle = GetMeshAssetHandle(CubeIndex0);
+        cubeEntity->ColliderComponent->AABB = GetMeshAABB(cubeEntity->ColliderComponent->MeshHandle);
+
         cubeEntity->SpatialComponent->Position =  V3(xzSpace*i, ySpace*j, xzSpace*k);
         cubeEntity->SpatialComponent->Rotation = RotateQuaternion( 0, V3(0,0,0) );
         cubeEntity->SpatialComponent->Scale = V3(1, 1, 1);
+
         cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
         cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0,0);
         cubeEntity->DynamicsComponent->Mass = 2;
@@ -272,17 +282,20 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
     }
   }
 
-  entity* floor = NewEntity( World );
-  NewComponents( World, floor,  COMPONENT_TYPE_RENDER   |
-                                     COMPONENT_TYPE_RENDER   |
-                                     COMPONENT_TYPE_SPATIAL  |
-                                     COMPONENT_TYPE_COLLIDER);
-  SetRenderAsset(GameState->AssetManager, floor->RenderComponent, 0, 0);
-  floor->ColliderComponent->AABB = GetObjectAABB(GameState->AssetManager, 0);
-  floor->ColliderComponent->Mesh = (collider_mesh*) PushStruct(World->PersistentArena, collider_mesh);
-  SetColliderMeshFromAABB( World->PersistentArena, floor->ColliderComponent );
-  floor->SpatialComponent->Position = V3( 0,-2, 0);
-  floor->SpatialComponent->Scale = V3( 18, 1, 18);
+  entity* floorEntity = NewEntity( World );
+  NewComponents( World, floorEntity,
+    COMPONENT_TYPE_RENDER   |
+    COMPONENT_TYPE_SPATIAL  |
+    COMPONENT_TYPE_COLLIDER);
+
+  floorEntity->RenderComponent->MeshHandle    = GetMeshAssetHandle(CubeIndex1);
+  floorEntity->RenderComponent->TextureHandle = GetTextureAssetHandle(CubeTextureIndex);
+
+  floorEntity->ColliderComponent->MeshHandle = GetMeshAssetHandle(CubeIndex1);
+  floorEntity->ColliderComponent->AABB = GetMeshAABB(floorEntity->ColliderComponent->MeshHandle);
+
+  floorEntity->SpatialComponent->Position = V3( 0,-2, 0);
+  floorEntity->SpatialComponent->Scale = V3( 18, 1, 18);
 
 #if 0
   NewComponents( World, floor, COMPONENT_TYPE_CONTROLLER );
@@ -475,6 +488,7 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
   if (!Memory->GameState)
   {
     Memory->GameState = BootstrapPushStruct(game_state, PersistentArena);
+    InitiateAssetManager(Memory->GameState);
     //Create2DScene(Thread, Memory, RenderCommands, Input );
     CreateCollisionTestScene(Thread, Memory, RenderCommands, Input );
     //CreateEpaVisualizerTestScene(Thread, Memory, RenderCommands, Input );
@@ -514,6 +528,8 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
 #if HANDMADE_INTERNAL
 game_memory* DebugGlobalMemory = 0;
 #endif
+
+game_asset_manager* GlobalAssetManager = 0;
 // Signature is
 //void game_update_and_render (thread_context* Thread,
 //                game_memory* Memory,
@@ -530,6 +546,10 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   TIMED_FUNCTION();
   Platform = Memory->PlatformAPI;
   InitiateGame(Thread, Memory, RenderCommands, Input);
+  Assert(Memory->GameState);
+  Assert(Memory->GameState->AssetManager);
+  GlobalAssetManager = Memory->GameState->AssetManager;
+
 
   RenderCommands->MainRenderGroup->ScreenWidth  = (r32)RenderCommands->ScreenWidthPixels;
   RenderCommands->MainRenderGroup->ScreenHeight = (r32)RenderCommands->ScreenHeightPixels;

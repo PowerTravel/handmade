@@ -1,6 +1,5 @@
 #include "debug.h"
 
-
 internal void
 RestartCollation();
 internal debug_state*

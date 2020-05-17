@@ -649,9 +649,10 @@ void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memo
   glUniformMatrix4fv(Program->NM, 1, GL_TRUE, AssetTest->NM.E);
   glUniformMatrix4fv(Program->TM, 1, GL_TRUE, AssetTest->TM.E);
 
-  Assert(AssetTest->Object < AssetManager->ObjectCount);
-  mesh_indeces* Object = AssetManager->Objects + AssetTest->Object;
-  book_keeper* ObjectKeeper = &AssetManager->ObjectKeeper[AssetTest->Object];
+  u32 MeshHandle = AssetTest->MeshHandle;
+  Assert(MeshHandle < AssetManager->ObjectCount);
+  mesh_indeces* Object = AssetManager->Objects + MeshHandle;
+  book_keeper* ObjectKeeper = &AssetManager->ObjectKeeper[MeshHandle];
   Assert(Object->MeshIndex < AssetManager->MeshCount);
 
   if(!ObjectKeeper->Loaded)
@@ -686,9 +687,10 @@ void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memo
     EndTemporaryMemory(TempMem);
   }
 
-  Assert(AssetTest->Texture < AssetManager->MaterialCount);
-  material* Material = AssetManager->Materials + AssetTest->Texture;
-  book_keeper* MaterialKeeper = &AssetManager->MaterialKeeper[AssetTest->Texture];
+  u32 TextureHandle = AssetTest->TextureHandle;
+  Assert(TextureHandle < AssetManager->MaterialCount);
+  material* Material = AssetManager->Materials + TextureHandle;
+  book_keeper* MaterialKeeper = &AssetManager->MaterialKeeper[TextureHandle];
 
   u32 SurfaceSmoothnes = 3;
   v4 AmbientColor   = V4(0,0,0,1);
@@ -699,41 +701,37 @@ void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memo
   glUniform4fv( Program->specularProduct, 1, SpecularColor.E);
   glUniform1f(  Program->shininess, Material->Shininess);
 
-  Assert(Material->DiffuseMap);
-
   bitmap* RenderTarget = Material->DiffuseMap;
-  Assert(Material->DiffuseMap);
+  Assert(RenderTarget);
+  if(!MaterialKeeper->Loaded)
   {
-    if(!MaterialKeeper->Loaded)
-    {
-      Assert(!MaterialKeeper->BufferHandle.TextureHandle);
-      MaterialKeeper->Loaded = true;
-      // Generate a texture slot
-      glGenTextures(1, &MaterialKeeper->BufferHandle.TextureHandle);
+    Assert(!MaterialKeeper->BufferHandle.TextureHandle);
+    MaterialKeeper->Loaded = true;
+    // Generate a texture slot
+    glGenTextures(1, &MaterialKeeper->BufferHandle.TextureHandle);
 
-      // Enable texture slot
-      glBindTexture( GL_TEXTURE_2D, MaterialKeeper->BufferHandle.TextureHandle );
+    // Enable texture slot
+    glBindTexture( GL_TEXTURE_2D, MaterialKeeper->BufferHandle.TextureHandle );
 
-      // Set texture environment state:
-      // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
+    // Set texture environment state:
+    // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
 
-      // Parameters set with glTexParameter affects the currently bound texture object,
-      // and stays with the texture object until changed.
+    // Parameters set with glTexParameter affects the currently bound texture object,
+    // and stays with the texture object until changed.
 
-      // How to resize textures
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
+    // How to resize textures
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
 
-      // Wrapping textures, (Mirror. Repeat border color, clamp, repeat etc... )
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT );
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT );
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-      glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
-                  RenderTarget->Width,  RenderTarget->Height,
-                  0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
-                  RenderTarget->Pixels);
-    }
+    // Wrapping textures, (Mirror. Repeat border color, clamp, repeat etc... )
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+    glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
+                RenderTarget->Width,  RenderTarget->Height,
+                0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
+                RenderTarget->Pixels);
   }
 
   glBindTexture( GL_TEXTURE_2D, MaterialKeeper->BufferHandle.TextureHandle );

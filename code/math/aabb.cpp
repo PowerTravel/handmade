@@ -50,7 +50,7 @@ r32 GetSize( const aabb3f* AABB, const aabb_metric Metric )
   return 0;
 }
 
-void GetAABBVertices(const aabb3f* AABB, v3* AABBVertices, u32* VerticeIndeces )
+void GetAABBVertices(const aabb3f* AABB, v3* AABBVertices, u32* VerticeIndeces = 0 )
 {
   AABBVertices[0] = V3( AABB->P0.X, AABB->P0.Y, AABB->P0.Z);
   AABBVertices[1] = V3( AABB->P1.X, AABB->P0.Y, AABB->P0.Z);

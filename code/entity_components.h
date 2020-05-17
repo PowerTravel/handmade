@@ -14,11 +14,12 @@ struct component_dynamics;
 struct component_surface;
 struct component_sprite_animation;
 struct world;
+struct asset_handle;
 
 struct component_render
 {
-  u32 Object;
-  u32 Texture;
+  u32 MeshHandle;
+  u32 TextureHandle;
 };
 
 struct entity
