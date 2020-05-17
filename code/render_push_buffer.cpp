@@ -28,7 +28,19 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup)
 }
 
 void DEBUGPushQuad(render_group* RenderGroup, rect2f Rect, v4 Color = V4(1,1,1,1))
+
 {
+  #if 0
+  push_buffer_header* Header = PushNewHeader( RenderGroup );
+  Header->Type = render_buffer_entry_type::ASSET_TEST;
+  Header->RenderState = RENDER_STATE_FILL;
+
+  entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
+  Body->MeshHandle = 0; // This is a QUAD
+  Body->TextureHandle = MATERIAL_BLUE;
+  Body->M  = GetModelMatrix( A->SpatialComponent ) * GetTranslationMatrix(Manifold->Contacts[j].A_ContactModelSpace);
+  Body->NM = Transpose(RigidInverse(Body->M));
+  #else
   component_surface* Surface = PushStruct(&RenderGroup->Arena, component_surface);
   Surface->Material = PushStruct(&RenderGroup->Arena, material);
   Surface->Material->AmbientColor = Color;
@@ -43,6 +55,7 @@ void DEBUGPushQuad(render_group* RenderGroup, rect2f Rect, v4 Color = V4(1,1,1,1
   r32 X0 = Rect.X + Rect.W/2.f;
   r32 Y0 = Rect.Y + Rect.H/2.f;
   Body->M  = GetTranslationMatrix(V4(X0, Y0,0,1)) * GetScaleMatrix(V4(Rect.W, Rect.H,1,0));
+  #endif
 }
 
 component_surface* PushNewSurface(render_group* RenderGroup, bitmap* BitMap, u32 ColorEnum)
@@ -61,6 +74,18 @@ void PushTexturedQuad(render_group* RenderGroup, rect2f QuadRect, rect2f Texture
   const m4 QuadTranslate    = GetTranslationMatrix(V4(QuadRect.X, QuadRect.Y,0,1));
   const m4 QuadScale        = GetScaleMatrix(V4(QuadRect.W, QuadRect.H,1,0));
 
+#if 0
+  push_buffer_header* Header = PushNewHeader( RenderGroup );
+  Header->Type = render_buffer_entry_type::ASSET_TEST;
+  Header->RenderState = RENDER_STATE_FILL;
+
+  entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
+  Body->MeshHandle = 0; // This is a QUAD
+  Body->TextureHandle = MATERIAL_BLUE;
+  Body->M  = QuadTranslate * QuadScale;
+  Body->NM = Transpose(RigidInverse(Body->M));
+  Body->TM = TextureTranslate * TextureScale
+#else
   // Todo: Find a better API So you don't need this BS all the time
   push_buffer_header* Header = PushNewHeader( RenderGroup );
   Header->Type = render_buffer_entry_type::PRIMITIVE;
@@ -70,6 +95,7 @@ void PushTexturedQuad(render_group* RenderGroup, rect2f QuadRect, rect2f Texture
   Body->Surface = Surface;
   Body->TM = TextureTranslate * TextureScale;
   Body->M  = QuadTranslate * QuadScale;
+#endif
 }
 
 rect2f DEBUGTextSize(r32 x, r32 y, render_group* RenderGroup, c8* String)
@@ -243,14 +269,8 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
       entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
       Body->MeshHandle = Entity->RenderComponent->MeshHandle;
       Body->TextureHandle = Entity->RenderComponent->TextureHandle;
-      if(Entity->SpatialComponent)
-      {
-        Body->M  = GetModelMatrix(Entity->SpatialComponent);
-        Body->NM = Transpose(RigidInverse(Body->M));
-      }else{
-        Body->M  = M4Identity();
-        Body->NM = M4Identity();
-      }
+      Body->M  = GetModelMatrix(Entity->SpatialComponent);
+      Body->NM = Transpose(RigidInverse(Body->M));
       Body->TM = M4Identity();
     }
     #if 0
@@ -560,6 +580,17 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
       }
       #endif
       {
+        #if 0
+        push_buffer_header* Header = PushNewHeader( RenderGroup );
+        Header->Type = render_buffer_entry_type::ASSET_TEST;
+        Header->RenderState = RENDER_STATE_FILL;
+
+        entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
+        Body->MeshHandle = 0; // This is a QUAD
+        Body->TextureHandle = MATERIAL_BLUE;
+        Body->M  = GetModelMatrix( A->SpatialComponent ) * GetTranslationMatrix(Manifold->Contacts[j].A_ContactModelSpace);
+        Body->NM = Transpose(RigidInverse(Body->M));
+        #else
         push_buffer_header* Header = PushNewHeader( RenderGroup );
         Header->Type = render_buffer_entry_type::PRIMITIVE;
         Header->RenderState = RENDER_STATE_POINTS;
@@ -569,8 +600,20 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
         Body->TM = M4Identity();
         Body->PrimitiveType = primitive_type::POINT;
         Body->Surface = BlueSurface;
+        #endif
       }
       {
+        #if 0
+        push_buffer_header* Header = PushNewHeader( RenderGroup );
+        Header->Type = render_buffer_entry_type::ASSET_TEST;
+        Header->RenderState = RENDER_STATE_FILL;
+
+        entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
+        Body->MeshHandle = 0; // This is a QUAD
+        Body->TextureHandle = MATERIAL_WHITE;
+        Body->M  = GetModelMatrix( B->SpatialComponent ) * GetTranslationMatrix(Manifold->Contacts[j].B_ContactModelSpace);
+        Body->NM = Transpose(RigidInverse(Body->M));
+        #else
         push_buffer_header* Header = PushNewHeader( RenderGroup );
         Header->Type = render_buffer_entry_type::PRIMITIVE;
         Header->RenderState = RENDER_STATE_POINTS;
@@ -580,6 +623,7 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
         Body->TM = M4Identity();
         Body->PrimitiveType = primitive_type::POINT;
         Body->Surface = WhiteSurface;
+        #endif
       }
     }
     Manifold = Manifold->Next;

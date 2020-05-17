@@ -214,8 +214,8 @@ void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_
 
   // TODO: Create a better way to ask for assets than giving known array-indeces
   //       Maybe Enums?
-  const u32 CubeIndex0 = 0; // CubeIndex0 and CubeIndex1 have different texture indeces
-  const u32 CubeIndex1 = 1;
+  const u32 CubeIndex0 = 1; // CubeIndex0 and CubeIndex1 have different texture indeces
+  const u32 CubeIndex1 = 2;
   const u32 CubeTextureIndex = 30;
   LoadCubeAsset( GameState );
 

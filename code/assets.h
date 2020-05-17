@@ -92,87 +92,8 @@ u32 GetMeshAssetHandle( u32 MeshIndex );
 collider_mesh GetColliderMesh(u32 MeshHandle);
 void RemoveRenderAsset( component_render* RenderComponent);
 aabb3f GetMeshAABB(u32 MeshHandle);
-/*
-struct render_buffer
-{
-  b32 Fill;
-  u32* VAO;
-  u32* VBO;
-  u32 nvi;   // Nr Indeces
-  u32* vi;   // Vertex Indeces
-  u32* ti;   // Texture Indeces
-  u32* ni;   // Normal Indeces
-
-  u32 nv;    // Nr Verices
-  v3* v;     // Vertices
-
-  u32 nvn;   // Nr Vertice Normals
-  v3* vn;    // Vertice Normals
-
-  u32 nvt;   // Nr Trxture Vertices
-  v2* vt;    // Texture Vertices
-};
-
-struct stb_font_map
-{
-  s32 StartChar;
-  s32 NumChars;
-  r32 FontHeightPx;
-
-  r32 Ascent;
-  r32 Descent;
-  r32 LineGap;
-
-  bitmap BitMap;
-  stbtt_bakedchar* CharData;
-};
-
-struct mesh_data
-{
-  u32 nv;    // Nr Verices
-  u32 nvn;   // Nr Vertice Normals
-  u32 nvt;   // Nr Trxture Vertices
-
-  v3* v;     // Vertices
-  v3* vn;    // Vertice Normals
-  v2* vt;    // Texture Vertices
-};
-
-struct mesh_indeces
-{
-  u32 Count;  // 3 times Nr Triangles
-  u32* vi;    // Vertex Indeces
-  u32* ti;    // Texture Indeces
-  u32* ni;    // Normal Indeces
-};
-
-struct render_mesh
-{
-  u32 ID;
-  u32 VAO;
-  u32 VBO;
-  mesh_data Data;
-  mesh_indeces Indeces;
-  aabb3f AABB;
-  surface_color Color;
-  u32 DiffuseMapHandle;
-};
 
 
-
-u32 PushBitMap(game_assets* Assets, bitmap* BitMap)
-{
-  // Will add a bitmap if it doesn't exist and return a handle
-  return 0;
-}
-
-struct component_collider;
-u32 GetOrCreateMesh(game_assets* Assets, component_collider* Collider)
-{
-  // Will add a mesh from Collider if it doesn't exist and return a handle
-  return 0;
-}
-*/
 enum MATERIAL_TYPE
 {
   MATERIAL_WHITE,

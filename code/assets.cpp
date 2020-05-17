@@ -1,6 +1,11 @@
 #include "assets.h"
 #include "obj_loader.h"
 
+//4 estates instead of 5;
+//have a bank, investment, divestment, salaries
+//No space to buy viniards
+
+
 extern game_asset_manager* GlobalAssetManager;
 
 void InitPredefinedMaterials(game_asset_manager* AssetManager)
@@ -46,6 +51,9 @@ void InitPredefinedMaterials(game_asset_manager* AssetManager)
     material* DstMaterial = (AssetManager->Materials + MaterialIndex);
     *DstMaterial = mtl[MaterialIndex];
 
+    // Todo: Split color from texture. I wanna be able to freely specify a colour without having to
+    //       pre-create it here.
+    //       Also, maybe only have 1 empty texture that gets used?
     bitmap* EmptyBitmap = PushStruct(AssetManager->AssetArena, bitmap);
     EmptyBitmap->BPP  = 32;
     EmptyBitmap->Width  = 1;
@@ -59,6 +67,109 @@ void InitPredefinedMaterials(game_asset_manager* AssetManager)
 
     ++AssetManager->MaterialCount;
   }
+}
+
+
+void InitPredefinedMeshes(game_asset_manager* AssetManager)
+{
+  {
+    v3 v[] =
+    {
+      V3(-0.5, -0.5, 0),
+      V3( 0.5, -0.5, 0),
+      V3( 0.5,  0.5, 0),
+      V3(-0.5,  0.5, 0)
+    };
+    v3 vn[] =
+    {
+      V3( 0, 0, 1),
+    };
+    v2 vt[] =
+    {
+      V2( 0, 0),
+      V2( 1, 0),
+      V2( 1, 1),
+      V2( 0, 1)
+    };
+    u32 vi[] = {0,1,2,0,2,3};
+    u32 ti[] = {0,1,2,0,2,3};
+    u32 ni[] = {0,0,0,0,0,0};
+    aabb3f AABB = AABB3f(V3(-0.5, -0.5, 0), V3( 0.5,  0.5, 0));
+
+    u32 MeshIndex = AssetManager->MeshCount++;
+    mesh_data* Data = AssetManager->MeshData + MeshIndex;
+    Data->nv  = ArrayCount(v);    // Nr Verices
+    Data->nvn = ArrayCount(vn);   // Nr Vertice Normals
+    Data->nvt = ArrayCount(vt);   // Nr Trxture Vertices
+    Data->v  = (v3*) PushCopy(AssetManager->AssetArena, sizeof(v), v);
+    Data->vn = (v3*) PushCopy(AssetManager->AssetArena, sizeof(vn), vn);
+    Data->vt = (v2*) PushCopy(AssetManager->AssetArena, sizeof(vt), vt);
+
+    u32 ObjectIndex = AssetManager->ObjectCount++;
+    mesh_indeces* Indeces = AssetManager->Objects + ObjectIndex;
+    Indeces->MeshIndex = MeshIndex;
+    Indeces->Count  = ArrayCount(vi);
+    Indeces->vi = (u32*) PushCopy(AssetManager->AssetArena, sizeof(vi), vi);
+    Indeces->ti = (u32*) PushCopy(AssetManager->AssetArena, sizeof(ti), ti);
+    Indeces->ni = (u32*) PushCopy(AssetManager->AssetArena, sizeof(ni), ni);
+    Indeces->AABB = AABB;
+  }
+
+  {
+    v3 v[] =
+    {
+      V3(-0.5,-0.5, 0.5),
+      V3( 0.5,-0.5, 0.5),
+      V3(-0.5, 0.5, 0.5),
+      V3( 0.5, 0.5, 0.5),
+      V3(-0.5, 0.5,-0.5),
+      V3( 0.5, 0.5,-0.5),
+      V3(-0.5,-0.5,-0.5),
+      V3( 0.5,-0.5,-0.5)
+    };
+
+    v3 vn[] =
+    {
+      V3( 0.0, 0.0, 1.0),
+      V3( 0.0, 1.0, 0.0),
+      V3( 0.0, 0.0,-1.0),
+      V3( 0.0,-1.0, 0.0),
+      V3( 1.0, 0.0, 0.0),
+      V3(-1.0, 0.0, 0.0)
+    };
+
+    v2 vt[] =
+    {
+      V2( 0, 0),
+      V2( 1, 0),
+      V2( 1, 1),
+      V2( 0, 1)
+    };
+
+    u32 vi[] = {0,1,2,2,1,3,2,3,4,4,3,5,4,5,6,6,5,7,6,7,0,0,7,1,1,7,3,3,7,5,6,0,4,4,0,2};
+    u32 ti[] = {0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2};
+    u32 ni[] = {0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,5,5,5,5,5,5};
+    aabb3f AABB = AABB3f(V3(-0.5, -0.5, -0.5), V3( 0.5, 0.5, 0.5));
+
+    u32 MeshIndex = AssetManager->MeshCount++;
+    mesh_data* Data = AssetManager->MeshData + MeshIndex;
+    Data->nv  = ArrayCount(v);    // Nr Verices
+    Data->nvn = ArrayCount(vn);   // Nr Vertice Normals
+    Data->nvt = ArrayCount(vt);   // Nr Trxture Vertices
+    Data->v  = (v3*) PushCopy(AssetManager->AssetArena, sizeof(v), v);
+    Data->vn = (v3*) PushCopy(AssetManager->AssetArena, sizeof(vn), vn);
+    Data->vt = (v2*) PushCopy(AssetManager->AssetArena, sizeof(vt), vt);
+
+    u32 ObjectIndex = AssetManager->ObjectCount++;
+    mesh_indeces* Indeces = AssetManager->Objects + ObjectIndex;
+    Indeces->MeshIndex = MeshIndex;
+    Indeces->Count  = ArrayCount(vi);
+    Indeces->vi = (u32*) PushCopy(AssetManager->AssetArena, sizeof(vi), vi);
+    Indeces->ti = (u32*) PushCopy(AssetManager->AssetArena, sizeof(ti), ti);
+    Indeces->ni = (u32*) PushCopy(AssetManager->AssetArena, sizeof(ni), ni);
+    Indeces->AABB = AABB;
+  }
+
 }
 
 
@@ -90,6 +201,7 @@ void InitiateAssetManager(game_state* State)
                                               State->AssetManager->MaxMaterialCount, book_keeper);
 
     InitPredefinedMaterials(State->AssetManager);
+    InitPredefinedMeshes(State->AssetManager);
 
     GlobalAssetManager = State->AssetManager;
   }
@@ -114,38 +226,37 @@ void LoadCubeAsset( game_state* State)
    Platform.DEBUGPlatformFreeFileMemory,
    "..\\handmade\\data\\cube\\cube.obj");
 
-  AssetManager->MeshCount = 1;
-  AssetManager->MeshData = PushArray(AssetArena,AssetManager->MeshCount, mesh_data);
-  *AssetManager->MeshData =*LoadedObjFile->MeshData;
+  u32 MeshIndex = AssetManager->MeshCount++;
+  mesh_data* NewMesh = AssetManager->MeshData + MeshIndex;
+  *NewMesh =*LoadedObjFile->MeshData;
 
-  AssetManager->ObjectCount = LoadedObjFile->ObjectCount;
-  AssetManager->Objects = PushArray(AssetArena, AssetManager->ObjectCount, mesh_indeces);
-  AssetManager->ObjectKeeper = PushArray(AssetArena, AssetManager->ObjectCount, book_keeper);
-  mesh_indeces* DstObject = AssetManager->Objects;
   for (u32 i = 0; i < LoadedObjFile->ObjectCount; ++i)
   {
     obj_group* LoadedObjectGroup = LoadedObjFile->Objects + i;
-    DstObject->MeshIndex = 0; // MeshDataIndex
+
+    u32 ObjectIndex = AssetManager->ObjectCount++;
+    mesh_indeces* DstObject = AssetManager->Objects + ObjectIndex;
+
+    DstObject->MeshIndex = MeshIndex;
     DstObject->AABB = LoadedObjectGroup->aabb;
-    DstObject->Count = LoadedObjectGroup->Indeces->Count;  // 3 times Nr Triangles
-    DstObject->vi = LoadedObjectGroup->Indeces->vi;    // Vertex Indeces
-    DstObject->ti = LoadedObjectGroup->Indeces->ti;    // Texture Indeces
-    DstObject->ni = LoadedObjectGroup->Indeces->ni;    // Normal Indeces
-    ++DstObject;
+    DstObject->Count = LoadedObjectGroup->Indeces->Count;
+    DstObject->vi = LoadedObjectGroup->Indeces->vi;
+    DstObject->ti = LoadedObjectGroup->Indeces->ti;
+    DstObject->ni = LoadedObjectGroup->Indeces->ni;
   }
 
-  material* DstMaterial = AssetManager->Materials + AssetManager->MaterialCount;
-  AssetManager->MaterialCount += LoadedObjFile->MaterialData->MaterialCount;
   for (u32 i = 0; i < LoadedObjFile->MaterialData->MaterialCount; ++i)
   {
     mtl_material* SrcMaterial = LoadedObjFile->MaterialData->Materials + i;
+
+    u32 MaterialIndex = AssetManager->MaterialCount++;
+    material* DstMaterial = AssetManager->Materials + MaterialIndex;
+
     DstMaterial->AmbientColor  = SrcMaterial->Ka ? *SrcMaterial->Ka : V4(1,1,1,1);
     DstMaterial->DiffuseColor  = SrcMaterial->Kd ? *SrcMaterial->Kd : V4(1,1,1,1);
     DstMaterial->SpecularColor = SrcMaterial->Ks ? *SrcMaterial->Ks : V4(1,1,1,1);
     DstMaterial->Shininess     = SrcMaterial->Ns ? *SrcMaterial->Ns : 1;
     DstMaterial->DiffuseMap    = SrcMaterial->MapKd;
-    ++AssetManager->MaterialCount;
-    DstMaterial++;
   }
 }
 
