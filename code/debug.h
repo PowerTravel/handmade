@@ -95,6 +95,7 @@ struct debug_state
   r32 RadialMenuX;
   r32 RadialMenuY;
   b32 ConfigMultiThreaded;
+  b32 ConfigCollisionPoints;
 
   b32 UpdateConfig;
 };

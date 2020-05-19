@@ -586,11 +586,10 @@ bitmap* LoadTGA(memory_arena* AssetArena,
   u32 BytesPerPixel = Header.PixelDepth/8;
 
   bitmap* Result = (bitmap*) PushStruct( AssetArena, bitmap );
-  Result->Handle = 0;
   Result->Pixels = PushArray( AssetArena, Header.Width*Header.Height, u32);
   Result->Width = Header.Width;
   Result->Height = Header.Height;
-
+  Result->BPP = 32;
 
   u32 PixelCount = Header.Width*Header.Height;
   u32* DstPxl = (u32*) Result->Pixels;
@@ -602,7 +601,7 @@ bitmap* LoadTGA(memory_arena* AssetArena,
     u32 MinimumFileSize = (HeaderSize + PixelCount * BytesPerPixel );
     Assert(ReadResult.ContentSize >= MinimumFileSize);
 
-    for( u32 i = 0; i <PixelCount; ++i )
+    for( u32 i = 0; i < PixelCount; ++i )
     {
       *DstPxl++ = ReadPixel(BytesPerPixel, SrcData);
       SrcData += BytesPerPixel;
@@ -610,7 +609,7 @@ bitmap* LoadTGA(memory_arena* AssetArena,
   }else if( Header.ImageType == 10 || Header.ImageType == 11 )
   {
     // Run-Length Endoded True color Image
-	ReadRunLengthEncodedRGB(PixelCount, BytesPerPixel, (u32*) DstPxl, SrcData);
+	  ReadRunLengthEncodedRGB(PixelCount, BytesPerPixel, (u32*) DstPxl, SrcData);
   }else{
     // We only support Black And White RLE Encoded images and True Color Images
     // IE not color mapping

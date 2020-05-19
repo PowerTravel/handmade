@@ -18,7 +18,7 @@ enum class render_buffer_entry_type
   PRIMITIVE,
   LIGHT,
   ASSET_TEST,
-  COLOURED_QUAD
+  OVERLAY_QUAD
 };
 
 enum data_type
@@ -36,11 +36,13 @@ enum render_state
   RENDER_STATE_FILL         = 0x8
 };
 
-struct entry_type_coloured_quad
+struct entry_type_overlay_quad
 {
   v4 Colour;
-  v3 CenterPosition;
-  v3 Size;
+  u32 TextureHandle;
+  u32 MeshHandle;
+  m4 M;
+  m4 TM;
 };
 
 struct entry_type_light
@@ -52,7 +54,7 @@ struct entry_type_light
 struct entry_type_asset_test
 {
   u32 MeshHandle;
-  u32 TextureHandle;
+  u32 MaterialHandle;
   m4 M;
   m4 NM;
   m4 TM;

@@ -42,49 +42,6 @@ global_variable b32 GlobalFireVic = false;
 
 #include "debug.h"
 
-internal stb_font_map STBBakeFont(memory_arena* Memory)
-{
-  const s32 Ranges[] =
-  {
-      0x20, 0x80,       // BasicLatin
-      0xA1, 0x100,      // ExtendedLatin
-      0x16A0, 0x1700,   // Runic
-      0x600, 0x700,     // Arabic
-      0x370, 0x400,     // Greek
-      0x2200, 0x2300    // Mathematical
-  };
-
-  thread_context Thread;
-  //debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\courbd.ttf");
-  debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\arial.ttf");
-  //debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\ITCEDSCR.ttf");
-
-  Assert(TTFFile.Contents);
-  stb_font_map Result = {};
-  Result.StartChar = Ranges[0];
-  Result.NumChars = Ranges[1] - Ranges[0];
-  Result.FontHeightPx = 24.f;
-  Result.CharData = PushArray(Memory, Result.NumChars, stbtt_bakedchar);
-
-  stbtt_GetScaledFontVMetrics((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
-   Result.FontHeightPx, &Result.Ascent, &Result.Descent, &Result.LineGap);
-
-  Result.BitMap.BPP = 8;
-  Result.BitMap.Width = 1028;
-  Result.BitMap.Height = 1028;
-  Result.BitMap.Pixels = (void*) PushArray(Memory, Result.BitMap.Width * Result.BitMap.Height, u8);
-  s32 ret = stbtt_BakeFontBitmap((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
-                       Result.FontHeightPx,
-                       (u8*)Result.BitMap.Pixels, Result.BitMap.Width, Result.BitMap.Height,
-                       Result.StartChar, Result.NumChars,
-                       Result.CharData);
-  Assert(ret>0);
-
-  Platform.DEBUGPlatformFreeFileMemory(&Thread, TTFFile.Contents);
-
-  return Result;
-}
-
 void AllocateGlobaklGjkEpaVisualizer(memory_arena* AssetArena)
 {
   GlobalGjkEpaVisualizer.MaxIndexCount = 1024;
@@ -495,7 +452,7 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
 
     AllocateGlobaklGjkEpaVisualizer(&Memory->GameState->AssetArena);
 
-    Memory->GameState->World->Assets->STBFontMap = STBBakeFont(&Memory->GameState->AssetArena);
+    STBBakeFont(Memory->GameState->AssetManager);
 
     RenderCommands->MainRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
 

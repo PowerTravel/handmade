@@ -641,25 +641,18 @@ CreateGLVertexBuffer( memory_arena* TemporaryMemory,
   return Result;
 }
 
-void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memory_arena* TempArena,
-  entry_type_asset_test* AssetTest, v4 LightColor)
+void PushMeshToGPU(memory_arena* TempArena, game_asset_manager* AssetManager, u32 ObjectHandle)
 {
-
-  glUniformMatrix4fv(Program->M,  1, GL_TRUE, AssetTest->M.E);
-  glUniformMatrix4fv(Program->NM, 1, GL_TRUE, AssetTest->NM.E);
-  glUniformMatrix4fv(Program->TM, 1, GL_TRUE, AssetTest->TM.E);
-
-  u32 MeshHandle = AssetTest->MeshHandle;
-  Assert(MeshHandle < AssetManager->ObjectCount);
-  mesh_indeces* Object = AssetManager->Objects + MeshHandle;
-  book_keeper* ObjectKeeper = &AssetManager->ObjectKeeper[MeshHandle];
-  Assert(Object->MeshIndex < AssetManager->MeshCount);
+  Assert(ObjectHandle < AssetManager->ObjectCount);
+  mesh_indeces* Object = GetObject(AssetManager, ObjectHandle);
+  book_keeper* ObjectKeeper = GetObjectKeeper(AssetManager, ObjectHandle);
+  Assert(Object->MeshHandle < AssetManager->MeshCount);
 
   if(!ObjectKeeper->Loaded)
   {
     temporary_memory TempMem = BeginTemporaryMemory(TempArena);
 
-    mesh_data* MeshData = AssetManager->MeshData + Object->MeshIndex;
+    mesh_data* MeshData = GetMeshData(AssetManager, Object->MeshHandle);
 
     u32 nvi = Object->Count;   // Nr Indeces
     u32* vi = Object->vi;      // Vertex Indeces
@@ -686,14 +679,61 @@ void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memo
 
     EndTemporaryMemory(TempMem);
   }
+}
 
-  u32 TextureHandle = AssetTest->TextureHandle;
+void BindTextureToGPU(game_asset_manager* AssetManager, u32 TextureHandle)
+{
+  bitmap* RenderTarget = AssetManager->Textures + TextureHandle;
+  book_keeper* TextureKeeper = AssetManager->TextureKeeper + TextureHandle;
+  Assert(RenderTarget);
+  Assert(RenderTarget->BPP == 32);
+  if(!TextureKeeper->Loaded)
+  {
+    Assert(!TextureKeeper->BufferHandle.TextureHandle);
+    TextureKeeper->Loaded = true;
+    // Generate a texture slot
+    glGenTextures(1, &TextureKeeper->BufferHandle.TextureHandle);
+
+    // Enable texture slot
+    glBindTexture( GL_TEXTURE_2D, TextureKeeper->BufferHandle.TextureHandle );
+
+    // Set texture environment state:
+    // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
+
+    // Parameters set with glTexParameter affects the currently bound texture object,
+    // and stays with the texture object until changed.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+
+    glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
+              RenderTarget->Width,  RenderTarget->Height,
+              0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
+              RenderTarget->Pixels);
+  }
+
+  glBindTexture( GL_TEXTURE_2D, TextureKeeper->BufferHandle.TextureHandle );
+
+}
+
+
+void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memory_arena* TempArena,
+  entry_type_asset_test* AssetTest, v4 LightColor)
+{
+  glUniformMatrix4fv(Program->M,  1, GL_TRUE, AssetTest->M.E);
+  glUniformMatrix4fv(Program->NM, 1, GL_TRUE, AssetTest->NM.E);
+  glUniformMatrix4fv(Program->TM, 1, GL_TRUE, AssetTest->TM.E);
+
+  u32 MeshHandle = AssetTest->MeshHandle;
+  PushMeshToGPU(TempArena, AssetManager, MeshHandle);
+
+  u32 TextureHandle = AssetTest->MaterialHandle;
   Assert(TextureHandle < AssetManager->MaterialCount);
   material* Material = AssetManager->Materials + TextureHandle;
-  book_keeper* MaterialKeeper = &AssetManager->MaterialKeeper[TextureHandle];
 
   u32 SurfaceSmoothnes = 3;
-  v4 AmbientColor   = V4(0,0,0,1);
+  v4 AmbientColor   = Material->TextureHandle ? V4(0,0,0,1) : Material->AmbientColor;
   v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
   v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
   glUniform4fv( Program->ambientProduct,  1, AmbientColor.E);
@@ -701,41 +741,11 @@ void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memo
   glUniform4fv( Program->specularProduct, 1, SpecularColor.E);
   glUniform1f(  Program->shininess, Material->Shininess);
 
-  bitmap* RenderTarget = Material->DiffuseMap;
-  Assert(RenderTarget);
-  if(!MaterialKeeper->Loaded)
-  {
-    Assert(!MaterialKeeper->BufferHandle.TextureHandle);
-    MaterialKeeper->Loaded = true;
-    // Generate a texture slot
-    glGenTextures(1, &MaterialKeeper->BufferHandle.TextureHandle);
+  BindTextureToGPU(AssetManager, Material->TextureHandle);
 
-    // Enable texture slot
-    glBindTexture( GL_TEXTURE_2D, MaterialKeeper->BufferHandle.TextureHandle );
 
-    // Set texture environment state:
-    // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
-
-    // Parameters set with glTexParameter affects the currently bound texture object,
-    // and stays with the texture object until changed.
-
-    // How to resize textures
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-
-    // Wrapping textures, (Mirror. Repeat border color, clamp, repeat etc... )
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-    glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
-                RenderTarget->Width,  RenderTarget->Height,
-                0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
-                RenderTarget->Pixels);
-  }
-
-  glBindTexture( GL_TEXTURE_2D, MaterialKeeper->BufferHandle.TextureHandle );
-
+  mesh_indeces* Object = AssetManager->Objects + MeshHandle;
+  book_keeper* ObjectKeeper = AssetManager->ObjectKeeper + MeshHandle;
   Assert(ObjectKeeper->BufferHandle.VAO);
   OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
 }
@@ -991,6 +1001,53 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
     setOpenGLState(Entry->RenderState);
     switch(Entry->Type)
     {
+      case render_buffer_entry_type::OVERLAY_QUAD:
+      {
+        entry_type_overlay_quad* Quad = (entry_type_overlay_quad*) Body;
+        glUniformMatrix4fv(TextOverlay.M,  1, GL_TRUE, Quad->M.E);
+        glUniformMatrix4fv(TextOverlay.TM, 1, GL_TRUE, Quad->TM.E);
+
+        u32 MeshHandle = Quad->MeshHandle;
+        PushMeshToGPU(&RenderGroup->Arena, RenderGroup->AssetManager, MeshHandle);
+        u32 TextureHandle = Quad->TextureHandle;
+
+        glUniform4fv( TextOverlay.ambientProduct,  1, Quad->Colour.E);
+
+        BindTextureToGPU(RenderGroup->AssetManager, Quad->TextureHandle);
+
+        mesh_indeces* Object = RenderGroup->AssetManager->Objects + MeshHandle;
+        book_keeper* ObjectKeeper = RenderGroup->AssetManager->ObjectKeeper + MeshHandle;
+        Assert(ObjectKeeper->BufferHandle.VAO);
+        OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
+      }break;
+      case render_buffer_entry_type::ASSET_TEST:
+      {
+        entry_type_asset_test* AssetTest = (entry_type_asset_test*) Body;
+        glUniformMatrix4fv(TextOverlay.M,  1, GL_TRUE, AssetTest->M.E);
+        glUniformMatrix4fv(TextOverlay.TM, 1, GL_TRUE, AssetTest->TM.E);
+
+        u32 MeshHandle = AssetTest->MeshHandle;
+        PushMeshToGPU(&RenderGroup->Arena, RenderGroup->AssetManager, MeshHandle);
+
+        u32 MaterialHandle = AssetTest->MaterialHandle;
+        Assert(MaterialHandle < RenderGroup->AssetManager->MaterialCount);
+        material* Material = RenderGroup->AssetManager->Materials + MaterialHandle;
+
+        glUniform4fv( TextOverlay.ambientProduct,  1, Material->AmbientColor.E);
+        glUniform4fv( TextOverlay.diffuseProduct,  1, Material->DiffuseColor.E);
+        glUniform4fv( TextOverlay.specularProduct, 1, Material->SpecularColor.E);
+        //glUniform1f(  TextOverlay.shininess, Material->Shininess);
+
+        BindTextureToGPU(RenderGroup->AssetManager, Material->TextureHandle);
+
+
+        mesh_indeces* Object = RenderGroup->AssetManager->Objects + MeshHandle;
+        book_keeper* ObjectKeeper = RenderGroup->AssetManager->ObjectKeeper + MeshHandle;
+        Assert(ObjectKeeper->BufferHandle.VAO);
+        OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
+
+      }break;
+
       case render_buffer_entry_type::PRIMITIVE:
       {
         entry_type_primitive* Primitive = (entry_type_primitive*) Body;

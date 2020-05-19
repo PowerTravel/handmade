@@ -272,7 +272,10 @@ DebugRewriteConfigFile(game_memory* Memory)
   {
     c8 Buffer[4096] = {};
     u32 Size = _snprintf_s(Buffer, sizeof(Buffer),
-    "#define MULTI_THREADED %d // b32\n", DebugState->ConfigMultiThreaded);
+"#define MULTI_THREADED %d // b32\n\
+#define SHOW_COLLISION_POINTS %d // b32\n",
+      DebugState->ConfigMultiThreaded,
+      DebugState->ConfigCollisionPoints);
     thread_context Dummy = {};
 
     Memory->PlatformAPI.DEBUGPlatformWriteEntireFile(&Dummy, "W:\\handmade\\code\\debug_config.h", Size, Buffer);
@@ -338,7 +341,7 @@ TogglePause(debug_state* DebugState)
       DebugState->Resumed = true;
     }
 
-    DebugState->Paused = false; 
+    DebugState->Paused = false;
   }
 }
 
@@ -346,7 +349,7 @@ TogglePause(debug_state* DebugState)
 void DebugMainWindow(game_input* GameInput)
 {
   r32 Width  = GlobalDebugRenderGroup->ScreenWidth;
-  r32 Height = GlobalDebugRenderGroup->ScreenHeight;  
+  r32 Height = GlobalDebugRenderGroup->ScreenHeight;
 
   m4 ScrenToPx =  M4( Height,        0, 0, 0,
                              0, Height, 0, 0,
@@ -363,7 +366,7 @@ void DebugMainWindow(game_input* GameInput)
     "Toggle Multi Threaded",
     "Toggle Show",
     "Toggle Pause",
-    "Back"
+    "Toggle Collision Points"
   };
   r32 AspectRatio = Width/Height;
   r32 ScreenWidth = AspectRatio;
@@ -375,7 +378,7 @@ void DebugMainWindow(game_input* GameInput)
   if(GameInput->MouseButton[PlatformMouseButton_Right].Pushed)
   {
     DebugState->RadialMenuX = GameInput->MouseX;
-    DebugState->RadialMenuY = GameInput->MouseY;  
+    DebugState->RadialMenuY = GameInput->MouseY;
   }
 
   if(GameInput->MouseButton[PlatformMouseButton_Right].EndedDown)
@@ -415,8 +418,6 @@ void DebugMainWindow(game_input* GameInput)
       r32 TextPosX = DebugState->RadialMenuX + Radius*Cos(Angle);
       r32 TextPosY = DebugState->RadialMenuY + Radius*Sin(Angle);
       rect2f TextBox = DEBUGTextSize(TextPosX, TextPosY, GlobalDebugRenderGroup, MenuItems[MenuItemIdx]);
-      TextBox.Y -=TextBox.H*0.5f;
-      TextBox.X -=TextBox.W*0.5f;
 
       v4 Color = V4(0,0,0.5f,1);
       if(MenuItemIdx == HotMenuItem)
@@ -424,7 +425,15 @@ void DebugMainWindow(game_input* GameInput)
         Color = V4(0,0.5f,0,1);
       }
 
+      #if 0
       DEBUGPushQuad(GlobalDebugRenderGroup, TextBox, Color);
+      #else
+      rect2f TexQuad = Rect2f(0,0,1,1);
+      //TextBox
+      //r32 X0 = Rect.X + Rect.W/2.f;
+      //r32 Y0 = Rect.Y + Rect.H/2.f;
+      DEBUGPushQuad(GlobalDebugRenderGroup, TextBox, TexQuad, Color, 0);
+      #endif
       DEBUGTextOutAt(TextPosX-TextBox.W*0.5f, TextPosY-TextBox.H*0.5f, GlobalDebugRenderGroup, MenuItems[MenuItemIdx]);
     }
   }
@@ -435,20 +444,30 @@ void DebugMainWindow(game_input* GameInput)
     DebugState->HotMenuItem = HotMenuItem;
   }
 
+  // "Toggle Multi Threaded",
   if(RightButtonReleased && DebugState->HotMenuItem == 0)
   {
     DebugState->ConfigMultiThreaded = !DebugState->ConfigMultiThreaded;
     DebugState->UpdateConfig = true;
   }
 
+  // "Toggle Show"
   if(RightButtonReleased && DebugState->HotMenuItem == 1)
   {
      DebugState->ChartVisible = !DebugState->ChartVisible;
   }
 
+  // "Toggle Pause"
   if(RightButtonReleased && DebugState->HotMenuItem == 2)
   {
     TogglePause(DebugState);
+  }
+
+  // "Toggle Collision Points"
+  if(RightButtonReleased && DebugState->HotMenuItem == 3)
+  {
+    DebugState->ConfigCollisionPoints = !DebugState->ConfigCollisionPoints;
+    DebugState->UpdateConfig = true;
   }
 
 }
@@ -533,13 +552,17 @@ void PushDebugOverlay(game_input* GameInput)
       r32 MaxX = StackX + LaneScale*Region->MaxT;
       r32 MinY = StackY + LaneWidth*Region->LaneIndex;
       r32 MaxY = MinY + LaneWidth;
-      rect2f Rect = {}; 
+      rect2f Rect = {};
       Rect.X = MinX;
       Rect.Y = MinY;
       Rect.W = MaxX-MinX;
       Rect.H = (MaxY-MinY)*0.9f;
-      
-      DEBUGPushQuad(GlobalDebugRenderGroup, Rect, Color);
+
+      rect2f TexQuad = Rect2f(0,0,1,1);
+      rect2f Rect2 = Rect;
+      Rect2.X += Rect2.W/2.f;
+      Rect2.Y += Rect2.H/2.f;
+      DEBUGPushQuad(GlobalDebugRenderGroup, Rect2, TexQuad, Color, 0);
 
       if((GameInput->MouseX >= Rect.X) && (GameInput->MouseX <= Rect.X+Rect.W) &&
          (GameInput->MouseY >= Rect.Y) && (GameInput->MouseY <= Rect.Y+Rect.H))
@@ -556,7 +579,6 @@ void PushDebugOverlay(game_input* GameInput)
     }
   }
 
-  
   if(GameInput->MouseButton[PlatformMouseButton_Left].Pushed)
   {
     if((GameInput->MouseX >= 0) && (GameInput->MouseX <= AspectRatio) &&

@@ -36,7 +36,7 @@ struct collider_mesh
 
 struct mesh_indeces
 {
-  u32 MeshIndex;
+  u32 MeshHandle;
   u32 Count;  // 3 times Nr Triangles
   u32* vi;    // Vertex Indeces
   u32* ti;    // Texture Indeces
@@ -50,7 +50,22 @@ struct material
   v4 DiffuseColor;
   v4 SpecularColor;
   r32 Shininess;
+  u32 TextureHandle;
   bitmap* DiffuseMap;
+};
+
+struct stb_font_map
+{
+  s32 StartChar;
+  s32 NumChars;
+  r32 FontHeightPx;
+
+  r32 Ascent;
+  r32 Descent;
+  r32 LineGap;
+
+  u32 BitmapHandle;
+  stbtt_bakedchar* CharData;
 };
 
 struct game_asset_manager
@@ -63,12 +78,18 @@ struct game_asset_manager
   u32 MeshCount;
   mesh_data* MeshData;
 
+  u32 MaxTextureCount;
+  u32 TextureCount;
+  bitmap* Textures;
+
   u32 MaxMaterialCount;
   u32 MaterialCount;
   material* Materials;
 
   book_keeper* ObjectKeeper;
-  book_keeper* MaterialKeeper;
+  book_keeper* TextureKeeper;
+
+  stb_font_map FontMap;
 
   memory_arena* AssetArena;
 };
@@ -88,11 +109,54 @@ void LoadPredefinedMaterials( game_state* State )
 //       TextureIndex and MeshIndex are to be replaced later with enums or
 //       strings or tags or something more human readable but still hardcoded.
 u32 GetTextureAssetHandle( u32 TextureIndex );
+
 u32 GetMeshAssetHandle( u32 MeshIndex );
 collider_mesh GetColliderMesh(u32 MeshHandle);
 void RemoveRenderAsset( component_render* RenderComponent);
 aabb3f GetMeshAABB(u32 MeshHandle);
 
+inline game_asset_manager* GetAssetManager();
+
+// Getters, Todo: Find a more elegant interface.
+// Im isolating getters now because later the handle
+// will not be the same as its array index.
+// And I don't wanna change code in 200 different places
+inline material*
+GetMaterial(game_asset_manager* AssetManager, u32 Handle )
+{
+  Assert(Handle < AssetManager->MaterialCount);
+  return AssetManager->Materials + Handle;
+}
+inline bitmap*
+GetTexture(game_asset_manager* AssetManager, u32 Handle )
+{
+  Assert(Handle < AssetManager->TextureCount);
+  return AssetManager->Textures + Handle;
+}
+inline book_keeper*
+GetTextureKeeper(game_asset_manager* AssetManager, u32 Handle )
+{
+  Assert(Handle < AssetManager->TextureCount);
+  return AssetManager->TextureKeeper + Handle;
+}
+inline mesh_indeces*
+GetObject(game_asset_manager* AssetManager, u32 Handle )
+{
+  Assert(Handle < AssetManager->ObjectCount);
+  return AssetManager->Objects + Handle;
+}
+inline book_keeper*
+GetObjectKeeper(game_asset_manager* AssetManager, u32 Handle )
+{
+  Assert(Handle < AssetManager->ObjectCount);
+  return AssetManager->ObjectKeeper + Handle;
+}
+inline mesh_data*
+GetMeshData(game_asset_manager* AssetManager, u32 Handle )
+{
+  Assert(Handle < AssetManager->MeshCount);
+  return AssetManager->MeshData + Handle;
+}
 
 enum MATERIAL_TYPE
 {

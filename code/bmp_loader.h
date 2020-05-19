@@ -81,6 +81,7 @@ DEBUGReadBMP(thread_context* Thread, game_state* aGameState,
     Result.Pixels = PushArray(Arena, Header->Width*Header->Height, u32);
     Result.Width = Header->Width;
     Result.Height = Header->Height;
+    Result.BPP = Header->BitsPerPixel;
 
     u32* Target = (u32*)Result.Pixels;
     u32* Source = (u32*)(((u8*)ReadResult.Contents) + Header->FileSize - 4);

@@ -1,1 +1,2 @@
-#define MULTI_THREADED 1 // b32
+#define MULTI_THREADED 0 // b32
+#define SHOW_COLLISION_POINTS 0 // b32

@@ -27,35 +27,24 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup)
   return NewEntryHeader;
 }
 
-void DEBUGPushQuad(render_group* RenderGroup, rect2f Rect, v4 Color = V4(1,1,1,1))
-
+void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRect, v4 Color, u32 TextureHandle)
 {
-  #if 0
+  const m4 TextureTranslate = GetTranslationMatrix(V4(TextureRect.X,TextureRect.Y,0,1));
+  const m4 TextureScale     = GetScaleMatrix(V4(TextureRect.W, TextureRect.H,1,0));
+  const m4 QuadTranslate    = GetTranslationMatrix(V4(QuadRect.X, QuadRect.Y,0,1));
+  const m4 QuadScale        = GetScaleMatrix(V4(QuadRect.W, QuadRect.H,1,0));
+
   push_buffer_header* Header = PushNewHeader( RenderGroup );
-  Header->Type = render_buffer_entry_type::ASSET_TEST;
+  Header->Type = render_buffer_entry_type::OVERLAY_QUAD;
   Header->RenderState = RENDER_STATE_FILL;
 
-  entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
-  Body->MeshHandle = 0; // This is a QUAD
-  Body->TextureHandle = MATERIAL_BLUE;
-  Body->M  = GetModelMatrix( A->SpatialComponent ) * GetTranslationMatrix(Manifold->Contacts[j].A_ContactModelSpace);
-  Body->NM = Transpose(RigidInverse(Body->M));
-  #else
-  component_surface* Surface = PushStruct(&RenderGroup->Arena, component_surface);
-  Surface->Material = PushStruct(&RenderGroup->Arena, material);
-  Surface->Material->AmbientColor = Color;
+  entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);
 
-  push_buffer_header*  Header = PushNewHeader( RenderGroup );
-  Header->Type = render_buffer_entry_type::PRIMITIVE;
-  Header->RenderState = RENDER_STATE_FILL;
-  entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
-  Body->PrimitiveType = primitive_type::QUAD;
-  Body->Surface = Surface;
-  Body->TM = M4Identity();
-  r32 X0 = Rect.X + Rect.W/2.f;
-  r32 Y0 = Rect.Y + Rect.H/2.f;
-  Body->M  = GetTranslationMatrix(V4(X0, Y0,0,1)) * GetScaleMatrix(V4(Rect.W, Rect.H,1,0));
-  #endif
+  Body->MeshHandle = 0; // Quad
+  Body->Colour = Color;
+  Body->TextureHandle = TextureHandle;
+  Body->M  = QuadTranslate * QuadScale;
+  Body->TM = TextureTranslate * TextureScale;
 }
 
 component_surface* PushNewSurface(render_group* RenderGroup, bitmap* BitMap, u32 ColorEnum)
@@ -81,7 +70,7 @@ void PushTexturedQuad(render_group* RenderGroup, rect2f QuadRect, rect2f Texture
 
   entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
   Body->MeshHandle = 0; // This is a QUAD
-  Body->TextureHandle = MATERIAL_BLUE;
+  Body->MaterialHandle = MATERIAL_BLUE;
   Body->M  = QuadTranslate * QuadScale;
   Body->NM = Transpose(RigidInverse(Body->M));
   Body->TM = TextureTranslate * TextureScale
@@ -100,7 +89,7 @@ void PushTexturedQuad(render_group* RenderGroup, rect2f QuadRect, rect2f Texture
 
 rect2f DEBUGTextSize(r32 x, r32 y, render_group* RenderGroup, c8* String)
 {
-  stb_font_map* FontMap = &RenderGroup->Assets->STBFontMap;
+  stb_font_map* FontMap = &GetAssetManager()->FontMap;
 
   const r32 ScreenScaleFactor = 1.f / RenderGroup->ScreenHeight;
 
@@ -162,14 +151,14 @@ void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* Str
 {
   r32 PixelPosX = CanPosX*RenderGroup->ScreenHeight;
   r32 PixelPosY = CanPosY*RenderGroup->ScreenHeight;
-  stb_font_map* FontMap = &RenderGroup->Assets->STBFontMap;
-  component_surface* BitMapFont = PushNewSurface(RenderGroup, &FontMap->BitMap, MATERIAL_WHITE);
+  stb_font_map* FontMap = &GetAssetManager()->FontMap;
+  bitmap* BitMap = GetTexture(GetAssetManager(), FontMap->BitmapHandle);
   stbtt_aligned_quad Quad  = {};
 
   const r32 ScreenScaleFactor = 1.f / RenderGroup->ScreenHeight;
 
-  const r32 Ks = 1.f / FontMap->BitMap.Width;
-  const r32 Kt = 1.f / FontMap->BitMap.Height;
+  const r32 Ks = 1.f / BitMap->Width;
+  const r32 Kt = 1.f / BitMap->Height;
 
   while (*String != '\0')
   {
@@ -182,7 +171,8 @@ void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* Str
       GlyphOffset.Y *= ScreenScaleFactor;
       GlyphOffset.W *= ScreenScaleFactor;
       GlyphOffset.H *= ScreenScaleFactor;
-      PushTexturedQuad(RenderGroup, GlyphOffset, TextureRect,  BitMapFont );
+      //PushTexturedQuad(RenderGroup, GlyphOffset, TextureRect,  FontMap->BitmapHandle );
+      DEBUGPushQuad(RenderGroup, GlyphOffset, TextureRect, V4(1,1,1,1),  FontMap->BitmapHandle);
     }
     PixelPosX += CH->xadvance;
     ++String;
@@ -193,7 +183,7 @@ void DEBUGAddTextSTB(c8* String, r32 LineNumber)
 {
   TIMED_FUNCTION();
   render_group* RenderGroup = GlobalDebugRenderGroup;
-  stb_font_map* FontMap = &RenderGroup->Assets->STBFontMap;
+  stb_font_map* FontMap = &GetAssetManager()->FontMap;
   r32 CanPosX = 1/100.f;
   r32 CanPosY = 1 - ((LineNumber+1) * FontMap->Ascent - LineNumber*FontMap->Descent)/RenderGroup->ScreenHeight;
   DEBUGTextOutAt(CanPosX, CanPosY, RenderGroup, String);
@@ -268,10 +258,23 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
       Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
       entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
       Body->MeshHandle = Entity->RenderComponent->MeshHandle;
-      Body->TextureHandle = Entity->RenderComponent->TextureHandle;
+      Body->MaterialHandle = Entity->RenderComponent->TextureHandle;
       Body->M  = GetModelMatrix(Entity->SpatialComponent);
       Body->NM = Transpose(RigidInverse(Body->M));
       Body->TM = M4Identity();
+    }
+
+    if( Entity->Types & COMPONENT_TYPE_COLLIDER  )
+    {
+      push_buffer_header* Header = PushNewHeader( RenderGroup );
+      Header->Type = render_buffer_entry_type::ASSET_TEST;
+      Header->RenderState = RENDER_STATE_WIREFRAME;
+
+      entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
+      Body->MeshHandle = Entity->RenderComponent->MeshHandle;
+      Body->MaterialHandle = MATERIAL_JADE;
+      Body->M  = GetModelMatrix(Entity->SpatialComponent);
+      Body->NM = Transpose(RigidInverse(Body->M));
     }
     #if 0
     if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
@@ -314,21 +317,6 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
         Body->M = GetModelMatrix(Entity->SpatialComponent);
       }
     }
-    #endif
-
-    if( Entity->Types & COMPONENT_TYPE_COLLIDER  )
-    {
-      push_buffer_header* Header = PushNewHeader( RenderGroup );
-      Header->Type = render_buffer_entry_type::ASSET_TEST;
-      Header->RenderState = RENDER_STATE_WIREFRAME;
-
-      entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
-      Body->MeshHandle = Entity->RenderComponent->MeshHandle;
-      Body->TextureHandle = MATERIAL_JADE;
-      Body->M  = GetModelMatrix(Entity->SpatialComponent);
-      Body->NM = Transpose(RigidInverse(Body->M));
-    }
-    #if 0
     if( GlobalVis )
     {
       gjk_epa_visualizer* Vis = GlobalVis;
@@ -535,20 +523,7 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
     #endif
   }
 
-  component_surface* GreenSurface = PushStruct(&RenderGroup->Arena, component_surface);
-  GreenSurface->Material = PushStruct(&RenderGroup->Arena, material);
-  SetMaterial(GreenSurface->Material, MATERIAL_GREEN);
-  component_surface* RedSurface = PushStruct(&RenderGroup->Arena, component_surface);
-  RedSurface->Material = PushStruct(&RenderGroup->Arena, material);
-  SetMaterial(RedSurface->Material, MATERIAL_RED);
-
-  component_surface* BlueSurface = PushStruct(&RenderGroup->Arena, component_surface);
-  BlueSurface->Material = PushStruct(&RenderGroup->Arena, material);
-  SetMaterial(BlueSurface->Material, MATERIAL_BLUE);
-  component_surface* WhiteSurface = PushStruct(&RenderGroup->Arena, component_surface);
-  WhiteSurface->Material = PushStruct(&RenderGroup->Arena, material);
-  SetMaterial(WhiteSurface->Material, MATERIAL_WHITE);
-
+  #if SHOW_COLLISION_POINTS
   contact_manifold* Manifold = World->FirstContactManifold;
   while(Manifold)
   {
@@ -557,76 +532,46 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
     entity* B = Manifold->B;
     for( u32 j = 0; j <Manifold->ContactCount; ++j)
     {
-      #if 0
       {
-        push_buffer_header* Header = PushNewHeader( RenderGroup );
-        Header->Type = render_buffer_entry_type::PRIMITIVE;
-        Header->RenderState = RENDER_STATE_POINTS;
-        entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
-        Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].A_ContactWorldSpace,1));
-        Body->TM = M4Identity();
-        Body->PrimitiveType = primitive_type::POINT;
-        Body->Surface = RedSurface;
-      }
-      {
-        push_buffer_header* Header = PushNewHeader( RenderGroup );
-        Header->Type = render_buffer_entry_type::PRIMITIVE;
-        Header->RenderState = RENDER_STATE_POINTS;
-        entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
-        Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].B_ContactWorldSpace,1));
-        Body->TM = M4Identity();
-        Body->PrimitiveType = primitive_type::POINT;
-        Body->Surface = GreenSurface;
-      }
-      #endif
-      {
-        #if 0
         push_buffer_header* Header = PushNewHeader( RenderGroup );
         Header->Type = render_buffer_entry_type::ASSET_TEST;
         Header->RenderState = RENDER_STATE_FILL;
 
         entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
-        Body->MeshHandle = 0; // This is a QUAD
-        Body->TextureHandle = MATERIAL_BLUE;
-        Body->M  = GetModelMatrix( A->SpatialComponent ) * GetTranslationMatrix(Manifold->Contacts[j].A_ContactModelSpace);
-        Body->NM = Transpose(RigidInverse(Body->M));
+        Body->MeshHandle = 1; // This is a Voxel
+        Body->MaterialHandle = MATERIAL_BLUE;
+
+        const m4 Rotation = GetRotationMatrix(A->SpatialComponent->Rotation);
+        const m4 Translation = GetTranslationMatrix(A->SpatialComponent->Position);
+        const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
+        #if 0
+        Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].A_ContactWorldSpace,1))*Scale;
         #else
-        push_buffer_header* Header = PushNewHeader( RenderGroup );
-        Header->Type = render_buffer_entry_type::PRIMITIVE;
-        Header->RenderState = RENDER_STATE_POINTS;
-        entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
-        Body->M = GetModelMatrix( A->SpatialComponent ) * GetTranslationMatrix(Manifold->Contacts[j].A_ContactModelSpace);
-        //Body->M = GetTranslationMatrix( Manifold->Contacts[j].A_ContactWorldSpace);
-        Body->TM = M4Identity();
-        Body->PrimitiveType = primitive_type::POINT;
-        Body->Surface = BlueSurface;
+        Body->M  = Translation*GetTranslationMatrix(Manifold->Contacts[j].A_ContactModelSpace)*Rotation*Scale;
         #endif
+        Body->NM = Transpose(RigidInverse(Body->M));
       }
       {
-        #if 0
         push_buffer_header* Header = PushNewHeader( RenderGroup );
         Header->Type = render_buffer_entry_type::ASSET_TEST;
         Header->RenderState = RENDER_STATE_FILL;
 
         entry_type_asset_test* Body = PushStruct(&RenderGroup->Arena, entry_type_asset_test);
-        Body->MeshHandle = 0; // This is a QUAD
-        Body->TextureHandle = MATERIAL_WHITE;
-        Body->M  = GetModelMatrix( B->SpatialComponent ) * GetTranslationMatrix(Manifold->Contacts[j].B_ContactModelSpace);
-        Body->NM = Transpose(RigidInverse(Body->M));
+        Body->MeshHandle = 1; // This is a Voxel
+        Body->MaterialHandle = MATERIAL_WHITE;
+
+        const m4 Rotation = GetRotationMatrix(B->SpatialComponent->Rotation);
+        const m4 Translation = GetTranslationMatrix(B->SpatialComponent->Position);
+        const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
+        #if 0
+        Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].B_ContactWorldSpace,1))*Scale;
         #else
-        push_buffer_header* Header = PushNewHeader( RenderGroup );
-        Header->Type = render_buffer_entry_type::PRIMITIVE;
-        Header->RenderState = RENDER_STATE_POINTS;
-        entry_type_primitive* Body = PushStruct(&RenderGroup->Arena, entry_type_primitive);
-        Body->M = GetModelMatrix( B->SpatialComponent ) * GetTranslationMatrix(Manifold->Contacts[j].B_ContactModelSpace);
-        //Body->M = GetTranslationMatrix( Manifold->Contacts[j].B_ContactWorldSpace);
-        Body->TM = M4Identity();
-        Body->PrimitiveType = primitive_type::POINT;
-        Body->Surface = WhiteSurface;
+        Body->M  =  Translation*GetTranslationMatrix(Manifold->Contacts[j].B_ContactModelSpace)*Rotation*Scale;
         #endif
+        Body->NM = Transpose(RigidInverse(Body->M));
       }
     }
     Manifold = Manifold->Next;
   }
-
+  #endif
 }

@@ -28,26 +28,10 @@ v2s32 V2S32(s32 i, s32 j)
   return Result;
 }
 
-struct stb_font_map
-{
-  s32 StartChar;
-  s32 NumChars;
-  r32 FontHeightPx;
-
-  r32 Ascent;
-  r32 Descent;
-  r32 LineGap;
-
-  bitmap BitMap;
-  stbtt_bakedchar* CharData;
-};
-
-
 struct game_assets
 {
   sprite_sheet TileMapSpriteSheet;
   sprite_sheet HeroSpriteSheet;
-  stb_font_map STBFontMap;
 };
 
 struct contact_manifold;

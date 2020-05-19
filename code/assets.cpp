@@ -46,24 +46,26 @@ void InitPredefinedMaterials(game_asset_manager* AssetManager)
 
   Assert(AssetManager->MaterialCount + ArrayCount(mtl) < AssetManager->MaxMaterialCount);
   u8 WhitePixel[4] = {255,255,255,255};
+
+  u32 EmptyTextureIndex = AssetManager->TextureCount++;
+  bitmap* EmptyBitmap = AssetManager->Textures + EmptyTextureIndex;
+  EmptyBitmap->BPP  = 32;
+  EmptyBitmap->Width  = 1;
+  EmptyBitmap->Height = 1;
+  EmptyBitmap->Pixels = PushCopy(AssetManager->AssetArena, sizeof(WhitePixel), WhitePixel);
+  book_keeper* TextureKeeper = (AssetManager->TextureKeeper + EmptyTextureIndex);
+  *TextureKeeper = {};
+
+
   for(u32 MaterialIndex = 0; MaterialIndex < ArrayCount(mtl); ++MaterialIndex)
   {
     material* DstMaterial = (AssetManager->Materials + MaterialIndex);
     *DstMaterial = mtl[MaterialIndex];
-
     // Todo: Split color from texture. I wanna be able to freely specify a colour without having to
     //       pre-create it here.
     //       Also, maybe only have 1 empty texture that gets used?
-    bitmap* EmptyBitmap = PushStruct(AssetManager->AssetArena, bitmap);
-    EmptyBitmap->BPP  = 32;
-    EmptyBitmap->Width  = 1;
-    EmptyBitmap->Height = 1;
-    EmptyBitmap->Pixels = PushCopy(AssetManager->AssetArena, sizeof(WhitePixel), WhitePixel);
 
-    DstMaterial->DiffuseMap = EmptyBitmap;
-
-    book_keeper* MaterialKeeper = (AssetManager->MaterialKeeper + MaterialIndex);
-    *MaterialKeeper = {};
+    DstMaterial->TextureHandle = EmptyTextureIndex;
 
     ++AssetManager->MaterialCount;
   }
@@ -107,7 +109,7 @@ void InitPredefinedMeshes(game_asset_manager* AssetManager)
 
     u32 ObjectIndex = AssetManager->ObjectCount++;
     mesh_indeces* Indeces = AssetManager->Objects + ObjectIndex;
-    Indeces->MeshIndex = MeshIndex;
+    Indeces->MeshHandle = MeshIndex;
     Indeces->Count  = ArrayCount(vi);
     Indeces->vi = (u32*) PushCopy(AssetManager->AssetArena, sizeof(vi), vi);
     Indeces->ti = (u32*) PushCopy(AssetManager->AssetArena, sizeof(ti), ti);
@@ -162,7 +164,7 @@ void InitPredefinedMeshes(game_asset_manager* AssetManager)
 
     u32 ObjectIndex = AssetManager->ObjectCount++;
     mesh_indeces* Indeces = AssetManager->Objects + ObjectIndex;
-    Indeces->MeshIndex = MeshIndex;
+    Indeces->MeshHandle = MeshIndex;
     Indeces->Count  = ArrayCount(vi);
     Indeces->vi = (u32*) PushCopy(AssetManager->AssetArena, sizeof(vi), vi);
     Indeces->ti = (u32*) PushCopy(AssetManager->AssetArena, sizeof(ti), ti);
@@ -173,9 +175,10 @@ void InitPredefinedMeshes(game_asset_manager* AssetManager)
 }
 
 
+
+
 void InitiateAssetManager(game_state* State)
 {
-
   if(!GlobalAssetManager)
   {
     State->AssetManager = PushStruct( &State->AssetArena, game_asset_manager);
@@ -197,7 +200,12 @@ void InitiateAssetManager(game_state* State)
     State->AssetManager->MaterialCount = 0;
     State->AssetManager->Materials = PushArray( State->AssetManager->AssetArena,
                                               State->AssetManager->MaxMaterialCount, material);
-    State->AssetManager->MaterialKeeper = PushArray(State->AssetManager->AssetArena,
+
+    State->AssetManager->MaxTextureCount = 64;
+    State->AssetManager->TextureCount = 0;
+    State->AssetManager->Textures = PushArray( State->AssetManager->AssetArena,
+                                               State->AssetManager->MaxTextureCount, bitmap);
+    State->AssetManager->TextureKeeper = PushArray(State->AssetManager->AssetArena,
                                               State->AssetManager->MaxMaterialCount, book_keeper);
 
     InitPredefinedMaterials(State->AssetManager);
@@ -207,7 +215,76 @@ void InitiateAssetManager(game_state* State)
   }
 }
 
-static inline game_asset_manager*
+
+internal void STBBakeFont(game_asset_manager* AssetManager)
+{
+  const s32 Ranges[] =
+  {
+      0x20, 0x80,       // BasicLatin
+      0xA1, 0x100,      // ExtendedLatin
+      0x16A0, 0x1700,   // Runic
+      0x600, 0x700,     // Arabic
+      0x370, 0x400,     // Greek
+      0x2200, 0x2300    // Mathematical
+  };
+
+  thread_context Thread;
+  //debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\courbd.ttf");
+  debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\arial.ttf");
+  //debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\ITCEDSCR.ttf");
+
+  Assert(TTFFile.Contents);
+  stb_font_map* FontMap = &AssetManager->FontMap;
+  FontMap->StartChar = Ranges[0];
+  FontMap->NumChars = Ranges[1] - Ranges[0];
+  FontMap->FontHeightPx = 24.f;
+  FontMap->CharData = PushArray(AssetManager->AssetArena, FontMap->NumChars, stbtt_bakedchar);
+
+  stbtt_GetScaledFontVMetrics((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
+   FontMap->FontHeightPx, &FontMap->Ascent, &FontMap->Descent, &FontMap->LineGap);
+
+FontMap->BitmapHandle = AssetManager->TextureCount++;
+  bitmap* Atlas = AssetManager->Textures + FontMap->BitmapHandle;
+
+
+  // Todo: Insetead of saving the 8bit font map to a 32 bit, write a custom shader for the 8bit 
+  //       texture that can render it with colour.
+  Atlas->BPP = 32;
+  Atlas->Width = 1028;
+  Atlas->Height = 1028;
+  Atlas->Pixels = (void*) PushArray(AssetManager->AssetArena, Atlas->Width * Atlas->Height, u32);
+  
+  temporary_memory TempMem = BeginTemporaryMemory(AssetManager->AssetArena);
+  u8* TmpPixels = PushArray(AssetManager->AssetArena, Atlas->Width * Atlas->Height, u8);
+
+  s32 ret = stbtt_BakeFontBitmap((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
+                       FontMap->FontHeightPx,
+                       TmpPixels, Atlas->Width, Atlas->Height,
+                       FontMap->StartChar, FontMap->NumChars,
+                       FontMap->CharData);
+  Assert(ret>0);
+
+  u32* Pixel = (u32*) Atlas->Pixels;
+  u8*  SrcPixel =  TmpPixels;
+  u8*  EndSrcPixel = TmpPixels + Atlas->Width * Atlas->Height;
+  while(SrcPixel != EndSrcPixel)
+  {
+    u8 Alpha = *SrcPixel;
+    u8 Blue = *SrcPixel;
+    u8 Green = *SrcPixel;
+    u8 Red = *SrcPixel;
+    u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
+    *Pixel++ = PixelData;
+    SrcPixel++;
+  }
+  
+  EndTemporaryMemory(TempMem);
+
+  Platform.DEBUGPlatformFreeFileMemory(&Thread, TTFFile.Contents);
+}
+
+
+inline game_asset_manager*
 GetAssetManager()
 {
   Assert(GlobalAssetManager);
@@ -237,7 +314,7 @@ void LoadCubeAsset( game_state* State)
     u32 ObjectIndex = AssetManager->ObjectCount++;
     mesh_indeces* DstObject = AssetManager->Objects + ObjectIndex;
 
-    DstObject->MeshIndex = MeshIndex;
+    DstObject->MeshHandle = MeshIndex;
     DstObject->AABB = LoadedObjectGroup->aabb;
     DstObject->Count = LoadedObjectGroup->Indeces->Count;
     DstObject->vi = LoadedObjectGroup->Indeces->vi;
@@ -250,13 +327,22 @@ void LoadCubeAsset( game_state* State)
     mtl_material* SrcMaterial = LoadedObjFile->MaterialData->Materials + i;
 
     u32 MaterialIndex = AssetManager->MaterialCount++;
+
     material* DstMaterial = AssetManager->Materials + MaterialIndex;
 
     DstMaterial->AmbientColor  = SrcMaterial->Ka ? *SrcMaterial->Ka : V4(1,1,1,1);
     DstMaterial->DiffuseColor  = SrcMaterial->Kd ? *SrcMaterial->Kd : V4(1,1,1,1);
     DstMaterial->SpecularColor = SrcMaterial->Ks ? *SrcMaterial->Ks : V4(1,1,1,1);
     DstMaterial->Shininess     = SrcMaterial->Ns ? *SrcMaterial->Ns : 1;
-    DstMaterial->DiffuseMap    = SrcMaterial->MapKd;
+
+    u32 TextureIndex = 0;
+    if(SrcMaterial->MapKd)
+    {
+      TextureIndex = AssetManager->TextureCount++;
+      bitmap* Texture = AssetManager->Textures + TextureIndex;
+      *Texture    = *SrcMaterial->MapKd;
+    }
+    DstMaterial->TextureHandle = TextureIndex;
   }
 }
 
@@ -266,50 +352,46 @@ u32 GetMeshAssetHandle( u32 MeshIndex )
   Assert(MeshIndex < AssetManager->ObjectCount);
   mesh_indeces* Object = AssetManager->Objects + MeshIndex;
   AssetManager->ObjectKeeper[MeshIndex].ReferenceCount++;
-  Assert(Object->MeshIndex < AssetManager->MeshCount);
+  Assert(Object->MeshHandle < AssetManager->MeshCount);
   return MeshIndex;
 }
 
-aabb3f GetMeshAABB(u32 MeshHandle)
+aabb3f GetMeshAABB(u32 ObjectHandle)
 {
   game_asset_manager* AssetManager = GetAssetManager();
-  Assert(MeshHandle < AssetManager->ObjectCount);
-  aabb3f Result = (AssetManager->Objects+MeshHandle)->AABB;
+  aabb3f Result = GetObject(AssetManager,ObjectHandle)->AABB;
   return Result;
 }
 
-collider_mesh GetColliderMesh(u32 MeshHandle)
+collider_mesh GetColliderMesh(u32 ObjectHandle)
 {
   collider_mesh Result = {};
   game_asset_manager* AssetManager = GetAssetManager();
-  mesh_indeces* Indeces =  AssetManager->Objects + MeshHandle;
-  mesh_data* Data =  AssetManager->MeshData + Indeces->MeshIndex;
+  mesh_indeces* Indeces =  GetObject(AssetManager, ObjectHandle);
+  mesh_data* Data =  GetMeshData(AssetManager, Indeces->MeshHandle);
   Result.nv = Data->nv;
   Result.v = Data->v;
   Result.nvi = Indeces->Count;
   Result.vi = Indeces->vi;
   return Result;
 }
-u32 GetTextureAssetHandle( u32 TextureIndex )
+u32 GetTextureAssetHandle( u32 MaterialHandle )
 {
   game_asset_manager* AssetManager = GetAssetManager();
-  Assert(TextureIndex < AssetManager->MaterialCount);
-  material* Material = AssetManager->Materials + TextureIndex;
-  AssetManager->MaterialKeeper[TextureIndex].ReferenceCount++;
-  return TextureIndex;
+  material* Material = GetMaterial(AssetManager, MaterialHandle);
+  GetTextureKeeper(AssetManager, Material->TextureHandle)->ReferenceCount++;
+  return MaterialHandle;
 }
 
-void RemoveMeshAsset(u32 MeshHandle)
+void RemoveMeshAsset(u32 ObjectHandle)
 {
   game_asset_manager* AssetManager = GetAssetManager();
-  Assert(MeshHandle < AssetManager->ObjectCount);
-  mesh_indeces* Object = AssetManager->Objects + MeshHandle;
-  AssetManager->ObjectKeeper[MeshHandle].ReferenceCount--;
+  mesh_indeces* Object = GetObject(AssetManager, ObjectHandle);
+  GetObjectKeeper(AssetManager, ObjectHandle)->ReferenceCount--;
 }
-void RemoveTextureAsset(u32 TextureHandle)
+void RemoveTextureAsset(u32 MaterialHandle)
 {
   game_asset_manager* AssetManager = GetAssetManager();
-  Assert(TextureHandle < AssetManager->MaterialCount);
-  material* Material = AssetManager->Materials + TextureHandle;
-  AssetManager->MaterialKeeper[TextureHandle].ReferenceCount--;
+  material* Material = GetMaterial(AssetManager, MaterialHandle);
+  GetTextureKeeper(AssetManager, Material->TextureHandle)->ReferenceCount--;
 }
