@@ -6,11 +6,9 @@
 #include "component_camera.h"
 #include "component_controller.h"
 #include "component_light.h"
-#include "component_mesh.h"
 #include "component_spatial.h"
 #include "component_collider.h"
 #include "component_dynamics.h"
-#include "component_surface.h"
 #include "component_sprite_animation.h"
 
 void NewComponents( world* World, entity* Entity, u32 EntityFlags )
@@ -32,10 +30,6 @@ void NewComponents( world* World, entity* Entity, u32 EntityFlags )
 	{
 		Entity->ControllerComponent = PushStruct(World->PersistentArena, component_controller);
 	}
-	if( EntityFlags & COMPONENT_TYPE_MESH )
-	{
-		Entity->MeshComponent =  PushStruct(World->PersistentArena, component_mesh);
-	}
 	if( EntityFlags & COMPONENT_TYPE_SPATIAL )
 	{
 		Entity->SpatialComponent =  PushStruct(World->PersistentArena, component_spatial);
@@ -49,10 +43,6 @@ void NewComponents( world* World, entity* Entity, u32 EntityFlags )
 	{
 		Assert(Entity->SpatialComponent && Entity->ColliderComponent); // Dynamics Requires Spatial and Collision
 		Entity->DynamicsComponent = PushStruct(World->PersistentArena, component_dynamics);
-	}
-	if( EntityFlags & COMPONENT_TYPE_SURFACE )
-	{
-		Entity->SurfaceComponent = PushStruct(World->PersistentArena, component_surface);
 	}
 	if( EntityFlags & COMPONENT_TYPE_SPRITE_ANIMATION )
 	{

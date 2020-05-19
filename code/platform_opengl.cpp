@@ -1,13 +1,7 @@
 
 #include "render_push_buffer.h"
 #include "math/affine_transformations.h"
-#include "component_mesh.h"
-#include "component_surface.h"
-#include "component_collider.h"
-#include "component_camera.h"
-#include "string.h"
 #include "bitmap.h"
-#include "assets.h"
 
 global_variable u32 TextureBindCount = 0;
 
@@ -442,90 +436,6 @@ void OpenGLSetViewport( r32 ViewPortAspectRatio, s32 WindowWidth, s32 WindowHeig
 
 }
 
-internal void
-LoadOrBindTexture( memory_arena* TemporaryMemory, bitmap* Bitmap )
-{
-  temporary_memory TempMem = BeginTemporaryMemory(TemporaryMemory);
-  local_persist bitmap EmptyBitmap = {};
-  u8 WhitePixel[4] = {255,255,255,255};
-  EmptyBitmap.BPP  = 32;
-  EmptyBitmap.Width  = 1;
-  EmptyBitmap.Height = 1;
-  EmptyBitmap.Pixels = (void*) WhitePixel;
-
-  bitmap* RenderTarget = Bitmap ? Bitmap : &EmptyBitmap;
-  if(!RenderTarget->Handle)
-  {
-    // Generate a texture slot
-    glGenTextures(1, &RenderTarget->Handle);
-
-    // Enable texture slot
-    glBindTexture( GL_TEXTURE_2D, RenderTarget->Handle );
-
-    // Set texture environment state:
-    // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
-
-    // Parameters set with glTexParameter affects the currently bound texture object,
-    // and stays with the texture object until changed.
-
-    // How to resize textures
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-
-    // Wrapping textures, (Mirror. Repeat border color, clamp, repeat etc... )
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT );
-
-    // Send a Texture to GPU referenced to the enabled texture slot
-    if(RenderTarget->BPP == 8)
-    {
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-      #if 1
-      //  Code for transforming an 8-bit texture to a 32 bit mono-color texture
-      u8* BitmapMemory = (u8*) PushArray(TemporaryMemory, RenderTarget->Width * RenderTarget->Height, u32);
-      u32* Pixel = (u32*) BitmapMemory;
-      u8*  SrcPixel =  (u8*) RenderTarget->Pixels;
-      u8*  EndSrcPixel = ((u8*) RenderTarget->Pixels)+ RenderTarget->Width * RenderTarget->Height;
-      while(SrcPixel != EndSrcPixel)
-      {
-        u8 Alpha = *SrcPixel;
-        u8 Blue = *SrcPixel;
-        u8 Green = *SrcPixel;
-        u8 Red = *SrcPixel;
-        u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
-        *Pixel++ = PixelData;
-        SrcPixel++;
-      }
-
-      glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
-        RenderTarget->Width,  RenderTarget->Height,
-        0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
-        BitmapMemory);
-#else
-      glTexImage2D( GL_TEXTURE_2D,  0, GL_ALPHA,
-        RenderTarget->Width,  RenderTarget->Height,
-        0, GL_ALPHA, GL_UNSIGNED_BYTE,
-        RenderTarget->Pixels);
-#endif
-  	}else{
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-      glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
-                RenderTarget->Width,  RenderTarget->Height,
-                0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
-                RenderTarget->Pixels);
-  	}
-  }
-
-  // Set texture environment state:
-  // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
-
-  glBindTexture( GL_TEXTURE_2D, RenderTarget->Handle );
-
-  EndTemporaryMemory(TempMem);
-}
-
 v4 Blend(v4* A, v4* B)
 {
   v4 Result =  V4( A->X * B->X,
@@ -719,7 +629,7 @@ void BindTextureToGPU(game_asset_manager* AssetManager, u32 TextureHandle)
 
 
 void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memory_arena* TempArena,
-  entry_type_asset_test* AssetTest, v4 LightColor)
+  entry_type_render_asset* AssetTest, v4 LightColor)
 {
   glUniformMatrix4fv(Program->M,  1, GL_TRUE, AssetTest->M.E);
   glUniformMatrix4fv(Program->NM, 1, GL_TRUE, AssetTest->NM.E);
@@ -792,6 +702,12 @@ internal void setOpenGLState(u32 State)
   }
 }
 
+v3 GetPositionFromMatrix( const m4* ViewMatrix )
+{
+  m4 inv = RigidInverse(*ViewMatrix);
+  return V3(Column(Transpose(inv),3));
+}
+
 internal void
 OpenGLRenderGroupToOutput( game_render_commands* Commands)
 {
@@ -838,7 +754,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
   glUniformMatrix4fv(Prog->P,  1, GL_TRUE, P.E);
   glUniformMatrix4fv(Prog->V,  1, GL_TRUE, V.E);
   glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, Identity.E);
-  glUniform4fv( Prog->cameraPosition, 1, GetCameraPosition(&V).E);
+  glUniform4fv( Prog->cameraPosition, 1, GetPositionFromMatrix(&V).E);
   v4 LightColor    = V4(0,0,0,1);
 
   // For each render group
@@ -858,114 +774,10 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         LightColor    = Light->Color;
       }break;
 
-      case render_buffer_entry_type::ASSET_TEST:
+      case render_buffer_entry_type::RENDER_ASSET:
       {
-        entry_type_asset_test* AssetTest = (entry_type_asset_test*) Body;
+        entry_type_render_asset* AssetTest = (entry_type_render_asset*) Body;
         DrawAsset(Prog, RenderGroup->AssetManager, &RenderGroup->Arena, AssetTest, LightColor);
-      }break;
-
-      case render_buffer_entry_type::INDEXED_BUFFER:
-      {
-        entry_type_indexed_buffer* IndexedBuffer = (entry_type_indexed_buffer*) Body;
-
-        glUniformMatrix4fv(Prog->M,  1, GL_TRUE, IndexedBuffer->M.E);
-        glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, IndexedBuffer->NM.E);
-
-        OpenGLPushBufferData(&RenderGroup->Arena, IndexedBuffer->Buffer);
-
-        Assert(IndexedBuffer->Surface);
-        component_surface* Surface = IndexedBuffer->Surface;
-        material* Material = Surface->Material;
-        LoadOrBindTexture(&RenderGroup->Arena, Material->DiffuseMap);
-
-        u32 SurfaceSmoothnes = 3;
-        v4 AmbientColor   = Material->DiffuseMap ? V4(0,0,0,1) : Blend(&LightColor, &Material->AmbientColor);
-        v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
-        v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
-        glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
-        glUniform4fv( Prog->diffuseProduct,  1, DiffuseColor.E);
-        glUniform4fv( Prog->specularProduct, 1, SpecularColor.E);
-        glUniform1f( Prog->shininess, Material->Shininess);
-
-        OpenGLDraw( *IndexedBuffer->Buffer->VAO, IndexedBuffer->DataType, IndexedBuffer->ElementLength, IndexedBuffer->ElementStart );
-
-      }break;
-
-      case render_buffer_entry_type::PRIMITIVE:
-      {
-        entry_type_primitive* Primitive = (entry_type_primitive*) Body;
-        u32 VAO = 0;
-        u32 NrIndeces = 0;
-        u32 ElementType = 0;
-        if(Primitive->PrimitiveType == primitive_type::POINT)
-        {
-          glPolygonMode(GL_FRONT_AND_BACK, GL_POINT);
-          local_persist u32 PointVao = 0;
-          local_persist u32 PointVbo = 0;
-          if(!PointVao)
-          {
-            u32 idx = 0;
-            opengl_vertex v = {};
-            r32 length = 0.5;
-            v.v = V3(0,0,0);
-            v.vn = V3(0,0,1);
-            v.vt = V2(0,0);
-            OpenGLSendMeshToGPU(&PointVao, &PointVbo, NULL, 1, &idx, 1, &v );
-          }
-
-          VAO = PointVao;
-          NrIndeces = 1;
-          ElementType = DATA_TYPE_POINT;
-
-        OpenGLDraw( VAO, DATA_TYPE_TRIANGLE, NrIndeces, 0 );
-        }else if(Primitive->PrimitiveType == primitive_type::QUAD)
-        {
-          local_persist u32 QuadVAO = 0;
-          local_persist u32 QuadVBO = 0;
-          if(!QuadVAO)
-          {
-            opengl_vertex Vertex[4] = {};
-            u32 Index[6] = {};
-            GetQuad(Index, Vertex);
-            OpenGLSendMeshToGPU(&QuadVAO, &QuadVBO, NULL, 6, Index, 4, Vertex );
-          }
-          VAO = QuadVAO;
-          NrIndeces = 6;
-          ElementType = DATA_TYPE_TRIANGLE;
-        }else if(Primitive->PrimitiveType == primitive_type::VOXEL)
-        {
-          local_persist u32 VoxelVAO = 0;
-          local_persist u32 VoxelVBO = 0;
-          if(!VoxelVAO)
-          {
-            opengl_vertex Vertex[36] = {};
-            u32 Index[36] = {};
-            GetVoxel(Index, Vertex);
-            OpenGLSendMeshToGPU(&VoxelVAO, &VoxelVBO, NULL, 36, Index, 36, Vertex );
-          }
-          VAO = VoxelVAO;
-          NrIndeces = 36;
-          ElementType = DATA_TYPE_TRIANGLE;
-        }
-
-        glUniformMatrix4fv(Prog->M,  1, GL_TRUE, Primitive->M.E);
-        glUniformMatrix4fv(Prog->NM, 1, GL_TRUE, M4Identity().E);
-        glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, Primitive->TM.E);
-
-        component_surface* Surface = Primitive->Surface;
-        material* Material =  Surface->Material;
-        u32 SurfaceSmoothnes = 3;
-        v4 AmbientColor   = Material->DiffuseMap ? V4(0,0,0,1) : Blend(&LightColor, &Material->AmbientColor);
-        v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
-        v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
-
-        LoadOrBindTexture(&RenderGroup->Arena, Material->DiffuseMap);
-        glUniform4fv( Prog->ambientProduct,  1, AmbientColor.E);
-        glUniform4fv( Prog->diffuseProduct,  1, DiffuseColor.E);
-        glUniform4fv( Prog->specularProduct, 1, SpecularColor.E);
-        glUniform1f(  Prog->shininess, Material->Shininess);
-
-        OpenGLDraw( VAO, ElementType, NrIndeces, 0 );
       }break;
     }
   }
@@ -1020,9 +832,9 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         Assert(ObjectKeeper->BufferHandle.VAO);
         OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
       }break;
-      case render_buffer_entry_type::ASSET_TEST:
+      case render_buffer_entry_type::RENDER_ASSET:
       {
-        entry_type_asset_test* AssetTest = (entry_type_asset_test*) Body;
+        entry_type_render_asset* AssetTest = (entry_type_render_asset*) Body;
         glUniformMatrix4fv(TextOverlay.M,  1, GL_TRUE, AssetTest->M.E);
         glUniformMatrix4fv(TextOverlay.TM, 1, GL_TRUE, AssetTest->TM.E);
 
@@ -1047,37 +859,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
 
       }break;
-
-      case render_buffer_entry_type::PRIMITIVE:
-      {
-        entry_type_primitive* Primitive = (entry_type_primitive*) Body;
-        u32 VAO = 0;
-        u32 NrIndeces = 0;
-        u32 ElementType = 0;
-        if(Primitive->PrimitiveType == primitive_type::QUAD)
-        {
-          local_persist u32 QuadVAO = 0;
-          local_persist u32 QuadVBO = 0;
-          if(!QuadVAO)
-          {
-            opengl_vertex Vertex[4] = {};
-            u32 Index[6] = {};
-            GetQuad(Index, Vertex);
-            OpenGLSendMeshToGPU(&QuadVAO, &QuadVBO, NULL, 6, Index, 4, Vertex );
-          }
-          VAO = QuadVAO;
-          NrIndeces = 6;
-          ElementType = DATA_TYPE_TRIANGLE;
-        }
-        glUniformMatrix4fv((u32) TextOverlay.M,  1, GL_TRUE, Primitive->M.E);
-        glUniformMatrix4fv((u32) TextOverlay.TM, 1, GL_TRUE, Primitive->TM.E);
-        component_surface* Surface = Primitive->Surface;
-        material* Material =  Surface->Material;
-        LoadOrBindTexture(&RenderGroup->Arena, Material->DiffuseMap);
-        glUniform4fv( TextOverlay.ambientProduct,  1,  Material->AmbientColor.E);
-
-        OpenGLDraw( VAO, ElementType, NrIndeces, 0 );
-      }
     }
   }
 }
@@ -1085,127 +866,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
 
 void DisplayBitmapViaOpenGL( u32 Width, u32 Height, void* Memory )
 {
-  const r32 DesiredAspectRatio = 1.77968526f;
-  OpenGLSetViewport( DesiredAspectRatio, Width, Height );
-
-  // Make our texture slot current
-  glBindTexture( GL_TEXTURE_2D, 0 );
-
-  //  GL_BGRA or GL_RGBA
-  // Send a Texture to GPU referenced to the texture handle
-  glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
-            Width,  Height,
-            0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
-            Memory);
-
-  // Set texture environment state:
-  // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
-
-  // How to resize textures
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST ); // Just take nearest
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST ); // Just take nearest
-
-  // Wrapping textures, (Mirror. Repeat border color, clamp, repeat etc... )
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
-
-  // Enable Texturing
-  glEnable( GL_TEXTURE_2D );
-
-  r32 R = 0x1E / (r32) 0xFF;
-  r32 G = 0x46 / (r32) 0xFF;
-  r32 B = 0x5A / (r32) 0xFF;
-  glClearColor(R,G,B, 0.f);
-  glClear(GL_COLOR_BUFFER_BIT);
-
-  glMatrixMode(GL_TEXTURE);
-  glLoadIdentity();
-
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity();
-
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-
-  glBegin(GL_TRIANGLES);
-
-  r32 P = 1.f;
-
-  glTexCoord2f( 0.f, 0.f );
-  glVertex2f( -P, -P );
-  glTexCoord2f( 1.f, 0.f );
-  glVertex2f(  P, -P );
-  glTexCoord2f( 1.f, 1.f );
-  glVertex2f(  P,  P );
-
-  glTexCoord2f( 0.f, 0.f );
-  glVertex2f( -P, -P );
-  glTexCoord2f( 1.f, 1.f );
-  glVertex2f(  P,  P );
-  glTexCoord2f( 0.f, 1.f );
-  glVertex2f( -P,  P );
-
-  glEnd();
-
-}
-
-void BindTexture(bitmap* Bitmap, b32 IsBackground )
-{
-  glEnable( GL_TEXTURE_2D );
-  if(Bitmap->Handle)
-  {
-    glBindTexture(GL_TEXTURE_2D, Bitmap->Handle);
-  }else{
-
-    Bitmap->Handle = ++TextureBindCount;
-
-    // Enable texture slot
-    glBindTexture(GL_TEXTURE_2D, Bitmap->Handle);
-
-    // Send a Texture to GPU referenced to the texture handle
-    glTexImage2D( GL_TEXTURE_2D,  0, OpenGLDefaultInternalTextureFormat,
-        Bitmap->Width,  Bitmap->Height,
-          0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,  Bitmap->Pixels);
-
-    // Set texture environment state:
-    // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
-
-    if(IsBackground){
-    // How to treat texture
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP );
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP );
-      glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-    }else{
-      /*
-        glActiveTexture(GL_TEXTURE0);
-        glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, textureID0);
-        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-        // --------------------
-        glActiveTexture(GL_TEXTURE1);
-        glEnable(GL_TEXTURE_2D);
-        glBindTexture(GL_TEXTURE_2D, textureID1);
-        glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
-        glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_INTERPOLATE);    // Interpolate RGB with RGB
-        glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB, GL_PREVIOUS);
-        glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_RGB, GL_TEXTURE);
-        glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE2_RGB, GL_PREVIOUS);
-        glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_RGB, GL_SRC_COLOR);
-        glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_RGB, GL_SRC_COLOR);
-        glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND2_RGB, GL_SRC_ALPHA);
-        // --------------------
-        glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA, GL_INTERPOLATE);    // Interpolate ALPHA with ALPHA
-        glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA, GL_PREVIOUS);
-        glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_ALPHA, GL_TEXTURE);
-        glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE2_ALPHA, GL_PREVIOUS);
-        glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA, GL_SRC_ALPHA);
-        glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_ALPHA, GL_SRC_ALPHA);
-        glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND2_ALPHA, GL_SRC_ALPHA);
-      */
-    }
-  }
 }
 
 #endif

@@ -60,11 +60,6 @@ void UpdateViewMatrix(  component_camera* Camera )
   Camera->DeltaPos = V3( 0, 0, 0 );
 }
 
-v3 GetCameraPosition( const m4* ViewMatrix )
-{
-  m4 inv = RigidInverse(*ViewMatrix);
-  return V3(Column(Transpose(inv),3));
-}
 
 void SetOrthoProj( component_camera* Camera, r32 aNear, r32 aFar, r32 aRight, r32 aLeft, r32 aTop, r32 aBottom )
 {

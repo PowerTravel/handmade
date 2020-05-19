@@ -62,7 +62,6 @@ global_variable x_input_set_state* XInputSetState_ = XInputSetStateStub;
 typedef DIRECT_SOUND_CREATE(direct_sound_create );
 
 #include "math/aabb.cpp"
-#include "primitive_meshes.cpp"
 #include "platform_opengl.cpp"
 
 DEBUG_PLATFORM_EXECUTE_SYSTEM_COMMAND(DEBUGExecuteSystemCommand)

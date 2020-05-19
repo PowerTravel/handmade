@@ -2,7 +2,6 @@
 
 #include "memory.h"
 #include "entity_components.h"
-#include "primitive_meshes.h"
 #include "math/vector_math.h"
 #include "standalone_utility.h"
 #include "assets.h"
@@ -14,10 +13,8 @@ struct collider_mesh;
 
 enum class render_buffer_entry_type
 {
-  INDEXED_BUFFER,
-  PRIMITIVE,
   LIGHT,
-  ASSET_TEST,
+  RENDER_ASSET,
   OVERLAY_QUAD
 };
 
@@ -51,7 +48,7 @@ struct entry_type_light
   m4 M;
 };
 
-struct entry_type_asset_test
+struct entry_type_render_asset
 {
   u32 MeshHandle;
   u32 MaterialHandle;
@@ -79,26 +76,6 @@ struct render_buffer
 
   u32 nvt;   // Nr Trxture Vertices
   v2* vt;    // Texture Vertices
-};
-
-struct entry_type_indexed_buffer
-{
-  u32 DataType;
-  render_buffer* Buffer;
-  // Get rid of surface component. Use textures OR colours.
-  component_surface* Surface;   // Has textures and render materials
-  m4 M;                         // Model Matrix Transform
-  m4 NM;                        // Normal Model Matrix Transform Transpose(Inv(ModelMatrix))
-  u32 ElementStart;
-  u32 ElementLength;
-};
-
-struct entry_type_primitive
-{
-  primitive_type PrimitiveType;
-  m4 M;   // Transforms for (0,0,0) Vertex
-  m4 TM;  // Transforms for (0,0), (1,1) Texture coordinate
-  component_surface* Surface;   // Has textures and render materials
 };
 
 struct push_buffer_header

@@ -5,10 +5,8 @@
 #include "string.h"
 #include "utility_macros.h"
 #include "data_containers.h"
-#include "component_surface.h"
 #include "component_spatial.h"
 #include "component_collider.h"
-#include "component_mesh.h"
 #include "entity_components.h"
 #include "assets.h"
 
