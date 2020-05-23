@@ -1,6 +1,4 @@
-#include "component_spatial.h"
-#include "component_collider.h"
-#include "component_dynamics.h"
+#include "entity_components.h"
 #include "handmade_tile.h"
 #include "utility_macros.h"
 #include "math/aabb.h"
@@ -19,7 +17,6 @@
 #define SLOP 0.01f
 
 #define SLOVER_ITERATIONS 4
-
 
 list< aabb3f > GetOverlappingWallTiles(memory_arena* Arena, tile_map* TileMap, aabb3f* BoundingBox, v3 CollisionEnvelope = {} )
 {
@@ -263,8 +260,8 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
         contact_data_cache PossibleContactCaches[5] = {};
         v3  ContactPoints[4] = {};
         u32 AddedContacts[4] = {};
-        utils::Copy(sizeof(PossibleContacts), Manifold->Contacts, PossibleContacts);
-        utils::Copy(sizeof(PossibleContactCaches), Manifold->CachedData, PossibleContactCaches);
+        Copy(sizeof(PossibleContacts), Manifold->Contacts, PossibleContacts);
+        Copy(sizeof(PossibleContactCaches), Manifold->CachedData, PossibleContactCaches);
         PossibleContacts[4] = NewContact;
         PossibleContactCaches[4] = CachedData;
         const m4 ModelMatA = GetModelMatrix(Manifold->A->SpatialComponent);
@@ -524,18 +521,40 @@ inline void IntegrateVelocities(world* World)
   }
 }
 
+static inline aabb3f
+GetWorldSpaceAABB( const aabb3f& AABB, const m4& TransMat )
+{
+  v3 Min = V3( TransMat * V4(AABB.P0,1));
+  v3 Max = Min;
+  v3 AABBVertices[8] = {};
+  GetAABBVertices(&AABB, AABBVertices);
+  for( u32 Index = 0; Index < ArrayCount(AABBVertices); ++Index )
+  {
+    const v3 Point = V3( TransMat * V4(AABBVertices[Index], 1) );
+
+    Min.X = (Point.X < Min.X) ? Point.X : Min.X;
+    Min.Y = (Point.Y < Min.Y) ? Point.Y : Min.Y;
+    Min.Z = (Point.Z < Min.Z) ? Point.Z : Min.Z;
+
+    Max.X = (Point.X > Max.X) ? Point.X : Max.X;
+    Max.Y = (Point.Y > Max.Y) ? Point.Y : Max.Y;
+    Max.Z = (Point.Z > Max.Z) ? Point.Z : Max.Z;
+  }
+  aabb3f Result = AABB3f(Min,Max);
+  return Result;
+}
+
 internal aabb_tree BuildBroadPhaseTree( world* World )
 {
   TIMED_FUNCTION();
   aabb_tree Result = {};
-  memory_arena* TransientArena = World->TransientArena;
+  memory_arena* TransientArena = GlobalTransientArena;
   for(u32 Index = 0;  Index < World->NrEntities; ++Index )
   {
     entity* E = &World->Entities[Index];
     if( E->ColliderComponent )
     {
-      aabb3f AABBWorldSpace = {};
-      GetTransformedAABBFromColliderMesh( E->ColliderComponent, GetModelMatrix(E->SpatialComponent), &AABBWorldSpace );
+      aabb3f AABBWorldSpace = GetWorldSpaceAABB( E->ColliderComponent->AABB, GetModelMatrix(E->SpatialComponent) );
       // TODO: Don't do a insert every timestep. Update an existing tree
       AABBTreeInsert( TransientArena, &Result, E, AABBWorldSpace );
     }
@@ -549,7 +568,7 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
 {
   TIMED_FUNCTION();
   broad_phase_result_stack* ColliderPair = BroadPhaseResultStack;
-  memory_arena* TransientArena = World->TransientArena;
+  memory_arena* TransientArena = GlobalTransientArena;
   contact_manifold** WorkArray = (contact_manifold**) PushArray(TransientArena, BroadPhaseResultCount, contact_manifold* );
   contact_manifold** WorkSlot = WorkArray;
   World->FirstContactManifold = 0;
@@ -859,10 +878,8 @@ IntegratePositions(world* World)
 void SpatialSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
-  r32 dt =  World->dtForFrame;
-  memory_arena* TransientArena = World->TransientArena;
 
-  temporary_memory TempMem1 = BeginTemporaryMemory( TransientArena );
+  temporary_memory TempMem1 = BeginTemporaryMemory( GlobalTransientArena );
 
   RemoveInvalidContactPoints( World );
 
@@ -873,7 +890,7 @@ void SpatialSystemUpdate( world* World )
   aabb_tree BroadPhaseTree = BuildBroadPhaseTree( World );
 
   u32 BroadPhaseResultCount = 0;
-  broad_phase_result_stack* const BroadPhaseResultStack = GetCollisionPairs( TransientArena, &BroadPhaseTree, &BroadPhaseResultCount );
+  broad_phase_result_stack* const BroadPhaseResultStack = GetCollisionPairs( &BroadPhaseTree, &BroadPhaseResultCount );
 
   CreateAndDoWork( World, BroadPhaseResultCount,  BroadPhaseResultStack );
 
@@ -894,5 +911,4 @@ void SpatialSystemUpdate( world* World )
   IntegratePositions(World);
 
   EndTemporaryMemory( TempMem1 );
-  CheckArena(TransientArena);
 }

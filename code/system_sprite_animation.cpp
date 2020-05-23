@@ -1,5 +1,4 @@
 #include "component_sprite_animation.h"
-#include "component_dynamics.h"
 #include "entity_components.h"
 #include "handmade.h"
 

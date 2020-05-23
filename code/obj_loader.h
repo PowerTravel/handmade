@@ -5,10 +5,6 @@
 #include "platform.h"
 
 struct bitmap;
-struct world;
-struct game_state;
-struct thread_context;
-struct entity;
 
 struct mtl_material
 {
@@ -58,12 +54,5 @@ struct obj_loaded_file
   obj_mtl_data* MaterialData;
 };
 
-obj_loaded_file* ReadOBJFile(memory_arena* AssetArena, memory_arena* TempArena,
-         debug_platform_read_entire_file* ReadEntireFile,
-         debug_platfrom_free_file_memory* FreeEntireFile,
-         char* FileName);
-
-bitmap* LoadTGA(memory_arena* AssetArena,
-         debug_platform_read_entire_file* ReadEntireFile,
-         debug_platfrom_free_file_memory* FreeEntireFile,
-         char* FileName);
+obj_loaded_file* ReadOBJFile(memory_arena* AssetArena, memory_arena* TempArena, char* FileName);
+bitmap* LoadTGA(memory_arena* AssetArena, char* FileName);

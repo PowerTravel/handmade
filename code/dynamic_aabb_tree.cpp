@@ -86,7 +86,7 @@ memory_index GetPrintableTree( memory_arena* TemporaryArena, aabb_tree* Tree, me
   return Scanner - Memory;
 }
 
-broad_phase_result_stack* GetCollisionPairs( memory_arena* TemporaryArena, aabb_tree* Tree, u32* ResultStackSize)
+broad_phase_result_stack* GetCollisionPairs( aabb_tree* Tree, u32* ResultStackSize)
 {
   TIMED_FUNCTION();
   *ResultStackSize = 0;
@@ -94,7 +94,7 @@ broad_phase_result_stack* GetCollisionPairs( memory_arena* TemporaryArena, aabb_
   {
     return 0;
   }
-  aabb_tree_node** const Base = (aabb_tree_node**) PushArray(TemporaryArena, 2*Tree->Size, aabb_tree_node*);
+  aabb_tree_node** const Base = (aabb_tree_node**) PushArray(GlobalTransientArena, 2*Tree->Size, aabb_tree_node*);
   aabb_tree_node** const LeftBase  = Base;
   aabb_tree_node** const RightBase = Base+1;
   broad_phase_result_stack* ResultHead = {};
@@ -116,7 +116,7 @@ broad_phase_result_stack* GetCollisionPairs( memory_arena* TemporaryArena, aabb_
         // Both are leaves
         if(AABBIntersects(&Left->AABB, &Right->AABB))
         {
-          broad_phase_result_stack* NewResult = (broad_phase_result_stack*) PushStruct(TemporaryArena ,broad_phase_result_stack);
+          broad_phase_result_stack* NewResult = (broad_phase_result_stack*) PushStruct(GlobalTransientArena ,broad_phase_result_stack);
           NewResult->A = Left->Entity;
           NewResult->B = Right->Entity;
           NewResult->Previous = ResultHead;

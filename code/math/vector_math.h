@@ -1027,3 +1027,14 @@ LinearTransform(const r32 OutputMin, const r32 OutputMax, const r32 InputMin, co
   const r32 Result = K * Input + M;
   return Result;
 }
+
+inline v4
+QuaternionMultiplication(const v4 r, const v4 q)
+{
+  v4 Result = {};
+  Result.W = r.W*q.W - r.X*q.X - r.Y*q.Y - r.Z*q.Z;  // scalar
+  Result.X = r.W*q.X + r.X*q.W - r.Y*q.Z + r.Z*q.Y;  // x-part (i)
+  Result.Y = r.W*q.Y + r.X*q.Z + r.Y*q.W - r.Z*q.X;  // y-part (j)
+  Result.Z = r.W*q.Z - r.X*q.Y + r.Y*q.X + r.Z*q.W;  // z-part (k)
+  return Result;
+}

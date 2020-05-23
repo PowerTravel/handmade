@@ -34,7 +34,6 @@ typedef int64_t s64;
 
 typedef s32 b32;
 
-
 typedef uint8_t  u8;
 typedef uint16_t u16;
 typedef uint32_t u32;

@@ -7,6 +7,7 @@
 
 
 extern game_asset_manager* GlobalAssetManager;
+extern memory_arena* GlobalTransientArena;
 
 void InitPredefinedMaterials(game_asset_manager* AssetManager)
 {
@@ -52,7 +53,7 @@ void InitPredefinedMaterials(game_asset_manager* AssetManager)
   EmptyBitmap->BPP  = 32;
   EmptyBitmap->Width  = 1;
   EmptyBitmap->Height = 1;
-  EmptyBitmap->Pixels = PushCopy(AssetManager->AssetArena, sizeof(WhitePixel), WhitePixel);
+  EmptyBitmap->Pixels = PushCopy(&AssetManager->AssetArena, sizeof(WhitePixel), WhitePixel);
   book_keeper* TextureKeeper = (AssetManager->TextureKeeper + EmptyTextureIndex);
   *TextureKeeper = {};
 
@@ -103,17 +104,17 @@ void InitPredefinedMeshes(game_asset_manager* AssetManager)
     Data->nv  = ArrayCount(v);    // Nr Verices
     Data->nvn = ArrayCount(vn);   // Nr Vertice Normals
     Data->nvt = ArrayCount(vt);   // Nr Trxture Vertices
-    Data->v  = (v3*) PushCopy(AssetManager->AssetArena, sizeof(v), v);
-    Data->vn = (v3*) PushCopy(AssetManager->AssetArena, sizeof(vn), vn);
-    Data->vt = (v2*) PushCopy(AssetManager->AssetArena, sizeof(vt), vt);
+    Data->v  = (v3*) PushCopy(&AssetManager->AssetArena, sizeof(v), v);
+    Data->vn = (v3*) PushCopy(&AssetManager->AssetArena, sizeof(vn), vn);
+    Data->vt = (v2*) PushCopy(&AssetManager->AssetArena, sizeof(vt), vt);
 
     u32 ObjectIndex = AssetManager->ObjectCount++;
     mesh_indeces* Indeces = AssetManager->Objects + ObjectIndex;
     Indeces->MeshHandle = MeshIndex;
     Indeces->Count  = ArrayCount(vi);
-    Indeces->vi = (u32*) PushCopy(AssetManager->AssetArena, sizeof(vi), vi);
-    Indeces->ti = (u32*) PushCopy(AssetManager->AssetArena, sizeof(ti), ti);
-    Indeces->ni = (u32*) PushCopy(AssetManager->AssetArena, sizeof(ni), ni);
+    Indeces->vi = (u32*) PushCopy(&AssetManager->AssetArena, sizeof(vi), vi);
+    Indeces->ti = (u32*) PushCopy(&AssetManager->AssetArena, sizeof(ti), ti);
+    Indeces->ni = (u32*) PushCopy(&AssetManager->AssetArena, sizeof(ni), ni);
     Indeces->AABB = AABB;
   }
 
@@ -158,61 +159,20 @@ void InitPredefinedMeshes(game_asset_manager* AssetManager)
     Data->nv  = ArrayCount(v);    // Nr Verices
     Data->nvn = ArrayCount(vn);   // Nr Vertice Normals
     Data->nvt = ArrayCount(vt);   // Nr Trxture Vertices
-    Data->v  = (v3*) PushCopy(AssetManager->AssetArena, sizeof(v), v);
-    Data->vn = (v3*) PushCopy(AssetManager->AssetArena, sizeof(vn), vn);
-    Data->vt = (v2*) PushCopy(AssetManager->AssetArena, sizeof(vt), vt);
+    Data->v  = (v3*) PushCopy(&AssetManager->AssetArena, sizeof(v), v);
+    Data->vn = (v3*) PushCopy(&AssetManager->AssetArena, sizeof(vn), vn);
+    Data->vt = (v2*) PushCopy(&AssetManager->AssetArena, sizeof(vt), vt);
 
     u32 ObjectIndex = AssetManager->ObjectCount++;
     mesh_indeces* Indeces = AssetManager->Objects + ObjectIndex;
     Indeces->MeshHandle = MeshIndex;
     Indeces->Count  = ArrayCount(vi);
-    Indeces->vi = (u32*) PushCopy(AssetManager->AssetArena, sizeof(vi), vi);
-    Indeces->ti = (u32*) PushCopy(AssetManager->AssetArena, sizeof(ti), ti);
-    Indeces->ni = (u32*) PushCopy(AssetManager->AssetArena, sizeof(ni), ni);
+    Indeces->vi = (u32*) PushCopy(&AssetManager->AssetArena, sizeof(vi), vi);
+    Indeces->ti = (u32*) PushCopy(&AssetManager->AssetArena, sizeof(ti), ti);
+    Indeces->ni = (u32*) PushCopy(&AssetManager->AssetArena, sizeof(ni), ni);
     Indeces->AABB = AABB;
   }
 
-}
-
-
-
-
-void InitiateAssetManager(game_state* State)
-{
-  if(!GlobalAssetManager)
-  {
-    State->AssetManager = PushStruct( &State->AssetArena, game_asset_manager);
-    State->AssetManager->AssetArena = &State->AssetArena;
-
-    State->AssetManager->MaxMeshCount = 64;
-    State->AssetManager->MeshCount = 0;
-    State->AssetManager->MeshData = PushArray(State->AssetManager->AssetArena,
-                                              State->AssetManager->MaxMeshCount, mesh_data);
-
-    State->AssetManager->MaxObjectCount = 64;
-    State->AssetManager->ObjectCount = 0;
-    State->AssetManager->Objects = PushArray(State->AssetManager->AssetArena,
-                                              State->AssetManager->MaxObjectCount, mesh_indeces);
-    State->AssetManager->ObjectKeeper = PushArray(State->AssetManager->AssetArena,
-                                              State->AssetManager->MaxObjectCount, book_keeper);
-
-    State->AssetManager->MaxMaterialCount = 64;
-    State->AssetManager->MaterialCount = 0;
-    State->AssetManager->Materials = PushArray( State->AssetManager->AssetArena,
-                                              State->AssetManager->MaxMaterialCount, material);
-
-    State->AssetManager->MaxTextureCount = 64;
-    State->AssetManager->TextureCount = 0;
-    State->AssetManager->Textures = PushArray( State->AssetManager->AssetArena,
-                                               State->AssetManager->MaxTextureCount, bitmap);
-    State->AssetManager->TextureKeeper = PushArray(State->AssetManager->AssetArena,
-                                              State->AssetManager->MaxMaterialCount, book_keeper);
-
-    InitPredefinedMaterials(State->AssetManager);
-    InitPredefinedMeshes(State->AssetManager);
-
-    GlobalAssetManager = State->AssetManager;
-  }
 }
 
 
@@ -238,7 +198,7 @@ internal void STBBakeFont(game_asset_manager* AssetManager)
   FontMap->StartChar = Ranges[0];
   FontMap->NumChars = Ranges[1] - Ranges[0];
   FontMap->FontHeightPx = 24.f;
-  FontMap->CharData = PushArray(AssetManager->AssetArena, FontMap->NumChars, stbtt_bakedchar);
+  FontMap->CharData = PushArray(&AssetManager->AssetArena, FontMap->NumChars, stbtt_bakedchar);
 
   stbtt_GetScaledFontVMetrics((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
    FontMap->FontHeightPx, &FontMap->Ascent, &FontMap->Descent, &FontMap->LineGap);
@@ -252,10 +212,10 @@ FontMap->BitmapHandle = AssetManager->TextureCount++;
   Atlas->BPP = 32;
   Atlas->Width = 1028;
   Atlas->Height = 1028;
-  Atlas->Pixels = (void*) PushArray(AssetManager->AssetArena, Atlas->Width * Atlas->Height, u32);
+  Atlas->Pixels = (void*) PushArray(&AssetManager->AssetArena, Atlas->Width * Atlas->Height, u32);
   
-  temporary_memory TempMem = BeginTemporaryMemory(AssetManager->AssetArena);
-  u8* TmpPixels = PushArray(AssetManager->AssetArena, Atlas->Width * Atlas->Height, u8);
+  temporary_memory TempMem = BeginTemporaryMemory(&AssetManager->AssetArena);
+  u8* TmpPixels = PushArray(&AssetManager->AssetArena, Atlas->Width * Atlas->Height, u8);
 
   s32 ret = stbtt_BakeFontBitmap((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
                        FontMap->FontHeightPx,
@@ -279,10 +239,46 @@ FontMap->BitmapHandle = AssetManager->TextureCount++;
   }
   
   EndTemporaryMemory(TempMem);
-
+  
   Platform.DEBUGPlatformFreeFileMemory(&Thread, TTFFile.Contents);
 }
 
+
+game_asset_manager* CreateAssetManager()
+{
+  game_asset_manager* AssetManager = BootstrapPushStruct(game_asset_manager, AssetArena);
+
+  AssetManager->MaxMeshCount = 64;
+  AssetManager->MeshCount = 0;
+  AssetManager->MeshData = PushArray(&AssetManager->AssetArena,
+                                            AssetManager->MaxMeshCount, mesh_data);
+
+  AssetManager->MaxObjectCount = 64;
+  AssetManager->ObjectCount = 0;
+  AssetManager->Objects = PushArray(&AssetManager->AssetArena,
+                                            AssetManager->MaxObjectCount, mesh_indeces);
+  AssetManager->ObjectKeeper = PushArray(&AssetManager->AssetArena,
+                                            AssetManager->MaxObjectCount, book_keeper);
+
+  AssetManager->MaxMaterialCount = 64;
+  AssetManager->MaterialCount = 0;
+  AssetManager->Materials = PushArray( &AssetManager->AssetArena,
+                                            AssetManager->MaxMaterialCount, material);
+
+  AssetManager->MaxTextureCount = 64;
+  AssetManager->TextureCount = 0;
+  AssetManager->Textures = PushArray( &AssetManager->AssetArena,
+                                             AssetManager->MaxTextureCount, bitmap);
+  AssetManager->TextureKeeper = PushArray(&AssetManager->AssetArena,
+                                            AssetManager->MaxMaterialCount, book_keeper);
+
+  InitPredefinedMaterials(AssetManager);
+  InitPredefinedMeshes(AssetManager);
+  
+  STBBakeFont(AssetManager);
+  
+  return AssetManager;
+}
 
 inline game_asset_manager*
 GetAssetManager()
@@ -294,13 +290,9 @@ GetAssetManager()
 // TODO: Create a global_context and stuff the Transient arena in there.
 void LoadCubeAsset( game_state* State)
 {
-  memory_arena* AssetArena = &State->AssetArena;
-
   game_asset_manager* AssetManager = GetAssetManager();
-
-  obj_loaded_file* LoadedObjFile = ReadOBJFile( AssetArena, &State->TransientArena,
-   Platform.DEBUGPlatformReadEntireFile,
-   Platform.DEBUGPlatformFreeFileMemory,
+  memory_arena* AssetArena = &AssetManager->AssetArena;
+  obj_loaded_file* LoadedObjFile = ReadOBJFile( AssetArena, GlobalTransientArena,
    "..\\handmade\\data\\cube\\cube.obj");
 
   u32 MeshIndex = AssetManager->MeshCount++;
@@ -351,7 +343,6 @@ u32 GetMeshAssetHandle( u32 MeshIndex )
   game_asset_manager* AssetManager = GetAssetManager();
   Assert(MeshIndex < AssetManager->ObjectCount);
   mesh_indeces* Object = AssetManager->Objects + MeshIndex;
-  AssetManager->ObjectKeeper[MeshIndex].ReferenceCount++;
   Assert(Object->MeshHandle < AssetManager->MeshCount);
   return MeshIndex;
 }
@@ -375,23 +366,10 @@ collider_mesh GetColliderMesh(u32 ObjectHandle)
   Result.vi = Indeces->vi;
   return Result;
 }
+
 u32 GetTextureAssetHandle( u32 MaterialHandle )
 {
   game_asset_manager* AssetManager = GetAssetManager();
   material* Material = GetMaterial(AssetManager, MaterialHandle);
-  GetTextureKeeper(AssetManager, Material->TextureHandle)->ReferenceCount++;
   return MaterialHandle;
-}
-
-void RemoveMeshAsset(u32 ObjectHandle)
-{
-  game_asset_manager* AssetManager = GetAssetManager();
-  mesh_indeces* Object = GetObject(AssetManager, ObjectHandle);
-  GetObjectKeeper(AssetManager, ObjectHandle)->ReferenceCount--;
-}
-void RemoveTextureAsset(u32 MaterialHandle)
-{
-  game_asset_manager* AssetManager = GetAssetManager();
-  material* Material = GetMaterial(AssetManager, MaterialHandle);
-  GetTextureKeeper(AssetManager, Material->TextureHandle)->ReferenceCount--;
 }

@@ -1,8 +1,6 @@
 #include "render_push_buffer.h"
 #include "component_camera.h"
-#include "component_light.h"
-#include "component_spatial.h"
-#include "component_collider.h"
+#include "entity_components.h"
 #include "component_sprite_animation.h"
 #include "gjk_epa_visualizer.h"
 #include "epa_collision_data.h"
@@ -146,6 +144,7 @@ void DEBUGAddTextSTB(c8* String, r32 LineNumber)
   DEBUGTextOutAt(CanPosX, CanPosY, RenderGroup, String);
 }
 
+
 void ResetRenderGroup(render_group* RenderGroup)
 {
   EndTemporaryMemory(RenderGroup->PushBufferMemory);
@@ -162,7 +161,6 @@ render_group* InitiateRenderGroup(game_state* GameState, r32 ScreenWidth, r32 Sc
 {
   render_group* Result = BootstrapPushStruct(render_group, Arena);
   Result->PushBufferMemory = BeginTemporaryMemory(&Result->Arena);
-  Result->Assets = GameState->World->Assets;
   Result->AssetManager = GameState->AssetManager;
   Result->ScreenWidth = ScreenWidth;
   Result->ScreenHeight = ScreenHeight;

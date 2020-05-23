@@ -3,13 +3,7 @@
 #include "memory.h"
 #include "entity_components.h"
 #include "math/vector_math.h"
-#include "standalone_utility.h"
 #include "assets.h"
-
-
-struct component_mesh;
-struct component_surface;
-struct collider_mesh;
 
 enum class render_buffer_entry_type
 {
@@ -86,8 +80,6 @@ struct push_buffer_header
   push_buffer_header* Next;
 };
 
-struct game_assets;
-
 struct render_group
 {
   r32 ScreenWidth;
@@ -101,7 +93,6 @@ struct render_group
   memory_arena Arena;
   temporary_memory PushBufferMemory;
 
-  game_assets* Assets;
   game_asset_manager* AssetManager;
   push_buffer_header* First;
   push_buffer_header* Last;

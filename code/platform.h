@@ -569,11 +569,11 @@ extern platform_api Platform;
 
 struct debug_frame_end_info;
 
-struct debug_state;
 struct game_memory
 {
   struct game_state* GameState;
-  debug_state* DebugState;
+  struct debug_state* DebugState;
+  struct global_context* Context;
   platform_api PlatformAPI;
 };
 

@@ -46,12 +46,6 @@ struct sprite_sheet
   u32 EntryCount;
 };
 
-struct uv_coordinate
-{
-  u32 u;
-  u32 v;
-};
-
 void SplitPixelIntoARGBComponents(u32 PixelValue, u8* A, u8* R, u8* G, u8* B)
 {
   *A = (u8) ((PixelValue & BITMAP_MASK_ALPHA) >> BITMAP_SHIFT_ALPHA);

@@ -1,15 +1,11 @@
-#include "standalone_utility.h"
 #include "obj_loader.h"
 #include "math/vector_math.h"
 #include "bitmap.h"
 #include "string.h"
 #include "utility_macros.h"
 #include "data_containers.h"
-#include "component_spatial.h"
-#include "component_collider.h"
 #include "entity_components.h"
 #include "assets.h"
-
 
 v4 ParseNumbers(char* String)
 {
@@ -27,7 +23,7 @@ v4 ParseNumbers(char* String)
 
     Assert(WordLength < STR_MAX_WORD_LENGTH);
 
-    utils::Copy( WordLength, Start, WordBuffer );
+    Copy( WordLength, Start, WordBuffer );
     WordBuffer[WordLength] = '\0';
 
     r64 value = str::StringToReal64(WordBuffer);
@@ -38,7 +34,6 @@ v4 ParseNumbers(char* String)
 
   return Result;
 }
-
 
 struct obj_start_string
 {
@@ -272,7 +267,7 @@ bool GetTrimmedLine( char* SrcLineStart, char* SrcLineEnd, u32* DstLength, char*
     return false;
   }
 
-  utils::Copy( Length, SrcLineStart, DstLine );
+  Copy( Length, SrcLineStart, DstLine );
   DstLine[Length] = '\0';
   *DstLength = (u32) Length;
   return true;
@@ -350,7 +345,7 @@ void ParseFaceLine(memory_arena* Arena, char* ParsedLine, group_to_parse* Active
 
     Assert(WordLength < STR_MAX_WORD_LENGTH);
 
-    utils::Copy( WordLength, Start, WordBuffer );
+    Copy( WordLength, Start, WordBuffer );
     WordBuffer[WordLength] = '\0';
 
     char* StartNr = WordBuffer;
@@ -555,14 +550,11 @@ void ReadRunLengthEncodedRGB( const u32 NrPixels, const u32 BytesPerPixel, u32* 
 }
 
 
-bitmap* LoadTGA(memory_arena* AssetArena,
-         debug_platform_read_entire_file* ReadEntireFile,
-         debug_platfrom_free_file_memory* FreeEntireFile,
-         char* FileName)
+bitmap* LoadTGA(memory_arena* AssetArena, char* FileName)
 {
 
   thread_context Thread{};
-  debug_read_file_result ReadResult = ReadEntireFile(&Thread, FileName);
+  debug_read_file_result ReadResult = Platform.DEBUGPlatformReadEntireFile(&Thread, FileName);
 
   if( !ReadResult.ContentSize ) { return {}; }
 
@@ -614,7 +606,7 @@ bitmap* LoadTGA(memory_arena* AssetArena,
     INVALID_CODE_PATH
   }
 
-  FreeEntireFile(&Thread, ReadResult.Contents);
+  Platform.DEBUGPlatformFreeFileMemory(&Thread, ReadResult.Contents);
 
   return Result;
 }
@@ -684,13 +676,10 @@ void CreateNewFilePath(char* BaseFilePath, char* NewFileName, u32 NewFilePathLen
 }
 
 
-obj_mtl_data* ReadMTLFile(memory_arena* AssetArena, memory_arena* TempArena,
-         debug_platform_read_entire_file* ReadEntireFile,
-         debug_platfrom_free_file_memory* FreeEntireFile,
-         char* FileName)
+obj_mtl_data* ReadMTLFile(memory_arena* AssetArena, memory_arena* TempArena, char* FileName)
 {
   thread_context Thread{};
-  debug_read_file_result ReadResult = ReadEntireFile(&Thread, FileName);
+  debug_read_file_result ReadResult = Platform.DEBUGPlatformReadEntireFile(&Thread, FileName);
 
   if( !ReadResult.ContentSize ) { return 0; }
 
@@ -828,9 +817,7 @@ obj_mtl_data* ReadMTLFile(memory_arena* AssetArena, memory_arena* TempArena,
         char TGAFilePath[STR_MAX_LINE_LENGTH] = {};
         CreateNewFilePath( FileName, DataType.String, sizeof(TGAFilePath), TGAFilePath );
 
-        ActieveMaterial->MapKd = LoadTGA( AssetArena,
-                           ReadEntireFile, FreeEntireFile,
-                           TGAFilePath);
+        ActieveMaterial->MapKd = LoadTGA( AssetArena, TGAFilePath);
       }break;
       case MTL_MAP_KS:
       {
@@ -868,9 +855,7 @@ obj_mtl_data* ReadMTLFile(memory_arena* AssetArena, memory_arena* TempArena,
         char TGAFilePath[STR_MAX_LINE_LENGTH] = {};
         CreateNewFilePath( FileName, DataType.String, sizeof(TGAFilePath), TGAFilePath );
 
-        ActieveMaterial->MapKs = LoadTGA( AssetArena,
-                           ReadEntireFile, FreeEntireFile,
-                           TGAFilePath);
+        ActieveMaterial->MapKs = LoadTGA( AssetArena, TGAFilePath);
       }break;
       case MTL_MAP_NS:
       {
@@ -938,9 +923,7 @@ obj_mtl_data* ReadMTLFile(memory_arena* AssetArena, memory_arena* TempArena,
         char TGAFilePath[STR_MAX_LINE_LENGTH] = {};
         CreateNewFilePath( FileName, LeftoverString, sizeof(TGAFilePath), TGAFilePath );
 
-        ActieveMaterial->BumpMap = LoadTGA( AssetArena,
-                           ReadEntireFile, FreeEntireFile,
-                           TGAFilePath);
+        ActieveMaterial->BumpMap = LoadTGA( AssetArena, TGAFilePath);
       }break;
       case MTL_REFLECTION_MAP:
       {
@@ -967,7 +950,7 @@ obj_mtl_data* ReadMTLFile(memory_arena* AssetArena, memory_arena* TempArena,
   }
 
   EndTemporaryMemory(TempMem);
-  FreeEntireFile(&Thread, ReadResult.Contents);
+  Platform.DEBUGPlatformFreeFileMemory(&Thread, ReadResult.Contents);
 
   return Result;
 }
@@ -1015,14 +998,11 @@ void SetBoundingBox( obj_loaded_file* OBJFile, memory_arena* TempArena )
   }
 }
 
-obj_loaded_file* ReadOBJFile(memory_arena* AssetArena, memory_arena* TempArena,
-         debug_platform_read_entire_file* ReadEntireFile,
-         debug_platfrom_free_file_memory* FreeEntireFile,
-         char* FileName)
+obj_loaded_file* ReadOBJFile(memory_arena* AssetArena, memory_arena* TempArena, char* FileName)
 {
 
   thread_context Thread{};
-  debug_read_file_result ReadResult = ReadEntireFile(&Thread, FileName);
+  debug_read_file_result ReadResult = Platform.DEBUGPlatformReadEntireFile(&Thread, FileName);
 
   char LineBuffer[STR_MAX_LINE_LENGTH];
 
@@ -1126,7 +1106,7 @@ obj_loaded_file* ReadOBJFile(memory_arena* AssetArena, memory_arena* TempArena,
         if(!MaterialFile)
         {
           // Stores materials to Asset Arena
-          MaterialFile =  ReadMTLFile(AssetArena, TempArena, ReadEntireFile, FreeEntireFile, MTLFileName);
+          MaterialFile =  ReadMTLFile(AssetArena, TempArena, MTLFileName);
         }
 
 
@@ -1164,7 +1144,7 @@ obj_loaded_file* ReadOBJFile(memory_arena* AssetArena, memory_arena* TempArena,
     GroupToParse.Push( DefaultGroup );
   }
 
-  FreeEntireFile(&Thread, ReadResult.Contents);
+  Platform.DEBUGPlatformFreeFileMemory(&Thread, ReadResult.Contents);
 
   obj_loaded_file* Result = (obj_loaded_file*) PushStruct( AssetArena, obj_loaded_file );
 
@@ -1258,8 +1238,6 @@ obj_loaded_file* ReadOBJFile(memory_arena* AssetArena, memory_arena* TempArena,
   SetBoundingBox(Result, TempArena);
 
   EndTemporaryMemory(TempMem);
-
-  CheckArena(TempArena);
 
   return Result;
 }

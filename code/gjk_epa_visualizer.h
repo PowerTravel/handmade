@@ -2,7 +2,6 @@
 
 #include "math/vector_math.h"
 #include "entity_components.h"
-#include "component_controller.h"
 #include "platform.h"
 
 struct simplex_index

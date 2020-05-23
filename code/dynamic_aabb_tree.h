@@ -1,7 +1,6 @@
 #pragma once
 
 #include "math/aabb.h"
-#include "component_collider.h"
 
 struct entity;
 struct memory_arena;
@@ -30,5 +29,5 @@ struct broad_phase_result_stack
 };
 
 memory_index GetPrintableTree( memory_arena* TemporaryArena, aabb_tree* Tree, memory_index MemorySize, char* Memory);
-broad_phase_result_stack* GetCollisionPairs( memory_arena* TemporaryArena, aabb_tree* Tree,  u32* ResultStackSize);
+broad_phase_result_stack* GetCollisionPairs( aabb_tree* Tree,  u32* ResultStackSize);
 void AABBTreeInsert( memory_arena* Arena, aabb_tree* Tree, entity* Entity , aabb3f& AABBWorldSpace );

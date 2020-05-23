@@ -479,7 +479,7 @@ u32 PushUnique( u8* Array, const u32 ElementCount, const u32 ElementByteSize,
   }
 
   // If we didn't find the element we push it to the end
-  utils::Copy(ElementByteSize, NewElement, Array);
+  Copy(ElementByteSize, NewElement, Array);
 
   return ElementCount;
 }

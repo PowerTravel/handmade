@@ -9,8 +9,22 @@
 
 #include "handmade.h"
 
-#include "random.h"
-#include "tiles_spritesheet.h"
+#include "assets.h"
+
+#if HANDMADE_INTERNAL
+game_memory* DebugGlobalMemory = 0;
+#endif
+
+game_state GlobalGameState_ = {};
+game_state* GlobalGameState = &GlobalGameState_;
+
+game_asset_manager  GlobalAssetManager_;
+game_asset_manager* GlobalAssetManager;
+
+memory_arena GlobalTransientArena_ = {};
+memory_arena* GlobalTransientArena = &GlobalTransientArena_;
+
+temporary_memory TransientTemporaryMemory;
 
 platform_api Platform;
 
@@ -41,22 +55,6 @@ global_variable b32 GlobalFireVic = false;
 #include "assets.cpp"
 
 #include "debug.h"
-
-void AllocateGlobaklGjkEpaVisualizer(memory_arena* AssetArena)
-{
-  GlobalGjkEpaVisualizer.MaxIndexCount = 1024;
-  GlobalGjkEpaVisualizer.Indeces = (u32*) PushArray(AssetArena, GlobalGjkEpaVisualizer.MaxIndexCount, u32);
-  GlobalGjkEpaVisualizer.MaxVertexCount = 1024;
-  GlobalGjkEpaVisualizer.Vertices = (v3*) PushArray(AssetArena, GlobalGjkEpaVisualizer.MaxVertexCount, v3);
-  GlobalGjkEpaVisualizer.NormalMaxIndexCount = 1024;
-  GlobalGjkEpaVisualizer.NormalIndeces = (u32*) PushArray(AssetArena, GlobalGjkEpaVisualizer.NormalMaxIndexCount, u32);
-  GlobalGjkEpaVisualizer.MaxNormalCount = 1024;
-  GlobalGjkEpaVisualizer.Normals = (v3*) PushArray(AssetArena, GlobalGjkEpaVisualizer.MaxNormalCount, v3);
-  GlobalGjkEpaVisualizer.MaxSimplexCount = 16;
-  GlobalGjkEpaVisualizer.Simplex = (simplex_index*) PushArray(AssetArena, GlobalGjkEpaVisualizer.MaxSimplexCount, simplex_index);
-  GlobalGjkEpaVisualizer.MaxEPACount = 32;
-  GlobalGjkEpaVisualizer.EPA = (epa_index*) PushArray(AssetArena, GlobalGjkEpaVisualizer.MaxEPACount, epa_index);
-}
 
 internal void
 GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
@@ -94,19 +92,16 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
 
 void AllocateWorld( u32 NrMaxEntities, game_state* GameState, u32 NumManifolds = 4 )
 {
-  GameState->World = (world*) PushStruct(&GameState->PersistentArena, world);
-  GameState->World->AssetArena      = &GameState->AssetArena;
-  GameState->World->PersistentArena = &GameState->PersistentArena;
-  GameState->World->TransientArena  = &GameState->TransientArena;
+  world* World = BootstrapPushStruct(world, Arena);
 
-  GameState->World->NrEntities = 0;
-  GameState->World->NrMaxEntities = NrMaxEntities;
-  GameState->World->Entities = (entity*) PushArray( &GameState->PersistentArena, GameState->World->NrMaxEntities, entity );
+  World->NrEntities = 0;
+  World->NrMaxEntities = NrMaxEntities;
+  World->Entities = (entity*) PushArray( &World->Arena, World->NrMaxEntities, entity );
 
-  GameState->World->MaxNrManifolds = NumManifolds*NrMaxEntities;
-  GameState->World->Manifolds = (contact_manifold*)  PushSize( &GameState->PersistentArena, GameState->World->MaxNrManifolds*( sizeof(contact_manifold) ));
-  GameState->World->FirstContactManifold = 0;
-  GameState->World->Assets = PushStruct(GameState->World->AssetArena, game_assets);
+  World->MaxNrManifolds = NumManifolds*NrMaxEntities;
+  World->Manifolds = (contact_manifold*)  PushSize( &World->Arena, World->MaxNrManifolds*( sizeof(contact_manifold) ));
+  World->FirstContactManifold = 0;
+  GameState->World = World;
 }
 
 #if 0
@@ -159,15 +154,12 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
 }
 #endif
 
-void CreateCollisionTestScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input)
+void CreateCollisionTestScene(game_memory* Memory, game_render_commands* RenderCommands, game_input* Input)
 {
   game_state* GameState        = Memory->GameState;
-  memory_arena* AssetArena     = &GameState->AssetArena;
-  memory_arena* TransientArena = &GameState->TransientArena;
 
   AllocateWorld(120, GameState, 32);
   world* World = GameState->World;
-  game_assets* Assets = World->Assets;
 
   // TODO: Create a better way to ask for assets than giving known array-indeces
   //       Maybe Enums?
@@ -440,25 +432,25 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
 }
 #endif
 
-void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
+
+void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
 {
   if (!Memory->GameState)
   {
-    Memory->GameState = BootstrapPushStruct(game_state, PersistentArena);
-    InitiateAssetManager(Memory->GameState);
+    TransientTemporaryMemory = BeginTemporaryMemory(GlobalTransientArena);
+
+    Memory->GameState = GlobalGameState;
+    GlobalGameState->AssetManager = CreateAssetManager();
+    GlobalAssetManager = GlobalGameState->AssetManager;
     //Create2DScene(Thread, Memory, RenderCommands, Input );
-    CreateCollisionTestScene(Thread, Memory, RenderCommands, Input );
-    //CreateEpaVisualizerTestScene(Thread, Memory, RenderCommands, Input );
+    CreateCollisionTestScene(Memory, RenderCommands, Input);
 
-    AllocateGlobaklGjkEpaVisualizer(&Memory->GameState->AssetArena);
-
-    STBBakeFont(Memory->GameState->AssetManager);
-
+  
     RenderCommands->MainRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
 
     // TODO: Right now DebugRenderGroup just solves the problem of drawing the overlay on top of everything else with a special shader.
     //       This should be supported by just one RenderGroup with sorting capabilities and shaderswitching.
-    //       Maybe DebugRenderGroup is something we want to move away from and consolidate into the DebugRenderGroup.
+    //       Maybe DebugRenderGroup is something we want to move away from and consolidate into the DebugState.
     //       Is there a problem with the debug system piping it's drawing through the GameRenderingPipeline?
     //       I mean it already sort of does since it all gets drawn in RenderGroupToOutput.
     RenderCommands->DebugRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
@@ -482,11 +474,6 @@ void InitiateGame(thread_context* Thread, game_memory* Memory, game_render_comma
   i the build directory.
 */
 
-#if HANDMADE_INTERNAL
-game_memory* DebugGlobalMemory = 0;
-#endif
-
-game_asset_manager* GlobalAssetManager = 0;
 // Signature is
 //void game_update_and_render (thread_context* Thread,
 //                game_memory* Memory,
@@ -494,20 +481,23 @@ game_asset_manager* GlobalAssetManager = 0;
 //                game_input* Input )
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
-  GlobalVis = &GlobalGjkEpaVisualizer;
+  TIMED_FUNCTION();
+
 #if HANDMADE_INTERNAL
   GlobalDebugRenderGroup =  RenderCommands->DebugRenderGroup;
   DebugGlobalMemory = Memory;
 #endif
-
-  TIMED_FUNCTION();
+  
   Platform = Memory->PlatformAPI;
-  InitiateGame(Thread, Memory, RenderCommands, Input);
+
+  InitiateGame(Memory, RenderCommands, Input);
+
+  EndTemporaryMemory(TransientTemporaryMemory);
+  TransientTemporaryMemory = BeginTemporaryMemory(GlobalTransientArena);
+
   Assert(Memory->GameState);
   Assert(Memory->GameState->AssetManager);
-  GlobalAssetManager = Memory->GameState->AssetManager;
-
-
+  
   RenderCommands->MainRenderGroup->ScreenWidth  = (r32)RenderCommands->ScreenWidthPixels;
   RenderCommands->MainRenderGroup->ScreenHeight = (r32)RenderCommands->ScreenHeightPixels;
 
@@ -524,7 +514,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   CameraSystemUpdate(GameState->World);
   SpriteAnimationSystemUpdate(GameState->World);
   FillRenderPushBuffer( World, RenderCommands->MainRenderGroup );
-  CheckArena(&GameState->TransientArena);
 
   if(Memory->DebugState)
   {

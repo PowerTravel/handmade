@@ -1,7 +1,6 @@
 #include "gjk_narrow_phase.h"
 #include "epa_collision_data.h"
 #include "gjk_epa_visualizer.h"
-#include "component_collider.h"
 #include "utility_macros.h"
 #include "math/affine_transformations.h"
 
@@ -464,7 +463,7 @@ void RecordGJKFrame(  const m4& AModelMat, const collider_mesh* AMesh,
       }
     }
     Vis->VertexCount = CSOCount;
-    utils::Copy(Vis->VertexCount*sizeof(v3), CSO, Vis->Vertices);
+    Copy(Vis->VertexCount*sizeof(v3), CSO, Vis->Vertices);
     Vis->CSOMeshOffset = 0;
     Vis->CSOMeshLength = CSOCount;
     for(u32 i = 0; i < CSOCount; ++i)
@@ -509,7 +508,7 @@ void RecordGJKFrame(  const m4& AModelMat, const collider_mesh* AMesh,
   if(SI->Length==4)
   {
     u32 VerticeIdx[4] = {};
-    utils::Copy(sizeof(VerticeIdx), &Vis->Indeces[SI->Offset], VerticeIdx);
+    Copy(sizeof(VerticeIdx), &Vis->Indeces[SI->Offset], VerticeIdx);
 
     // Fix Winding so that all triangles go ccw
     v3 v01 = Vis->Vertices[VerticeIdx[1]] - Vis->Vertices[VerticeIdx[0]];
@@ -545,7 +544,7 @@ void RecordGJKFrame(  const m4& AModelMat, const collider_mesh* AMesh,
     CCWSimplexIdx[10] = VerticeIdx[3];
     CCWSimplexIdx[11] = VerticeIdx[0];
 
-    utils::Copy(sizeof(CCWSimplexIdx), CCWSimplexIdx, &Vis->Indeces[SI->Offset]);
+    Copy(sizeof(CCWSimplexIdx), CCWSimplexIdx, &Vis->Indeces[SI->Offset]);
     SI->Length=12;
   }
 
