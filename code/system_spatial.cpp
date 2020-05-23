@@ -548,7 +548,7 @@ internal aabb_tree BuildBroadPhaseTree( world* World )
 {
   TIMED_FUNCTION();
   aabb_tree Result = {};
-  memory_arena* TransientArena = GlobalTransientArena;
+  memory_arena* TransientArena = GlobalGameState->TransientArena;
   for(u32 Index = 0;  Index < World->NrEntities; ++Index )
   {
     entity* E = &World->Entities[Index];
@@ -568,7 +568,7 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
 {
   TIMED_FUNCTION();
   broad_phase_result_stack* ColliderPair = BroadPhaseResultStack;
-  memory_arena* TransientArena = GlobalTransientArena;
+  memory_arena* TransientArena = GlobalGameState->TransientArena;
   contact_manifold** WorkArray = (contact_manifold**) PushArray(TransientArena, BroadPhaseResultCount, contact_manifold* );
   contact_manifold** WorkSlot = WorkArray;
   World->FirstContactManifold = 0;
@@ -879,7 +879,7 @@ void SpatialSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
 
-  temporary_memory TempMem1 = BeginTemporaryMemory( GlobalTransientArena );
+  temporary_memory TempMem1 = BeginTemporaryMemory( GlobalGameState->TransientArena );
 
   RemoveInvalidContactPoints( World );
 

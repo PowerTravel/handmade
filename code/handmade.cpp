@@ -15,17 +15,7 @@
 game_memory* DebugGlobalMemory = 0;
 #endif
 
-game_state GlobalGameState_ = {};
-game_state* GlobalGameState = &GlobalGameState_;
-
-game_asset_manager  GlobalAssetManager_;
-game_asset_manager* GlobalAssetManager;
-
-memory_arena GlobalTransientArena_ = {};
-memory_arena* GlobalTransientArena = &GlobalTransientArena_;
-
-temporary_memory TransientTemporaryMemory;
-
+game_state* GlobalGameState;
 platform_api Platform;
 
 #include "gjk_epa_visualizer.h"
@@ -90,18 +80,19 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
   }
 }
 
-void AllocateWorld( u32 NrMaxEntities, game_state* GameState, u32 NumManifolds = 4 )
+world* AllocateWorld( u32 NrMaxEntities, u32 NumManifolds = 4 )
 {
-  world* World = BootstrapPushStruct(world, Arena);
+  world* World = PushStruct(GlobalGameState->PersistentArena, world);
+  World->Arena = GlobalGameState->PersistentArena;
 
   World->NrEntities = 0;
   World->NrMaxEntities = NrMaxEntities;
-  World->Entities = (entity*) PushArray( &World->Arena, World->NrMaxEntities, entity );
+  World->Entities = (entity*) PushArray( World->Arena, World->NrMaxEntities, entity );
 
   World->MaxNrManifolds = NumManifolds*NrMaxEntities;
-  World->Manifolds = (contact_manifold*)  PushSize( &World->Arena, World->MaxNrManifolds*( sizeof(contact_manifold) ));
+  World->Manifolds = (contact_manifold*)  PushSize( World->Arena, World->MaxNrManifolds*( sizeof(contact_manifold) ));
   World->FirstContactManifold = 0;
-  GameState->World = World;
+  return World;
 }
 
 #if 0
@@ -154,11 +145,8 @@ void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, g
 }
 #endif
 
-void CreateCollisionTestScene(game_memory* Memory, game_render_commands* RenderCommands, game_input* Input)
+void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 {
-  game_state* GameState        = Memory->GameState;
-
-  AllocateWorld(120, GameState, 32);
   world* World = GameState->World;
 
   // TODO: Create a better way to ask for assets than giving known array-indeces
@@ -166,7 +154,6 @@ void CreateCollisionTestScene(game_memory* Memory, game_render_commands* RenderC
   const u32 CubeIndex0 = 1; // CubeIndex0 and CubeIndex1 have different texture indeces
   const u32 CubeIndex1 = 2;
   const u32 CubeTextureIndex = 30;
-  LoadCubeAsset( GameState );
 
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
@@ -255,7 +242,7 @@ void CreateCollisionTestScene(game_memory* Memory, game_render_commands* RenderC
   entity* ControllableCamera = NewEntity( World );
   NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
 
-  r32 AspectRatio = (r32)RenderCommands->ResolutionWidthPixels / (r32) RenderCommands->ResolutionHeightPixels;
+  r32 AspectRatio = GameState->ScreenWidthPixels / GameState->ScreenHeightPixels;
   r32 FieldOfView =  90;
   SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
   LookAt(ControllableCamera->CameraComponent, 1*V3(3,3,3), V3(0,0,0));
@@ -437,23 +424,20 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
 {
   if (!Memory->GameState)
   {
-    TransientTemporaryMemory = BeginTemporaryMemory(GlobalTransientArena);
-
+    GlobalGameState = BootstrapPushStruct(game_state, PersistentArena);
     Memory->GameState = GlobalGameState;
-    GlobalGameState->AssetManager = CreateAssetManager();
-    GlobalAssetManager = GlobalGameState->AssetManager;
-    //Create2DScene(Thread, Memory, RenderCommands, Input );
-    CreateCollisionTestScene(Memory, RenderCommands, Input);
+    Memory->GameState->TransientArena = PushStruct(Memory->GameState->PersistentArena, memory_arena);
+    Memory->GameState->IsInitialized = true;
 
-  
-    RenderCommands->MainRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
+    Memory->GameState->TransientTempMem = BeginTemporaryMemory(Memory->GameState->TransientArena);
 
-    // TODO: Right now DebugRenderGroup just solves the problem of drawing the overlay on top of everything else with a special shader.
-    //       This should be supported by just one RenderGroup with sorting capabilities and shaderswitching.
-    //       Maybe DebugRenderGroup is something we want to move away from and consolidate into the DebugState.
-    //       Is there a problem with the debug system piping it's drawing through the GameRenderingPipeline?
-    //       I mean it already sort of does since it all gets drawn in RenderGroupToOutput.
-    RenderCommands->DebugRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
+    Memory->GameState->AssetManager = CreateAssetManager();
+    Memory->GameState->World = AllocateWorld(120, 32);
+
+    Memory->GameState->ScreenWidthPixels = (r32)RenderCommands->ResolutionWidthPixels;
+    Memory->GameState->ScreenHeightPixels = (r32)RenderCommands->ResolutionHeightPixels;
+
+    CreateCollisionTestScene(Memory->GameState, Input);    
 
     for (s32 ControllerIndex = 0;
     ControllerIndex < ArrayCount(Input->Controllers);
@@ -463,8 +447,49 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
       Controller->IsAnalog = true;
     }
   }
+
+  if(!RenderCommands->MainRenderGroup)
+  {
+    RenderCommands->MainRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
+  }
+    
+  if(!RenderCommands->DebugRenderGroup)
+  {
+    // TODO: Right now DebugRenderGroup just solves the problem of drawing the overlay on top of everything else with a special shader.
+    //       This should be supported by just one RenderGroup with sorting capabilities and shaderswitching.
+    //       Maybe DebugRenderGroup is something we want to move away from and consolidate into the DebugState.
+    //       Is there a problem with the debug system piping it's drawing through the GameRenderingPipeline?
+    //       I mean it already sort of does since it all gets drawn in RenderGroupToOutput.
+    RenderCommands->DebugRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);    
+  }
 }
 
+void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
+{
+  Platform = Memory->PlatformAPI;
+
+  InitiateGame(Memory, RenderCommands, Input);
+
+#if HANDMADE_INTERNAL
+  GlobalDebugRenderGroup =  RenderCommands->DebugRenderGroup;
+  DebugGlobalMemory = Memory;
+#endif
+
+  Assert(Memory->GameState);
+  Assert(Memory->GameState->AssetManager);
+  
+  GlobalGameState = Memory->GameState;
+
+  EndTemporaryMemory(GlobalGameState->TransientTempMem);
+  GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
+
+  RenderCommands->MainRenderGroup->ScreenWidth  = (r32)RenderCommands->ScreenWidthPixels;
+  RenderCommands->MainRenderGroup->ScreenHeight = (r32)RenderCommands->ScreenHeightPixels;
+
+  RenderCommands->DebugRenderGroup->ScreenWidth  = (r32) RenderCommands->ScreenWidthPixels;
+  RenderCommands->DebugRenderGroup->ScreenHeight = (r32) RenderCommands->ScreenHeightPixels;
+
+};
 
 /*
   Note:
@@ -473,6 +498,7 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
   Also called 'name mangling' or 'name decoration'. The actual function names are visible in the outputted .map file
   i the build directory.
 */
+
 
 // Signature is
 //void game_update_and_render (thread_context* Thread,
@@ -483,37 +509,17 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
   TIMED_FUNCTION();
 
-#if HANDMADE_INTERNAL
-  GlobalDebugRenderGroup =  RenderCommands->DebugRenderGroup;
-  DebugGlobalMemory = Memory;
-#endif
-  
-  Platform = Memory->PlatformAPI;
+  BeginFrame(Memory, RenderCommands, Input);
 
-  InitiateGame(Memory, RenderCommands, Input);
-
-  EndTemporaryMemory(TransientTemporaryMemory);
-  TransientTemporaryMemory = BeginTemporaryMemory(GlobalTransientArena);
-
-  Assert(Memory->GameState);
-  Assert(Memory->GameState->AssetManager);
-  
-  RenderCommands->MainRenderGroup->ScreenWidth  = (r32)RenderCommands->ScreenWidthPixels;
-  RenderCommands->MainRenderGroup->ScreenHeight = (r32)RenderCommands->ScreenHeightPixels;
-
-  RenderCommands->DebugRenderGroup->ScreenWidth  = (r32) RenderCommands->ScreenWidthPixels;
-  RenderCommands->DebugRenderGroup->ScreenHeight = (r32) RenderCommands->ScreenHeightPixels;
-
-  game_state* GameState = Memory->GameState;
-  world* World = GameState->World;
+  world* World = GlobalGameState->World;
   World->dtForFrame = Input->dt;
   World->GlobalTimeSec += Input->dt;
 
-  ControllerSystemUpdate(GameState->World);
-  SpatialSystemUpdate(GameState->World);
-  CameraSystemUpdate(GameState->World);
-  SpriteAnimationSystemUpdate(GameState->World);
-  FillRenderPushBuffer( World, RenderCommands->MainRenderGroup );
+  ControllerSystemUpdate(World);
+  SpatialSystemUpdate(World);
+  CameraSystemUpdate(World);
+  SpriteAnimationSystemUpdate(World);
+  FillRenderPushBuffer(World, RenderCommands->MainRenderGroup );
 
   if(Memory->DebugState)
   {

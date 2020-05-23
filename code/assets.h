@@ -97,7 +97,6 @@ struct game_asset_manager
 
 struct collider_mesh;
 struct component_render;
-void LoadCubeAsset( game_state* State );
 
 // Note: TextureIndex and MeshIndex are not the same as MeshHandle.
 //       TextureIndex and MeshIndex are hardcoded array indeces that

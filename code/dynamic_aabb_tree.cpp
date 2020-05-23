@@ -94,7 +94,7 @@ broad_phase_result_stack* GetCollisionPairs( aabb_tree* Tree, u32* ResultStackSi
   {
     return 0;
   }
-  aabb_tree_node** const Base = (aabb_tree_node**) PushArray(GlobalTransientArena, 2*Tree->Size, aabb_tree_node*);
+  aabb_tree_node** const Base = (aabb_tree_node**) PushArray(GlobalGameState->TransientArena, 2*Tree->Size, aabb_tree_node*);
   aabb_tree_node** const LeftBase  = Base;
   aabb_tree_node** const RightBase = Base+1;
   broad_phase_result_stack* ResultHead = {};
@@ -116,7 +116,7 @@ broad_phase_result_stack* GetCollisionPairs( aabb_tree* Tree, u32* ResultStackSi
         // Both are leaves
         if(AABBIntersects(&Left->AABB, &Right->AABB))
         {
-          broad_phase_result_stack* NewResult = (broad_phase_result_stack*) PushStruct(GlobalTransientArena ,broad_phase_result_stack);
+          broad_phase_result_stack* NewResult = (broad_phase_result_stack*) PushStruct(GlobalGameState->TransientArena ,broad_phase_result_stack);
           NewResult->A = Left->Entity;
           NewResult->B = Right->Entity;
           NewResult->Previous = ResultHead;

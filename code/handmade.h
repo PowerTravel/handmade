@@ -17,8 +17,7 @@ struct world
   r32 GlobalTimeSec;
   r32 dtForFrame;
 
-  memory_arena Arena;
-//  memory_arena* TransientArena;
+  memory_arena* Arena;
 
   tile_map     TileMap;
   u32          NrEntities;
@@ -30,19 +29,21 @@ struct world
   contact_manifold* FirstContactManifold;
 };
 
-struct global_context
-{
-  memory_arena TransientArena;
-  game_asset_manager AssetManager;
-  platform_api PlatformAPI;
-};
-
-
 // This is to be a ginormous struct where we can set things
 // we wanna access from everywhere. (Except the debug system which is it's own thing)
 struct game_state
 {
+  r32 ScreenWidthPixels;
+  r32 ScreenHeightPixels;
+
+  memory_arena* PersistentArena;
+  memory_arena* TransientArena;
+
+  temporary_memory TransientTempMem;
+
   game_asset_manager* AssetManager;
+
   world* World;
+
   b32 IsInitialized;
 };

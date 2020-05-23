@@ -573,7 +573,6 @@ struct game_memory
 {
   struct game_state* GameState;
   struct debug_state* DebugState;
-  struct global_context* Context;
   platform_api PlatformAPI;
 };
 

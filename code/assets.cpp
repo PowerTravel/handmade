@@ -1,14 +1,6 @@
 #include "assets.h"
 #include "obj_loader.h"
 
-//4 estates instead of 5;
-//have a bank, investment, divestment, salaries
-//No space to buy viniards
-
-
-extern game_asset_manager* GlobalAssetManager;
-extern memory_arena* GlobalTransientArena;
-
 void InitPredefinedMaterials(game_asset_manager* AssetManager)
 {
   local_persist material mtl[30] =
@@ -243,56 +235,10 @@ FontMap->BitmapHandle = AssetManager->TextureCount++;
   Platform.DEBUGPlatformFreeFileMemory(&Thread, TTFFile.Contents);
 }
 
-
-game_asset_manager* CreateAssetManager()
+internal void LoadCubeAsset(game_asset_manager* AssetManager)
 {
-  game_asset_manager* AssetManager = BootstrapPushStruct(game_asset_manager, AssetArena);
-
-  AssetManager->MaxMeshCount = 64;
-  AssetManager->MeshCount = 0;
-  AssetManager->MeshData = PushArray(&AssetManager->AssetArena,
-                                            AssetManager->MaxMeshCount, mesh_data);
-
-  AssetManager->MaxObjectCount = 64;
-  AssetManager->ObjectCount = 0;
-  AssetManager->Objects = PushArray(&AssetManager->AssetArena,
-                                            AssetManager->MaxObjectCount, mesh_indeces);
-  AssetManager->ObjectKeeper = PushArray(&AssetManager->AssetArena,
-                                            AssetManager->MaxObjectCount, book_keeper);
-
-  AssetManager->MaxMaterialCount = 64;
-  AssetManager->MaterialCount = 0;
-  AssetManager->Materials = PushArray( &AssetManager->AssetArena,
-                                            AssetManager->MaxMaterialCount, material);
-
-  AssetManager->MaxTextureCount = 64;
-  AssetManager->TextureCount = 0;
-  AssetManager->Textures = PushArray( &AssetManager->AssetArena,
-                                             AssetManager->MaxTextureCount, bitmap);
-  AssetManager->TextureKeeper = PushArray(&AssetManager->AssetArena,
-                                            AssetManager->MaxMaterialCount, book_keeper);
-
-  InitPredefinedMaterials(AssetManager);
-  InitPredefinedMeshes(AssetManager);
-  
-  STBBakeFont(AssetManager);
-  
-  return AssetManager;
-}
-
-inline game_asset_manager*
-GetAssetManager()
-{
-  Assert(GlobalAssetManager);
-  return GlobalAssetManager;
-}
-
-// TODO: Create a global_context and stuff the Transient arena in there.
-void LoadCubeAsset( game_state* State)
-{
-  game_asset_manager* AssetManager = GetAssetManager();
   memory_arena* AssetArena = &AssetManager->AssetArena;
-  obj_loaded_file* LoadedObjFile = ReadOBJFile( AssetArena, GlobalTransientArena,
+  obj_loaded_file* LoadedObjFile = ReadOBJFile( AssetArena, GlobalGameState->TransientArena,
    "..\\handmade\\data\\cube\\cube.obj");
 
   u32 MeshIndex = AssetManager->MeshCount++;
@@ -337,6 +283,52 @@ void LoadCubeAsset( game_state* State)
     DstMaterial->TextureHandle = TextureIndex;
   }
 }
+
+
+game_asset_manager* CreateAssetManager()
+{
+  game_asset_manager* AssetManager = BootstrapPushStruct(game_asset_manager, AssetArena);
+
+  AssetManager->MaxMeshCount = 64;
+  AssetManager->MeshCount = 0;
+  AssetManager->MeshData = PushArray(&AssetManager->AssetArena,
+                                            AssetManager->MaxMeshCount, mesh_data);
+
+  AssetManager->MaxObjectCount = 64;
+  AssetManager->ObjectCount = 0;
+  AssetManager->Objects = PushArray(&AssetManager->AssetArena,
+                                            AssetManager->MaxObjectCount, mesh_indeces);
+  AssetManager->ObjectKeeper = PushArray(&AssetManager->AssetArena,
+                                            AssetManager->MaxObjectCount, book_keeper);
+
+  AssetManager->MaxMaterialCount = 64;
+  AssetManager->MaterialCount = 0;
+  AssetManager->Materials = PushArray( &AssetManager->AssetArena,
+                                            AssetManager->MaxMaterialCount, material);
+
+  AssetManager->MaxTextureCount = 64;
+  AssetManager->TextureCount = 0;
+  AssetManager->Textures = PushArray( &AssetManager->AssetArena,
+                                             AssetManager->MaxTextureCount, bitmap);
+  AssetManager->TextureKeeper = PushArray(&AssetManager->AssetArena,
+                                            AssetManager->MaxMaterialCount, book_keeper);
+
+  InitPredefinedMaterials(AssetManager);
+  InitPredefinedMeshes(AssetManager);
+  
+  STBBakeFont(AssetManager);
+  LoadCubeAsset(AssetManager);
+
+  return AssetManager;
+}
+
+inline game_asset_manager*
+GetAssetManager()
+{
+  Assert(GlobalGameState->AssetManager);
+  return GlobalGameState->AssetManager;
+}
+
 
 u32 GetMeshAssetHandle( u32 MeshIndex )
 {
