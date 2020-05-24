@@ -18,24 +18,14 @@ game_memory* DebugGlobalMemory = 0;
 game_state* GlobalGameState;
 platform_api Platform;
 
-#include "gjk_epa_visualizer.h"
-gjk_epa_visualizer GlobalGjkEpaVisualizer = {};
-gjk_epa_visualizer* GlobalVis;
-global_variable b32 GlobalFireVic = false;
-
-
 #include "math/aabb.cpp"
 #include "handmade_tile.cpp"
 #include "obj_loader.cpp"
 #include "render_push_buffer.cpp"
 #include "dynamic_aabb_tree.cpp"
 #include "gjk_narrow_phase.cpp"
-#if 1
 #include "epa_collision_data.cpp"
 #include "halfedge_mesh.cpp"
-#else
-#include "epa_collision_data_old.cpp"
-#endif
 
 #include "entity_components.cpp"
 #include "system_controller.cpp"
@@ -95,56 +85,6 @@ world* AllocateWorld( u32 NrMaxEntities, u32 NumManifolds = 4 )
   return World;
 }
 
-#if 0
-void CreateEpaVisualizerTestScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
-{
-  game_state* GameState = Memory->GameState;
-  memory_arena* AssetArena = &GameState->AssetArena;
-  memory_arena* TransientArena = &GameState->TransientArena;
-
-  AllocateWorld(20, GameState);
-  world* World = GameState->World;
-  game_assets* Assets = World->Assets;
-
-
-  entity* Light = NewEntity( World );
-  NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
-  Light->LightComponent->Color = V4(5,5,5,1);
-  Light->SpatialComponent->Position = V3(0,2,4);
-
-  obj_loaded_file* cube = ReadOBJFile( Thread, GameState,
-         Platform.DEBUGPlatformReadEntireFile,
-         Platform.DEBUGPlatformFreeFileMemory,
-         "..\\handmade\\data\\cube\\cube.obj");
-
-  entity* CubeA = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
-  SetMaterial(CubeA->SurfaceComponent->Material, MATERIAL_RED_RUBBER);
-  CubeA->SpatialComponent->Position = V3( 3,0,0);
-  CubeA->SpatialComponent->Scale = V3(2, 2, 2);
-
-  entity* CubeB = CreateEntityFromOBJGroup( World, &cube->Objects[0], cube->MeshData );
-  SetMaterial(CubeB->SurfaceComponent->Material, MATERIAL_BLUE_RUBBER);
-  CubeB->SpatialComponent->Position = V3(3,0,1);
-  CubeB->SpatialComponent->Rotation = RotateQuaternion( Pi32/4.f, V3(0,0,1) );
-  CubeB->SpatialComponent->Scale = V3(2, 2, 2);
-
-  NewComponents( World, CubeA, COMPONENT_TYPE_CONTROLLER );
-
-  CubeA->ControllerComponent->Controller = GetController(Input, 1);
-  CubeA->ControllerComponent->Type = ControllerType_EpaGjkVisualizer;
-
-  entity* ControllableCamera = NewEntity( World );
-  NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
-
-  r32 AspectRatio = (r32)RenderCommands->ResolutionWidthPixels / (r32) RenderCommands->ResolutionHeightPixels;
-  r32 FieldOfView =  90;
-  SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
-  LookAt(ControllableCamera->CameraComponent, 1*V3(0,3,8), V3(0,3,0));
-  ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
-  ControllableCamera->ControllerComponent->Type = ControllerType_FlyingCamera;
-}
-#endif
-
 void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 {
   world* World = GameState->World;
@@ -158,7 +98,19 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
   Light->LightComponent->Color = V4(3,3,3,1);
-  Light->SpatialComponent->Position = V3(10,10,10);
+  Light->SpatialComponent->Position = V3(0,5,5);
+
+  entity* LightMesh = NewEntity( World );
+  NewComponents( World, LightMesh,
+    COMPONENT_TYPE_RENDER   |
+    COMPONENT_TYPE_SPATIAL);
+
+  LightMesh->RenderComponent->MeshHandle    = GetMeshAssetHandle(CubeIndex1);
+  LightMesh->RenderComponent->TextureHandle = GetTextureAssetHandle(0);
+
+  LightMesh->SpatialComponent->Position = Light->SpatialComponent->Position;
+  LightMesh->SpatialComponent->Scale    = V3( 0.3, 0.3, 0.3);
+
 
 #define State3
 #if defined(State1)
@@ -218,26 +170,37 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     }
   }
 
-  entity* floorEntity = NewEntity( World );
-  NewComponents( World, floorEntity,
+  entity* FloorEntity = NewEntity( World );
+  NewComponents( World, FloorEntity,
     COMPONENT_TYPE_RENDER   |
     COMPONENT_TYPE_SPATIAL  |
     COMPONENT_TYPE_COLLIDER);
 
-  floorEntity->RenderComponent->MeshHandle    = GetMeshAssetHandle(CubeIndex1);
-  floorEntity->RenderComponent->TextureHandle = GetTextureAssetHandle(CubeTextureIndex);
+  FloorEntity->RenderComponent->MeshHandle    = GetMeshAssetHandle(CubeIndex1);
+  FloorEntity->RenderComponent->TextureHandle = GetTextureAssetHandle(CubeTextureIndex);
 
-  floorEntity->ColliderComponent->MeshHandle = GetMeshAssetHandle(CubeIndex1);
-  floorEntity->ColliderComponent->AABB = GetMeshAABB(floorEntity->ColliderComponent->MeshHandle);
+  FloorEntity->ColliderComponent->MeshHandle = GetMeshAssetHandle(CubeIndex1);
+  FloorEntity->ColliderComponent->AABB = GetMeshAABB(FloorEntity->ColliderComponent->MeshHandle);
 
-  floorEntity->SpatialComponent->Position = V3( 0,-2, 0);
-  floorEntity->SpatialComponent->Scale = V3( 18, 1, 18);
+  FloorEntity->SpatialComponent->Position = V3( 0,-2, 0);
+  FloorEntity->SpatialComponent->Scale = V3( 18, 1, 18);
 
-#if 0
-  NewComponents( World, floor, COMPONENT_TYPE_CONTROLLER );
-  floor->ControllerComponent->Controller = GetController(Input, 1);
-  floor->ControllerComponent->Type = ControllerType_EpaGjkVisualizer;
-#endif
+  entity* SpriteAnimationEntity = NewEntity( World );
+  NewComponents( World, SpriteAnimationEntity,
+    COMPONENT_TYPE_RENDER   |
+    COMPONENT_TYPE_SPATIAL  |
+    COMPONENT_TYPE_COLLIDER);
+
+  SpriteAnimationEntity->RenderComponent->MeshHandle    = GetMeshAssetHandle(CubeIndex1);
+  SpriteAnimationEntity->RenderComponent->TextureHandle = GetTextureAssetHandle(MATERIAL_BRASS);
+
+  SpriteAnimationEntity->ColliderComponent->MeshHandle = GetMeshAssetHandle(CubeIndex1);
+  SpriteAnimationEntity->ColliderComponent->AABB = GetMeshAABB(SpriteAnimationEntity->ColliderComponent->MeshHandle);
+
+  SpriteAnimationEntity->SpatialComponent->Position = V3( -0,  8, 8);
+  SpriteAnimationEntity->SpatialComponent->Scale    = V3( 18, 18, 1);
+
+
 
   entity* ControllableCamera = NewEntity( World );
   NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
@@ -245,7 +208,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   r32 AspectRatio = GameState->ScreenWidthPixels / GameState->ScreenHeightPixels;
   r32 FieldOfView =  90;
   SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
-  LookAt(ControllableCamera->CameraComponent, 1*V3(3,3,3), V3(0,0,0));
+  LookAt(ControllableCamera->CameraComponent, 1*V3(0,3,-8), V3(0,3,0));
 
   ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
   ControllableCamera->ControllerComponent->Type = ControllerType_FlyingCamera;

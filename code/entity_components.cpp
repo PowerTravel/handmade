@@ -1,4 +1,3 @@
-#include "epa_collision_data.h"
 #include "handmade.h"
 #include "handmade_tile.h"
 #include "utility_macros.h"

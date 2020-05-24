@@ -15,7 +15,6 @@ struct game_controller_input;
 enum ControllerType
 {
   ControllerType_Hero,
-  ControllerType_EpaGjkVisualizer,
   ControllerType_FlyingCamera,
 };
 

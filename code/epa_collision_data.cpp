@@ -1,4 +1,3 @@
-#include "gjk_epa_visualizer.h"
 #include "epa_collision_data.h"
 #include "gjk_narrow_phase.h"
 #include "memory.h"

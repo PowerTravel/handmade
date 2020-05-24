@@ -2,7 +2,6 @@
 #include "component_camera.h"
 #include "entity_components.h"
 #include "component_sprite_animation.h"
-#include "gjk_epa_visualizer.h"
 #include "epa_collision_data.h"
 
 push_buffer_header* PushNewHeader(render_group* RenderGroup)

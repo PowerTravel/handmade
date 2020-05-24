@@ -5,7 +5,6 @@
 #include "dynamic_aabb_tree.h"
 #include "gjk_narrow_phase.h"
 #include "epa_collision_data.h"
-#include "gjk_epa_visualizer.h"
 
 #define NEW_CONTACT_THRESHOLD 0.1f
 #define PERSISTENT_CONTACT_THRESHOLD 0.1f
@@ -373,27 +372,6 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
   }
 
   EndTemporaryMemory(TempMem);
-}
-
-void FireOnceVic(memory_arena* TransientArena, entity* A, entity* B)
-{
-  local_persist b32 Fired = false;
-  if(!Fired && GlobalFireVic )
-  {
-    Fired = true;
-    ResetEPA(GlobalVis);
-    m4 ModelMatrixA = GetModelMatrix(A->SpatialComponent);
-    m4 ModelMatrixB = GetModelMatrix(B->SpatialComponent);
-    collider_mesh MeshA = GetColliderMesh(A->ColliderComponent->MeshHandle);
-    collider_mesh MeshB = GetColliderMesh(B->ColliderComponent->MeshHandle);
-
-    gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
-                                                &ModelMatrixA, &MeshA,
-                                                &ModelMatrixB, &MeshB);
-    contact_data apa = EPACollisionResolution(TransientArena, &ModelMatrixA, &MeshA,
-                                                              &ModelMatrixB, &MeshB,
-                                                              &NarrowPhaseResult.Simplex);
-  }
 }
 
 internal void RemoveInvalidContactPoints( world* World )

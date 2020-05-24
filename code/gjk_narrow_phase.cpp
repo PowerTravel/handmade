@@ -1,6 +1,5 @@
 #include "gjk_narrow_phase.h"
 #include "epa_collision_data.h"
-#include "gjk_epa_visualizer.h"
 #include "utility_macros.h"
 #include "math/affine_transformations.h"
 
@@ -423,142 +422,6 @@ IsPointOnSimplexSurface(const gjk_simplex& Simplex, const v3& Point)
   return false;
 }
 
-void RecordGJKFrame(  const m4& AModelMat, const collider_mesh* AMesh,
-                      const m4& BModelMat, const collider_mesh* BMesh, gjk_simplex* Simplex, const v3& ClosestPointOnSurface )
-{
-  TIMED_FUNCTION();
-  gjk_epa_visualizer* Vis = GlobalVis;
-  if(!Vis) return;
-  if(!Vis->TriggerRecord)
-  {
-    Vis->UpdateVBO = false;
-    return;
-  }
-
-  if(!Vis->CSOMeshLength)
-  {
-
-    v3 CSO[128] = {};
-    Assert((AMesh->nv * BMesh->nv) < ArrayCount(CSO));
-    u32 CSOCount = 0;
-    for(u32 i = 0; i < AMesh->nv; ++i)
-    {
-      for(u32 j = 0; j < BMesh->nv; ++j)
-      {
-        v3 cso = V3( AModelMat * V4(AMesh->v[i],1) - BModelMat * V4(BMesh->v[j],1));
-        b32 UniqueCSO = true;
-        for(u32 k = 0; k < CSOCount; ++k)
-        {
-          if(cso == CSO[k])
-          {
-            UniqueCSO = false;
-            break;
-          }
-        }
-
-        if(UniqueCSO)
-        {
-          CSO[CSOCount++] = cso;
-        }
-      }
-    }
-    Vis->VertexCount = CSOCount;
-    Copy(Vis->VertexCount*sizeof(v3), CSO, Vis->Vertices);
-    Vis->CSOMeshOffset = 0;
-    Vis->CSOMeshLength = CSOCount;
-    for(u32 i = 0; i < CSOCount; ++i)
-    {
-      Vis->Indeces[i] = i;
-    }
-    Vis->IndexCount = CSOCount;
-  }
-
-  Vis->UpdateVBO = true;
-  Assert(Vis->IndexCount  < Vis->MaxIndexCount);
-  Assert(Vis->VertexCount < Vis->MaxVertexCount);
-
-  simplex_index* SI = &Vis->Simplex[Vis->SimplexCount++];
-  SI->ClosestPoint = ClosestPointOnSurface;
-  SI->Offset = Vis->IndexCount;
-  SI->Length = Simplex->Dimension;
-  for (u32 i = 0; i < SI->Length; ++i)
-  {
-    v3& Vertex = Simplex->SP[i].S;
-    b32 Unique = true;
-    u32 VerticeIndex = 0;
-    while(VerticeIndex < Vis->VertexCount)
-    {
-      if(Vertex == Vis->Vertices[VerticeIndex])
-      {
-        Unique = false;
-        break;
-      }
-      VerticeIndex++;
-    }
-
-    if(Unique)
-    {
-      Assert(Vis->MaxVertexCount > VerticeIndex);
-      Vis->Vertices[Vis->VertexCount++] = Vertex;
-    }
-    Vis->Indeces[SI->Offset+i] = VerticeIndex;
-  }
-
-  // Expand the 4 vertices to 4 triangles
-  if(SI->Length==4)
-  {
-    u32 VerticeIdx[4] = {};
-    Copy(sizeof(VerticeIdx), &Vis->Indeces[SI->Offset], VerticeIdx);
-
-    // Fix Winding so that all triangles go ccw
-    v3 v01 = Vis->Vertices[VerticeIdx[1]] - Vis->Vertices[VerticeIdx[0]];
-    v3 v02 = Vis->Vertices[VerticeIdx[2]] - Vis->Vertices[VerticeIdx[0]];
-    v3 v03 = Vis->Vertices[VerticeIdx[3]] - Vis->Vertices[VerticeIdx[0]];
-    const r32 Determinant = v03 * CrossProduct(v01,v02);
-    Assert(Abs(Determinant) > 10E-7);
-    if(Determinant > 0.f)
-    {
-      // Swap first and third Support
-      u32 Tmp = VerticeIdx[0];
-      VerticeIdx[0] = VerticeIdx[3];
-      VerticeIdx[3] = Tmp;
-    }
-
-    u32 CCWSimplexIdx[12] = {};
-    // 0,1,2 is a outwards facing triangle
-    CCWSimplexIdx[ 0] = VerticeIdx[0];
-    CCWSimplexIdx[ 1] = VerticeIdx[1];
-    CCWSimplexIdx[ 2] = VerticeIdx[2];
-
-    // All the other triangles must go around the
-    // first triangle with 3rd index in the middle
-    CCWSimplexIdx[ 3] = VerticeIdx[0];
-    CCWSimplexIdx[ 4] = VerticeIdx[3];
-    CCWSimplexIdx[ 5] = VerticeIdx[1];
-
-    CCWSimplexIdx[ 6] = VerticeIdx[1];
-    CCWSimplexIdx[ 7] = VerticeIdx[3];
-    CCWSimplexIdx[ 8] = VerticeIdx[2];
-
-    CCWSimplexIdx[ 9] = VerticeIdx[2];
-    CCWSimplexIdx[10] = VerticeIdx[3];
-    CCWSimplexIdx[11] = VerticeIdx[0];
-
-    Copy(sizeof(CCWSimplexIdx), CCWSimplexIdx, &Vis->Indeces[SI->Offset]);
-    SI->Length=12;
-  }
-
-  Vis->IndexCount = SI->Offset + SI->Length;
-
-  u32 IndexCount = 0;
-  Assert( Vis->MaxIndexCount    > Vis->IndexCount);
-  Assert( Vis->MaxVertexCount   > Vis->VertexCount);
-  Assert( Vis->MaxSimplexCount  > Vis->SimplexCount);
-
-  u32 SimplexCount = 0;
-  u32 ActiveSimplexFrame = 0;
-}
-
 gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_mesh* AMesh,
                                            const m4* BModelMat, const collider_mesh* BMesh)
 {
@@ -610,8 +473,6 @@ gjk_collision_result GJKCollisionDetection(const m4* AModelMat, const collider_m
         INVALID_CODE_PATH
       }
     }
-
-    RecordGJKFrame(*AModelMat, AMesh, *BModelMat, BMesh, &Simplex, PartialResult.ClosestPoint);
 
     if(PartialResult.Reduced)
     {
