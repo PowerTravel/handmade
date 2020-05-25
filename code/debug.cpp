@@ -273,9 +273,11 @@ DebugRewriteConfigFile(game_memory* Memory)
     c8 Buffer[4096] = {};
     u32 Size = _snprintf_s(Buffer, sizeof(Buffer),
 "#define MULTI_THREADED %d // b32\n\
-#define SHOW_COLLISION_POINTS %d // b32\n",
+#define SHOW_COLLISION_POINTS %d // b32\n\
+#define SHOW_COLLIDER %d // b32\n",
       DebugState->ConfigMultiThreaded,
-      DebugState->ConfigCollisionPoints);
+      DebugState->ConfigCollisionPoints,
+      DebugState->ConfigCollider);
     thread_context Dummy = {};
 
     Memory->PlatformAPI.DEBUGPlatformWriteEntireFile(&Dummy, "W:\\handmade\\code\\debug_config.h", Size, Buffer);
@@ -366,7 +368,8 @@ void DebugMainWindow(game_input* GameInput)
     "Toggle Multi Threaded",
     "Toggle Show",
     "Toggle Pause",
-    "Toggle Collision Points"
+    "Toggle Collision Points",
+    "Toggle Colliders"
   };
   r32 AspectRatio = Width/Height;
   r32 ScreenWidth = AspectRatio;
@@ -467,6 +470,13 @@ void DebugMainWindow(game_input* GameInput)
   if(RightButtonReleased && DebugState->HotMenuItem == 3)
   {
     DebugState->ConfigCollisionPoints = !DebugState->ConfigCollisionPoints;
+    DebugState->UpdateConfig = true;
+  }
+
+  // "Toggle Colliders"
+  if(RightButtonReleased && DebugState->HotMenuItem == 4)
+  {
+    DebugState->ConfigCollider = !DebugState->ConfigCollider;
     DebugState->UpdateConfig = true;
   }
 

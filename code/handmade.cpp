@@ -10,12 +10,13 @@
 #include "handmade.h"
 
 #include "assets.h"
+#include "tiles_spritesheet.h"
 
 #if HANDMADE_INTERNAL
 game_memory* DebugGlobalMemory = 0;
 #endif
 
-game_state* GlobalGameState;
+game_state* GlobalGameState = 0;
 platform_api Platform;
 
 #include "math/aabb.cpp"
@@ -89,6 +90,16 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 {
   world* World = GameState->World;
 
+  entity* ControllableCamera = NewEntity( World );
+  NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
+
+  r32 AspectRatio = GameState->ScreenWidthPixels / GameState->ScreenHeightPixels;
+  r32 FieldOfView =  90;
+  SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
+  LookAt(ControllableCamera->CameraComponent, 1*V3(0,3,-8), V3(0,3,0));
+
+  ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
+  ControllableCamera->ControllerComponent->Type = ControllerType_FlyingCamera;
   // TODO: Create a better way to ask for assets than giving known array-indeces
   //       Maybe Enums?
   const u32 CubeIndex0 = 1; // CubeIndex0 and CubeIndex1 have different texture indeces
@@ -96,23 +107,18 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   const u32 CubeTextureIndex = 30;
 
   entity* Light = NewEntity( World );
-  NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
-  Light->LightComponent->Color = V4(3,3,3,1);
-  Light->SpatialComponent->Position = V3(0,5,5);
+  NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL | COMPONENT_TYPE_RENDER);
 
-  entity* LightMesh = NewEntity( World );
-  NewComponents( World, LightMesh,
-    COMPONENT_TYPE_RENDER   |
-    COMPONENT_TYPE_SPATIAL);
+  Light->LightComponent->Color = 0.6*V4(1,1,1,1);
 
-  LightMesh->RenderComponent->MeshHandle    = GetMeshAssetHandle(CubeIndex1);
-  LightMesh->RenderComponent->TextureHandle = GetTextureAssetHandle(0);
+  Light->SpatialComponent->Position = V3(1,1,1);
+  Light->SpatialComponent->Scale    = V3( 0.3, 0.3, 0.3);
 
-  LightMesh->SpatialComponent->Position = Light->SpatialComponent->Position;
-  LightMesh->SpatialComponent->Scale    = V3( 0.3, 0.3, 0.3);
+  Light->RenderComponent->MeshHandle     = GetMeshAssetHandle(CubeIndex1);
+  Light->RenderComponent->MaterialHandle = GetMaterialAssetHandle(MATERIAL_WHITE);
 
 
-#define State3
+#define State4
 #if defined(State1)
   // Bug - producing state. Gets a broken mesh somewhere
   r32 ySpace = 1;
@@ -154,7 +160,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
           COMPONENT_TYPE_DYNAMICS);
 
         cubeEntity->RenderComponent->MeshHandle    = GetMeshAssetHandle(CubeIndex0);
-        cubeEntity->RenderComponent->TextureHandle = GetTextureAssetHandle(RollingIndex++ % CubeTextureIndex);
+        cubeEntity->RenderComponent->MaterialHandle = GetMaterialAssetHandle(RollingIndex++ % CubeTextureIndex);
 
         cubeEntity->ColliderComponent->MeshHandle = GetMeshAssetHandle(CubeIndex0);
         cubeEntity->ColliderComponent->AABB = GetMeshAABB(cubeEntity->ColliderComponent->MeshHandle);
@@ -177,7 +183,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     COMPONENT_TYPE_COLLIDER);
 
   FloorEntity->RenderComponent->MeshHandle    = GetMeshAssetHandle(CubeIndex1);
-  FloorEntity->RenderComponent->TextureHandle = GetTextureAssetHandle(CubeTextureIndex);
+  FloorEntity->RenderComponent->MaterialHandle = GetMaterialAssetHandle(CubeTextureIndex);
 
   FloorEntity->ColliderComponent->MeshHandle = GetMeshAssetHandle(CubeIndex1);
   FloorEntity->ColliderComponent->AABB = GetMeshAABB(FloorEntity->ColliderComponent->MeshHandle);
@@ -187,86 +193,27 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 
   entity* SpriteAnimationEntity = NewEntity( World );
   NewComponents( World, SpriteAnimationEntity,
-    COMPONENT_TYPE_RENDER   |
-    COMPONENT_TYPE_SPATIAL  |
-    COMPONENT_TYPE_COLLIDER);
+    COMPONENT_TYPE_SPRITE_ANIMATION |
+    COMPONENT_TYPE_RENDER           |
+    COMPONENT_TYPE_SPATIAL);
 
-  SpriteAnimationEntity->RenderComponent->MeshHandle    = GetMeshAssetHandle(CubeIndex1);
-  SpriteAnimationEntity->RenderComponent->TextureHandle = GetTextureAssetHandle(MATERIAL_BRASS);
-
-  SpriteAnimationEntity->ColliderComponent->MeshHandle = GetMeshAssetHandle(CubeIndex1);
-  SpriteAnimationEntity->ColliderComponent->AABB = GetMeshAABB(SpriteAnimationEntity->ColliderComponent->MeshHandle);
+  SpriteAnimationEntity->RenderComponent->MeshHandle    = GetMeshAssetHandle(0);
+  SpriteAnimationEntity->RenderComponent->MaterialHandle = GetMaterialAssetHandle(31);
 
   SpriteAnimationEntity->SpatialComponent->Position = V3( -0,  8, 8);
+  SpriteAnimationEntity->SpatialComponent->Rotation = RotateQuaternion( Pi32, V3(0,1,0) );
   SpriteAnimationEntity->SpatialComponent->Scale    = V3( 18, 18, 1);
 
+  component_sprite_animation* SpriteAnimation = SpriteAnimationEntity->SpriteAnimationComponent;
 
+  hash_map<bitmap_coordinate> HeroCoordinates = LoadAdventurerSpriteSheetCoordinates( GameState->TransientArena );
+  SpriteAnimation->MaterialHande = GetMaterialAssetHandle(31);
+  material* TmpMat = GetMaterial(GameState->AssetManager, SpriteAnimation->MaterialHande );
+  bitmap* HeroSpriteSheet = GetTexture(GameState->AssetManager, TmpMat->TextureHandle );
 
-  entity* ControllableCamera = NewEntity( World );
-  NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
+  SpriteAnimation->Animation = hash_map< list<m4> >(&GameState->AssetManager->AssetArena,6);
 
-  r32 AspectRatio = GameState->ScreenWidthPixels / GameState->ScreenHeightPixels;
-  r32 FieldOfView =  90;
-  SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
-  LookAt(ControllableCamera->CameraComponent, 1*V3(0,3,-8), V3(0,3,0));
-
-  ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
-  ControllableCamera->ControllerComponent->Type = ControllerType_FlyingCamera;
-}
-
-#if 0
-void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_commands* RenderCommands,  game_input* Input )
-{
-  game_state* GameState = Memory->GameState;
-  memory_arena* AssetArena = &GameState->AssetArena;
-  memory_arena* TransientArena = &GameState->TransientArena;
-
-  AllocateWorld(100, GameState);
-  InitializeTileMap( &GameState->World->TileMap );
-  world* World = GameState->World;
-  game_assets* Assets = World->Assets;
-
-  entity* Light = NewEntity( World );
-  NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL );
-  Light->LightComponent->Color = V4(1,1,1,1);
-  Light->SpatialComponent->Position =  V3(3,3,3);
-
-  entity* Player = NewEntity( World );
-
-  NewComponents( World, Player, COMPONENT_TYPE_CONTROLLER |
-                                COMPONENT_TYPE_SPATIAL | COMPONENT_TYPE_COLLIDER | COMPONENT_TYPE_DYNAMICS |
-                                COMPONENT_TYPE_SPRITE_ANIMATION |
-                                COMPONENT_TYPE_CAMERA);
-
-  r32 AspectRatio = (r32)RenderCommands->ResolutionWidthPixels / (r32) RenderCommands->ResolutionHeightPixels;
-  r32 FieldOfView =  90;
-  SetCameraComponent(Player->CameraComponent, FieldOfView, AspectRatio );
-  LookAt(Player->CameraComponent, 3*V3(0,0,1), V3(0,0,0));
-
-  Player->ControllerComponent->Controller = GetController(Input, 1);
-  Player->ControllerComponent->Type = ControllerType_Hero;
-
-  Player->SpatialComponent->Position = V3(0,3,0);
-  Player->ColliderComponent->AABB = AABB3f( V3(-0.5,-0.5,0), V3(0.5,0.5,0) );
-  SetColliderMeshFromAABB(World->PersistentArena, Player->ColliderComponent);
-
-  Player->DynamicsComponent->LinearVelocity  = V3(0,0,0);
-  Player->DynamicsComponent->AngularVelocity = V3(0,0,0);
-  Player->DynamicsComponent->Mass = 1;
-
-  component_sprite_animation* SpriteAnimation = Player->SpriteAnimationComponent;
-
-  Assets->HeroSpriteSheet.bitmap = LoadTGA( Thread, &GameState->AssetArena,
-         Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-         Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-        "..\\handmade\\data\\Platformer\\Adventurer\\adventurer-Sheet.tga" );
-  bitmap* HeroSpriteSheet = Assets->HeroSpriteSheet.bitmap;
-
-  hash_map<bitmap_coordinate> HeroCoordinates = LoadAdventurerSpriteSheetCoordinates( TransientArena );
-  SpriteAnimation->Bitmap = Assets->HeroSpriteSheet.bitmap;
-  SpriteAnimation->Animation = hash_map< list<m4> >(AssetArena,6);
-
-  list<m4> Idle1(AssetArena);
+  list<m4> Idle1(&GameState->AssetManager->AssetArena);
   Idle1.First();
   Idle1.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle1_01")));
   Idle1.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle1_02")));
@@ -274,7 +221,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
   Idle1.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle1_04")));
   SpriteAnimation->Animation.Insert("idle1",  Idle1);
 
-  list<m4> Idle2(AssetArena);
+  list<m4> Idle2(&GameState->AssetManager->AssetArena);
   Idle2.First();
   Idle2.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle2_01")));
   Idle2.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle2_02")));
@@ -282,7 +229,7 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
   Idle2.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("idle2_04")));
   SpriteAnimation->Animation.Insert("idle2",  Idle2);
 
-  list<m4> Run(AssetArena);
+  list<m4> Run(&GameState->AssetManager->AssetArena);
   Run.First();
   Run.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("run_01")));
   Run.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("run_02")));
@@ -292,96 +239,21 @@ void Create2DScene(thread_context* Thread, game_memory* Memory, game_render_comm
   Run.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("run_06")));
   SpriteAnimation->Animation.Insert("run",  Run);
 
-  list<m4> Jump(AssetArena);
+  list<m4> Jump(&GameState->AssetManager->AssetArena);
   Jump.First();
   Jump.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("jump_01")));
   Jump.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("jump_02")));
   Jump.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("jump_03")));
   SpriteAnimation->Animation.Insert("jump",  Jump);
 
-  list<m4> Fall(AssetArena);
+  list<m4> Fall(&GameState->AssetManager->AssetArena);
   Fall.First();
   Fall.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("fall_01")));
   Fall.InsertAfter(GetSpriteSheetTranslationMatrix(HeroSpriteSheet, HeroCoordinates.Get("fall_02")));
   SpriteAnimation->Animation.Insert("fall",  Fall);
 
   SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("idle1");
-
-
-  Assets->TileMapSpriteSheet.bitmap = LoadTGA( Thread, &GameState->AssetArena,
-         Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-         Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-        "..\\handmade\\data\\Platformer\\tga\\tiles_spritesheet.tga" );
-
-  bitmap* TileMap = LoadTGA( Thread, &GameState->AssetArena,
-         Memory->PlatformAPI.DEBUGPlatformReadEntireFile,
-         Memory->PlatformAPI.DEBUGPlatformFreeFileMemory,
-         "..\\handmade\\data\\Platformer\\tga\\TileMap.tga" );
-
-  hash_map<bitmap_coordinate> SpriteCoordinates = LoadTileSpriteSheetCoordinates(AssetArena);
-  bitmap* SpriteSheet = Assets->TileMapSpriteSheet.bitmap;
-  for (u32 X = 0; X < TileMap->Width; ++X)
-  {
-    for (u32 Y = 0; Y < TileMap->Height; ++Y)
-    {
-      // Check IF Alpha Value exists
-      u8 A,R,G,B;
-      u32  CurrentPixel = 0;
-      if(!GetPixelValue(TileMap, X, Y, &CurrentPixel)) break;
-
-      SplitPixelIntoARGBComponents(CurrentPixel,&A,&R,&G,&B);
-
-      if(!A) break;
-
-      tile_contents TileContents = {};
-      TileContents.Bitmap = SpriteSheet;
-      if( G == 0xff )
-      {
-        b32 ToLeft  = false;
-        b32 ToRight = false;
-        TileContents.Type = TILE_TYPE_FLOOR;
-
-        u32 LeftPixelValue = 0;
-        if( GetPixelValue(TileMap, X+1, Y, &LeftPixelValue) )
-        {
-          SplitPixelIntoARGBComponents(LeftPixelValue,&A,&R,&G,&B);
-          if( G == 0xff )
-          {
-            ToLeft = true;
-          }
-        }
-
-        u32 RightPixelValue = 0;
-        if( GetPixelValue(TileMap, X-1, Y, &RightPixelValue) )
-        {
-          SplitPixelIntoARGBComponents(RightPixelValue,&A,&R,&G,&B);
-          if( G == 0xff )
-          {
-            ToRight = true;
-          }
-        }
-
-        if(ToLeft && ToRight)
-        {
-          TileContents.TM = GetSpriteSheetTranslationMatrix(SpriteSheet, SpriteCoordinates.Get("grassMid"));
-        }else if(ToLeft && !ToRight)
-        {
-          TileContents.TM = GetSpriteSheetTranslationMatrix(SpriteSheet, SpriteCoordinates.Get("grassLeft"));
-        }else if(!ToLeft && ToRight)
-        {
-          TileContents.TM = GetSpriteSheetTranslationMatrix(SpriteSheet, SpriteCoordinates.Get("grassRight"));
-        }else if(!ToLeft && !ToRight)
-        {
-          TileContents.TM = GetSpriteSheetTranslationMatrix(SpriteSheet, SpriteCoordinates.Get("grass"));
-        }
-        SetTileContentsAbs(&GameState->AssetArena, &World->TileMap, X, Y, 0, TileContents );
-      }
-    }
-  }
-
 }
-#endif
-
 
 void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
 {

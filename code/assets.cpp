@@ -195,7 +195,7 @@ internal void STBBakeFont(game_asset_manager* AssetManager)
   stbtt_GetScaledFontVMetrics((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
    FontMap->FontHeightPx, &FontMap->Ascent, &FontMap->Descent, &FontMap->LineGap);
 
-FontMap->BitmapHandle = AssetManager->TextureCount++;
+  FontMap->BitmapHandle = AssetManager->TextureCount++;
   bitmap* Atlas = AssetManager->Textures + FontMap->BitmapHandle;
 
 
@@ -319,6 +319,19 @@ game_asset_manager* CreateAssetManager()
   STBBakeFont(AssetManager);
   LoadCubeAsset(AssetManager);
 
+  u32 TextureIndex = TextureIndex = AssetManager->TextureCount++;
+  bitmap* HeroSpriteSheet = AssetManager->Textures + TextureIndex;
+  *HeroSpriteSheet = *LoadTGA(&AssetManager->AssetArena,
+        "..\\handmade\\data\\Platformer\\Adventurer\\adventurer-Sheet.tga" );
+
+  u32 MaterialIndex = AssetManager->MaterialCount++;
+  material* HeroMaterial = AssetManager->Materials + MaterialIndex;
+  HeroMaterial->AmbientColor = V4(1,1,1,1);
+  HeroMaterial->DiffuseColor = V4(1,1,1,1);
+  HeroMaterial->SpecularColor = V4(1,1,1,1);
+  HeroMaterial->Shininess = 1;
+  HeroMaterial->TextureHandle = GetTextureAssetHandle(TextureIndex);
+
   return AssetManager;
 }
 
@@ -359,9 +372,14 @@ collider_mesh GetColliderMesh(u32 ObjectHandle)
   return Result;
 }
 
-u32 GetTextureAssetHandle( u32 MaterialHandle )
+u32 GetMaterialAssetHandle( u32 MaterialHandle )
 {
   game_asset_manager* AssetManager = GetAssetManager();
   material* Material = GetMaterial(AssetManager, MaterialHandle);
   return MaterialHandle;
+}
+
+u32 GetTextureAssetHandle( u32 TextureIndex )
+{
+  return TextureIndex;
 }

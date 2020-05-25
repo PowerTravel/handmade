@@ -70,7 +70,7 @@ struct component_dynamics
 struct component_render
 {
   u32 MeshHandle;
-  u32 TextureHandle;
+  u32 MaterialHandle;
 };
 
 struct entity

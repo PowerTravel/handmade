@@ -227,6 +227,6 @@ m4 GetSpriteSheetTranslationMatrix(bitmap* SpriteSheet, bitmap_coordinate* Coord
   r32 YMin = (r32) SpriteSheet->Height - (Coordinate->y + Coordinate->h);
   r32 Yoffset = YMin / (r32) SpriteSheet->Height;
   r32 ScaleY  =  (r32) Coordinate->h / (r32) SpriteSheet->Height;
-
-  return GetTranslationMatrix(V4(Xoffset,Yoffset,0,1)) * GetScaleMatrix(V4(ScaleX,ScaleY,0,1));
+  m4 Result = GetTranslationMatrix(V4(Xoffset,Yoffset,0,1)) * GetScaleMatrix(V4(ScaleX,ScaleY,0,1));
+  return Result;
 }

@@ -1,6 +1,7 @@
 #include "component_sprite_animation.h"
 #include "entity_components.h"
 #include "handmade.h"
+#include "random.h"
 
 void SpriteAnimationSystemUpdate(world* World)
 {
@@ -9,7 +10,7 @@ void SpriteAnimationSystemUpdate(world* World)
   {
     entity* Entity = &World->Entities[Index];
 
-    if( Entity->Types & COMPONENT_TYPE_SPRITE_ANIMATION )
+    if( Entity->SpriteAnimationComponent )
     {
       component_sprite_animation* SpriteAnimation = Entity->SpriteAnimationComponent;
       Assert(  SpriteAnimation->ActiveSeries );
@@ -26,7 +27,7 @@ void SpriteAnimationSystemUpdate(world* World)
         }
       }
 
-      if(Entity->Types & COMPONENT_TYPE_DYNAMICS)
+      if(Entity->DynamicsComponent)
       {
         v3 Velocity = Entity->DynamicsComponent->LinearVelocity;
         if(Velocity.Y > 0)
@@ -48,6 +49,36 @@ void SpriteAnimationSystemUpdate(world* World)
         {
           SpriteAnimation->InvertX = true;
         }
+      }else{
+
+        local_persist u32 Timer = 0;
+
+        if(Timer%100 == 0)
+        { 
+          r32 r = GetRandomReal(Timer);
+          r32 interval = 1.f/4.f;
+          if(r < interval)
+          {
+            SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("jump");
+          }else if(r  >= interval && r < 2*interval){
+            SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("fall");
+          }else if(r  >= 2*interval && r < 3*interval)
+          {
+            SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("idle1");
+          }else{
+            SpriteAnimation->ActiveSeries = SpriteAnimation->Animation.Get("run");
+          }
+
+          r = GetRandomReal(Timer);
+          if( r < 0.5)
+          {
+            SpriteAnimation->InvertX = false;
+          }else{
+            SpriteAnimation->InvertX = true;
+          }
+        }
+        Timer++;
+
       }
 
     }

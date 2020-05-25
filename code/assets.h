@@ -51,8 +51,8 @@ struct material
   v4 DiffuseColor;
   v4 SpecularColor;
   r32 Shininess;
+  b32 Emissive;
   u32 TextureHandle;
-  bitmap* DiffuseMap;
 };
 
 struct stb_font_map
@@ -105,6 +105,7 @@ struct component_render;
 //       be the way the rest of the program references the asset.
 //       TextureIndex and MeshIndex are to be replaced later with enums or
 //       strings or tags or something more human readable but still hardcoded.
+u32 GetMaterialAssetHandle( u32 MaterialIndex );
 u32 GetTextureAssetHandle( u32 TextureIndex );
 u32 GetMeshAssetHandle( u32 MeshIndex );
 collider_mesh GetColliderMesh(u32 MeshHandle);

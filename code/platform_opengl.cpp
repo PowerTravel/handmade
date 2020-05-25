@@ -210,7 +210,6 @@ void main()\n\
   vec4 H = normalize(L+E);\n\
   float Ks = pow(max(dot(H,N), 0.0 ), shininess);\n\
 \n\
-\n\
   vertexColor = ambientProduct + Kd*(diffuseProduct + Ks*specularProduct);\n\
 \n\
   vec4 tmpTex = TM*vec4(textureCoordinate,0,1);\n\
@@ -436,7 +435,8 @@ void OpenGLSetViewport( r32 ViewPortAspectRatio, s32 WindowWidth, s32 WindowHeig
 
 }
 
-v4 Blend(v4* A, v4* B)
+internal inline v4
+Blend(v4* A, v4* B)
 {
   v4 Result =  V4( A->X * B->X,
              A->Y * B->Y,
@@ -643,9 +643,12 @@ void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memo
   material* Material = AssetManager->Materials + TextureHandle;
 
   u32 SurfaceSmoothnes = 3;
-  v4 AmbientColor   = Material->TextureHandle ? V4(0,0,0,1) : Material->AmbientColor;
+  v4 AmbientColor   = Blend(&LightColor, &Material->AmbientColor);
+  AmbientColor.W = 1;
   v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
+  DiffuseColor.W = 1;
   v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
+  SpecularColor.W = 1;
   glUniform4fv( Program->ambientProduct,  1, AmbientColor.E);
   glUniform4fv( Program->diffuseProduct,  1, DiffuseColor.E);
   glUniform4fv( Program->specularProduct, 1, SpecularColor.E);
@@ -753,7 +756,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
 
   glUniformMatrix4fv(Prog->P,  1, GL_TRUE, P.E);
   glUniformMatrix4fv(Prog->V,  1, GL_TRUE, V.E);
-  glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, Identity.E);
+  //glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, Identity.E);
   glUniform4fv( Prog->cameraPosition, 1, GetPositionFromMatrix(&V).E);
   v4 LightColor    = V4(0,0,0,1);
 
@@ -773,7 +776,16 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         glUniform4fv( Prog->lightPosition,  1, (Light->M*V4(0,0,0,1)).E);
         LightColor    = Light->Color;
       }break;
+    }
+  }
 
+  for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
+  {
+    u8* Head = (u8*) Entry;
+    u8* Body = Head + sizeof(push_buffer_header);
+    setOpenGLState(Entry->RenderState);
+    switch(Entry->Type)
+    {
       case render_buffer_entry_type::RENDER_ASSET:
       {
         entry_type_render_asset* AssetTest = (entry_type_render_asset*) Body;
@@ -781,6 +793,8 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
       }break;
     }
   }
+
+
 
   // DEBUG OVERLAY
 

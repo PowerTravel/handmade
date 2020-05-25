@@ -187,11 +187,11 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
     {
       RenderGroup->ProjectionMatrix = Entity->CameraComponent->P;
       RenderGroup->ViewMatrix       = Entity->CameraComponent->V;
-      break;
     }
 
-    if( Entity->LightComponent && Entity->SpatialComponent )
+    if( Entity->LightComponent )
     {
+      Assert(Entity->SpatialComponent);
       push_buffer_header* Header = PushNewHeader( RenderGroup );
       Header->Type = render_buffer_entry_type::LIGHT;
 
@@ -205,19 +205,36 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
   {
     entity* Entity = &World->Entities[Index];
 
-    if(Entity->RenderComponent)
+    if(Entity->RenderComponent && !Entity->SpriteAnimationComponent)
     {
       push_buffer_header* Header = PushNewHeader( RenderGroup );
       Header->Type = render_buffer_entry_type::RENDER_ASSET;
       Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
       entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
       Body->MeshHandle = Entity->RenderComponent->MeshHandle;
-      Body->MaterialHandle = Entity->RenderComponent->TextureHandle;
+      Body->MaterialHandle = Entity->RenderComponent->MaterialHandle;
       Body->M  = GetModelMatrix(Entity->SpatialComponent);
       Body->NM = Transpose(RigidInverse(Body->M));
       Body->TM = M4Identity();
     }
+    if(Entity->SpriteAnimationComponent)
+    {
+      // Todo, we should modify the RenderComponent with the proper bitmap and coordinates in the
+      // Sprite animation system.
+      Assert(Entity->SpatialComponent);
+      Assert(Entity->RenderComponent);
+      push_buffer_header* Header = PushNewHeader( RenderGroup );
+      Header->Type = render_buffer_entry_type::RENDER_ASSET;
+      Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
+      entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
+      Body->MeshHandle = Entity->RenderComponent->MeshHandle;
+      Body->MaterialHandle = Entity->RenderComponent->MaterialHandle;
+      Body->M  = GetModelMatrix(Entity->SpatialComponent);
+      Body->NM = Transpose(RigidInverse(Body->M));
+      Body->TM = Entity->SpriteAnimationComponent->ActiveSeries->Get();
+    }
 
+#if SHOW_COLLIDER
     if( Entity->Types & COMPONENT_TYPE_COLLIDER  )
     {
       push_buffer_header* Header = PushNewHeader( RenderGroup );
@@ -230,7 +247,7 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
       Body->M  = GetModelMatrix(Entity->SpatialComponent);
       Body->NM = Transpose(RigidInverse(Body->M));
     }
-    
+#endif
   }
 
   #if SHOW_COLLISION_POINTS
@@ -249,14 +266,15 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
 
         entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
         Body->MeshHandle = 1; // This is a Voxel
-        Body->MaterialHandle = MATERIAL_BLUE;
+        Body->MaterialHandle = GetMaterialAssetHandle(MATERIAL_BLUE);
 
         const m4 Rotation = GetRotationMatrix(A->SpatialComponent->Rotation);
         const m4 Translation = GetTranslationMatrix(A->SpatialComponent->Position);
         const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
-        #if 0
+        #if 1
         Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].A_ContactWorldSpace,1))*Scale;
         #else
+        // This is not working for some reason
         Body->M  = Translation*GetTranslationMatrix(Manifold->Contacts[j].A_ContactModelSpace)*Rotation*Scale;
         #endif
         Body->NM = Transpose(RigidInverse(Body->M));
@@ -268,12 +286,12 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
 
         entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
         Body->MeshHandle = 1; // This is a Voxel
-        Body->MaterialHandle = MATERIAL_WHITE;
+        Body->MaterialHandle = GetMaterialAssetHandle(MATERIAL_WHITE);
 
         const m4 Rotation = GetRotationMatrix(B->SpatialComponent->Rotation);
         const m4 Translation = GetTranslationMatrix(B->SpatialComponent->Position);
         const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
-        #if 0
+        #if 1
         Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].B_ContactWorldSpace,1))*Scale;
         #else
         Body->M  =  Translation*GetTranslationMatrix(Manifold->Contacts[j].B_ContactModelSpace)*Rotation*Scale;
