@@ -30,8 +30,8 @@ enum render_state
 struct entry_type_overlay_quad
 {
   v4 Colour;
-  u32 TextureHandle;
-  u32 MeshHandle;
+  u32 TextureIndex;
+  u32 ObjectIndex;
   m4 M;
   m4 TM;
 };
@@ -44,8 +44,7 @@ struct entry_type_light
 
 struct entry_type_render_asset
 {
-  u32 MeshHandle;
-  u32 MaterialHandle;
+  u32 AssetHandle;
   m4 M;
   m4 NM;
   m4 TM;

@@ -3,16 +3,17 @@
 #include "bitmap.h"
 #include "platform.h"
 #include "memory.h"
+#include "utility_macros.h"
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "externals/stb_truetype.h"
 
 struct book_keeper
 {
-  // Todo: Is it okay to keep opengl specific data in the asset manager.
-  //       I think so but im not sure.
   opengl_handles BufferHandle;
   b32 Loaded;
+  b32 Exists;
+  b32 Dirty;
 };
 
 struct mesh_data
@@ -43,6 +44,7 @@ struct mesh_indeces
   u32* ti;    // Texture Indeces
   u32* ni;    // Normal Indeces
   aabb3f AABB;
+  char Name[128];
 };
 
 struct material
@@ -52,8 +54,18 @@ struct material
   v4 SpecularColor;
   r32 Shininess;
   b32 Emissive;
-  u32 TextureHandle;
 };
+
+material CreateMaterial( v4 AmbientColor, v4 DiffuseColor, v4 SpecularColor, r32 Shininess, b32 Emissive, u32 TextureHandle)
+{
+  material Result = {};
+  Result.AmbientColor = AmbientColor;
+  Result.DiffuseColor = DiffuseColor;
+  Result.SpecularColor = SpecularColor;
+  Result.Shininess = Shininess;
+  Result.Emissive = Emissive;
+  return Result;
+}
 
 struct stb_font_map
 {
@@ -65,126 +77,159 @@ struct stb_font_map
   r32 Descent;
   r32 LineGap;
 
-  u32 BitmapHandle;
+  u32 BitmapIndex;
   stbtt_bakedchar* CharData;
+};
+
+struct asset_instance
+{
+  u32 ObjectIndex;
+  u32 MaterialIndex;
+  u32 TextureIndex;
+};
+
+enum class asset_type
+{
+  OBJECT,
+  MATERIAL,
+  BITMAP,
+  INSTANCE,
+  MESH
+};
+
+struct asset_vector
+{
+  u32 Count;
+  u32 MaxCount;
+  void** Values;
+};
+
+struct asset_hash_map
+{
+  u32 Count;
+  u32 MaxCount;
+  c8* Keys[64];
+  void** Values;
 };
 
 struct game_asset_manager
 {
   memory_arena AssetArena;
 
-  u32 MaxObjectCount;
-  u32 ObjectCount;
-  mesh_indeces* Objects;
+  asset_vector   Instances;
+  u32 TemporaryInstancesBase;
+  u32 TemporaryInstancesCount;
 
-  u32 MaxMeshCount;
-  u32 MeshCount;
-  mesh_data* MeshData;
-
-  u32 MaxTextureCount;
-  u32 TextureCount;
-  bitmap* Textures;
-
-  u32 MaxMaterialCount;
-  u32 MaterialCount;
-  material* Materials;
+  asset_vector   Meshes;
+  asset_hash_map Bitmaps;
+  asset_hash_map Objects;
+  asset_hash_map Materials;
 
   book_keeper* ObjectKeeper;
-  book_keeper* TextureKeeper;
+  book_keeper* BitmapKeeper;
 
   stb_font_map FontMap;
 };
 
-struct collider_mesh;
-struct component_render;
 
-// Note: TextureIndex and MeshIndex are not the same as MeshHandle.
-//       TextureIndex and MeshIndex are hardcoded array indeces that
-//       point to an asset. They are only to be used to set up an asset
-//       once in initialization. A handle is then generated which will
-//       be the way the rest of the program references the asset.
-//       TextureIndex and MeshIndex are to be replaced later with enums or
-//       strings or tags or something more human readable but still hardcoded.
-u32 GetMaterialAssetHandle( u32 MaterialIndex );
-u32 GetTextureAssetHandle( u32 TextureIndex );
-u32 GetMeshAssetHandle( u32 MeshIndex );
-collider_mesh GetColliderMesh(u32 MeshHandle);
-void RemoveRenderAsset( component_render* RenderComponent);
-aabb3f GetMeshAABB(u32 MeshHandle);
+// Game Layer API
+u32 GetAssetHandle(game_asset_manager* AssetManager);
+void SetAsset(game_asset_manager* AssetManager, asset_type AssetType, char* Name, u32 Handle);
+u32 GetTemporaryAssetHandle(game_asset_manager* AssetManager);
+void CopyAssets(game_asset_manager* AssetManager, u32 SrcHandle, u32 DstHandle);
+u32 GetAssetIndex(game_asset_manager* AssetManager, asset_type AssetType, char* Key);
+void ResetAssetManagerTemporaryInstances(game_asset_manager* AssetManager);
 
-inline game_asset_manager* GetAssetManager();
-
-// Getters, Todo: Find a more elegant interface.
-// Im isolating getters now because later the handle
-// will not be the same as its array index.
-// And I don't wanna change code in 200 different places
-inline material*
-GetMaterial(game_asset_manager* AssetManager, u32 Handle )
+// GL Layer API
+internal asset_instance* GetAssetInstance(game_asset_manager* AssetManager, u32 Handle)
 {
-  Assert(Handle < AssetManager->MaterialCount);
-  return AssetManager->Materials + Handle;
-}
-inline bitmap*
-GetTexture(game_asset_manager* AssetManager, u32 Handle )
-{
-  Assert(Handle < AssetManager->TextureCount);
-  return AssetManager->Textures + Handle;
-}
-inline book_keeper*
-GetTextureKeeper(game_asset_manager* AssetManager, u32 Handle )
-{
-  Assert(Handle < AssetManager->TextureCount);
-  return AssetManager->TextureKeeper + Handle;
-}
-inline mesh_indeces*
-GetObject(game_asset_manager* AssetManager, u32 Handle )
-{
-  Assert(Handle < AssetManager->ObjectCount);
-  return AssetManager->Objects + Handle;
-}
-inline book_keeper*
-GetObjectKeeper(game_asset_manager* AssetManager, u32 Handle )
-{
-  Assert(Handle < AssetManager->ObjectCount);
-  return AssetManager->ObjectKeeper + Handle;
-}
-inline mesh_data*
-GetMeshData(game_asset_manager* AssetManager, u32 Handle )
-{
-  Assert(Handle < AssetManager->MeshCount);
-  return AssetManager->MeshData + Handle;
+  Assert(Handle < AssetManager->Instances.Count + AssetManager->TemporaryInstancesCount);
+  asset_instance* Result = (asset_instance*) AssetManager->Instances.Values[Handle];
+  Assert(Result);
+  return Result;
 }
 
-enum MATERIAL_TYPE
+inline mesh_indeces* GetObjectFromIndex(game_asset_manager* AssetManager, u32 Index, book_keeper** Keeper = NULL )
 {
-  MATERIAL_WHITE,
-  MATERIAL_RED,
-  MATERIAL_GREEN,
-  MATERIAL_BLUE,
-  MATERIAL_EMERALD,
-  MATERIAL_JADE,
-  MATERIAL_OBSIDIAN,
-  MATERIAL_PEARL,
-  MATERIAL_RUBY,
-  MATERIAL_TURQUOISE,
-  MATERIAL_BRASS,
-  MATERIAL_BRONZE,
-  MATERIAL_CHROME,
-  MATERIAL_COMPPER,
-  MATERIAL_GOLD,
-  MATERIAL_SILVER,
-  MATERIAL_BLACK_PLASTIC,
-  MATERIAL_CYAN_PLASTIC,
-  MATERIAL_GREEN_PLASTIC,
-  MATERIAL_RED_PLASTIC,
-  MATERIAL_BLUE_PLASTIC,
-  MATERIAL_WHITE_PLASTIC,
-  MATERIAL_YELLOW_PLASTIC,
-  MATERIAL_BLACK_RUBBER,
-  MATERIAL_CYAN_RUBBER,
-  MATERIAL_GREEN_RUBBER,
-  MATERIAL_RED_RUBBER,
-  MATERIAL_BLUE_RUBBER,
-  MATERIAL_WHITE_RUBBER,
-  MATERIAL_YELLOW_RUBBER
+  Assert(Index < AssetManager->Objects.MaxCount);
+  mesh_indeces* Result = (mesh_indeces*) AssetManager->Objects.Values[Index];
+  Assert(Result);
+
+  if(Keeper) *Keeper = AssetManager->ObjectKeeper + Index;
+
+  return Result;
+}
+
+mesh_indeces* GetObject(game_asset_manager* AssetManager, u32 Handle, book_keeper** Keeper = NULL )
+{
+  asset_instance* Instance = GetAssetInstance(AssetManager, Handle);
+  mesh_indeces* Result = GetObjectFromIndex(AssetManager, Instance->ObjectIndex, Keeper);
+  return Result;
 };
+
+inline mesh_data* GetMeshFromIndex(game_asset_manager* AssetManager, u32 Index)
+{
+  Assert(Index < AssetManager->Meshes.Count);
+  mesh_data* Result = (mesh_data*) AssetManager->Meshes.Values[Index];
+  Assert(Result);
+  return Result;
+}
+
+mesh_data* GetMesh(game_asset_manager* AssetManager, u32 Handle)
+{
+  mesh_indeces* Object = GetObject(AssetManager, Handle );
+  mesh_data* Result = GetMeshFromIndex(AssetManager, Object->MeshHandle);
+  return Result;
+}
+
+collider_mesh GetColliderMesh( game_asset_manager* AssetManager, u32 Handle)
+{
+  mesh_indeces* Object = GetObject(AssetManager, Handle);
+  mesh_data* Data = GetMesh(AssetManager, Handle);
+  collider_mesh Result = {};
+  Result.nv = Data->nv;
+  Result.v = Data->v;
+  Result.nvi = Object->Count;
+  Result.vi = Object->vi;
+  return Result;
+}
+
+aabb3f GetMeshAABB(game_asset_manager* AssetManager, u32 Handle)
+{
+  mesh_indeces* Object = GetObject(AssetManager, Handle);
+  return Object->AABB;
+}
+
+inline material* GetMaterialFromIndex(game_asset_manager* AssetManager, u32 Index )
+{
+  Assert(Index < AssetManager->Materials.MaxCount);
+  material* Result = (material*) AssetManager->Materials.Values[Index];
+  Assert(Result);
+  return Result;
+}
+
+material* GetMaterial(game_asset_manager* AssetManager, u32 Handle )
+{
+  asset_instance* Instance = GetAssetInstance(AssetManager, Handle);
+  material* Result = GetMaterialFromIndex(AssetManager, Instance->MaterialIndex );
+  return Result;
+};
+
+inline bitmap* GetBitmapFromIndex(game_asset_manager* AssetManager, u32 Index, book_keeper** Keeper = NULL )
+{
+  Assert(Index < AssetManager->Bitmaps.MaxCount);
+  bitmap* Result = (bitmap*) AssetManager->Bitmaps.Values[Index];
+
+  Assert(Result);
+
+  if(Keeper) *Keeper = AssetManager->BitmapKeeper + Index;
+
+  return Result;
+}
+
+bitmap* GetBitmap(game_asset_manager* AssetManager, u32 Handle, book_keeper** Keeper = NULL )
+{
+  asset_instance* Instance = GetAssetInstance(AssetManager, Handle);
+  bitmap* Result = GetBitmapFromIndex(AssetManager, Instance->TextureIndex, Keeper);
+  return Result;
+}

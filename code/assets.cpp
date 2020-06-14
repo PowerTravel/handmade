@@ -1,71 +1,174 @@
 #include "assets.h"
 #include "obj_loader.h"
+#include "utility_macros.h"
 
-void InitPredefinedMaterials(game_asset_manager* AssetManager)
+void* AllocateValue_(memory_arena* Arena, midx Size, void** Values, u32 Index, u32* Count, u32* MaxCount)
 {
-  local_persist material mtl[30] =
+  Assert(*Count < *MaxCount);
+  void* Result = Values[Index];
+  if (Arena && !Result)
   {
-    { V4(1,        1,        1,        1), V4( 1,        1,          1,          1), V4( 1,          1,          1,          1), 1          }, // WHITE
-    { V4(1,        0,        0,        1), V4( 1,        0,          0,          1), V4( 1,          0,          0,          1), 1          }, // RED
-    { V4(0,        1,        0,        1), V4( 0,        1,          0,          1), V4( 0,          1,          0,          1), 1          }, // GREEN
-    { V4(0,        0,        1,        1), V4( 0,        0,          1,          1), V4( 0,          0,          1,          1), 1          }, // Blue
-    { V4(0.0215,   0.1745,   0.0215,   1), V4( 0.07568,  0.61424,    0.07568,    1), V4( 0.633,      0.727811,   0.633,      1), 0.6        }, // emerald
-    { V4(0.135,    0.2225,   0.1575,   1), V4( 0.54,     0.89,       0.63,       1), V4( 0.316228,   0.316228,   0.316228,   1), 0.1        }, // jade
-    { V4(0.05375,  0.05,     0.06625,  1), V4( 0.18275,  0.17,       0.22525,    1), V4( 0.332741,   0.328634,   0.346435,   1), 0.3        }, // obsidian
-    { V4(0.25,     0.20725,  0.20725,  1), V4( 1.0,      0.829,      0.829,      1), V4( 0.296648,   0.296648,   0.296648,   1), 0.088      }, // pearl
-    { V4(0.1745,   0.01175,  0.01175,  1), V4( 0.61424,  0.04136,    0.04136,    1), V4( 0.727811,   0.626959,   0.626959,   1), 0.6        }, // ruby
-    { V4(0.1,      0.18725,  0.1745,   1), V4( 0.396,    0.74151,    0.69102,    1), V4( 0.297254,   0.30829,    0.306678,   1), 0.1        }, // turquoise
-    { V4(0.329412, 0.223529, 0.027451, 1), V4( 0.780392, 0.568627,   0.113725,   1), V4( 0.992157,   0.941176,   0.807843,   1), 0.21794872 }, // brass
-    { V4(0.2125,   0.1275,   0.054,    1), V4( 0.714,    0.4284,     0.18144,    1), V4( 0.393548,   0.271906,   0.166721,   1), 0.2        }, // bronze
-    { V4(0.25,     0.25,     0.25,     1), V4( 0.4,      0.4,        0.4,        1), V4( 0.774597,   0.774597,   0.774597,   1), 0.6        }, // chrome
-    { V4(0.19125,  0.0735,   0.0225,   1), V4( 0.7038,   0.27048,    0.0828,     1), V4( 0.256777,   0.137622,   0.086014,   1), 0.1        }, // copper
-    { V4(0.24725,  0.1995,   0.0745,   1), V4( 0.75164,  0.60648,    0.22648,    1), V4( 0.628281,   0.555802,   0.366065,   1), 0.4        }, // gold
-    { V4(0.19225,  0.19225,  0.19225,  1), V4( 0.50754,  0.50754,    0.50754,    1), V4( 0.508273,   0.508273,   0.508273,   1), 0.4        }, // silver
-    { V4(0.0,      0.0,      0.0,      1), V4( 0.01,     0.01,       0.01,       1), V4( 0.50,       0.50,       0.50,       1), 0.25       }, // black plastic   
-    { V4(0.0,      0.1,      0.06,     1), V4( 0.0,      0.50980392, 0.50980392, 1), V4( 0.50196078, 0.50196078, 0.50196078, 1), 0.25       }, // cyan plastic  
-    { V4(0.0,      0.0,      0.0,      1), V4( 0.1,      0.35,       0.1,        1), V4( 0.45,       0.55,       0.45,       1), 0.25       }, // green plastic   
-    { V4(0.0,      0.0,      0.0,      1), V4( 0.5,      0.0,        0.0,        1), V4( 0.7,        0.6,        0.6,        1), 0.25       }, // red plastic 
-    { V4(0.0,      0.0,      0.0,      1), V4( 0.0,      0.0,        0.5,        1), V4( 0.6,        0.6,        0.7,        1), 0.25       }, // blue plastic      
-    { V4(0.0,      0.0,      0.0,      1), V4( 0.55,     0.55,       0.55,       1), V4( 0.70,       0.70,       0.70,       1), 0.25       }, // white plastic   
-    { V4(0.0,      0.0,      0.0,      1), V4( 0.5,      0.5,        0.0,        1), V4( 0.60,       0.60,       0.50,       1), 0.25       }, // yellow plastic
-    { V4(0.02,     0.02,     0.02,     1), V4( 0.01,     0.01,       0.01,       1), V4( 0.4,        0.4,        0.4,        1), 0.078125   }, // black rubber  
-    { V4(0.0,      0.05,     0.05,     1), V4( 0.4,      0.5,        0.5,        1), V4( 0.04,       0.7,        0.7,        1), 0.078125   }, // cyan rubber   
-    { V4(0.0,      0.05,     0.0,      1), V4( 0.4,      0.5,        0.4,        1), V4( 0.04,       0.7,        0.04,       1), 0.078125   }, // green rubber  
-    { V4(0.05,     0.0,      0.0,      1), V4( 0.5,      0.4,        0.4,        1), V4( 0.7,        0.04,       0.04,       1), 0.078125   }, // red rubber      
-    { V4(0.00,     0.0,      0.05,     1), V4( 0.4,      0.4,        0.5,        1), V4( 0.04,       0.04,       0.7,        1), 0.078125   }, // blue rubber 
-    { V4(0.05,     0.05,     0.05,     1), V4( 0.5,      0.5,        0.5,        1), V4( 0.7,        0.7,        0.7,        1), 0.078125   }, // white rubber  
-    { V4(0.05,     0.05,     0.0,      1), V4( 0.5,      0.5,        0.4,        1), V4( 0.7,        0.7,        0.04,       1), 0.078125   } // yellow rubber        
-  };
-
-  Assert(AssetManager->MaterialCount + ArrayCount(mtl) < AssetManager->MaxMaterialCount);
-  u8 WhitePixel[4] = {255,255,255,255};
-
-  u32 EmptyTextureIndex = AssetManager->TextureCount++;
-  bitmap* EmptyBitmap = AssetManager->Textures + EmptyTextureIndex;
-  EmptyBitmap->BPP  = 32;
-  EmptyBitmap->Width  = 1;
-  EmptyBitmap->Height = 1;
-  EmptyBitmap->Pixels = PushCopy(&AssetManager->AssetArena, sizeof(WhitePixel), WhitePixel);
-  book_keeper* TextureKeeper = (AssetManager->TextureKeeper + EmptyTextureIndex);
-  *TextureKeeper = {};
-
-
-  for(u32 MaterialIndex = 0; MaterialIndex < ArrayCount(mtl); ++MaterialIndex)
-  {
-    material* DstMaterial = (AssetManager->Materials + MaterialIndex);
-    *DstMaterial = mtl[MaterialIndex];
-    // Todo: Split color from texture. I wanna be able to freely specify a colour without having to
-    //       pre-create it here.
-    //       Also, maybe only have 1 empty texture that gets used?
-
-    DstMaterial->TextureHandle = EmptyTextureIndex;
-
-    ++AssetManager->MaterialCount;
+    (*Count)++;
+    Assert(*Count < *MaxCount);
+    Result = PushSize(Arena, Size);
+    Values[Index] = Result;
   }
+
+  return Result;
+}
+
+#define AllocateInstance(AssetManager, Index) (asset_instance*) AllocateValue_(&AssetManager->AssetArena, sizeof(asset_instance), AssetManager->Instances.Values, Index, &AssetManager->Instances.Count, &AssetManager->Instances.MaxCount);
+#define AllocateMesh(AssetManager, Index) (mesh_data*) AllocateValue_(&AssetManager->AssetArena, sizeof(mesh_data), AssetManager->Meshes.Values, Index, &AssetManager->Meshes.Count, &AssetManager->Meshes.MaxCount);
+#define AllocateBitmap(AssetManager, Index) (bitmap*) AllocateValue_(&AssetManager->AssetArena, sizeof(bitmap), AssetManager->Bitmaps.Values, Index, &AssetManager->Bitmaps.Count, &AssetManager->Bitmaps.MaxCount);
+#define AllocateObject(AssetManager, Index) (mesh_indeces*) AllocateValue_(&AssetManager->AssetArena, sizeof(mesh_indeces), AssetManager->Objects.Values, Index, &AssetManager->Objects.Count, &AssetManager->Objects.MaxCount);
+#define AllocateMaterial(AssetManager, Index) (material*) AllocateValue_(&AssetManager->AssetArena, sizeof(material), AssetManager->Materials.Values, Index, &AssetManager->Materials.Count, &AssetManager->Materials.MaxCount);
+
+u32 StringToIndex(asset_hash_map* HashMap, c8* Key)
+{
+  Assert(Key);
+  Assert(str::StringLength(Key) > 0);
+
+  const u32 StartIndex = utils::djb2_hash(Key) % HashMap->MaxCount;
+
+  u32 Index = StartIndex;
+  c8* MapKey = HashMap->Keys[StartIndex];
+  while(MapKey && !str::Equals(Key, MapKey))
+  {
+    ++Index;
+    Index = Index % HashMap->MaxCount;
+    MapKey = HashMap->Keys[Index];
+    Assert(Index != StartIndex);
+  }
+  return Index;
+}
+
+inline b32 IsKeySet(asset_hash_map* HashMap, u32 Index)
+{
+  return HashMap->Keys[Index] != nullptr;
+}
+
+internal inline u32 GetNamedHandle(asset_hash_map* HashMap,  c8* Key)
+{
+  Assert(Key);
+  u32 Result = StringToIndex(HashMap, Key);
+  Assert(IsKeySet(HashMap, Result));
+  return Result;
+}
+
+internal void SetKey(memory_arena* Arena, asset_hash_map* HashMap, u32 Index, c8* Key)
+{
+  Assert(Key);
+  Assert(!IsKeySet(HashMap, Index));
+  c8* dst = (c8*) PushCopy(Arena, str::StringLength(Key)*sizeof(c8), Key);
+  HashMap->Keys[Index] = dst;
+}
+
+inline u32 GetObjectAssetIndex(game_asset_manager* AssetManager, c8* Key)
+{
+  u32 Result = StringToIndex(&AssetManager->Objects, Key);
+  return Result;  
+}
+inline u32 GetMaterialAssetIndex(game_asset_manager* AssetManager, c8* Key)
+{
+  u32 Result = StringToIndex(&AssetManager->Materials, Key);
+  return Result;
+}
+inline u32 GetBitmapAssetIndex(game_asset_manager* AssetManager, c8* Key)
+{
+  u32 Result = StringToIndex(&AssetManager->Bitmaps, Key);
+  return Result;
+}
+
+internal u32 PushBitmapData(game_asset_manager* AssetManager, c8* Key, u32 Width, u32 Height, u32 BPP, void* PixelData)
+{
+  u32 Index = GetBitmapAssetIndex(AssetManager, Key);
+  SetKey(&AssetManager->AssetArena, &AssetManager->Bitmaps, Index, Key);
+  bitmap* Bitmap = AllocateBitmap(AssetManager, Index);
+  Bitmap->BPP = BPP;
+  Bitmap->Width = Width;
+  Bitmap->Height = Height;
+  midx MemorySize = Width * Height * BPP / 8;
+  Bitmap->Pixels = PushCopy(&AssetManager->AssetArena, MemorySize, PixelData);
+  return Index;
+}
+
+internal u32 PushMeshData(game_asset_manager* AssetManager, u32 nv, v3* v, u32 nvn, v3* vn, u32 nvt, v2* vt)
+{
+  u32 Index = AssetManager->Meshes.Count;
+  Assert(AssetManager->Meshes.Count < AssetManager->Meshes.MaxCount)
+  mesh_data* Data = AllocateMesh(AssetManager, Index);
+  Data->nv  = nv;    // Nr Verices
+  Data->nvn = nvn;   // Nr Vertice Normals
+  Data->nvt = nvt;   // Nr Trxture Vertices
+  Data->v  = (v3*) PushCopy(&AssetManager->AssetArena, nv*sizeof(v3), v);
+  Data->vn = (v3*) PushCopy(&AssetManager->AssetArena, nvn*sizeof(v3), vn);
+  Data->vt = (v2*) PushCopy(&AssetManager->AssetArena, nvt*sizeof(v2), vt);
+  return Index;
+}
+
+internal u32 PushIndexData(game_asset_manager* AssetManager, c8* Key, u32 MeshIndex, u32 Count, u32* vi, u32* ti, u32* ni, aabb3f AABB)
+{
+  u32 Index = GetObjectAssetIndex(AssetManager, Key);
+  SetKey(&AssetManager->AssetArena, &AssetManager->Objects, Index, Key);
+  mesh_indeces* Indeces = AllocateObject(AssetManager, Index);
+  Indeces->MeshHandle = MeshIndex;
+  Indeces->Count  = Count;
+  Indeces->vi = (u32*) PushCopy(&AssetManager->AssetArena, Count * sizeof(u32), vi);
+  Indeces->ti = (u32*) PushCopy(&AssetManager->AssetArena, Count * sizeof(u32), ti);
+  Indeces->ni = (u32*) PushCopy(&AssetManager->AssetArena, Count * sizeof(u32), ni);
+  Indeces->AABB = AABB;
+  str::CopyStrings( str::StringLength( Key ), Key,
+                    ArrayCount( Indeces->Name ), Indeces->Name );
+  return Index;
+}
+
+internal void PushMaterialData(game_asset_manager* AssetManager, c8* Key, material SrcMaterial)
+{
+  u32 Index = GetMaterialAssetIndex(AssetManager, Key);
+  SetKey(&AssetManager->AssetArena, &AssetManager->Materials, Index, Key);
+  material* DstMaterial = AllocateMaterial(AssetManager, Index);
+  *DstMaterial = SrcMaterial;
+}
+
+void LoadPredefinedMaterials(game_asset_manager* AssetManager)
+{ 
+  u8 WhitePixel[4] = {255,255,255,255};
+  u32 BitmapIndex = PushBitmapData(AssetManager, "null", 1, 1, 32, (void*)WhitePixel);
+
+  PushMaterialData(AssetManager, "white",           CreateMaterial(V4(1.0,      1.0,      1.0,      1), V4( 1.0,      1.0,        1.0,        1), V4( 1.0,        1.0,        1.0,        1), 1.0,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "red",             CreateMaterial(V4(1.0,      0.0,      0.0,      1), V4( 1.0,      0.0,        0.0,        1), V4( 1.0,        0.0,        0.0,        1), 1.0,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "green",           CreateMaterial(V4(0.0,      1.0,      0.0,      1), V4( 0.0,      1.0,        0.0,        1), V4( 0.0,        1.0,        0.0,        1), 1.0,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "blue",            CreateMaterial(V4(0.0,      0.0,      1.0,      1), V4( 0.0,      0.0,        1.0,        1), V4( 0.0,        0.0,        1.0,        1), 1.0,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "emerald",         CreateMaterial(V4(0.0215,   0.1745,   0.0215,   1), V4( 0.07568,  0.61424,    0.07568,    1), V4( 0.633,      0.727811,   0.633,      1), 0.6,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "jade",            CreateMaterial(V4(0.135,    0.2225,   0.1575,   1), V4( 0.54,     0.89,       0.63,       1), V4( 0.316228,   0.316228,   0.316228,   1), 0.1,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "obsidian",        CreateMaterial(V4(0.05375,  0.05,     0.06625,  1), V4( 0.18275,  0.17,       0.22525,    1), V4( 0.332741,   0.328634,   0.3,        1), 0.3,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "pearl",           CreateMaterial(V4(0.25,     0.20725,  0.20725,  1), V4( 1.0,      0.829,      0.829,      1), V4( 0.296648,   0.296648,   0.088,      1), 0.088,      false, BitmapIndex));
+  PushMaterialData(AssetManager, "ruby",            CreateMaterial(V4(0.1745,   0.01175,  0.01175,  1), V4( 0.61424,  0.04136,    0.04136,    1), V4( 0.727811,   0.626959,   0.6,        1), 0.6,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "turquoise",       CreateMaterial(V4(0.1,      0.18725,  0.1745,   1), V4( 0.396,    0.74151,    0.69102,    1), V4( 0.297254,   0.30829,    0.1,        1), 0.1,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "brass",           CreateMaterial(V4(0.329412, 0.223529, 0.027451, 1), V4( 0.780392, 0.568627,   0.113725,   1), V4( 0.992157,   0.941176,   0.21794872, 1), 0.21794872, false, BitmapIndex));
+  PushMaterialData(AssetManager, "bronze",          CreateMaterial(V4(0.2125,   0.1275,   0.054,    1), V4( 0.714,    0.4284,     0.18144,    1), V4( 0.393548,   0.271906,   0.2,        1), 0.2,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "chrome",          CreateMaterial(V4(0.25,     0.25,     0.25,     1), V4( 0.4,      0.4,        0.4,        1), V4( 0.774597,   0.774597,   0.6,        1), 0.6,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "compper",         CreateMaterial(V4(0.19125,  0.0735,   0.0225,   1), V4( 0.7038,   0.27048,    0.0828,     1), V4( 0.256777,   0.137622,   0.1,        1), 0.1,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "gold",            CreateMaterial(V4(0.24725,  0.1995,   0.0745,   1), V4( 0.75164,  0.60648,    0.22648,    1), V4( 0.628281,   0.555802,   0.4,        1), 0.4,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "silver",          CreateMaterial(V4(0.19225,  0.19225,  0.19225,  1), V4( 0.50754,  0.50754,    0.50754,    1), V4( 0.508273,   0.508273,   0.4,        1), 0.4,        false, BitmapIndex));
+  PushMaterialData(AssetManager, "black_plastic",   CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.01,     0.01,       0.01,       1), V4( 0.50,       0.50,       0.25,       1), 0.25,       false, BitmapIndex));
+  PushMaterialData(AssetManager, "cyan_plastic",    CreateMaterial(V4(0.0,      0.1,      0.06,     1), V4( 0.0,      0.50980392, 0.50980392, 1), V4( 0.50196078, 0.50196078, 0.25,       1), 0.25,       false, BitmapIndex));
+  PushMaterialData(AssetManager, "green_plastic",   CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.1,      0.35,       0.1,        1), V4( 0.45,       0.55,       0.25,       1), 0.25,       false, BitmapIndex));
+  PushMaterialData(AssetManager, "red_plastic",     CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.5,      0.0,        0.0,        1), V4( 0.7,        0.6,        0.25,       1), 0.25,       false, BitmapIndex));
+  PushMaterialData(AssetManager, "blue_plastic",    CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.0,      0.0,        0.5,        1), V4( 0.6,        0.6,        0.25,       1), 0.25,       false, BitmapIndex));
+  PushMaterialData(AssetManager, "white_plastic",   CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.55,     0.55,       0.55,       1), V4( 0.70,       0.70,       0.25,       1), 0.25,       false, BitmapIndex));
+  PushMaterialData(AssetManager, "yellow_plastic",  CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.5,      0.5,        0.0,        1), V4( 0.60,       0.60,       0.25,       1), 0.25,       false, BitmapIndex));
+  PushMaterialData(AssetManager, "black_rubber",    CreateMaterial(V4(0.02,     0.02,     0.02,     1), V4( 0.01,     0.01,       0.01,       1), V4( 0.4,        0.4,        0.078125,   1), 0.078125,   false, BitmapIndex));
+  PushMaterialData(AssetManager, "cyan_rubber",     CreateMaterial(V4(0.0,      0.05,     0.05,     1), V4( 0.4,      0.5,        0.5,        1), V4( 0.04,       0.7,        0.078125,   1), 0.078125,   false, BitmapIndex));
+  PushMaterialData(AssetManager, "green_rubber",    CreateMaterial(V4(0.0,      0.05,     0.0,      1), V4( 0.4,      0.5,        0.4,        1), V4( 0.04,       0.7,        0.078125,   1), 0.078125,   false, BitmapIndex));
+  PushMaterialData(AssetManager, "red_rubber",      CreateMaterial(V4(0.05,     0.0,      0.0,      1), V4( 0.5,      0.4,        0.4,        1), V4( 0.7,        0.04,       0.078125,   1), 0.078125,   false, BitmapIndex));
+  PushMaterialData(AssetManager, "blue_rubber",     CreateMaterial(V4(0.00,     0.0,      0.05,     1), V4( 0.4,      0.4,        0.5,        1), V4( 0.04,       0.04,       0.078125,   1), 0.078125,   false, BitmapIndex));
+  PushMaterialData(AssetManager, "white_rubber",    CreateMaterial(V4(0.05,     0.05,     0.05,     1), V4( 0.5,      0.5,        0.5,        1), V4( 0.7,        0.7,        0.078125,   1), 0.078125,   false, BitmapIndex));
+  PushMaterialData(AssetManager, "yellow_rubber",   CreateMaterial(V4(0.05,     0.05,     0.0,      1), V4( 0.5,      0.5,        0.4,        1), V4( 0.7,        0.7,        0.078125,   1), 0.078125,   false, BitmapIndex));
 }
 
 
-void InitPredefinedMeshes(game_asset_manager* AssetManager)
+void LoadPredefinedMeshes(game_asset_manager* AssetManager)
 {
   {
     v3 v[] =
@@ -86,28 +189,16 @@ void InitPredefinedMeshes(game_asset_manager* AssetManager)
       V2( 1, 1),
       V2( 0, 1)
     };
+    u32 MeshIndex = PushMeshData(AssetManager,
+      ArrayCount(v),  v,
+      ArrayCount(vn), vn,
+      ArrayCount(vt), vt);
+
     u32 vi[] = {0,1,2,0,2,3};
     u32 ti[] = {0,1,2,0,2,3};
     u32 ni[] = {0,0,0,0,0,0};
     aabb3f AABB = AABB3f(V3(-0.5, -0.5, 0), V3( 0.5,  0.5, 0));
-
-    u32 MeshIndex = AssetManager->MeshCount++;
-    mesh_data* Data = AssetManager->MeshData + MeshIndex;
-    Data->nv  = ArrayCount(v);    // Nr Verices
-    Data->nvn = ArrayCount(vn);   // Nr Vertice Normals
-    Data->nvt = ArrayCount(vt);   // Nr Trxture Vertices
-    Data->v  = (v3*) PushCopy(&AssetManager->AssetArena, sizeof(v), v);
-    Data->vn = (v3*) PushCopy(&AssetManager->AssetArena, sizeof(vn), vn);
-    Data->vt = (v2*) PushCopy(&AssetManager->AssetArena, sizeof(vt), vt);
-
-    u32 ObjectIndex = AssetManager->ObjectCount++;
-    mesh_indeces* Indeces = AssetManager->Objects + ObjectIndex;
-    Indeces->MeshHandle = MeshIndex;
-    Indeces->Count  = ArrayCount(vi);
-    Indeces->vi = (u32*) PushCopy(&AssetManager->AssetArena, sizeof(vi), vi);
-    Indeces->ti = (u32*) PushCopy(&AssetManager->AssetArena, sizeof(ti), ti);
-    Indeces->ni = (u32*) PushCopy(&AssetManager->AssetArena, sizeof(ni), ni);
-    Indeces->AABB = AABB;
+    PushIndexData(AssetManager, "quad", MeshIndex, ArrayCount(vi), vi, ti, ni, AABB);
   }
 
   {
@@ -141,34 +232,21 @@ void InitPredefinedMeshes(game_asset_manager* AssetManager)
       V2( 0, 1)
     };
 
+    u32 MeshIndex = PushMeshData(AssetManager,
+      ArrayCount(v),  v,
+      ArrayCount(vn), vn,
+      ArrayCount(vt), vt);
+
     u32 vi[] = {0,1,2,2,1,3,2,3,4,4,3,5,4,5,6,6,5,7,6,7,0,0,7,1,1,7,3,3,7,5,6,0,4,4,0,2};
     u32 ti[] = {0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2};
     u32 ni[] = {0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,5,5,5,5,5,5};
     aabb3f AABB = AABB3f(V3(-0.5, -0.5, -0.5), V3( 0.5, 0.5, 0.5));
-
-    u32 MeshIndex = AssetManager->MeshCount++;
-    mesh_data* Data = AssetManager->MeshData + MeshIndex;
-    Data->nv  = ArrayCount(v);    // Nr Verices
-    Data->nvn = ArrayCount(vn);   // Nr Vertice Normals
-    Data->nvt = ArrayCount(vt);   // Nr Trxture Vertices
-    Data->v  = (v3*) PushCopy(&AssetManager->AssetArena, sizeof(v), v);
-    Data->vn = (v3*) PushCopy(&AssetManager->AssetArena, sizeof(vn), vn);
-    Data->vt = (v2*) PushCopy(&AssetManager->AssetArena, sizeof(vt), vt);
-
-    u32 ObjectIndex = AssetManager->ObjectCount++;
-    mesh_indeces* Indeces = AssetManager->Objects + ObjectIndex;
-    Indeces->MeshHandle = MeshIndex;
-    Indeces->Count  = ArrayCount(vi);
-    Indeces->vi = (u32*) PushCopy(&AssetManager->AssetArena, sizeof(vi), vi);
-    Indeces->ti = (u32*) PushCopy(&AssetManager->AssetArena, sizeof(ti), ti);
-    Indeces->ni = (u32*) PushCopy(&AssetManager->AssetArena, sizeof(ni), ni);
-    Indeces->AABB = AABB;
+    PushIndexData(AssetManager, "voxel", MeshIndex, ArrayCount(vi), vi, ti, ni, AABB);
   }
 
 }
 
-
-internal void STBBakeFont(game_asset_manager* AssetManager)
+internal void stbtt_BakeFontBitmap(game_asset_manager* AssetManager)
 {
   const s32 Ranges[] =
   {
@@ -180,45 +258,37 @@ internal void STBBakeFont(game_asset_manager* AssetManager)
       0x2200, 0x2300    // Mathematical
   };
 
-  thread_context Thread;
-  //debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\courbd.ttf");
-  debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\arial.ttf");
-  //debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\ITCEDSCR.ttf");
-
-  Assert(TTFFile.Contents);
   stb_font_map* FontMap = &AssetManager->FontMap;
   FontMap->StartChar = Ranges[0];
   FontMap->NumChars = Ranges[1] - Ranges[0];
   FontMap->FontHeightPx = 24.f;
   FontMap->CharData = PushArray(&AssetManager->AssetArena, FontMap->NumChars, stbtt_bakedchar);
 
+  thread_context Thread;
+  debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\arial.ttf");
+  Assert(TTFFile.Contents);
   stbtt_GetScaledFontVMetrics((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
    FontMap->FontHeightPx, &FontMap->Ascent, &FontMap->Descent, &FontMap->LineGap);
-
-  FontMap->BitmapHandle = AssetManager->TextureCount++;
-  bitmap* Atlas = AssetManager->Textures + FontMap->BitmapHandle;
-
-
+  
   // Todo: Insetead of saving the 8bit font map to a 32 bit, write a custom shader for the 8bit 
   //       texture that can render it with colour.
-  Atlas->BPP = 32;
-  Atlas->Width = 1028;
-  Atlas->Height = 1028;
-  Atlas->Pixels = (void*) PushArray(&AssetManager->AssetArena, Atlas->Width * Atlas->Height, u32);
-  
-  temporary_memory TempMem = BeginTemporaryMemory(&AssetManager->AssetArena);
-  u8* TmpPixels = PushArray(&AssetManager->AssetArena, Atlas->Width * Atlas->Height, u8);
+  u32 BPP = 32;
+  u32 Width = 1028;
+  u32 Height = 1028;
+    
+  u8* Pixels8BPP = PushArray(GlobalGameState->TransientArena, Width * Height, u8);
 
   s32 ret = stbtt_BakeFontBitmap((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
                        FontMap->FontHeightPx,
-                       TmpPixels, Atlas->Width, Atlas->Height,
+                       Pixels8BPP, Width, Height,
                        FontMap->StartChar, FontMap->NumChars,
                        FontMap->CharData);
   Assert(ret>0);
 
-  u32* Pixel = (u32*) Atlas->Pixels;
-  u8*  SrcPixel =  TmpPixels;
-  u8*  EndSrcPixel = TmpPixels + Atlas->Width * Atlas->Height;
+  u32* BasePixel = PushArray(GlobalGameState->TransientArena, Width*Height, u32 );
+  u32* Pixels = BasePixel;
+  u8*  SrcPixel =  Pixels8BPP;
+  u8*  EndSrcPixel = Pixels8BPP + Width * Height;
   while(SrcPixel != EndSrcPixel)
   {
     u8 Alpha = *SrcPixel;
@@ -226,12 +296,11 @@ internal void STBBakeFont(game_asset_manager* AssetManager)
     u8 Green = *SrcPixel;
     u8 Red = *SrcPixel;
     u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
-    *Pixel++ = PixelData;
+    *Pixels++ = PixelData;
     SrcPixel++;
   }
-  
-  EndTemporaryMemory(TempMem);
-  
+  FontMap->BitmapIndex = PushBitmapData(AssetManager, "debug_font", Width, Height, BPP, BasePixel);
+
   Platform.DEBUGPlatformFreeFileMemory(&Thread, TTFFile.Contents);
 }
 
@@ -241,145 +310,191 @@ internal void LoadCubeAsset(game_asset_manager* AssetManager)
   obj_loaded_file* LoadedObjFile = ReadOBJFile( AssetArena, GlobalGameState->TransientArena,
    "..\\handmade\\data\\cube\\cube.obj");
 
-  u32 MeshIndex = AssetManager->MeshCount++;
-  mesh_data* NewMesh = AssetManager->MeshData + MeshIndex;
-  *NewMesh =*LoadedObjFile->MeshData;
+  mesh_data* MeshData = LoadedObjFile->MeshData;
+
+  u32 MeshIndex = PushMeshData(AssetManager,
+      MeshData->nv,  MeshData->v,
+      MeshData->nvn, MeshData->vn,
+      MeshData->nvt, MeshData->vt);
 
   for (u32 i = 0; i < LoadedObjFile->ObjectCount; ++i)
   {
     obj_group* LoadedObjectGroup = LoadedObjFile->Objects + i;
-
-    u32 ObjectIndex = AssetManager->ObjectCount++;
-    mesh_indeces* DstObject = AssetManager->Objects + ObjectIndex;
-
-    DstObject->MeshHandle = MeshIndex;
-    DstObject->AABB = LoadedObjectGroup->aabb;
-    DstObject->Count = LoadedObjectGroup->Indeces->Count;
-    DstObject->vi = LoadedObjectGroup->Indeces->vi;
-    DstObject->ti = LoadedObjectGroup->Indeces->ti;
-    DstObject->ni = LoadedObjectGroup->Indeces->ni;
+    Assert(LoadedObjectGroup->GroupName);
+    PushIndexData(AssetManager,
+      LoadedObjectGroup->GroupName,
+      MeshIndex,
+      LoadedObjectGroup->Indeces->Count, 
+      LoadedObjectGroup->Indeces->vi,
+      LoadedObjectGroup->Indeces->ti,
+      LoadedObjectGroup->Indeces->ni,
+      LoadedObjectGroup->aabb);
   }
 
   for (u32 i = 0; i < LoadedObjFile->MaterialData->MaterialCount; ++i)
   {
     mtl_material* SrcMaterial = LoadedObjFile->MaterialData->Materials + i;
+    Assert(SrcMaterial->NameLength > 0);
+    Assert(SrcMaterial->NameLength < 120);
+    Assert(SrcMaterial->Name);
 
-    u32 MaterialIndex = AssetManager->MaterialCount++;
-
-    material* DstMaterial = AssetManager->Materials + MaterialIndex;
-
-    DstMaterial->AmbientColor  = SrcMaterial->Ka ? *SrcMaterial->Ka : V4(1,1,1,1);
-    DstMaterial->DiffuseColor  = SrcMaterial->Kd ? *SrcMaterial->Kd : V4(1,1,1,1);
-    DstMaterial->SpecularColor = SrcMaterial->Ks ? *SrcMaterial->Ks : V4(1,1,1,1);
-    DstMaterial->Shininess     = SrcMaterial->Ns ? *SrcMaterial->Ns : 1;
-
-    u32 TextureIndex = 0;
+    u32 BitmapHandle = 0;
     if(SrcMaterial->MapKd)
-    {
-      TextureIndex = AssetManager->TextureCount++;
-      bitmap* Texture = AssetManager->Textures + TextureIndex;
-      *Texture    = *SrcMaterial->MapKd;
+    {  
+      c8 TexKey[128] = {};
+      c8 Appendix[] = "_kd";
+      str::CatStrings( SrcMaterial->NameLength, SrcMaterial->Name,
+        ArrayCount(Appendix), Appendix, ArrayCount(TexKey),  TexKey );
+      BitmapHandle = PushBitmapData(AssetManager, TexKey,
+        SrcMaterial->MapKd->Width, SrcMaterial->MapKd->Height,
+        SrcMaterial->MapKd->BPP,   SrcMaterial->MapKd->Pixels);
     }
-    DstMaterial->TextureHandle = TextureIndex;
+
+    material Material = CreateMaterial(*SrcMaterial->Ka, *SrcMaterial->Kd, *SrcMaterial->Ks, *SrcMaterial->Ns, false, BitmapHandle);
+    PushMaterialData(AssetManager, SrcMaterial->Name, Material);
   }
 }
 
+internal void LoadHeroSpriteSheet(game_asset_manager* AssetManager)
+{
+  bitmap* Bitmap = LoadTGA(&AssetManager->AssetArena,
+        "..\\handmade\\data\\Platformer\\Adventurer\\adventurer-Sheet.tga" );
+  u32 BitmapHandle = PushBitmapData(AssetManager, "hero_sprite_sheet", Bitmap->Width, Bitmap->Height, Bitmap->BPP, Bitmap->Pixels);
+  PushMaterialData(AssetManager, "hero_sprite_sheet", CreateMaterial(V4(1,1,1,1),V4(1,1,1,1),V4(1,1,1,1),1,true, BitmapHandle));
+}
+
+void LoadAssets()
+{
+  game_asset_manager* AssetManager = GlobalGameState->AssetManager;
+  LoadPredefinedMaterials(AssetManager);
+  LoadPredefinedMeshes(AssetManager);
+  stbtt_BakeFontBitmap(AssetManager);
+  LoadCubeAsset(AssetManager);  
+  LoadHeroSpriteSheet(AssetManager);
+}
 
 game_asset_manager* CreateAssetManager()
 {
   game_asset_manager* AssetManager = BootstrapPushStruct(game_asset_manager, AssetArena);
 
-  AssetManager->MaxMeshCount = 64;
-  AssetManager->MeshCount = 0;
-  AssetManager->MeshData = PushArray(&AssetManager->AssetArena,
-                                            AssetManager->MaxMeshCount, mesh_data);
+  AssetManager->Instances.MaxCount = 256;
+  AssetManager->Instances.Values = (void**) PushArray(&AssetManager->AssetArena,
+                                            AssetManager->Instances.MaxCount, void*);
+  AssetManager->TemporaryInstancesBase = 0;
+  AssetManager->TemporaryInstancesCount = 0;
 
-  AssetManager->MaxObjectCount = 64;
-  AssetManager->ObjectCount = 0;
-  AssetManager->Objects = PushArray(&AssetManager->AssetArena,
-                                            AssetManager->MaxObjectCount, mesh_indeces);
+  AssetManager->Meshes.MaxCount = 64;
+  AssetManager->Meshes.Values = (void**) PushArray(&AssetManager->AssetArena,
+                                  AssetManager->Meshes.MaxCount, mesh_data);
+
+  AssetManager->Objects.MaxCount = 64;
+  AssetManager->Objects.Values = (void**) PushArray(&AssetManager->AssetArena,
+                                            AssetManager->Objects.MaxCount, void*);
   AssetManager->ObjectKeeper = PushArray(&AssetManager->AssetArena,
-                                            AssetManager->MaxObjectCount, book_keeper);
+                                            AssetManager->Objects.MaxCount, book_keeper);
 
-  AssetManager->MaxMaterialCount = 64;
-  AssetManager->MaterialCount = 0;
-  AssetManager->Materials = PushArray( &AssetManager->AssetArena,
-                                            AssetManager->MaxMaterialCount, material);
+  AssetManager->Materials.MaxCount = 64;
+  AssetManager->Materials.Values = (void**) PushArray( &AssetManager->AssetArena,
+                                            AssetManager->Materials.MaxCount, void*);
 
-  AssetManager->MaxTextureCount = 64;
-  AssetManager->TextureCount = 0;
-  AssetManager->Textures = PushArray( &AssetManager->AssetArena,
-                                             AssetManager->MaxTextureCount, bitmap);
-  AssetManager->TextureKeeper = PushArray(&AssetManager->AssetArena,
-                                            AssetManager->MaxMaterialCount, book_keeper);
-
-  InitPredefinedMaterials(AssetManager);
-  InitPredefinedMeshes(AssetManager);
-  
-  STBBakeFont(AssetManager);
-  LoadCubeAsset(AssetManager);
-
-  u32 TextureIndex = TextureIndex = AssetManager->TextureCount++;
-  bitmap* HeroSpriteSheet = AssetManager->Textures + TextureIndex;
-  *HeroSpriteSheet = *LoadTGA(&AssetManager->AssetArena,
-        "..\\handmade\\data\\Platformer\\Adventurer\\adventurer-Sheet.tga" );
-
-  u32 MaterialIndex = AssetManager->MaterialCount++;
-  material* HeroMaterial = AssetManager->Materials + MaterialIndex;
-  HeroMaterial->AmbientColor = V4(1,1,1,1);
-  HeroMaterial->DiffuseColor = V4(1,1,1,1);
-  HeroMaterial->SpecularColor = V4(1,1,1,1);
-  HeroMaterial->Shininess = 1;
-  HeroMaterial->TextureHandle = GetTextureAssetHandle(TextureIndex);
-
+  AssetManager->Bitmaps.MaxCount = 64;
+  AssetManager->Bitmaps.Values = (void**) PushArray( &AssetManager->AssetArena,
+                                            AssetManager->Materials.MaxCount, void*);
+  AssetManager->BitmapKeeper = PushArray(&AssetManager->AssetArena,
+                                            AssetManager->Materials.MaxCount, book_keeper);
   return AssetManager;
 }
 
-inline game_asset_manager*
-GetAssetManager()
+// Game Layer API
+u32 GetAssetHandle(game_asset_manager* AssetManager)
 {
-  Assert(GlobalGameState->AssetManager);
-  return GlobalGameState->AssetManager;
-}
-
-
-u32 GetMeshAssetHandle( u32 MeshIndex )
-{
-  game_asset_manager* AssetManager = GetAssetManager();
-  Assert(MeshIndex < AssetManager->ObjectCount);
-  mesh_indeces* Object = AssetManager->Objects + MeshIndex;
-  Assert(Object->MeshHandle < AssetManager->MeshCount);
-  return MeshIndex;
-}
-
-aabb3f GetMeshAABB(u32 ObjectHandle)
-{
-  game_asset_manager* AssetManager = GetAssetManager();
-  aabb3f Result = GetObject(AssetManager,ObjectHandle)->AABB;
+  u32 Result = AssetManager->Instances.Count;
+  AllocateInstance(AssetManager, Result);
   return Result;
 }
 
-collider_mesh GetColliderMesh(u32 ObjectHandle)
+void ResetAssetManagerTemporaryInstances(game_asset_manager* AssetManager)
 {
-  collider_mesh Result = {};
-  game_asset_manager* AssetManager = GetAssetManager();
-  mesh_indeces* Indeces =  GetObject(AssetManager, ObjectHandle);
-  mesh_data* Data =  GetMeshData(AssetManager, Indeces->MeshHandle);
-  Result.nv = Data->nv;
-  Result.v = Data->v;
-  Result.nvi = Indeces->Count;
-  Result.vi = Indeces->vi;
+  AssetManager->TemporaryInstancesCount = 0;
+}
+
+u32 GetTemporaryAssetHandle(game_asset_manager* AssetManager)
+{
+  if(AssetManager->TemporaryInstancesBase == 0)
+  {
+    AssetManager->TemporaryInstancesBase = AssetManager->Instances.Count;
+    AssetManager->TemporaryInstancesCount = 0;
+  }
+
+  u32 Base = AssetManager->TemporaryInstancesBase;
+  u32 Count = AssetManager->TemporaryInstancesCount++;
+  u32 Result = Base+Count;
+
+  asset_vector* Instances = &AssetManager->Instances;
+  Assert(Result < Instances->MaxCount);
+  asset_instance* Instance = (asset_instance*) Instances->Values[Result];
+  if(!Instance)
+  {
+    Instances->Values[Result] = PushStruct(&AssetManager->AssetArena, asset_instance);
+  }else{
+    *Instance = {};
+  }
+
   return Result;
 }
 
-u32 GetMaterialAssetHandle( u32 MaterialHandle )
+void CopyAssets(game_asset_manager* AssetManager, u32 SrcHandle, u32 DstHandle)
 {
-  game_asset_manager* AssetManager = GetAssetManager();
-  material* Material = GetMaterial(AssetManager, MaterialHandle);
-  return MaterialHandle;
+  Assert(SrcHandle < AssetManager->Instances.Count);
+  Assert(DstHandle < AssetManager->Instances.Count+AssetManager->TemporaryInstancesCount);
+
+  utils::Copy(sizeof(asset_instance), AssetManager->Instances.Values[SrcHandle],
+                                      AssetManager->Instances.Values[DstHandle]);
 }
 
-u32 GetTextureAssetHandle( u32 TextureIndex )
+u32 GetAssetIndex(game_asset_manager* AssetManager, asset_type AssetType, char* Key)
 {
-  return TextureIndex;
+  u32 Result =  U32Max;
+  switch(AssetType)
+  {
+    case asset_type::OBJECT:
+    {
+      Result = GetNamedHandle(&AssetManager->Objects, Key);
+    }break;
+    case asset_type::MATERIAL:
+    {
+      Result = GetNamedHandle(&AssetManager->Materials, Key);
+    }break;
+    case asset_type::BITMAP:
+    {
+      Result = GetNamedHandle(&AssetManager->Bitmaps, Key);
+    }break;
+  }
+
+  Assert(Result != U32Max);
+  return Result;
+}
+
+
+void SetAsset(game_asset_manager* AssetManager, asset_type AssetType, char* Key, u32 Handle)
+{
+  asset_instance* Instance = GetAssetInstance(AssetManager, Handle);
+  switch(AssetType)
+  {
+    case asset_type::OBJECT:
+    {
+      Instance->ObjectIndex = GetObjectAssetIndex(AssetManager, Key);
+      Assert(IsKeySet(&AssetManager->Objects, Instance->ObjectIndex));
+    }break;
+    case asset_type::MATERIAL:
+    {
+      Instance->MaterialIndex = GetMaterialAssetIndex(AssetManager, Key);
+      Assert(IsKeySet(&AssetManager->Materials, Instance->MaterialIndex));
+    }break;
+    case asset_type::BITMAP:
+    {
+      Instance->TextureIndex = GetBitmapAssetIndex(AssetManager, Key);
+      Assert(IsKeySet(&AssetManager->Bitmaps, Instance->TextureIndex));
+    }break;
+  }
 }

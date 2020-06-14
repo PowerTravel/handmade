@@ -89,7 +89,7 @@ world* AllocateWorld( u32 NrMaxEntities, u32 NumManifolds = 4 )
 void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 {
   world* World = GameState->World;
-
+  game_asset_manager* AssetManager = GlobalGameState->AssetManager;
   entity* ControllableCamera = NewEntity( World );
   NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
 
@@ -100,12 +100,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 
   ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
   ControllableCamera->ControllerComponent->Type = ControllerType_FlyingCamera;
-  // TODO: Create a better way to ask for assets than giving known array-indeces
-  //       Maybe Enums?
-  const u32 CubeIndex0 = 1; // CubeIndex0 and CubeIndex1 have different texture indeces
-  const u32 CubeIndex1 = 2;
-  const u32 CubeTextureIndex = 30;
-
+ 
   entity* Light = NewEntity( World );
   NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL | COMPONENT_TYPE_RENDER);
 
@@ -114,8 +109,10 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   Light->SpatialComponent->Position = V3(1,1,1);
   Light->SpatialComponent->Scale    = V3( 0.3, 0.3, 0.3);
 
-  Light->RenderComponent->MeshHandle     = GetMeshAssetHandle(CubeIndex1);
-  Light->RenderComponent->MaterialHandle = GetMaterialAssetHandle(MATERIAL_WHITE);
+  Light->RenderComponent->AssetHandle = GetAssetHandle(GameState->AssetManager);
+  SetAsset( GameState->AssetManager, asset_type::OBJECT,   "voxel", Light->RenderComponent->AssetHandle);
+  SetAsset( GameState->AssetManager, asset_type::MATERIAL, "white", Light->RenderComponent->AssetHandle);  // May have a texture
+  SetAsset( GameState->AssetManager, asset_type::BITMAP,   "null",  Light->RenderComponent->AssetHandle);  // Overrides texture
 
 
 #define State4
@@ -146,6 +143,10 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   s32 karr[] = {-0,1};
 #endif
   u32 RollingIndex = 0;
+  u32 cubeAssetHandle = GetAssetHandle( GameState->AssetManager);
+  SetAsset( AssetManager, asset_type::OBJECT, "cube1", cubeAssetHandle );
+  SetAsset( AssetManager, asset_type::MATERIAL, "cube", cubeAssetHandle );
+  SetAsset( AssetManager, asset_type::BITMAP, "cube_kd", cubeAssetHandle );
   for (s32 i = iarr[0]; i < iarr[1]; ++i)
   {
     for (s32 j = jarr[0]; j < jarr[1]; ++j)
@@ -159,11 +160,10 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
           COMPONENT_TYPE_COLLIDER |
           COMPONENT_TYPE_DYNAMICS);
 
-        cubeEntity->RenderComponent->MeshHandle    = GetMeshAssetHandle(CubeIndex0);
-        cubeEntity->RenderComponent->MaterialHandle = GetMaterialAssetHandle(RollingIndex++ % CubeTextureIndex);
+        cubeEntity->RenderComponent->AssetHandle = cubeAssetHandle;
 
-        cubeEntity->ColliderComponent->MeshHandle = GetMeshAssetHandle(CubeIndex0);
-        cubeEntity->ColliderComponent->AABB = GetMeshAABB(cubeEntity->ColliderComponent->MeshHandle);
+        cubeEntity->ColliderComponent->AssetHandle = cubeAssetHandle;
+        cubeEntity->ColliderComponent->AABB = GetMeshAABB(AssetManager, cubeAssetHandle);
 
         cubeEntity->SpatialComponent->Position =  V3(xzSpace*i, ySpace*j, xzSpace*k);
         cubeEntity->SpatialComponent->Rotation = RotateQuaternion( 0, V3(0,0,0) );
@@ -182,11 +182,14 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     COMPONENT_TYPE_SPATIAL  |
     COMPONENT_TYPE_COLLIDER);
 
-  FloorEntity->RenderComponent->MeshHandle    = GetMeshAssetHandle(CubeIndex1);
-  FloorEntity->RenderComponent->MaterialHandle = GetMaterialAssetHandle(CubeTextureIndex);
+  u32 FloorHandle = GetAssetHandle(AssetManager);
+  FloorEntity->RenderComponent->AssetHandle = FloorHandle;
+  SetAsset( AssetManager, asset_type::OBJECT, "cube1", FloorHandle);
+  SetAsset( AssetManager, asset_type::MATERIAL, "cube", FloorHandle );
+  SetAsset( AssetManager, asset_type::BITMAP, "cube_kd", FloorHandle );
 
-  FloorEntity->ColliderComponent->MeshHandle = GetMeshAssetHandle(CubeIndex1);
-  FloorEntity->ColliderComponent->AABB = GetMeshAABB(FloorEntity->ColliderComponent->MeshHandle);
+  FloorEntity->ColliderComponent->AssetHandle = FloorHandle;
+  FloorEntity->ColliderComponent->AABB = GetMeshAABB( AssetManager, FloorHandle);
 
   FloorEntity->SpatialComponent->Position = V3( 0,-2, 0);
   FloorEntity->SpatialComponent->Scale = V3( 18, 1, 18);
@@ -197,8 +200,12 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     COMPONENT_TYPE_RENDER           |
     COMPONENT_TYPE_SPATIAL);
 
-  SpriteAnimationEntity->RenderComponent->MeshHandle    = GetMeshAssetHandle(0);
-  SpriteAnimationEntity->RenderComponent->MaterialHandle = GetMaterialAssetHandle(31);
+  u32 HeroSpriteHandle = GetAssetHandle(AssetManager);
+  SetAsset( AssetManager, asset_type::OBJECT, "quad", HeroSpriteHandle);
+  SetAsset( AssetManager, asset_type::BITMAP, "hero_sprite_sheet", HeroSpriteHandle);
+  SetAsset( AssetManager, asset_type::MATERIAL, "cube", HeroSpriteHandle );
+
+  SpriteAnimationEntity->RenderComponent->AssetHandle = HeroSpriteHandle;
 
   SpriteAnimationEntity->SpatialComponent->Position = V3( -0,  8, 8);
   SpriteAnimationEntity->SpatialComponent->Rotation = RotateQuaternion( Pi32, V3(0,1,0) );
@@ -207,10 +214,8 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   component_sprite_animation* SpriteAnimation = SpriteAnimationEntity->SpriteAnimationComponent;
 
   hash_map<bitmap_coordinate> HeroCoordinates = LoadAdventurerSpriteSheetCoordinates( GameState->TransientArena );
-  SpriteAnimation->MaterialHande = GetMaterialAssetHandle(31);
-  material* TmpMat = GetMaterial(GameState->AssetManager, SpriteAnimation->MaterialHande );
-  bitmap* HeroSpriteSheet = GetTexture(GameState->AssetManager, TmpMat->TextureHandle );
-
+  
+  bitmap* HeroSpriteSheet =  GetBitmap(GameState->AssetManager, HeroSpriteHandle);
   SpriteAnimation->Animation = hash_map< list<m4> >(&GameState->AssetManager->AssetArena,6);
 
   list<m4> Idle1(&GameState->AssetManager->AssetArena);
@@ -260,19 +265,21 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
   if (!Memory->GameState)
   {
     GlobalGameState = BootstrapPushStruct(game_state, PersistentArena);
+    GlobalGameState->AssetManager = CreateAssetManager();
+    GlobalGameState->TransientArena = PushStruct(GlobalGameState->PersistentArena, memory_arena);
+    GlobalGameState->IsInitialized = true;
+
+    GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
+
+    LoadAssets();
+    GlobalGameState->World = AllocateWorld(120, 32);
+
+    GlobalGameState->ScreenWidthPixels  = (r32)RenderCommands->ResolutionWidthPixels;
+    GlobalGameState->ScreenHeightPixels = (r32)RenderCommands->ResolutionHeightPixels;
+
+    CreateCollisionTestScene(GlobalGameState, Input);    
+
     Memory->GameState = GlobalGameState;
-    Memory->GameState->TransientArena = PushStruct(Memory->GameState->PersistentArena, memory_arena);
-    Memory->GameState->IsInitialized = true;
-
-    Memory->GameState->TransientTempMem = BeginTemporaryMemory(Memory->GameState->TransientArena);
-
-    Memory->GameState->AssetManager = CreateAssetManager();
-    Memory->GameState->World = AllocateWorld(120, 32);
-
-    Memory->GameState->ScreenWidthPixels = (r32)RenderCommands->ResolutionWidthPixels;
-    Memory->GameState->ScreenHeightPixels = (r32)RenderCommands->ResolutionHeightPixels;
-
-    CreateCollisionTestScene(Memory->GameState, Input);    
 
     for (s32 ControllerIndex = 0;
     ControllerIndex < ArrayCount(Input->Controllers);
@@ -314,7 +321,7 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
   Assert(Memory->GameState->AssetManager);
   
   GlobalGameState = Memory->GameState;
-
+  
   EndTemporaryMemory(GlobalGameState->TransientTempMem);
   GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
 
@@ -324,6 +331,7 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
   RenderCommands->DebugRenderGroup->ScreenWidth  = (r32) RenderCommands->ScreenWidthPixels;
   RenderCommands->DebugRenderGroup->ScreenHeight = (r32) RenderCommands->ScreenHeightPixels;
 
+  ResetAssetManagerTemporaryInstances(GlobalGameState->AssetManager);
 };
 
 /*

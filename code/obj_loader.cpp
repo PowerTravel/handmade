@@ -23,7 +23,7 @@ v4 ParseNumbers(char* String)
 
     Assert(WordLength < STR_MAX_WORD_LENGTH);
 
-    Copy( WordLength, Start, WordBuffer );
+    utils::Copy( WordLength, Start, WordBuffer );
     WordBuffer[WordLength] = '\0';
 
     r64 value = str::StringToReal64(WordBuffer);
@@ -267,7 +267,7 @@ bool GetTrimmedLine( char* SrcLineStart, char* SrcLineEnd, u32* DstLength, char*
     return false;
   }
 
-  Copy( Length, SrcLineStart, DstLine );
+  utils::Copy( Length, SrcLineStart, DstLine );
   DstLine[Length] = '\0';
   *DstLength = (u32) Length;
   return true;
@@ -345,7 +345,7 @@ void ParseFaceLine(memory_arena* Arena, char* ParsedLine, group_to_parse* Active
 
     Assert(WordLength < STR_MAX_WORD_LENGTH);
 
-    Copy( WordLength, Start, WordBuffer );
+    utils::Copy( WordLength, Start, WordBuffer );
     WordBuffer[WordLength] = '\0';
 
     char* StartNr = WordBuffer;

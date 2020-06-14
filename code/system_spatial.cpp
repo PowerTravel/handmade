@@ -154,8 +154,8 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
   entity* B = Manifold->B;
   m4 ModelMatrixA = GetModelMatrix(A->SpatialComponent);
   m4 ModelMatrixB = GetModelMatrix(B->SpatialComponent);
-  collider_mesh MeshA = GetColliderMesh(A->ColliderComponent->MeshHandle);
-  collider_mesh MeshB = GetColliderMesh(B->ColliderComponent->MeshHandle);
+  collider_mesh MeshA = GetColliderMesh(GlobalGameState->AssetManager, A->ColliderComponent->AssetHandle);
+  collider_mesh MeshB = GetColliderMesh(GlobalGameState->AssetManager, B->ColliderComponent->AssetHandle);
 
   gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
       &ModelMatrixA, &MeshA,
@@ -259,8 +259,8 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
         contact_data_cache PossibleContactCaches[5] = {};
         v3  ContactPoints[4] = {};
         u32 AddedContacts[4] = {};
-        Copy(sizeof(PossibleContacts), Manifold->Contacts, PossibleContacts);
-        Copy(sizeof(PossibleContactCaches), Manifold->CachedData, PossibleContactCaches);
+        utils::Copy(sizeof(PossibleContacts), Manifold->Contacts, PossibleContacts);
+        utils::Copy(sizeof(PossibleContactCaches), Manifold->CachedData, PossibleContactCaches);
         PossibleContacts[4] = NewContact;
         PossibleContactCaches[4] = CachedData;
         const m4 ModelMatA = GetModelMatrix(Manifold->A->SpatialComponent);

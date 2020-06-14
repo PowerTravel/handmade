@@ -5,7 +5,6 @@
 struct gjk_simplex;
 struct entity;
 struct memory_arena;
-struct collider_mesh;
 
 struct contact_data
 {

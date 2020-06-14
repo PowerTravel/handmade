@@ -22,7 +22,7 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup)
   return NewEntryHeader;
 }
 
-void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRect, v4 Color, u32 TextureHandle)
+void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRect, v4 Color, u32 TextureIndex)
 {
   const m4 TextureTranslate = GetTranslationMatrix(V4(TextureRect.X,TextureRect.Y,0,1));
   const m4 TextureScale     = GetScaleMatrix(V4(TextureRect.W, TextureRect.H,1,0));
@@ -35,16 +35,17 @@ void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRec
 
   entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);
 
-  Body->MeshHandle = 0; // Quad
+  
+  Body->ObjectIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::OBJECT, "quad");
   Body->Colour = Color;
-  Body->TextureHandle = TextureHandle;
+  Body->TextureIndex = TextureIndex;
   Body->M  = QuadTranslate * QuadScale;
   Body->TM = TextureTranslate * TextureScale;
 }
 
 rect2f DEBUGTextSize(r32 x, r32 y, render_group* RenderGroup, c8* String)
 {
-  stb_font_map* FontMap = &GetAssetManager()->FontMap;
+  stb_font_map* FontMap = &GlobalGameState->AssetManager->FontMap;
 
   const r32 ScreenScaleFactor = 1.f / RenderGroup->ScreenHeight;
 
@@ -106,8 +107,10 @@ void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* Str
 {
   r32 PixelPosX = CanPosX*RenderGroup->ScreenHeight;
   r32 PixelPosY = CanPosY*RenderGroup->ScreenHeight;
-  stb_font_map* FontMap = &GetAssetManager()->FontMap;
-  bitmap* BitMap = GetTexture(GetAssetManager(), FontMap->BitmapHandle);
+  game_asset_manager* AssetManager =  GlobalGameState->AssetManager;
+  stb_font_map* FontMap = &AssetManager->FontMap;
+
+  bitmap* BitMap = GetBitmapFromIndex(AssetManager, FontMap->BitmapIndex);
   stbtt_aligned_quad Quad  = {};
 
   const r32 ScreenScaleFactor = 1.f / RenderGroup->ScreenHeight;
@@ -126,7 +129,7 @@ void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* Str
       GlyphOffset.Y *= ScreenScaleFactor;
       GlyphOffset.W *= ScreenScaleFactor;
       GlyphOffset.H *= ScreenScaleFactor;
-      DEBUGPushQuad(RenderGroup, GlyphOffset, TextureRect, V4(1,1,1,1),  FontMap->BitmapHandle);
+      DEBUGPushQuad(RenderGroup, GlyphOffset, TextureRect, V4(1,1,1,1), FontMap->BitmapIndex);
     }
     PixelPosX += CH->xadvance;
     ++String;
@@ -137,7 +140,7 @@ void DEBUGAddTextSTB(c8* String, r32 LineNumber)
 {
   TIMED_FUNCTION();
   render_group* RenderGroup = GlobalDebugRenderGroup;
-  stb_font_map* FontMap = &GetAssetManager()->FontMap;
+  stb_font_map* FontMap = &GlobalGameState->AssetManager->FontMap;
   r32 CanPosX = 1/100.f;
   r32 CanPosY = 1 - ((LineNumber+1) * FontMap->Ascent - LineNumber*FontMap->Descent)/RenderGroup->ScreenHeight;
   DEBUGTextOutAt(CanPosX, CanPosY, RenderGroup, String);
@@ -171,10 +174,10 @@ render_group* InitiateRenderGroup(game_state* GameState, r32 ScreenWidth, r32 Sc
 }
 
 
-void FillRenderPushBuffer( world* World, render_group* RenderGroup )
+void FillRenderPushBuffer(world* World, render_group* RenderGroup )
 {
   TIMED_FUNCTION();
-
+  game_asset_manager* AssetManager = GlobalGameState->AssetManager;
   ResetRenderGroup(RenderGroup);
 
   // TODO: Make a proper entity library so we can extracl for example ALL Lights efficiently
@@ -211,24 +214,20 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
       Header->Type = render_buffer_entry_type::RENDER_ASSET;
       Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
       entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-      Body->MeshHandle = Entity->RenderComponent->MeshHandle;
-      Body->MaterialHandle = Entity->RenderComponent->MaterialHandle;
+      Body->AssetHandle = Entity->RenderComponent->AssetHandle;
       Body->M  = GetModelMatrix(Entity->SpatialComponent);
       Body->NM = Transpose(RigidInverse(Body->M));
       Body->TM = M4Identity();
     }
     if(Entity->SpriteAnimationComponent)
     {
-      // Todo, we should modify the RenderComponent with the proper bitmap and coordinates in the
-      // Sprite animation system.
       Assert(Entity->SpatialComponent);
       Assert(Entity->RenderComponent);
       push_buffer_header* Header = PushNewHeader( RenderGroup );
       Header->Type = render_buffer_entry_type::RENDER_ASSET;
       Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
       entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-      Body->MeshHandle = Entity->RenderComponent->MeshHandle;
-      Body->MaterialHandle = Entity->RenderComponent->MaterialHandle;
+      Body->AssetHandle = Entity->RenderComponent->AssetHandle;
       Body->M  = GetModelMatrix(Entity->SpatialComponent);
       Body->NM = Transpose(RigidInverse(Body->M));
       Body->TM = Entity->SpriteAnimationComponent->ActiveSeries->Get();
@@ -242,8 +241,13 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
       Header->RenderState = RENDER_STATE_WIREFRAME;
 
       entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-      Body->MeshHandle = Entity->RenderComponent->MeshHandle;
-      Body->MaterialHandle = MATERIAL_JADE;
+
+      // Gives a new handle containing assets of  Entity->RenderComponent->AssetHandle
+      u32 TempHandle = GetTemporaryAssetHandle(RenderGroup->AssetManager);
+      CopyAssets(RenderGroup->AssetManager, Entity->RenderComponent->AssetHandle,  TempHandle);
+      SetAsset(RenderGroup->AssetManager, asset_type::MATERIAL, "jade", TempHandle);
+
+      Body->AssetHandle = TempHandle;
       Body->M  = GetModelMatrix(Entity->SpatialComponent);
       Body->NM = Transpose(RigidInverse(Body->M));
     }
@@ -264,10 +268,12 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
         Header->Type = render_buffer_entry_type::RENDER_ASSET;
         Header->RenderState = RENDER_STATE_FILL;
 
+        u32 TempHandle = GetTemporaryAssetHandle(RenderGroup->AssetManager);
+        SetAsset(RenderGroup->AssetManager, asset_type::OBJECT, "voxel", TempHandle);
+        SetAsset(RenderGroup->AssetManager, asset_type::MATERIAL, "blue", TempHandle);
+        
         entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-        Body->MeshHandle = 1; // This is a Voxel
-        Body->MaterialHandle = GetMaterialAssetHandle(MATERIAL_BLUE);
-
+        Body->AssetHandle = TempHandle;
         const m4 Rotation = GetRotationMatrix(A->SpatialComponent->Rotation);
         const m4 Translation = GetTranslationMatrix(A->SpatialComponent->Position);
         const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
@@ -284,9 +290,12 @@ void FillRenderPushBuffer( world* World, render_group* RenderGroup )
         Header->Type = render_buffer_entry_type::RENDER_ASSET;
         Header->RenderState = RENDER_STATE_FILL;
 
+        u32 TempHandle = GetTemporaryAssetHandle(RenderGroup->AssetManager);
+        SetAsset(RenderGroup->AssetManager, asset_type::OBJECT, "voxel", TempHandle);
+        SetAsset(RenderGroup->AssetManager, asset_type::MATERIAL, "white", TempHandle);
+
         entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-        Body->MeshHandle = 1; // This is a Voxel
-        Body->MaterialHandle = GetMaterialAssetHandle(MATERIAL_WHITE);
+        Body->AssetHandle = TempHandle;
 
         const m4 Rotation = GetRotationMatrix(B->SpatialComponent->Rotation);
         const m4 Translation = GetTranslationMatrix(B->SpatialComponent->Position);

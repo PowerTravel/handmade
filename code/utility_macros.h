@@ -2,6 +2,7 @@
 
 #include "intrinsics.h"
 
+
 #define GetCantorPair(a,b) ((u32) ( (1/2.f) * ((a) + (b)) * ((a) + (b) + 1) + (b) ))
 #define Clamp(Val, Min, Max) ((Val) < (Min)) ? (Min) : (((Val) > (Max)) ? (Max) : (Val))
 
@@ -36,11 +37,29 @@
 #define OffsetOf(type, Member) (umm) &(((type *)0)->Member)
 
 #define CopyArray( Count, Source, Dest ) utils::Copy( (Count)*sizeof( *(Source) ), ( Source ), ( Dest ) )
-inline void* Copy(midx aSize, void* SourceInit, void* DestInit)
-{
-  u8 *Source = (u8 *)SourceInit;
-  u8 *Dest = (u8 *)DestInit;
-  while(aSize--) {*Dest++ = *Source++;}
 
-  return(DestInit);
+namespace utils
+{
+  inline void* Copy(midx aSize, void* SourceInit, void* DestInit)
+  {
+    u8 *Source = (u8 *)SourceInit;
+    u8 *Dest = (u8 *)DestInit;
+    u32 i = 0;
+    while (aSize--) { *Dest++ = *Source++;}
+
+    return(DestInit);
+  }
+  
+  // djb2 from http://www.cse.yorku.ca/~oz/hash.html
+  inline u32 djb2_hash(const char* str)
+  {
+    u32 hash = 5381;
+    u32 c;
+
+    while (c = *str++)
+      hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+    return hash;
+  }
+ 
 }

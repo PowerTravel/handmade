@@ -479,7 +479,7 @@ u32 PushUnique( u8* Array, const u32 ElementCount, const u32 ElementByteSize,
   }
 
   // If we didn't find the element we push it to the end
-  Copy(ElementByteSize, NewElement, Array);
+  utils::Copy(ElementByteSize, NewElement, Array);
 
   return ElementCount;
 }
@@ -551,18 +551,13 @@ CreateGLVertexBuffer( memory_arena* TemporaryMemory,
   return Result;
 }
 
-void PushMeshToGPU(memory_arena* TempArena, game_asset_manager* AssetManager, u32 ObjectHandle)
+void PushMeshToGPU(memory_arena* TempArena,
+  mesh_indeces* Object, book_keeper* ObjectKeeper, mesh_data* MeshData)
 {
-  Assert(ObjectHandle < AssetManager->ObjectCount);
-  mesh_indeces* Object = GetObject(AssetManager, ObjectHandle);
-  book_keeper* ObjectKeeper = GetObjectKeeper(AssetManager, ObjectHandle);
-  Assert(Object->MeshHandle < AssetManager->MeshCount);
-
   if(!ObjectKeeper->Loaded)
   {
     temporary_memory TempMem = BeginTemporaryMemory(TempArena);
 
-    mesh_data* MeshData = GetMeshData(AssetManager, Object->MeshHandle);
 
     u32 nvi = Object->Count;   // Nr Indeces
     u32* vi = Object->vi;      // Vertex Indeces
@@ -591,21 +586,19 @@ void PushMeshToGPU(memory_arena* TempArena, game_asset_manager* AssetManager, u3
   }
 }
 
-void BindTextureToGPU(game_asset_manager* AssetManager, u32 TextureHandle)
+void BindTextureToGPU(bitmap* RenderTarget, book_keeper* BitmapKeeper)
 {
-  bitmap* RenderTarget = AssetManager->Textures + TextureHandle;
-  book_keeper* TextureKeeper = AssetManager->TextureKeeper + TextureHandle;
   Assert(RenderTarget);
   Assert(RenderTarget->BPP == 32);
-  if(!TextureKeeper->Loaded)
+  if(!BitmapKeeper->Loaded)
   {
-    Assert(!TextureKeeper->BufferHandle.TextureHandle);
-    TextureKeeper->Loaded = true;
+    Assert(!BitmapKeeper->BufferHandle.TextureHandle);
+    BitmapKeeper->Loaded = true;
     // Generate a texture slot
-    glGenTextures(1, &TextureKeeper->BufferHandle.TextureHandle);
+    glGenTextures(1, &BitmapKeeper->BufferHandle.TextureHandle);
 
     // Enable texture slot
-    glBindTexture( GL_TEXTURE_2D, TextureKeeper->BufferHandle.TextureHandle );
+    glBindTexture( GL_TEXTURE_2D, BitmapKeeper->BufferHandle.TextureHandle );
 
     // Set texture environment state:
     // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
@@ -623,7 +616,7 @@ void BindTextureToGPU(game_asset_manager* AssetManager, u32 TextureHandle)
               RenderTarget->Pixels);
   }
 
-  glBindTexture( GL_TEXTURE_2D, TextureKeeper->BufferHandle.TextureHandle );
+  glBindTexture( GL_TEXTURE_2D, BitmapKeeper->BufferHandle.TextureHandle );
 
 }
 
@@ -635,12 +628,15 @@ void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memo
   glUniformMatrix4fv(Program->NM, 1, GL_TRUE, AssetTest->NM.E);
   glUniformMatrix4fv(Program->TM, 1, GL_TRUE, AssetTest->TM.E);
 
-  u32 MeshHandle = AssetTest->MeshHandle;
-  PushMeshToGPU(TempArena, AssetManager, MeshHandle);
+  u32 AssetHandle = AssetTest->AssetHandle;
 
-  u32 TextureHandle = AssetTest->MaterialHandle;
-  Assert(TextureHandle < AssetManager->MaterialCount);
-  material* Material = AssetManager->Materials + TextureHandle;
+  book_keeper* ObjectKeeper = 0;
+  mesh_indeces* Object = GetObject(AssetManager, AssetHandle, &ObjectKeeper);
+  mesh_data* MeshData = GetMesh(AssetManager, AssetHandle);
+
+  PushMeshToGPU(TempArena, Object, ObjectKeeper, MeshData);
+
+  material* Material   = GetMaterial(AssetManager, AssetHandle);
 
   u32 SurfaceSmoothnes = 3;
   v4 AmbientColor   = Blend(&LightColor, &Material->AmbientColor);
@@ -654,11 +650,10 @@ void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memo
   glUniform4fv( Program->specularProduct, 1, SpecularColor.E);
   glUniform1f(  Program->shininess, Material->Shininess);
 
-  BindTextureToGPU(AssetManager, Material->TextureHandle);
+  book_keeper* BitmapKeeper = 0;
+  bitmap* RenderTarget = GetBitmap(AssetManager, AssetHandle, &BitmapKeeper);
+  BindTextureToGPU(RenderTarget, BitmapKeeper);
 
-
-  mesh_indeces* Object = AssetManager->Objects + MeshHandle;
-  book_keeper* ObjectKeeper = AssetManager->ObjectKeeper + MeshHandle;
   Assert(ObjectKeeper->BufferHandle.VAO);
   OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
 }
@@ -833,16 +828,18 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         glUniformMatrix4fv(TextOverlay.M,  1, GL_TRUE, Quad->M.E);
         glUniformMatrix4fv(TextOverlay.TM, 1, GL_TRUE, Quad->TM.E);
 
-        u32 MeshHandle = Quad->MeshHandle;
-        PushMeshToGPU(&RenderGroup->Arena, RenderGroup->AssetManager, MeshHandle);
-        u32 TextureHandle = Quad->TextureHandle;
+        book_keeper* ObjectKeeper = 0;
+        mesh_indeces* Object = GetObjectFromIndex(RenderGroup->AssetManager, Quad->ObjectIndex, &ObjectKeeper);
+        mesh_data* MeshData = GetMeshFromIndex(RenderGroup->AssetManager, Object->MeshHandle);
+
+        PushMeshToGPU(&RenderGroup->Arena, Object, ObjectKeeper, MeshData);
 
         glUniform4fv( TextOverlay.ambientProduct,  1, Quad->Colour.E);
 
-        BindTextureToGPU(RenderGroup->AssetManager, Quad->TextureHandle);
+        book_keeper* BitmapKeeper = 0;
+        bitmap* RenderTarget = GetBitmapFromIndex(RenderGroup->AssetManager, Quad->TextureIndex, &BitmapKeeper);
+        BindTextureToGPU(RenderTarget, BitmapKeeper);
 
-        mesh_indeces* Object = RenderGroup->AssetManager->Objects + MeshHandle;
-        book_keeper* ObjectKeeper = RenderGroup->AssetManager->ObjectKeeper + MeshHandle;
         Assert(ObjectKeeper->BufferHandle.VAO);
         OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
       }break;
@@ -852,23 +849,25 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         glUniformMatrix4fv(TextOverlay.M,  1, GL_TRUE, AssetTest->M.E);
         glUniformMatrix4fv(TextOverlay.TM, 1, GL_TRUE, AssetTest->TM.E);
 
-        u32 MeshHandle = AssetTest->MeshHandle;
-        PushMeshToGPU(&RenderGroup->Arena, RenderGroup->AssetManager, MeshHandle);
+        u32 AssetHandle = AssetTest->AssetHandle;
+        book_keeper* ObjectKeeper = 0;
+        mesh_indeces* Object = GetObject(RenderGroup->AssetManager, AssetHandle, &ObjectKeeper);
+        mesh_data* MeshData = GetMesh(RenderGroup->AssetManager, AssetHandle);
 
-        u32 MaterialHandle = AssetTest->MaterialHandle;
-        Assert(MaterialHandle < RenderGroup->AssetManager->MaterialCount);
-        material* Material = RenderGroup->AssetManager->Materials + MaterialHandle;
+        PushMeshToGPU(&RenderGroup->Arena, Object, ObjectKeeper, MeshData);
 
+
+        material* Material = GetMaterial(RenderGroup->AssetManager, AssetHandle);
         glUniform4fv( TextOverlay.ambientProduct,  1, Material->AmbientColor.E);
         glUniform4fv( TextOverlay.diffuseProduct,  1, Material->DiffuseColor.E);
         glUniform4fv( TextOverlay.specularProduct, 1, Material->SpecularColor.E);
         //glUniform1f(  TextOverlay.shininess, Material->Shininess);
 
-        BindTextureToGPU(RenderGroup->AssetManager, Material->TextureHandle);
 
+        book_keeper* BitmapKeeper = 0;
+        bitmap* RenderTarget = GetBitmap(RenderGroup->AssetManager, AssetHandle, &BitmapKeeper);
+        BindTextureToGPU(RenderTarget, BitmapKeeper);
 
-        mesh_indeces* Object = RenderGroup->AssetManager->Objects + MeshHandle;
-        book_keeper* ObjectKeeper = RenderGroup->AssetManager->ObjectKeeper + MeshHandle;
         Assert(ObjectKeeper->BufferHandle.VAO);
         OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
 

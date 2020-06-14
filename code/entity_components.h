@@ -55,7 +55,7 @@ struct component_collider
 {
   // Always in Model Space
   aabb3f AABB;
-  u32 MeshHandle;
+  u32 AssetHandle;
 };
 
 // Requires spatial and collision primitive
@@ -69,8 +69,7 @@ struct component_dynamics
 
 struct component_render
 {
-  u32 MeshHandle;
-  u32 MaterialHandle;
+  u32 AssetHandle;
 };
 
 struct entity
