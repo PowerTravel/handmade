@@ -42,20 +42,14 @@ u32 StringToIndex(asset_hash_map* HashMap, c8* Key)
   return Index;
 }
 
-inline b32 IsKeySet(asset_hash_map* HashMap, u32 Index)
+internal inline b32
+IsKeySet(asset_hash_map* HashMap, u32 Index)
 {
   return HashMap->Keys[Index] != nullptr;
 }
 
-internal inline u32 GetNamedHandle(asset_hash_map* HashMap,  c8* Key)
-{
-  Assert(Key);
-  u32 Result = StringToIndex(HashMap, Key);
-  Assert(IsKeySet(HashMap, Result));
-  return Result;
-}
-
-internal void SetKey(memory_arena* Arena, asset_hash_map* HashMap, u32 Index, c8* Key)
+internal inline void
+SetKey(memory_arena* Arena, asset_hash_map* HashMap, u32 Index, c8* Key)
 {
   Assert(Key);
   Assert(!IsKeySet(HashMap, Index));
@@ -63,23 +57,27 @@ internal void SetKey(memory_arena* Arena, asset_hash_map* HashMap, u32 Index, c8
   HashMap->Keys[Index] = dst;
 }
 
-inline u32 GetObjectAssetIndex(game_asset_manager* AssetManager, c8* Key)
+internal inline u32
+GetObjectAssetIndex(game_asset_manager* AssetManager, c8* Key)
 {
   u32 Result = StringToIndex(&AssetManager->Objects, Key);
   return Result;  
 }
-inline u32 GetMaterialAssetIndex(game_asset_manager* AssetManager, c8* Key)
+internal inline u32
+GetMaterialAssetIndex(game_asset_manager* AssetManager, c8* Key)
 {
   u32 Result = StringToIndex(&AssetManager->Materials, Key);
   return Result;
 }
-inline u32 GetBitmapAssetIndex(game_asset_manager* AssetManager, c8* Key)
+internal inline u32
+GetBitmapAssetIndex(game_asset_manager* AssetManager, c8* Key)
 {
   u32 Result = StringToIndex(&AssetManager->Bitmaps, Key);
   return Result;
 }
 
-internal u32 PushBitmapData(game_asset_manager* AssetManager, c8* Key, u32 Width, u32 Height, u32 BPP, void* PixelData)
+internal u32
+PushBitmapData(game_asset_manager* AssetManager, c8* Key, u32 Width, u32 Height, u32 BPP, void* PixelData)
 {
   u32 Index = GetBitmapAssetIndex(AssetManager, Key);
   SetKey(&AssetManager->AssetArena, &AssetManager->Bitmaps, Index, Key);
@@ -92,7 +90,8 @@ internal u32 PushBitmapData(game_asset_manager* AssetManager, c8* Key, u32 Width
   return Index;
 }
 
-internal u32 PushMeshData(game_asset_manager* AssetManager, u32 nv, v3* v, u32 nvn, v3* vn, u32 nvt, v2* vt)
+internal u32
+PushMeshData(game_asset_manager* AssetManager, u32 nv, v3* v, u32 nvn, v3* vn, u32 nvt, v2* vt)
 {
   u32 Index = AssetManager->Meshes.Count;
   Assert(AssetManager->Meshes.Count < AssetManager->Meshes.MaxCount)
@@ -106,7 +105,8 @@ internal u32 PushMeshData(game_asset_manager* AssetManager, u32 nv, v3* v, u32 n
   return Index;
 }
 
-internal u32 PushIndexData(game_asset_manager* AssetManager, c8* Key, u32 MeshIndex, u32 Count, u32* vi, u32* ti, u32* ni, aabb3f AABB)
+internal u32
+PushIndexData(game_asset_manager* AssetManager, c8* Key, u32 MeshIndex, u32 Count, u32* vi, u32* ti, u32* ni, aabb3f AABB)
 {
   u32 Index = GetObjectAssetIndex(AssetManager, Key);
   SetKey(&AssetManager->AssetArena, &AssetManager->Objects, Index, Key);
@@ -122,7 +122,8 @@ internal u32 PushIndexData(game_asset_manager* AssetManager, c8* Key, u32 MeshIn
   return Index;
 }
 
-internal void PushMaterialData(game_asset_manager* AssetManager, c8* Key, material SrcMaterial)
+internal void
+PushMaterialData(game_asset_manager* AssetManager, c8* Key, material SrcMaterial)
 {
   u32 Index = GetMaterialAssetIndex(AssetManager, Key);
   SetKey(&AssetManager->AssetArena, &AssetManager->Materials, Index, Key);
@@ -130,7 +131,7 @@ internal void PushMaterialData(game_asset_manager* AssetManager, c8* Key, materi
   *DstMaterial = SrcMaterial;
 }
 
-void LoadPredefinedMaterials(game_asset_manager* AssetManager)
+internal void LoadPredefinedMaterials(game_asset_manager* AssetManager)
 { 
   u8 WhitePixel[4] = {255,255,255,255};
   u32 BitmapIndex = PushBitmapData(AssetManager, "null", 1, 1, 32, (void*)WhitePixel);
@@ -167,8 +168,7 @@ void LoadPredefinedMaterials(game_asset_manager* AssetManager)
   PushMaterialData(AssetManager, "yellow_rubber",   CreateMaterial(V4(0.05,     0.05,     0.0,      1), V4( 0.5,      0.5,        0.4,        1), V4( 0.7,        0.7,        0.078125,   1), 0.078125,   false, BitmapIndex));
 }
 
-
-void LoadPredefinedMeshes(game_asset_manager* AssetManager)
+internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
 {
   {
     v3 v[] =
@@ -363,15 +363,6 @@ internal void LoadHeroSpriteSheet(game_asset_manager* AssetManager)
   PushMaterialData(AssetManager, "hero_sprite_sheet", CreateMaterial(V4(1,1,1,1),V4(1,1,1,1),V4(1,1,1,1),1,true, BitmapHandle));
 }
 
-void LoadAssets()
-{
-  game_asset_manager* AssetManager = GlobalGameState->AssetManager;
-  LoadPredefinedMaterials(AssetManager);
-  LoadPredefinedMeshes(AssetManager);
-  stbtt_BakeFontBitmap(AssetManager);
-  LoadCubeAsset(AssetManager);  
-  LoadHeroSpriteSheet(AssetManager);
-}
 
 game_asset_manager* CreateAssetManager()
 {
@@ -403,6 +394,15 @@ game_asset_manager* CreateAssetManager()
   AssetManager->BitmapKeeper = PushArray(&AssetManager->AssetArena,
                                             AssetManager->Materials.MaxCount, book_keeper);
   return AssetManager;
+}
+
+void LoadAssets(game_asset_manager* AssetManager)
+{
+  LoadPredefinedMaterials(AssetManager);
+  LoadPredefinedMeshes(AssetManager);
+  stbtt_BakeFontBitmap(AssetManager);
+  LoadCubeAsset(AssetManager);  
+  LoadHeroSpriteSheet(AssetManager);
 }
 
 // Game Layer API
@@ -459,15 +459,18 @@ u32 GetAssetIndex(game_asset_manager* AssetManager, asset_type AssetType, char* 
   {
     case asset_type::OBJECT:
     {
-      Result = GetNamedHandle(&AssetManager->Objects, Key);
+      Result = GetObjectAssetIndex( AssetManager, Key);
+      Assert(IsKeySet(&AssetManager->Objects, Result));
     }break;
     case asset_type::MATERIAL:
     {
-      Result = GetNamedHandle(&AssetManager->Materials, Key);
+      Result = GetMaterialAssetIndex(AssetManager, Key);
+      Assert(IsKeySet(&AssetManager->Materials, Result));
     }break;
     case asset_type::BITMAP:
     {
-      Result = GetNamedHandle(&AssetManager->Bitmaps, Key);
+      Result = GetBitmapAssetIndex(AssetManager, Key);
+      Assert(IsKeySet(&AssetManager->Bitmaps, Result));
     }break;
   }
 

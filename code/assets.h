@@ -131,6 +131,9 @@ struct game_asset_manager
   stb_font_map FontMap;
 };
 
+// Creation (Maybe separate DDL later)
+game_asset_manager* CreateAssetManager();
+void LoadAssets(game_asset_manager* AssetManager);
 
 // Game Layer API
 u32 GetAssetHandle(game_asset_manager* AssetManager);

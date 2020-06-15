@@ -271,7 +271,7 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
 
     GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
 
-    LoadAssets();
+    LoadAssets(GlobalGameState->AssetManager);
     GlobalGameState->World = AllocateWorld(120, 32);
 
     GlobalGameState->ScreenWidthPixels  = (r32)RenderCommands->ResolutionWidthPixels;
