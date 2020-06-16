@@ -265,13 +265,11 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
   if (!Memory->GameState)
   {
     GlobalGameState = BootstrapPushStruct(game_state, PersistentArena);
-    GlobalGameState->AssetManager = CreateAssetManager();
     GlobalGameState->TransientArena = PushStruct(GlobalGameState->PersistentArena, memory_arena);
-    GlobalGameState->IsInitialized = true;
-
     GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
 
-    LoadAssets(GlobalGameState->AssetManager);
+    GlobalGameState->AssetManager = CreateAssetManager();
+
     GlobalGameState->World = AllocateWorld(120, 32);
 
     GlobalGameState->ScreenWidthPixels  = (r32)RenderCommands->ResolutionWidthPixels;
@@ -288,6 +286,8 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
       game_controller_input* Controller = GetController(Input, ControllerIndex);
       Controller->IsAnalog = true;
     }
+
+    GlobalGameState->IsInitialized = true;
   }
 
   if(!RenderCommands->MainRenderGroup)

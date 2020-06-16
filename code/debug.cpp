@@ -428,15 +428,11 @@ void DebugMainWindow(game_input* GameInput)
         Color = V4(0,0.5f,0,1);
       }
 
-      #if 0
-      DEBUGPushQuad(GlobalDebugRenderGroup, TextBox, Color);
-      #else
       rect2f TexQuad = Rect2f(0,0,1,1);
       //TextBox
       //r32 X0 = Rect.X + Rect.W/2.f;
       //r32 Y0 = Rect.Y + Rect.H/2.f;
       DEBUGPushQuad(GlobalDebugRenderGroup, TextBox, TexQuad, Color, 0);
-      #endif
       DEBUGTextOutAt(TextPosX-TextBox.W*0.5f, TextPosY-TextBox.H*0.5f, GlobalDebugRenderGroup, MenuItems[MenuItemIdx]);
     }
   }

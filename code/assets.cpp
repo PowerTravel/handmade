@@ -170,6 +170,7 @@ internal void LoadPredefinedMaterials(game_asset_manager* AssetManager)
 
 internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
 {
+
   {
     v3 v[] =
     {
@@ -198,7 +199,8 @@ internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
     u32 ti[] = {0,1,2,0,2,3};
     u32 ni[] = {0,0,0,0,0,0};
     aabb3f AABB = AABB3f(V3(-0.5, -0.5, 0), V3( 0.5,  0.5, 0));
-    PushIndexData(AssetManager, "quad", MeshIndex, ArrayCount(vi), vi, ti, ni, AABB);
+    u32 ObjectIndex = PushIndexData(AssetManager, "quad", MeshIndex, ArrayCount(vi), vi, ti, ni, AABB);
+    AssetManager->EnumeratedMeshes[(u32)predefined_mesh::QUAD] = ObjectIndex;
   }
 
   {
@@ -241,7 +243,8 @@ internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
     u32 ti[] = {0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2};
     u32 ni[] = {0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,5,5,5,5,5,5};
     aabb3f AABB = AABB3f(V3(-0.5, -0.5, -0.5), V3( 0.5, 0.5, 0.5));
-    PushIndexData(AssetManager, "voxel", MeshIndex, ArrayCount(vi), vi, ti, ni, AABB);
+    u32 ObjectIndex = PushIndexData(AssetManager, "voxel", MeshIndex, ArrayCount(vi), vi, ti, ni, AABB);
+    AssetManager->EnumeratedMeshes[(u32)predefined_mesh::VOXEL] = ObjectIndex;
   }
 
 }
@@ -363,6 +366,14 @@ internal void LoadHeroSpriteSheet(game_asset_manager* AssetManager)
   PushMaterialData(AssetManager, "hero_sprite_sheet", CreateMaterial(V4(1,1,1,1),V4(1,1,1,1),V4(1,1,1,1),1,true, BitmapHandle));
 }
 
+internal void LoadAssets(game_asset_manager* AssetManager)
+{
+  LoadPredefinedMaterials(AssetManager);
+  LoadPredefinedMeshes(AssetManager);
+  stbtt_BakeFontBitmap(AssetManager);
+  LoadCubeAsset(AssetManager);  
+  LoadHeroSpriteSheet(AssetManager);
+}
 
 game_asset_manager* CreateAssetManager()
 {
@@ -393,16 +404,13 @@ game_asset_manager* CreateAssetManager()
                                             AssetManager->Materials.MaxCount, void*);
   AssetManager->BitmapKeeper = PushArray(&AssetManager->AssetArena,
                                             AssetManager->Materials.MaxCount, book_keeper);
-  return AssetManager;
-}
 
-void LoadAssets(game_asset_manager* AssetManager)
-{
-  LoadPredefinedMaterials(AssetManager);
-  LoadPredefinedMeshes(AssetManager);
-  stbtt_BakeFontBitmap(AssetManager);
-  LoadCubeAsset(AssetManager);  
-  LoadHeroSpriteSheet(AssetManager);
+  AssetManager->EnumeratedMeshes = PushArray(&AssetManager->AssetArena,
+                                            (u32)predefined_mesh::COUNT, u32);
+
+  LoadAssets(AssetManager);
+
+  return AssetManager;
 }
 
 // Game Layer API

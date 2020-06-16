@@ -331,3 +331,25 @@ b32 SweeptAABB( aabb3f& a, aabb3f& b, v3& Step, r32& HitPercentage, v3& HitNorma
   HitNormal = V3(HitNomral2D);
   return Result;
 }
+
+aabb3f TransformAABB( const aabb3f& AABB, const m4& TransMat )
+{
+  v3 Min = V3( TransMat * V4(AABB.P0,1));
+  v3 Max = Min;
+  v3 AABBVertices[8] = {};
+  GetAABBVertices(&AABB, AABBVertices);
+  for( u32 Index = 0; Index < ArrayCount(AABBVertices); ++Index )
+  {
+    const v3 Point = V3( TransMat * V4(AABBVertices[Index], 1) );
+
+    Min.X = (Point.X < Min.X) ? Point.X : Min.X;
+    Min.Y = (Point.Y < Min.Y) ? Point.Y : Min.Y;
+    Min.Z = (Point.Z < Min.Z) ? Point.Z : Min.Z;
+
+    Max.X = (Point.X > Max.X) ? Point.X : Max.X;
+    Max.Y = (Point.Y > Max.Y) ? Point.Y : Max.Y;
+    Max.Z = (Point.Z > Max.Z) ? Point.Z : Max.Z;
+  }
+  aabb3f Result = AABB3f(Min,Max);
+  return Result;
+}

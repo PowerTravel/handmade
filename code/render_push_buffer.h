@@ -9,7 +9,8 @@ enum class render_buffer_entry_type
 {
   LIGHT,
   RENDER_ASSET,
-  OVERLAY_QUAD
+  OVERLAY_QUAD,
+  LINE
 };
 
 enum data_type
@@ -25,6 +26,14 @@ enum render_state
   RENDER_STATE_POINTS       = 0x2,
   RENDER_STATE_WIREFRAME    = 0x4,
   RENDER_STATE_FILL         = 0x8
+};
+
+struct entry_type_line
+{
+  v3 Start;
+  v3 End;
+  u32 MaterialIndex;
+  r32 LineThickness;
 };
 
 struct entry_type_overlay_quad
@@ -49,7 +58,6 @@ struct entry_type_render_asset
   m4 NM;
   m4 TM;
 };
-
 
 struct render_buffer
 {

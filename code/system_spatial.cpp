@@ -499,28 +499,6 @@ inline void IntegrateVelocities(world* World)
   }
 }
 
-static inline aabb3f
-GetWorldSpaceAABB( const aabb3f& AABB, const m4& TransMat )
-{
-  v3 Min = V3( TransMat * V4(AABB.P0,1));
-  v3 Max = Min;
-  v3 AABBVertices[8] = {};
-  GetAABBVertices(&AABB, AABBVertices);
-  for( u32 Index = 0; Index < ArrayCount(AABBVertices); ++Index )
-  {
-    const v3 Point = V3( TransMat * V4(AABBVertices[Index], 1) );
-
-    Min.X = (Point.X < Min.X) ? Point.X : Min.X;
-    Min.Y = (Point.Y < Min.Y) ? Point.Y : Min.Y;
-    Min.Z = (Point.Z < Min.Z) ? Point.Z : Min.Z;
-
-    Max.X = (Point.X > Max.X) ? Point.X : Max.X;
-    Max.Y = (Point.Y > Max.Y) ? Point.Y : Max.Y;
-    Max.Z = (Point.Z > Max.Z) ? Point.Z : Max.Z;
-  }
-  aabb3f Result = AABB3f(Min,Max);
-  return Result;
-}
 
 internal aabb_tree BuildBroadPhaseTree( world* World )
 {
@@ -532,7 +510,7 @@ internal aabb_tree BuildBroadPhaseTree( world* World )
     entity* E = &World->Entities[Index];
     if( E->ColliderComponent )
     {
-      aabb3f AABBWorldSpace = GetWorldSpaceAABB( E->ColliderComponent->AABB, GetModelMatrix(E->SpatialComponent) );
+      aabb3f AABBWorldSpace = TransformAABB( E->ColliderComponent->AABB, GetModelMatrix(E->SpatialComponent) );
       // TODO: Don't do a insert every timestep. Update an existing tree
       AABBTreeInsert( TransientArena, &Result, E, AABBWorldSpace );
     }

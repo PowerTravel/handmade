@@ -146,7 +146,6 @@ void DEBUGAddTextSTB(c8* String, r32 LineNumber)
   DEBUGTextOutAt(CanPosX, CanPosY, RenderGroup, String);
 }
 
-
 void ResetRenderGroup(render_group* RenderGroup)
 {
   EndTemporaryMemory(RenderGroup->PushBufferMemory);
@@ -173,6 +172,47 @@ render_group* InitiateRenderGroup(game_state* GameState, r32 ScreenWidth, r32 Sc
   return Result;
 }
 
+internal inline void
+PushLine(render_group* RenderGroup, v3 Start, v3 End, r32 LineThickness, u32 MaterialIndex)
+{
+  push_buffer_header* Header = PushNewHeader( RenderGroup );
+  Header->Type = render_buffer_entry_type::LINE;
+  Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;;
+  entry_type_line* Body = PushStruct(&RenderGroup->Arena, entry_type_line);
+  Body->Start = Start;
+  Body->End = End;
+  Body->LineThickness = LineThickness;
+  Body->MaterialIndex = MaterialIndex;
+}
+
+internal inline void
+PushBoxFrame(render_group* RenderGroup, m4 M, aabb3f AABB, r32 LineThickness, u32 MaterialIndex)
+{
+  v3 P[8] = {};;
+  GetAABBVertices(&AABB, P);
+  for(u32 i = 0; i < ArrayCount(P); ++i)
+  {
+    P[i] = V3(M*V4(P[i],1));
+  }
+
+  // Negative Z
+  PushLine(RenderGroup, P[0], P[1], LineThickness, MaterialIndex);
+  PushLine(RenderGroup, P[1], P[2], LineThickness, MaterialIndex);
+  PushLine(RenderGroup, P[2], P[3], LineThickness, MaterialIndex);
+  PushLine(RenderGroup, P[3], P[0], LineThickness, MaterialIndex);
+  // Positive Z
+  PushLine(RenderGroup, P[4], P[5], LineThickness, MaterialIndex);
+  PushLine(RenderGroup, P[5], P[6], LineThickness, MaterialIndex);
+  PushLine(RenderGroup, P[6], P[7], LineThickness, MaterialIndex);
+  PushLine(RenderGroup, P[7], P[4], LineThickness, MaterialIndex);
+
+  // Joining Lines
+  PushLine(RenderGroup, P[0], P[4], LineThickness, MaterialIndex);
+  PushLine(RenderGroup, P[1], P[5], LineThickness, MaterialIndex);
+  PushLine(RenderGroup, P[2], P[6], LineThickness, MaterialIndex);
+  PushLine(RenderGroup, P[3], P[7], LineThickness, MaterialIndex);
+
+}
 
 void FillRenderPushBuffer(world* World, render_group* RenderGroup )
 {
@@ -234,22 +274,14 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
     }
 
 #if SHOW_COLLIDER
-    if( Entity->Types & COMPONENT_TYPE_COLLIDER  )
+    if( Entity->ColliderComponent )
     {
-      push_buffer_header* Header = PushNewHeader( RenderGroup );
-      Header->Type = render_buffer_entry_type::RENDER_ASSET;
-      Header->RenderState = RENDER_STATE_WIREFRAME;
-
-      entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-
-      // Gives a new handle containing assets of  Entity->RenderComponent->AssetHandle
-      u32 TempHandle = GetTemporaryAssetHandle(RenderGroup->AssetManager);
-      CopyAssets(RenderGroup->AssetManager, Entity->RenderComponent->AssetHandle,  TempHandle);
-      SetAsset(RenderGroup->AssetManager, asset_type::MATERIAL, "jade", TempHandle);
-
-      Body->AssetHandle = TempHandle;
-      Body->M  = GetModelMatrix(Entity->SpatialComponent);
-      Body->NM = Transpose(RigidInverse(Body->M));
+      Assert(Entity->SpatialComponent);
+      m4 M = GetModelMatrix(Entity->SpatialComponent);
+      aabb3f  AABB =Entity->ColliderComponent->AABB;
+      r32 LineThickness = 0.03;
+      u32 MaterialIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::MATERIAL, "jade");
+      PushBoxFrame(RenderGroup, M, AABB, LineThickness, MaterialIndex);
     }
 #endif
   }

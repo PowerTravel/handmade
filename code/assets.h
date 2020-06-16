@@ -97,6 +97,14 @@ enum class asset_type
   MESH
 };
 
+enum class predefined_mesh
+{
+  QUAD,
+  VOXEL,
+  COUNT
+  // SPHERE, CYLINDER ....
+};
+
 struct asset_vector
 {
   u32 Count;
@@ -129,11 +137,12 @@ struct game_asset_manager
   book_keeper* BitmapKeeper;
 
   stb_font_map FontMap;
+
+  u32* EnumeratedMeshes;
 };
 
 // Creation (Maybe separate DDL later)
 game_asset_manager* CreateAssetManager();
-void LoadAssets(game_asset_manager* AssetManager);
 
 // Game Layer API
 u32 GetAssetHandle(game_asset_manager* AssetManager);
@@ -143,7 +152,15 @@ void CopyAssets(game_asset_manager* AssetManager, u32 SrcHandle, u32 DstHandle);
 u32 GetAssetIndex(game_asset_manager* AssetManager, asset_type AssetType, char* Key);
 void ResetAssetManagerTemporaryInstances(game_asset_manager* AssetManager);
 
+
 // GL Layer API
+inline u32
+GetEnumeratedObjectIndex(game_asset_manager* AssetManager, predefined_mesh MeshType)
+{
+  u32 Result = AssetManager->EnumeratedMeshes[(u32)MeshType];
+  return Result;
+}
+
 internal asset_instance* GetAssetInstance(game_asset_manager* AssetManager, u32 Handle)
 {
   Assert(Handle < AssetManager->Instances.Count + AssetManager->TemporaryInstancesCount);

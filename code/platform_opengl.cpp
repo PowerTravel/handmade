@@ -700,10 +700,10 @@ internal void setOpenGLState(u32 State)
   }
 }
 
-v3 GetPositionFromMatrix( const m4* ViewMatrix )
+v3 GetPositionFromMatrix( const m4* M )
 {
-  m4 inv = RigidInverse(*ViewMatrix);
-  return V3(Column(Transpose(inv),3));
+  m4 inv = RigidInverse(*M);
+  return V3(Column(inv,3));
 }
 
 internal void
@@ -752,7 +752,8 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
   glUniformMatrix4fv(Prog->P,  1, GL_TRUE, P.E);
   glUniformMatrix4fv(Prog->V,  1, GL_TRUE, V.E);
   //glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, Identity.E);
-  glUniform4fv( Prog->cameraPosition, 1, GetPositionFromMatrix(&V).E);
+  v3 CameraPosition = GetPositionFromMatrix(&V);
+  glUniform4fv( Prog->cameraPosition, 1, CameraPosition.E);
   v4 LightColor    = V4(0,0,0,1);
 
   // For each render group
@@ -785,6 +786,75 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
       {
         entry_type_render_asset* AssetTest = (entry_type_render_asset*) Body;
         DrawAsset(Prog, RenderGroup->AssetManager, &RenderGroup->Arena, AssetTest, LightColor);
+      }break;
+      case render_buffer_entry_type::LINE:
+      {
+        entry_type_line* Line = (entry_type_line*) Body;
+        v3 Start = Line->Start;
+        v3 End = Line->End;
+
+        v3 xp = Normalize(End-Start);
+        v3 vc = Normalize(CameraPosition - Start);
+
+        // Make sure vc and x are not parallel
+        if( Abs( (vc * xp) - 1.0f ) <  0.0001f )
+        {
+          break;
+        }
+
+        v3 yp = Normalize(CrossProduct(vc, xp));
+        v3 zp = Normalize(CrossProduct(xp, yp));
+
+        // Rotates from WorldCoordinateSystem to NewCoordinateSystem
+        // RotMat * V3(1,0,0) = xp
+        // RotMat * V3(0,1,0) = yp
+        // RotMat * V3(0,0,1) = zp
+        m4 RotMat = M4( xp.X, yp.X, zp.X, 0,
+                        xp.Y, yp.Y, zp.Y, 0,
+                        xp.Z, yp.Z, zp.Z, 0,
+                        0,   0,   0, 1);
+        
+        r32 w  = Norm(End-Start);
+        r32 h = Line->LineThickness;
+
+        m4 ScaleMat = M4Identity();
+        ScaleMat.E[0] = w;
+        ScaleMat.E[5] = h;
+
+        v3 MidPoint = (Start + End) / 2;
+        m4 TransMat = M4Identity();
+        TransMat.E[3]  = MidPoint.X;
+        TransMat.E[7]  = MidPoint.Y;
+        TransMat.E[11] = MidPoint.Z;
+
+        m4 M = TransMat*RotMat*ScaleMat;
+
+        m4 TM = M4Identity();
+        glUniformMatrix4fv(Prog->M,  1, GL_TRUE, M.E);
+        glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, TM.E);
+
+
+        u32 ObjectIndex = GetEnumeratedObjectIndex(RenderGroup->AssetManager, predefined_mesh::QUAD);
+        book_keeper* ObjectKeeper = 0;
+        mesh_indeces* Object = GetObjectFromIndex(RenderGroup->AssetManager, ObjectIndex, &ObjectKeeper);
+        mesh_data* MeshData = GetMeshFromIndex(RenderGroup->AssetManager, Object->MeshHandle);
+
+        PushMeshToGPU(&RenderGroup->Arena, Object, ObjectKeeper, MeshData);
+
+        // Todo:: The reason we need to always push a bitmap even if were not using it is because we keep
+        //        using the same shader for everything. Fix switching of shaders.
+        material* Material = GetMaterialFromIndex(RenderGroup->AssetManager, Line->MaterialIndex);
+        glUniform4fv( Prog->ambientProduct,  1, Material->AmbientColor.E);
+        glUniform4fv( Prog->diffuseProduct,  1, Material->DiffuseColor.E);
+        glUniform4fv( Prog->specularProduct, 1, Material->SpecularColor.E);
+        glUniform1f(  Prog->shininess, Material->Shininess);
+        book_keeper* BitmapKeeper = 0;
+        // Funnily enough texture "null" maps to index 0.
+        // However TODO: Make a quick lookup to bitmaps similar to GetEnumeratedObjectIndex
+        bitmap* RenderTarget = GetBitmapFromIndex(RenderGroup->AssetManager, 0, &BitmapKeeper);
+        BindTextureToGPU(RenderTarget, BitmapKeeper);
+
+        OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
       }break;
     }
   }
@@ -843,6 +913,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         Assert(ObjectKeeper->BufferHandle.VAO);
         OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
       }break;
+      /*
       case render_buffer_entry_type::RENDER_ASSET:
       {
         entry_type_render_asset* AssetTest = (entry_type_render_asset*) Body;
@@ -872,6 +943,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
 
       }break;
+      */
     }
   }
 }
