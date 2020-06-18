@@ -172,6 +172,7 @@ render_group* InitiateRenderGroup(game_state* GameState, r32 ScreenWidth, r32 Sc
   return Result;
 }
 
+
 internal inline void
 PushLine(render_group* RenderGroup, v3 Start, v3 End, r32 LineThickness, u32 MaterialIndex)
 {
@@ -182,6 +183,9 @@ PushLine(render_group* RenderGroup, v3 Start, v3 End, r32 LineThickness, u32 Mat
   Body->Start = Start;
   Body->End = End;
   Body->LineThickness = LineThickness;
+  // TODO: Add setting like this to make the line be drawn with the same width on screen
+  //       no matter how far away it is from the camera.
+  // Body->ConstantWidth = false;
   Body->MaterialIndex = MaterialIndex;
 }
 
@@ -286,7 +290,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
 #endif
   }
 
-  #if SHOW_COLLISION_POINTS
+#if SHOW_COLLISION_POINTS
   contact_manifold* Manifold = World->FirstContactManifold;
   while(Manifold)
   {
@@ -342,5 +346,17 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
     }
     Manifold = Manifold->Next;
   }
-  #endif
+#endif
+
+#if SHOW_AABB_TREE
+  aabb3f* AABBTree;
+  u32 Count = GetAABBList(&World->BroadPhaseTree, &AABBTree);
+  for(u32 Idx = 0; Idx < Count; ++Idx)
+  {
+    r32 LineThickness = 0.03;
+    u32 MaterialIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::MATERIAL, "jade");
+    PushBoxFrame(RenderGroup, M4Identity(), *AABBTree++, LineThickness, MaterialIndex);
+  }
+#endif
+
 }

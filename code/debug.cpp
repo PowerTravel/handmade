@@ -19,6 +19,13 @@ DEBUGGetState()
     DebugState->Paused = false;
     DebugState->Resumed = false;
     DebugState->ScopeToRecord = 0;
+
+    // Config state
+    DebugState->ConfigMultiThreaded = MULTI_THREADED;
+    DebugState->ConfigCollisionPoints = SHOW_COLLISION_POINTS;
+    DebugState->ConfigCollider = SHOW_COLLIDER;
+    DebugState->ConfigAABBTree = SHOW_AABB_TREE;
+
     RestartCollation();
   }
   return DebugState;
@@ -50,6 +57,7 @@ RestartCollation()
     DebugState->ChartBot = 0.3f;
     DebugState->ChartWidth = 0.3f;
     DebugState->ChartHeight = 0.6f;
+
 }
 
 void BeginDebugStatistics(debug_statistics* Statistic)
@@ -274,10 +282,12 @@ DebugRewriteConfigFile(game_memory* Memory)
     u32 Size = _snprintf_s(Buffer, sizeof(Buffer),
 "#define MULTI_THREADED %d // b32\n\
 #define SHOW_COLLISION_POINTS %d // b32\n\
-#define SHOW_COLLIDER %d // b32\n",
+#define SHOW_COLLIDER %d // b32\n\
+#define SHOW_AABB_TREE %d // b32",
       DebugState->ConfigMultiThreaded,
       DebugState->ConfigCollisionPoints,
-      DebugState->ConfigCollider);
+      DebugState->ConfigCollider,
+      DebugState->ConfigAABBTree);
     thread_context Dummy = {};
 
     Memory->PlatformAPI.DEBUGPlatformWriteEntireFile(&Dummy, "W:\\handmade\\code\\debug_config.h", Size, Buffer);
@@ -369,7 +379,8 @@ void DebugMainWindow(game_input* GameInput)
     "Toggle Show",
     "Toggle Pause",
     "Toggle Collision Points",
-    "Toggle Colliders"
+    "Toggle Colliders",
+    "Toggle AABBTree"
   };
   r32 AspectRatio = Width/Height;
   r32 ScreenWidth = AspectRatio;
@@ -476,6 +487,12 @@ void DebugMainWindow(game_input* GameInput)
     DebugState->UpdateConfig = true;
   }
 
+  // "Toggle AABBTree"
+  if(RightButtonReleased && DebugState->HotMenuItem == 4)
+  {
+    DebugState->ConfigAABBTree = !DebugState->ConfigAABBTree;
+    DebugState->UpdateConfig = true;
+  }
 }
 
 inline internal debug_frame*

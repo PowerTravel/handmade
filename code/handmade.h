@@ -5,7 +5,7 @@
 #include "memory.h"
 #include "bitmap.h"
 #include "handmade_tile.h"
-
+#include "dynamic_aabb_tree.h"
 #include "assets.h"
 
 
@@ -27,6 +27,8 @@ struct world
   u32 MaxNrManifolds;
   contact_manifold* Manifolds;
   contact_manifold* FirstContactManifold;
+
+  aabb_tree BroadPhaseTree;
 };
 
 // This is to be a ginormous struct where we can set things

@@ -97,6 +97,7 @@ struct debug_state
   b32 ConfigMultiThreaded;
   b32 ConfigCollisionPoints;
   b32 ConfigCollider;
+  b32 ConfigAABBTree;
 
   b32 UpdateConfig;
 };

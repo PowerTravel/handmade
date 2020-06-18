@@ -72,6 +72,11 @@ struct component_render
   u32 AssetHandle;
 };
 
+//struct component_vector{
+//  u32 Type;
+//  void** Component;
+//};
+
 struct entity
 {
   u32 id;

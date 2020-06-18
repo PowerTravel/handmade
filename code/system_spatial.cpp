@@ -835,18 +835,16 @@ void SpatialSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
 
-  temporary_memory TempMem1 = BeginTemporaryMemory( GlobalGameState->TransientArena );
-
   RemoveInvalidContactPoints( World );
 
   DoWarmStarting( World );
 
   IntegrateVelocities( World );
 
-  aabb_tree BroadPhaseTree = BuildBroadPhaseTree( World );
+  World->BroadPhaseTree = BuildBroadPhaseTree( World );
 
   u32 BroadPhaseResultCount = 0;
-  broad_phase_result_stack* const BroadPhaseResultStack = GetCollisionPairs( &BroadPhaseTree, &BroadPhaseResultCount );
+  broad_phase_result_stack* const BroadPhaseResultStack = GetCollisionPairs( &World->BroadPhaseTree, &BroadPhaseResultCount );
 
   CreateAndDoWork( World, BroadPhaseResultCount,  BroadPhaseResultStack );
 
@@ -866,5 +864,4 @@ void SpatialSystemUpdate( world* World )
 
   IntegratePositions(World);
 
-  EndTemporaryMemory( TempMem1 );
 }

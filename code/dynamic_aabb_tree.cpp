@@ -54,12 +54,15 @@ Get(aabb_tree_node** Head)
   return *Head;
 }
 
-memory_index GetPrintableTree( memory_arena* TemporaryArena, aabb_tree* Tree, memory_index MemorySize, char* Memory)
+u32 GetAABBList(aabb_tree* Tree, aabb3f** Result)
 {
-  aabb_tree_node** const Base = (aabb_tree_node**) PushArray(TemporaryArena, 2*Tree->Size, aabb_tree_node*);
+  aabb_tree_node** const Base = PushArray(GlobalGameState->TransientArena, Tree->Size, aabb_tree_node*);
   aabb_tree_node** Head = Base;
 
-  char* Scanner = Memory;
+  *Result = PushArray(GlobalGameState->TransientArena, Tree->Size, aabb3f);
+  aabb3f* AABBList = *Result;
+
+  u32 Count = 0;
 
   // Init the stacks
   aabb_tree_node* CurrentNode = Tree->Root;
@@ -74,16 +77,15 @@ memory_index GetPrintableTree( memory_arena* TemporaryArena, aabb_tree* Tree, me
     Head  = Pop(Head);
 
     aabb_tree_node* ParentNode = Get(Head);
-    Scanner += str::itoa((u32)IsLeaf(CurrentNode), 64, Scanner);
-    *Scanner++ = ' ' ;
-    Scanner+= AABBToString(&CurrentNode->AABB, 64, Scanner);
-    *Scanner++= '\n';
+    
+    *AABBList++ = CurrentNode->AABB;
+    Assert(Count < Tree->Size);
+    Count++;
 
     CurrentNode = CurrentNode->Right;
   }
-  *Scanner = '\0';
-  Assert(Scanner >= Memory);
-  return Scanner - Memory;
+
+  return Tree->Size;
 }
 
 broad_phase_result_stack* GetCollisionPairs( aabb_tree* Tree, u32* ResultStackSize)
