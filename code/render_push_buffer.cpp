@@ -1,7 +1,6 @@
 #include "render_push_buffer.h"
 #include "component_camera.h"
 #include "entity_components.h"
-#include "component_sprite_animation.h"
 #include "epa_collision_data.h"
 
 push_buffer_header* PushNewHeader(render_group* RenderGroup)
@@ -223,77 +222,81 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
   TIMED_FUNCTION();
   game_asset_manager* AssetManager = GlobalGameState->AssetManager;
   ResetRenderGroup(RenderGroup);
+  entity_manager* EM = GlobalGameState->EntityManager;
+  game_asset_manager* AM = GlobalGameState->AssetManager;
 
-  // TODO: Make a proper entity library so we can extracl for example ALL Lights efficiently
-  //       So we don't have to loop over ALL entitis several times
-  for(u32 Index = 0; Index <  World->NrEntities; ++Index )
   {
-    entity* Entity = &World->Entities[Index];
-
-    if( Entity->CameraComponent )
+    component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
+    while(Next(EM, ComponentList))
     {
-      RenderGroup->ProjectionMatrix = Entity->CameraComponent->P;
-      RenderGroup->ViewMatrix       = Entity->CameraComponent->V;
+      component_camera* Camera = (component_camera*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CAMERA);
+      RenderGroup->ProjectionMatrix = Camera->P;
+      RenderGroup->ViewMatrix       = Camera->V;
     }
+  }
 
-    if( Entity->LightComponent )
+  {
+    component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_LIGHT | COMPONENT_FLAG_SPATIAL);
+    while(Next(EM, ComponentList))
     {
-      Assert(Entity->SpatialComponent);
+      component_light* Light = (component_light*) GetComponent(EM, ComponentList, COMPONENT_FLAG_LIGHT);
+      component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
+      Assert(Spatial);
+
       push_buffer_header* Header = PushNewHeader( RenderGroup );
       Header->Type = render_buffer_entry_type::LIGHT;
 
       entry_type_light* Body = PushStruct(&RenderGroup->Arena, entry_type_light);
-      Body->Color  = Entity->LightComponent->Color;
-      Body->M      = GetModelMatrix(Entity->SpatialComponent);
+      Body->Color  = Light->Color;
+      Body->M      = GetModelMatrix(Spatial);
     }
   }
 
-  for(u32 Index = 0; Index <  World->NrEntities; ++Index )
   {
-    entity* Entity = &World->Entities[Index];
-
-    if(Entity->RenderComponent && !Entity->SpriteAnimationComponent)
+    component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_RENDER | COMPONENT_FLAG_SPATIAL);
+    while(Next(EM, ComponentList))
     {
+      component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL );
+      component_render* Render = (component_render*) GetComponent(EM, ComponentList, COMPONENT_FLAG_RENDER );
+
       push_buffer_header* Header = PushNewHeader( RenderGroup );
       Header->Type = render_buffer_entry_type::RENDER_ASSET;
       Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
       entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-      Body->AssetHandle = Entity->RenderComponent->AssetHandle;
-      Body->M  = GetModelMatrix(Entity->SpatialComponent);
+      Body->AssetHandle = Render->AssetHandle;
+      Body->M  = GetModelMatrix(Spatial);
       Body->NM = Transpose(RigidInverse(Body->M));
       Body->TM = M4Identity();
+
+      component_sprite_animation* SpriteAnimation = (component_sprite_animation*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPRITE_ANIMATION );
+      if(SpriteAnimation)
+      {
+        Body->TM = SpriteAnimation->ActiveSeries->Get();
+      }
     }
-    if(Entity->SpriteAnimationComponent)
-    {
-      Assert(Entity->SpatialComponent);
-      Assert(Entity->RenderComponent);
-      push_buffer_header* Header = PushNewHeader( RenderGroup );
-      Header->Type = render_buffer_entry_type::RENDER_ASSET;
-      Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
-      entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-      Body->AssetHandle = Entity->RenderComponent->AssetHandle;
-      Body->M  = GetModelMatrix(Entity->SpatialComponent);
-      Body->NM = Transpose(RigidInverse(Body->M));
-      Body->TM = Entity->SpriteAnimationComponent->ActiveSeries->Get();
-    }
+  }
 
 #if SHOW_COLLIDER
-    if( Entity->ColliderComponent )
+  {
+    component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_COLLIDER);
+    while(Next(EM, ComponentList))
     {
-      Assert(Entity->SpatialComponent);
-      m4 M = GetModelMatrix(Entity->SpatialComponent);
-      aabb3f  AABB =Entity->ColliderComponent->AABB;
+      component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
+      component_collider* Collider = (component_collider*) GetComponent(EM, ComponentList, COMPONENT_FLAG_COLLIDER);
+      m4 M = GetModelMatrix(Spatial);
+      aabb3f AABB = Collider->AABB;
       r32 LineThickness = 0.03;
-      u32 MaterialIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::MATERIAL, "jade");
+      u32 MaterialIndex = GetAssetIndex(AM, asset_type::MATERIAL, "jade");
       PushBoxFrame(RenderGroup, M, AABB, LineThickness, MaterialIndex);
     }
-#endif
   }
+#endif
 
 #if SHOW_COLLISION_POINTS
   contact_manifold* Manifold = World->FirstContactManifold;
   while(Manifold)
   {
+    //TODO: Turn manifold into an entity
     Assert(Manifold->ContactCount);
     entity* A = Manifold->A;
     entity* B = Manifold->B;
@@ -304,14 +307,15 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
         Header->Type = render_buffer_entry_type::RENDER_ASSET;
         Header->RenderState = RENDER_STATE_FILL;
 
-        u32 TempHandle = GetTemporaryAssetHandle(RenderGroup->AssetManager);
-        SetAsset(RenderGroup->AssetManager, asset_type::OBJECT, "voxel", TempHandle);
-        SetAsset(RenderGroup->AssetManager, asset_type::MATERIAL, "blue", TempHandle);
+        u32 TempHandle = GetTemporaryAssetHandle(AM);
+        SetAsset(AM, asset_type::OBJECT, "voxel", TempHandle);
+        SetAsset(AM, asset_type::MATERIAL, "blue", TempHandle);
         
         entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
         Body->AssetHandle = TempHandle;
-        const m4 Rotation = GetRotationMatrix(A->SpatialComponent->Rotation);
-        const m4 Translation = GetTranslationMatrix(A->SpatialComponent->Position);
+        component_spatial* Spatial = (component_spatial*) GetComponent(EM, A->ID, COMPONENT_FLAG_SPATIAL);
+        const m4 Rotation = GetRotationMatrix(Spatial->Rotation);
+        const m4 Translation = GetTranslationMatrix(Spatial->Position);
         const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
         #if 1
         Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].A_ContactWorldSpace,1))*Scale;
@@ -326,15 +330,16 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
         Header->Type = render_buffer_entry_type::RENDER_ASSET;
         Header->RenderState = RENDER_STATE_FILL;
 
-        u32 TempHandle = GetTemporaryAssetHandle(RenderGroup->AssetManager);
-        SetAsset(RenderGroup->AssetManager, asset_type::OBJECT, "voxel", TempHandle);
-        SetAsset(RenderGroup->AssetManager, asset_type::MATERIAL, "white", TempHandle);
+        u32 TempHandle = GetTemporaryAssetHandle(AM);
+        SetAsset(AM, asset_type::OBJECT, "voxel", TempHandle);
+        SetAsset(AM, asset_type::MATERIAL, "white", TempHandle);
 
         entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
         Body->AssetHandle = TempHandle;
 
-        const m4 Rotation = GetRotationMatrix(B->SpatialComponent->Rotation);
-        const m4 Translation = GetTranslationMatrix(B->SpatialComponent->Position);
+        component_spatial* Spatial = (component_spatial*) GetComponent(EM, B->ID, COMPONENT_FLAG_SPATIAL);
+        const m4 Rotation = GetRotationMatrix(Spatial->Rotation);
+        const m4 Translation = GetTranslationMatrix(Spatial->Position);
         const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
         #if 1
         Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].B_ContactWorldSpace,1))*Scale;
@@ -354,7 +359,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
   for(u32 Idx = 0; Idx < Count; ++Idx)
   {
     r32 LineThickness = 0.03;
-    u32 MaterialIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::MATERIAL, "jade");
+    u32 MaterialIndex = GetAssetIndex(AM, asset_type::MATERIAL, "jade");
     PushBoxFrame(RenderGroup, M4Identity(), *AABBTree++, LineThickness, MaterialIndex);
   }
 #endif

@@ -22,13 +22,10 @@ void UpdateViewMatrixAngularMovement(  component_camera* Camera )
 void CameraSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
-	for(u32 Index = 0;  Index < World->NrEntities; ++Index )
+  component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_CAMERA);
+	while( Next(GlobalGameState->EntityManager, ComponentList) )
 	{
-		entity* Entity = &World->Entities[Index];
-
-		if( ( Entity->Types & COMPONENT_TYPE_CAMERA ) )
-		{
-			UpdateViewMatrix( Entity->CameraComponent );
-		}
+		component_camera* Camera = GetCameraComponent(ComponentList);
+		UpdateViewMatrix(Camera);
 	}
 }

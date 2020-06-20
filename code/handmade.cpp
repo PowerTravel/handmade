@@ -76,10 +76,6 @@ world* AllocateWorld( u32 NrMaxEntities, u32 NumManifolds = 4 )
   world* World = PushStruct(GlobalGameState->PersistentArena, world);
   World->Arena = GlobalGameState->PersistentArena;
 
-  World->NrEntities = 0;
-  World->NrMaxEntities = NrMaxEntities;
-  World->Entities = (entity*) PushArray( World->Arena, World->NrMaxEntities, entity );
-
   World->MaxNrManifolds = NumManifolds*NrMaxEntities;
   World->Manifolds = (contact_manifold*)  PushSize( World->Arena, World->MaxNrManifolds*( sizeof(contact_manifold) ));
   World->FirstContactManifold = 0;
@@ -90,29 +86,47 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 {
   world* World = GameState->World;
   game_asset_manager* AssetManager = GlobalGameState->AssetManager;
-  entity* ControllableCamera = NewEntity( World );
-  NewComponents( World, ControllableCamera, COMPONENT_TYPE_CONTROLLER | COMPONENT_TYPE_CAMERA);
+  entity_manager* EM = GlobalGameState->EntityManager;
 
+  u32 TestEntity1 = NewEntity( EM );
+  NewComponents( EM, TestEntity1, 0x01 | 0x04 | 0x10 );
+  NewComponents( EM, TestEntity1, 0x02 | 0x08 | 0x20 );
+
+  u32 TestEntity2 = NewEntity( EM );
+  NewComponents( EM, TestEntity2, 0x01 | 0x20 );
+  NewComponents( EM, TestEntity2, 0x02 | 0x08 | 0x10 );
+
+  u32 TestEntity3 = NewEntity( EM );
+  NewComponents( EM, TestEntity3, 0x20 );
+  NewComponents( EM, TestEntity3, 0x02 | 0x08 | 0x10 );
+
+  u32 ControllableCamera = NewEntity( EM );
+  NewComponents( EM, ControllableCamera, COMPONENT_FLAG_CONTROLLER | COMPONENT_FLAG_CAMERA);
+  component_camera* Camera = GetCameraComponent(ControllableCamera);
   r32 AspectRatio = GameState->ScreenWidthPixels / GameState->ScreenHeightPixels;
   r32 FieldOfView =  90;
-  SetCameraComponent(ControllableCamera->CameraComponent, FieldOfView, AspectRatio );
-  LookAt(ControllableCamera->CameraComponent, 1*V3(0,3,-8), V3(0,3,0));
+  SetCameraComponent(Camera, FieldOfView, AspectRatio );
+  LookAt(Camera, 1*V3(0,3,-8), V3(0,3,0));
 
-  ControllableCamera->ControllerComponent->Controller = GetController(Input, 1);
-  ControllableCamera->ControllerComponent->Type = ControllerType_FlyingCamera;
+  component_controller* Controller = GetControllerComponent(ControllableCamera);
+  Controller->Controller = GetController(Input, 1);
+  Controller->Type = ControllerType_FlyingCamera;
  
-  entity* Light = NewEntity( World );
-  NewComponents( World, Light, COMPONENT_TYPE_LIGHT | COMPONENT_TYPE_SPATIAL | COMPONENT_TYPE_RENDER);
+  u32 LightEntity = NewEntity( EM );
+  NewComponents( EM, LightEntity, COMPONENT_FLAG_LIGHT | COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_RENDER);
+  component_light* Light = GetLightComponent(LightEntity);
+  component_spatial* LightSpatial = GetSpatialComponent(LightEntity);
+  component_render* LightRender = GetRenderComponent(LightEntity);
 
-  Light->LightComponent->Color = 0.6*V4(1,1,1,1);
+  Light->Color = 0.6*V4(1,1,1,1);
 
-  Light->SpatialComponent->Position = V3(1,1,1);
-  Light->SpatialComponent->Scale    = V3( 0.3, 0.3, 0.3);
+  LightSpatial->Position = V3(1,1,1);
+  LightSpatial->Scale    = V3( 0.3, 0.3, 0.3);
 
-  Light->RenderComponent->AssetHandle = GetAssetHandle(GameState->AssetManager);
-  SetAsset( GameState->AssetManager, asset_type::OBJECT,   "voxel", Light->RenderComponent->AssetHandle);
-  SetAsset( GameState->AssetManager, asset_type::MATERIAL, "white", Light->RenderComponent->AssetHandle);  // May have a texture
-  SetAsset( GameState->AssetManager, asset_type::BITMAP,   "null",  Light->RenderComponent->AssetHandle);  // Overrides texture
+  LightRender->AssetHandle = GetAssetHandle(GameState->AssetManager);
+  SetAsset( GameState->AssetManager, asset_type::OBJECT,   "voxel", LightRender->AssetHandle);
+  SetAsset( GameState->AssetManager, asset_type::MATERIAL, "white", LightRender->AssetHandle);  // May have a texture
+  SetAsset( GameState->AssetManager, asset_type::BITMAP,   "null",  LightRender->AssetHandle);  // Overrides texture
 
 
 #define State4
@@ -143,75 +157,82 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   s32 karr[] = {-0,1};
 #endif
   u32 RollingIndex = 0;
-  u32 cubeAssetHandle = GetAssetHandle( GameState->AssetManager);
-  SetAsset( AssetManager, asset_type::OBJECT, "cube1", cubeAssetHandle );
-  SetAsset( AssetManager, asset_type::MATERIAL, "cube", cubeAssetHandle );
-  SetAsset( AssetManager, asset_type::BITMAP, "cube_kd", cubeAssetHandle );
+  u32 CubeAssetHandle = GetAssetHandle( GameState->AssetManager);
+  SetAsset( AssetManager, asset_type::OBJECT, "cube1", CubeAssetHandle );
+  SetAsset( AssetManager, asset_type::MATERIAL, "cube", CubeAssetHandle );
+  SetAsset( AssetManager, asset_type::BITMAP, "cube_kd", CubeAssetHandle );
   for (s32 i = iarr[0]; i < iarr[1]; ++i)
   {
     for (s32 j = jarr[0]; j < jarr[1]; ++j)
     {
       for (s32 k = karr[0]; k < karr[1]; ++k)
       {
-        entity* cubeEntity = NewEntity( World );
-        NewComponents( World, cubeEntity,
-          COMPONENT_TYPE_RENDER   |
-          COMPONENT_TYPE_SPATIAL  |
-          COMPONENT_TYPE_COLLIDER |
-          COMPONENT_TYPE_DYNAMICS);
+        u32 CubeEntity = NewEntity( EM );
+        NewComponents( EM, CubeEntity,
+          COMPONENT_FLAG_RENDER   |
+          COMPONENT_FLAG_SPATIAL  |
+          COMPONENT_FLAG_COLLIDER |
+          COMPONENT_FLAG_DYNAMICS);
 
-        cubeEntity->RenderComponent->AssetHandle = cubeAssetHandle;
+        GetRenderComponent(CubeEntity)->AssetHandle = CubeAssetHandle;
 
-        cubeEntity->ColliderComponent->AssetHandle = cubeAssetHandle;
-        cubeEntity->ColliderComponent->AABB = GetMeshAABB(AssetManager, cubeAssetHandle);
+        component_spatial* CubeSpatial = GetSpatialComponent(CubeEntity);
+        CubeSpatial->Position =  V3(xzSpace*i, ySpace*j, xzSpace*k);
+        CubeSpatial->Rotation = RotateQuaternion( 0, V3(0,0,0) );
+        CubeSpatial->Scale = V3(1, 1, 1);
+        
+        component_collider* CubeCollider = GetColliderComponent(CubeEntity);
+        CubeCollider->AssetHandle = CubeAssetHandle;
+        CubeCollider->AABB = GetMeshAABB(AssetManager, CubeAssetHandle);
 
-        cubeEntity->SpatialComponent->Position =  V3(xzSpace*i, ySpace*j, xzSpace*k);
-        cubeEntity->SpatialComponent->Rotation = RotateQuaternion( 0, V3(0,0,0) );
-        cubeEntity->SpatialComponent->Scale = V3(1, 1, 1);
-
-        cubeEntity->DynamicsComponent->LinearVelocity  = V3(0,0,0);
-        cubeEntity->DynamicsComponent->AngularVelocity = V3(0,0,0);
-        cubeEntity->DynamicsComponent->Mass = 2;
+        component_dynamics* CubeDynamics = GetDynamicsComponent(CubeEntity);
+        CubeDynamics->LinearVelocity  = V3(0,0,0);
+        CubeDynamics->AngularVelocity = V3(0,0,0);
+        CubeDynamics->Mass = 2;
       }
     }
   }
 
-  entity* FloorEntity = NewEntity( World );
-  NewComponents( World, FloorEntity,
-    COMPONENT_TYPE_RENDER   |
-    COMPONENT_TYPE_SPATIAL  |
-    COMPONENT_TYPE_COLLIDER);
+  u32 FloorEntity = NewEntity( EM );
+  NewComponents( EM, FloorEntity,
+    COMPONENT_FLAG_RENDER   |
+    COMPONENT_FLAG_SPATIAL  |
+    COMPONENT_FLAG_COLLIDER);
 
   u32 FloorHandle = GetAssetHandle(AssetManager);
-  FloorEntity->RenderComponent->AssetHandle = FloorHandle;
   SetAsset( AssetManager, asset_type::OBJECT, "cube1", FloorHandle);
   SetAsset( AssetManager, asset_type::MATERIAL, "cube", FloorHandle );
   SetAsset( AssetManager, asset_type::BITMAP, "cube_kd", FloorHandle );
 
-  FloorEntity->ColliderComponent->AssetHandle = FloorHandle;
-  FloorEntity->ColliderComponent->AABB = GetMeshAABB( AssetManager, FloorHandle);
+  GetRenderComponent(FloorEntity)->AssetHandle = FloorHandle;
 
-  FloorEntity->SpatialComponent->Position = V3( 0,-2, 0);
-  FloorEntity->SpatialComponent->Scale = V3( 18, 1, 18);
+  component_spatial* FloorSpatial = GetSpatialComponent(FloorEntity);
+  FloorSpatial->Position = V3( 0,-2, 0);
+  FloorSpatial->Scale = V3( 18, 1, 18);
 
-  entity* SpriteAnimationEntity = NewEntity( World );
-  NewComponents( World, SpriteAnimationEntity,
-    COMPONENT_TYPE_SPRITE_ANIMATION |
-    COMPONENT_TYPE_RENDER           |
-    COMPONENT_TYPE_SPATIAL);
+  component_collider* FloorCollider = GetColliderComponent(FloorEntity);
+  FloorCollider->AssetHandle = FloorHandle;
+  FloorCollider->AABB = GetMeshAABB( AssetManager, FloorHandle);
+
+  u32 SpriteAnimationEntity = NewEntity( EM );
+  NewComponents( EM, SpriteAnimationEntity,
+    COMPONENT_FLAG_SPRITE_ANIMATION |
+    COMPONENT_FLAG_RENDER           |
+    COMPONENT_FLAG_SPATIAL);
 
   u32 HeroSpriteHandle = GetAssetHandle(AssetManager);
   SetAsset( AssetManager, asset_type::OBJECT, "quad", HeroSpriteHandle);
   SetAsset( AssetManager, asset_type::BITMAP, "hero_sprite_sheet", HeroSpriteHandle);
   SetAsset( AssetManager, asset_type::MATERIAL, "cube", HeroSpriteHandle );
 
-  SpriteAnimationEntity->RenderComponent->AssetHandle = HeroSpriteHandle;
+  GetRenderComponent(SpriteAnimationEntity)->AssetHandle = HeroSpriteHandle;
 
-  SpriteAnimationEntity->SpatialComponent->Position = V3( -0,  8, 8);
-  SpriteAnimationEntity->SpatialComponent->Rotation = RotateQuaternion( Pi32, V3(0,1,0) );
-  SpriteAnimationEntity->SpatialComponent->Scale    = V3( 18, 18, 1);
+  component_spatial* SpriteSpatial = GetSpatialComponent(SpriteAnimationEntity);
+  SpriteSpatial->Position = V3( -0,  8, 8);
+  SpriteSpatial->Rotation = RotateQuaternion( Pi32, V3(0,1,0) );
+  SpriteSpatial->Scale    = V3( 18, 18, 1);
 
-  component_sprite_animation* SpriteAnimation = SpriteAnimationEntity->SpriteAnimationComponent;
+  component_sprite_animation* SpriteAnimation = GetSpriteAnimationComponent(SpriteAnimationEntity);
 
   hash_map<bitmap_coordinate> HeroCoordinates = LoadAdventurerSpriteSheetCoordinates( GameState->TransientArena );
   
@@ -269,6 +290,7 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
     GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
 
     GlobalGameState->AssetManager = CreateAssetManager();
+    GlobalGameState->EntityManager = CreateEntityManager();
 
     GlobalGameState->World = AllocateWorld(120, 32);
 

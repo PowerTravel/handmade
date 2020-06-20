@@ -1,7 +1,7 @@
 #include "component_camera.h"
 #include "handmade.h"
 #include "entity_components.h"
-
+/*
 void CameraController( entity* CameraEntity )
 {
   component_camera* Camera = CameraEntity->CameraComponent;
@@ -72,96 +72,96 @@ void CameraController( entity* CameraEntity )
     }
   }
 }
-
-void FlyingCameraController( entity* CameraEntity )
+*/
+void FlyingCameraController( component_controller* Controller, component_camera* Camera )
 {
-  component_camera* Camera = CameraEntity->CameraComponent;
-  game_controller_input* Controller = CameraEntity->ControllerComponent->Controller;
   Assert(Camera);
   Assert(Controller);
-  if( Controller->IsAnalog )
+
+  game_controller_input* Input = Controller->Controller;
+  if( Input->IsAnalog )
   {
     b32 hasMoved = false;
     r32 dr = 0.05;
     r32 da = 0.05;
     r32 Length = 3;
-    if(Controller->LeftStickLeft.EndedDown)
+    if(Input->LeftStickLeft.EndedDown)
     {
       TranslateCamera( Camera, V3(-dr,0,0));
       hasMoved = true;
     }
-    if(Controller->LeftStickRight.EndedDown)
+    if(Input->LeftStickRight.EndedDown)
     {
       TranslateCamera( Camera, V3(dr,0,0));
       hasMoved = true;
     }
-    if(Controller->LeftStickUp.EndedDown)
+    if(Input->LeftStickUp.EndedDown)
     {
       TranslateCamera( Camera, V3(0,dr,0));
       hasMoved = true;
     }
-    if(Controller->LeftStickDown.EndedDown)
+    if(Input->LeftStickDown.EndedDown)
     {
       TranslateCamera( Camera, V3(0,-dr,0));
       hasMoved = true;
     }
-    if(Controller->RightStickUp.EndedDown)
+    if(Input->RightStickUp.EndedDown)
     {
       RotateCamera( Camera, da, V3(1,0,0) );
       hasMoved = true;
     }
-    if(Controller->RightStickDown.EndedDown)
+    if(Input->RightStickDown.EndedDown)
     {
       RotateCamera( Camera, da, V3(-1,0,0) );
       hasMoved = true;
     }
-    if(Controller->RightStickLeft.EndedDown)
+    if(Input->RightStickLeft.EndedDown)
     {
       v4 WorldUpCamCoord = Camera->V * V4(0,1,0,0);
       RotateCamera( Camera, da, V3( WorldUpCamCoord) );
       hasMoved = true;
     }
-    if(Controller->RightStickRight.EndedDown)
+    if(Input->RightStickRight.EndedDown)
     {
       v4 WorldDownCamCoord = Camera->V * V4(0,-1,0,0);
       RotateCamera( Camera, da, V3( WorldDownCamCoord ) );
       hasMoved = true;
     }
-    if(Controller->RightTrigger.EndedDown)
+    if(Input->RightTrigger.EndedDown)
     {
       TranslateCamera(Camera, V3(0,0,-dr));
       hasMoved = true;
     }
-    if(Controller->LeftTrigger.EndedDown)
+    if(Input->LeftTrigger.EndedDown)
     {
       TranslateCamera(Camera, V3( 0, 0, dr));
       hasMoved = true;
     }
-    if(Controller->A.EndedDown)
+    if(Input->A.EndedDown)
     {
       // at Z, top is Y, X is Right
       LookAt( Camera, Length*V3(0,1,0),V3(0,0,0),V3(0,0,-1));
     }
-    if(Controller->B.EndedDown)
+    if(Input->B.EndedDown)
     {
       // at X, top is Y, X is Left
       LookAt( Camera, Length * Normalize( V3(1,0,0) ),V3(0,0,0));
     }
-    if(Controller->X.EndedDown)
+    if(Input->X.EndedDown)
     {
       // at X, top is Y, X is Left
       LookAt( Camera, Length*V3(0,0,1), V3(0,0,0));
     }
-    if(Controller->Y.EndedDown)
+    if(Input->Y.EndedDown)
     {
       // at Y, top is X is up, X is Left
       LookAt( Camera, Length*V3(0,1,1),V3(0,0,0), V3(1,0,0));
     }
-    if(Controller->RightShoulder.EndedDown)
+    if(Input->RightShoulder.EndedDown)
     {
       SetOrthoProj( Camera, -3, 3 );
     }
-    if(Controller->LeftShoulder.EndedDown)
+    if(Input->LeftShoulder.EndedDown)
     {
       SetPerspectiveProj( Camera, 0.1, 1000 );
     }
@@ -173,37 +173,36 @@ void FlyingCameraController( entity* CameraEntity )
   }
 }
 
-void HeroController( entity* HeroEntity )
+void HeroController( component_controller*  Controller,
+                     component_spatial*     Spatial,
+                     component_dynamics*    Dynamics,
+                     component_camera*      Camera )
 {
-  game_controller_input* Controller = HeroEntity->ControllerComponent->Controller;
-  component_spatial*     Spatial  = HeroEntity->SpatialComponent;
-  component_dynamics*    Dynamics = HeroEntity->DynamicsComponent;
-  component_camera*      Camera   = HeroEntity->CameraComponent;
-
   Assert(Spatial);
   Assert(Dynamics);
   Assert(Controller);
   Assert(Camera);
 
-  if( Controller->IsAnalog )
+  game_controller_input* Input = Controller->Controller;
+  if( Input->IsAnalog )
   {
     r32 ImpulseStrength = 20;
     r32 JumpImpulse = 0;
     v2 StickAverage = V2(0,0);
 
-    if(Controller->LeftStickLeft.EndedDown || Controller->LeftStickRight.EndedDown )
+    if(Input->LeftStickLeft.EndedDown || Input->LeftStickRight.EndedDown )
     {
-      StickAverage.X = Controller->LeftStickAverageX;
+      StickAverage.X = Input->LeftStickAverageX;
     }
 
-    if(Controller->A.EndedDown)
+    if(Input->A.EndedDown)
     {
       JumpImpulse = 4;
     }
 
     Dynamics->ExternalForce = ImpulseStrength * (V3(StickAverage, 0) + V3(0,JumpImpulse,0));
 
-    if(Controller->X.EndedDown)
+    if(Input->X.EndedDown)
     {
       *Spatial = component_spatial(V3(0,1,0));
       Dynamics->ExternalForce  = V3(0,0,0);
@@ -220,22 +219,25 @@ void HeroController( entity* HeroEntity )
 void ControllerSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
-  for (u32 Index = 0;  Index < World->NrEntities; ++Index )
+  entity_manager* EM = GlobalGameState->EntityManager;
+  component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
+  while(Next(EM, ComponentList))
   {
-    entity* E = &World->Entities[Index];
-    if (E->ControllerComponent)
+    component_controller* Controller = (component_controller*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CONTROLLER);
+    switch (Controller->Type)
     {
-      switch (E->ControllerComponent->Type)
+      case ControllerType_FlyingCamera:
       {
-        case ControllerType_FlyingCamera:
-        {
-          FlyingCameraController(E);
-        }break;
-        case ControllerType_Hero:
-        {
-          HeroController(E);
-        }break;
-      }
+        component_camera* Camera   = (component_camera*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CAMERA);
+        FlyingCameraController(Controller, Camera);
+      }break;
+      case ControllerType_Hero:
+      {
+        component_spatial*     Spatial  = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
+        component_dynamics*    Dynamics = (component_dynamics*) GetComponent(EM, ComponentList, COMPONENT_FLAG_DYNAMICS);
+        component_camera*      Camera   = (component_camera*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CAMERA);
+        HeroController(Controller, Spatial, Dynamics, Camera);
+      }break;
     }
   }
 }

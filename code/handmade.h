@@ -7,7 +7,7 @@
 #include "handmade_tile.h"
 #include "dynamic_aabb_tree.h"
 #include "assets.h"
-
+#include "entity_components.h"
 
 struct entity;
 struct contact_manifold;
@@ -20,9 +20,6 @@ struct world
   memory_arena* Arena;
 
   tile_map     TileMap;
-  u32          NrEntities;
-  u32          NrMaxEntities;
-  entity*      Entities;
 
   u32 MaxNrManifolds;
   contact_manifold* Manifolds;
@@ -31,8 +28,7 @@ struct world
   aabb_tree BroadPhaseTree;
 };
 
-// This is to be a ginormous struct where we can set things
-// we wanna access from everywhere. (Except the debug system which is it's own thing)
+// This is to be a ginormous struct where we can set things we wanna access from everywhere.
 struct game_state
 {
   r32 ScreenWidthPixels;
@@ -44,6 +40,7 @@ struct game_state
   temporary_memory TransientTempMem;
 
   game_asset_manager* AssetManager;
+  entity_manager* EntityManager;
 
   world* World;
 

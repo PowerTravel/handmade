@@ -2,15 +2,6 @@
 
 #include "math/affine_transformations.h"
 
-struct component_camera
-{
-  r32 AngleOfView;
-  r32 AspectRatio;
-  m4  DeltaRot;
-  v3  DeltaPos;
-  m4  V;
-  m4  P;
-};
 
 
 void LookAt( component_camera* Camera, v3 aFrom,  v3 aTo,  v3 aTmp = V3(0,1,0) )

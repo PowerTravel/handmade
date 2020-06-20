@@ -149,13 +149,19 @@ v3 ClosestPointOnEdge(const v3& EdgeStart, const v3& EdgeEnd, const v3& Point)
 internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
 {
   TIMED_FUNCTION();
+  entity_manager* EM = GlobalGameState->EntityManager;
   contact_manifold* Manifold = (contact_manifold*) Data;
-  entity* A = Manifold->A;
-  entity* B = Manifold->B;
-  m4 ModelMatrixA = GetModelMatrix(A->SpatialComponent);
-  m4 ModelMatrixB = GetModelMatrix(B->SpatialComponent);
-  collider_mesh MeshA = GetColliderMesh(GlobalGameState->AssetManager, A->ColliderComponent->AssetHandle);
-  collider_mesh MeshB = GetColliderMesh(GlobalGameState->AssetManager, B->ColliderComponent->AssetHandle);
+
+  component_spatial* SpatialA = (component_spatial*) GetComponent(EM, Manifold->A->ID, COMPONENT_FLAG_SPATIAL);
+  component_spatial* SpatialB = (component_spatial*) GetComponent(EM, Manifold->B->ID, COMPONENT_FLAG_SPATIAL);
+  component_collider* ColliderA = (component_collider*) GetComponent(EM, Manifold->A->ID, COMPONENT_FLAG_COLLIDER);
+  component_collider* ColliderB = (component_collider*) GetComponent(EM, Manifold->B->ID, COMPONENT_FLAG_COLLIDER);
+  component_dynamics* DynamicsA = (component_dynamics*) GetComponent(EM, Manifold->A->ID, COMPONENT_FLAG_DYNAMICS);
+  component_dynamics* DynamicsB = (component_dynamics*) GetComponent(EM, Manifold->B->ID, COMPONENT_FLAG_DYNAMICS);
+  m4 ModelMatrixA = GetModelMatrix(SpatialA);
+  m4 ModelMatrixB = GetModelMatrix(SpatialB);
+  collider_mesh MeshA = GetColliderMesh(GlobalGameState->AssetManager, ColliderA->AssetHandle);
+  collider_mesh MeshB = GetColliderMesh(GlobalGameState->AssetManager, ColliderB->AssetHandle);
 
   gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
       &ModelMatrixA, &MeshA,
@@ -209,19 +215,19 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
       // Todo: Solve stationary objects with stationary constraint?
       r32 ma = R32Max;
       r32 mb = R32Max;
-      if (A->DynamicsComponent)
+      if (DynamicsA)
       {
-        ma = A->DynamicsComponent->Mass;
+        ma = DynamicsA->Mass;
       }
 
-      if (B->DynamicsComponent)
+      if (DynamicsB)
       {
-        mb = B->DynamicsComponent->Mass;
+        mb = DynamicsB->Mass;
       }
 
       m3 InvM[4] = {};
-      GetAABBInverseMassMatrix( &A->ColliderComponent->AABB, ma, &InvM[0], &InvM[1]);
-      GetAABBInverseMassMatrix( &B->ColliderComponent->AABB, mb, &InvM[2], &InvM[3]);
+      GetAABBInverseMassMatrix( &ColliderA->AABB, ma, &InvM[0], &InvM[1]);
+      GetAABBInverseMassMatrix( &ColliderB->AABB, mb, &InvM[2], &InvM[3]);
 
       CachedData.J[0] = -n;
       CachedData.J[1] = -CrossProduct(ra, n);
@@ -263,15 +269,13 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
         utils::Copy(sizeof(PossibleContactCaches), Manifold->CachedData, PossibleContactCaches);
         PossibleContacts[4] = NewContact;
         PossibleContactCaches[4] = CachedData;
-        const m4 ModelMatA = GetModelMatrix(Manifold->A->SpatialComponent);
-        const m4 ModelMatB = GetModelMatrix(Manifold->B->SpatialComponent);
 
         r32 Depth = 0;
         u32 nrAddedContacts = 0;
         for (u32 i = 0; i < ArrayCount(PossibleContacts); ++i)
         {
-          const v3 PossiblePointA = V3( ModelMatA * V4(PossibleContacts[i].A_ContactModelSpace,1));
-          const v3 PossiblePointB = V3( ModelMatB * V4(PossibleContacts[i].B_ContactModelSpace,1));
+          const v3 PossiblePointA = V3( ModelMatrixA * V4(PossibleContacts[i].A_ContactModelSpace,1));
+          const v3 PossiblePointB = V3( ModelMatrixB * V4(PossibleContacts[i].B_ContactModelSpace,1));
           const r32 PenetrationDepth = (PossiblePointA - PossiblePointB)*PossibleContacts[i].ContactNormal;
           if(Depth < PenetrationDepth)
           {
@@ -291,7 +295,7 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
             continue;
           }
 
-          const v3 PossiblePointA = V3( ModelMatA * V4(PossibleContacts[i].A_ContactModelSpace,1));
+          const v3 PossiblePointA = V3( ModelMatrixA * V4(PossibleContacts[i].A_ContactModelSpace,1));
 
           r32 TestLength = Norm(PossiblePointA - ContactPoints[0]);
           if(Length < TestLength)
@@ -311,7 +315,7 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
           {
             continue;
           }
-          const v3 PossiblePoint = V3( ModelMatA * V4(PossibleContacts[i].A_ContactModelSpace,1));
+          const v3 PossiblePoint = V3( ModelMatrixA * V4(PossibleContacts[i].A_ContactModelSpace,1));
           const v3 ClosestPoint = ClosestPointOnEdge(ContactPoints[0], ContactPoints[1], PossiblePoint);
 
           const r32 TestLength = Norm(PossiblePoint - ClosestPoint);
@@ -334,7 +338,7 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
             continue;
           }
 
-          const v3 PossiblePoint = V3( ModelMatA * V4(PossibleContacts[i].A_ContactModelSpace,1));
+          const v3 PossiblePoint = V3( ModelMatrixA * V4(PossibleContacts[i].A_ContactModelSpace,1));
           const v3 a = ContactPoints[0];
           const v3 b = ContactPoints[1];
           const v3 c = ContactPoints[2];
@@ -378,10 +382,14 @@ internal void RemoveInvalidContactPoints( world* World )
 {
   TIMED_FUNCTION();
   contact_manifold* Manifold = World->FirstContactManifold;
+  entity_manager* EM = GlobalGameState->EntityManager;
   while (Manifold)
   {
-    m4 ModelMatA = GetModelMatrix(Manifold->A->SpatialComponent);
-    m4 ModelMatB = GetModelMatrix(Manifold->B->SpatialComponent);
+    component_spatial* SpatialA = (component_spatial*) GetComponent(EM, Manifold->A->ID, COMPONENT_FLAG_SPATIAL);
+    component_spatial* SpatialB = (component_spatial*) GetComponent(EM, Manifold->B->ID, COMPONENT_FLAG_SPATIAL);
+    m4 ModelMatrixA = GetModelMatrix(SpatialA);
+    m4 ModelMatrixB = GetModelMatrix(SpatialB);
+
     u32 DstIndex = 0;
     for (u32 SrcIndex = 0;
          SrcIndex < Manifold->ContactCount;
@@ -390,8 +398,8 @@ internal void RemoveInvalidContactPoints( world* World )
       contact_data* SrcContact = Manifold->Contacts + SrcIndex;
       contact_data_cache* SrcCache = Manifold->CachedData + SrcIndex;
 
-      const v3 LocalToGlobalA = V3( ModelMatA * V4(SrcContact->A_ContactModelSpace,1));
-      const v3 LocalToGlobalB = V3( ModelMatB * V4(SrcContact->B_ContactModelSpace,1));
+      const v3 LocalToGlobalA = V3( ModelMatrixA * V4(SrcContact->A_ContactModelSpace,1));
+      const v3 LocalToGlobalB = V3( ModelMatrixB * V4(SrcContact->B_ContactModelSpace,1));
 
       const v3 rAB = LocalToGlobalB - LocalToGlobalA;
 
@@ -458,15 +466,17 @@ internal void DoWarmStarting( world* World )
       CachedData->AccumulatedLambdaN1 = 0;
       CachedData->AccumulatedLambdaN2 = 0;
 
-      if(A->DynamicsComponent)
+      component_dynamics* DynamicsA = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->A->ID, COMPONENT_FLAG_DYNAMICS);
+      component_dynamics* DynamicsB = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->B->ID, COMPONENT_FLAG_DYNAMICS);
+      if(DynamicsA)
       {
-        A->DynamicsComponent->LinearVelocity  += (DeltaV[0] + DeltaV1[0] + DeltaV[0]);
-        A->DynamicsComponent->AngularVelocity += (DeltaV[1] + DeltaV1[1] + DeltaV[1]);
+        DynamicsA->LinearVelocity  += (DeltaV[0] + DeltaV1[0] + DeltaV[0]);
+        DynamicsA->AngularVelocity += (DeltaV[1] + DeltaV1[1] + DeltaV[1]);
       }
-      if(B->DynamicsComponent)
+      if(DynamicsB)
       {
-        B->DynamicsComponent->LinearVelocity  += (DeltaV[2] + DeltaV1[2] + DeltaV[2]);
-        B->DynamicsComponent->AngularVelocity += (DeltaV[3] + DeltaV1[3] + DeltaV[3]);
+        DynamicsB->LinearVelocity  += (DeltaV[2] + DeltaV1[2] + DeltaV[2]);
+        DynamicsB->AngularVelocity += (DeltaV[3] + DeltaV1[3] + DeltaV[3]);
       }
     }
     Manifold = Manifold->Next;
@@ -477,43 +487,38 @@ inline void IntegrateVelocities(world* World)
 {
   TIMED_FUNCTION();
   r32 dt =  World->dtForFrame;
-  for(u32 Index = 0;  Index < World->NrEntities; ++Index )
+
+  component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_DYNAMICS);
+  while(Next(GlobalGameState->EntityManager, ComponentList))
   {
-    entity* E = &World->Entities[Index];
-    if( E->DynamicsComponent )
-    {
-      component_spatial*   S = E->SpatialComponent;
-      component_dynamics*  D = E->DynamicsComponent;
+    component_spatial*   S = (component_spatial*) GetComponent(GlobalGameState->EntityManager,  ComponentList, COMPONENT_FLAG_SPATIAL);
+    component_dynamics*  D = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_DYNAMICS);
 
-      // Forward euler
-      // TODO: Investigate other more stable integration methods
-      v3 Gravity = V3(0,-10,0);
-      v3 LinearAcceleration = Gravity * D->Mass;
-      D->LinearVelocity     += dt * LinearAcceleration;
+    // Forward euler
+    // TODO: Investigate other more stable integration methods
+    v3 Gravity = V3(0,-10,0);
+    v3 LinearAcceleration = Gravity * D->Mass;
+    D->LinearVelocity     += dt * LinearAcceleration;
 
-      // TODO: Can angular acceleration be integrated naively like this?
-      //       Don't think so, use rotor-integration, See paper of Michael Boyle
-      v3 AngularAcceleration = {};
-      D->AngularVelocity += dt * AngularAcceleration;
-    }
+    v3 AngularAcceleration = {};
+    D->AngularVelocity += dt * AngularAcceleration;
   }
 }
 
 
-internal aabb_tree BuildBroadPhaseTree( world* World )
+internal aabb_tree BuildBroadPhaseTree( )
 {
   TIMED_FUNCTION();
   aabb_tree Result = {};
   memory_arena* TransientArena = GlobalGameState->TransientArena;
-  for(u32 Index = 0;  Index < World->NrEntities; ++Index )
+  component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_COLLIDER);
+  while(Next(GlobalGameState->EntityManager, ComponentList))
   {
-    entity* E = &World->Entities[Index];
-    if( E->ColliderComponent )
-    {
-      aabb3f AABBWorldSpace = TransformAABB( E->ColliderComponent->AABB, GetModelMatrix(E->SpatialComponent) );
-      // TODO: Don't do a insert every timestep. Update an existing tree
-      AABBTreeInsert( TransientArena, &Result, E, AABBWorldSpace );
-    }
+    component_spatial* Spatial = (component_spatial*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_SPATIAL);
+    component_collider* Collider = (component_collider*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_COLLIDER);
+    aabb3f AABBWorldSpace = TransformAABB( Collider->AABB, GetModelMatrix(Spatial) );
+    // TODO: Don't do a insert every timestep. Update an existing tree
+    AABBTreeInsert( TransientArena, &Result, GetEntity((u8*) Spatial), AABBWorldSpace );
   }
 
   return Result;
@@ -531,13 +536,10 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
   while( ColliderPair )
   {
     // Find a manifold memory slot for manifold made up of A and B;
-    r32 a = (r32) ColliderPair->A->id;
-    r32 b = (r32) ColliderPair->B->id;
+    r32 a = (r32) ColliderPair->A->ID;
+    r32 b = (r32) ColliderPair->B->ID;
 
-    r32 CantorPairR32 =(1/2.f) * (a + b)*(a + b + 1) + b;
-    u32 CantorPairA = (u32)CantorPairR32;
-    u32 CantorPair = GetCantorPair(ColliderPair->A->id,  ColliderPair->B->id);
-    Assert(CantorPair == CantorPairA);
+    u32 CantorPair = GetCantorPair(a,  b);
     u32 ManifoldIndex = CantorPair % World->MaxNrManifolds;
     u32 HashMapCollisions = 0;
     contact_manifold* Manifold = 0;
@@ -558,8 +560,8 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
         Manifold->WorldArrayIndex = ManifoldIndex;
         break;
       }
-      else if(((SrcA->id == ManifoldArraySlot->A->id) && (SrcB->id == ManifoldArraySlot->B->id)) ||
-              ((SrcA->id == ManifoldArraySlot->B->id) && (SrcB->id == ManifoldArraySlot->A->id)))
+      else if(((SrcA->ID == ManifoldArraySlot->A->ID) && (SrcB->ID == ManifoldArraySlot->B->ID)) ||
+              ((SrcA->ID == ManifoldArraySlot->B->ID) && (SrcB->ID == ManifoldArraySlot->A->ID)))
       {
         Manifold = ManifoldArraySlot;
         Assert(Manifold->MaxContactCount == 4);
@@ -568,8 +570,8 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
       }else{
         TIMED_BLOCK(ContactArrayCollisions);
         ++HashMapCollisions;
-        Assert( !((SrcA->id == ManifoldArraySlot->A->id) && (SrcB->id == ManifoldArraySlot->B->id)) &&
-                !((SrcB->id == ManifoldArraySlot->A->id) && (SrcA->id == ManifoldArraySlot->B->id)) );
+        Assert( !((SrcA->ID == ManifoldArraySlot->A->ID) && (SrcB->ID == ManifoldArraySlot->B->ID)) &&
+                !((SrcB->ID == ManifoldArraySlot->A->ID) && (SrcA->ID == ManifoldArraySlot->B->ID)) );
         ManifoldIndex = (ManifoldIndex+1) % World->MaxNrManifolds;
       }
     }
@@ -634,23 +636,27 @@ SolveNonPenetrationConstraints(world* World)
     for(u32 k = 0; k < Manifold->ContactCount; ++k)
     {
       v3 V[4] = {};
-      if(A->DynamicsComponent)
+      component_spatial* SpatialA = GetSpatialComponent(A->ID);
+      component_spatial* SpatialB = GetSpatialComponent(B->ID);
+      component_dynamics* DynamicsA = GetDynamicsComponent(A->ID);
+      component_dynamics* DynamicsB = GetDynamicsComponent(B->ID);
+      if(DynamicsA)
       {
-        V[0] = A->DynamicsComponent->LinearVelocity;
-        V[1] = A->DynamicsComponent->AngularVelocity;
+        V[0] = DynamicsA->LinearVelocity;
+        V[1] = DynamicsA->AngularVelocity;
       }
-      if(B->DynamicsComponent)
+      if(DynamicsB)
       {
-        V[2] = B->DynamicsComponent->LinearVelocity;
-        V[3] = B->DynamicsComponent->AngularVelocity;
+        V[2] = DynamicsB->LinearVelocity;
+        V[3] = DynamicsB->AngularVelocity;
       }
 
       contact_data* Contact = &Manifold->Contacts[k];
       contact_data_cache* CachedData = &Manifold->CachedData[k];
 
       v3 ContactNormal     = Contact->ContactNormal;
-      v3 ContactPointDiff  = V3(GetModelMatrix(A->SpatialComponent) * V4(Contact->A_ContactModelSpace,1)) -
-                             V3(GetModelMatrix(B->SpatialComponent) * V4(Contact->B_ContactModelSpace,1));
+      v3 ContactPointDiff  = V3(GetModelMatrix(SpatialA) * V4(Contact->A_ContactModelSpace,1)) -
+                             V3(GetModelMatrix(SpatialB) * V4(Contact->B_ContactModelSpace,1));
       r32 PenetrationDepth = ContactPointDiff * ContactNormal;
 
       r32 Restitution       = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, ContactNormal, SLOP);
@@ -664,15 +670,15 @@ SolveNonPenetrationConstraints(world* World)
       v3 DeltaV[4] = {};
       ScaleV12(LambdaDiff, CachedData->InvMJ, DeltaV);
 
-      if(A->DynamicsComponent)
+      if(DynamicsA)
       {
-        A->DynamicsComponent->LinearVelocity  += DeltaV[0];
-        A->DynamicsComponent->AngularVelocity += DeltaV[1];
+        DynamicsA->LinearVelocity  += DeltaV[0];
+        DynamicsA->AngularVelocity += DeltaV[1];
       }
-      if(B->DynamicsComponent)
+      if(DynamicsB)
       {
-        B->DynamicsComponent->LinearVelocity  += DeltaV[2];
-        B->DynamicsComponent->AngularVelocity += DeltaV[3];
+        DynamicsB->LinearVelocity  += DeltaV[2];
+        DynamicsB->AngularVelocity += DeltaV[3];
       }
     }
     Manifold = Manifold->Next;
@@ -687,20 +693,20 @@ SolveFrictionalConstraints( world* World )
   while(Manifold)
   {
     Assert(Manifold->ContactCount>0);
-    entity* A = Manifold->A;
-    entity* B = Manifold->B;
+    component_dynamics* DynamicsA = GetDynamicsComponent(Manifold->A->ID);
+    component_dynamics* DynamicsB = GetDynamicsComponent(Manifold->B->ID);
     for(u32 k = 0; k < Manifold->ContactCount; ++k)
     {
       v3 V[4] = {};
-      if(A->DynamicsComponent)
+      if(DynamicsA)
       {
-        V[0] = A->DynamicsComponent->LinearVelocity;
-        V[1] = A->DynamicsComponent->AngularVelocity;
+        V[0] = DynamicsA->LinearVelocity;
+        V[1] = DynamicsA->AngularVelocity;
       }
-      if(B->DynamicsComponent)
+      if(DynamicsB)
       {
-        V[2] = B->DynamicsComponent->LinearVelocity;
-        V[3] = B->DynamicsComponent->AngularVelocity;
+        V[2] = DynamicsB->LinearVelocity;
+        V[3] = DynamicsB->AngularVelocity;
       }
 
       contact_data* Contact = &Manifold->Contacts[k];
@@ -726,15 +732,15 @@ SolveFrictionalConstraints( world* World )
       ScaleV12(LambdaDiffN1, CachedData->InvMJn1, DeltaV1);
       ScaleV12(LambdaDiffN2, CachedData->InvMJn2, DeltaV2);
 
-      if(A->DynamicsComponent)
+      if(DynamicsA)
       {
-        A->DynamicsComponent->LinearVelocity  += (DeltaV1[0] + DeltaV2[0]);
-        A->DynamicsComponent->AngularVelocity += (DeltaV1[1] + DeltaV2[1]);
+        DynamicsA->LinearVelocity  += (DeltaV1[0] + DeltaV2[0]);
+        DynamicsA->AngularVelocity += (DeltaV1[1] + DeltaV2[1]);
       }
-      if(B->DynamicsComponent)
+      if(DynamicsB)
       {
-        B->DynamicsComponent->LinearVelocity  += (DeltaV1[2] + DeltaV2[2]);
-        B->DynamicsComponent->AngularVelocity += (DeltaV1[3] + DeltaV2[3]);
+        DynamicsB->LinearVelocity  += (DeltaV1[2] + DeltaV2[2]);
+        DynamicsB->AngularVelocity += (DeltaV1[3] + DeltaV2[3]);
       }
 
     }
@@ -814,20 +820,18 @@ inline internal void
 IntegratePositions(world* World)
 {
   TIMED_FUNCTION();
-  for(u32 Index = 0;  Index < World->NrEntities; ++Index )
+
+  component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_DYNAMICS);
+  while(Next(GlobalGameState->EntityManager,ComponentList))
   {
-    entity* E = &World->Entities[Index];
-    if( E->Types & COMPONENT_TYPE_DYNAMICS )
-    {
-      component_spatial*   S = E->SpatialComponent;
-      component_dynamics*  D = E->DynamicsComponent;
-      #if 1
-      TimestepVelocityForwardEuler( World->dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
-      #else
-      TimestepVelocityRungeKutta4( World->dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
-      #endif
-      S->Rotation = Normalize(S->Rotation);
-    }
+    component_spatial* S = GetSpatialComponent(ComponentList);
+    component_dynamics* D = GetDynamicsComponent(ComponentList);
+    #if 1
+    TimestepVelocityForwardEuler( World->dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
+    #else
+    TimestepVelocityRungeKutta4( World->dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
+    S->Rotation = Normalize(S->Rotation);
+    #endif
   }
 }
 
@@ -841,7 +845,7 @@ void SpatialSystemUpdate( world* World )
 
   IntegrateVelocities( World );
 
-  World->BroadPhaseTree = BuildBroadPhaseTree( World );
+  World->BroadPhaseTree = BuildBroadPhaseTree( );
 
   u32 BroadPhaseResultCount = 0;
   broad_phase_result_stack* const BroadPhaseResultStack = GetCollisionPairs( &World->BroadPhaseTree, &BroadPhaseResultCount );

@@ -3,67 +3,160 @@
 #include "utility_macros.h"
 #include "entity_components.h"
 #include "component_camera.h"
-#include "component_sprite_animation.h"
 
-void NewComponents(world* World, entity* Entity, u32 EntityFlags )
+em_chunk* PushNewChunk(entity_manager* EM, component_list* List)
 {
-	Assert( EntityFlags );
-	Assert( ! ( EntityFlags & ( ~(COMPONENT_TYPE_FINAL - 1) ) ) );
-
-	Entity->Types = Entity->Types | EntityFlags;
-
-	if( EntityFlags & COMPONENT_TYPE_CAMERA )
-	{
-		Entity->CameraComponent = PushStruct(World->Arena, component_camera);
-	}
-	if( EntityFlags & COMPONENT_TYPE_LIGHT )
-	{
-		Entity->LightComponent = PushStruct(World->Arena, component_light);
-	}
-	if( EntityFlags & COMPONENT_TYPE_CONTROLLER )
-	{
-		Entity->ControllerComponent = PushStruct(World->Arena, component_controller);
-	}
-	if( EntityFlags & COMPONENT_TYPE_SPATIAL )
-	{
-		Entity->SpatialComponent =  PushStruct(World->Arena, component_spatial);
-	}
-	if( EntityFlags & COMPONENT_TYPE_COLLIDER )
-	{
-		Assert(Entity->SpatialComponent); // Collision Requires Spatial
-		Entity->ColliderComponent = PushStruct(World->Arena, component_collider);
-	}
-	if( EntityFlags & COMPONENT_TYPE_DYNAMICS )
-	{
-		Assert(Entity->SpatialComponent && Entity->ColliderComponent); // Dynamics Requires Spatial and Collision
-		Entity->DynamicsComponent = PushStruct(World->Arena, component_dynamics);
-	}
-	if( EntityFlags & COMPONENT_TYPE_SPRITE_ANIMATION )
-	{
-		Entity->SpriteAnimationComponent = PushStruct(World->Arena, component_sprite_animation);
-	}
-	if( EntityFlags & COMPONENT_TYPE_RENDER )
-	{
-		Entity->RenderComponent = PushStruct(World->Arena, component_render);
-	}
+  em_chunk* Chunk = PushStruct(&EM->Arena, em_chunk);
+  Chunk->Used = 0;
+  Chunk->Memory = PushArray(&EM->Arena, List->ChunkSize, u8);
+  Chunk->Previous = List->Last;
+  List->Last = Chunk;
+  return Chunk;
 }
 
-entity* NewEntity( world* World )
+internal inline component_base*
+PushComponent(entity_manager* EM, u32 ComponentIndex)
 {
-	Assert( World );
-	Assert(  World->NrEntities < World->NrMaxEntities);
+  component_list* ComponentList = EM->Components + ComponentIndex;
 
-	entity* NewEntity = &World->Entities[World->NrEntities++];
+  if (!ComponentList->Last)
+  {
+    ComponentList->Last = PushNewChunk(EM, ComponentList);
+  }
 
-	NewEntity->id 	 = EntityID++;
+  em_chunk* Chunk = ComponentList->Last;
+  midx RemainingBytes = ComponentList->ChunkSize - Chunk->Used;
 
-	return NewEntity;
+  if (RemainingBytes < ComponentList->ComponentSize)
+  {
+    Assert(RemainingBytes == 0);
+    ComponentList->Last = PushNewChunk(EM, ComponentList);
+    ComponentList->Last->Previous = Chunk;
+    Chunk = ComponentList->Last;
+  }
+
+  component_base* ComponentBase = (component_base*) (Chunk->Memory + Chunk->Used);
+  Chunk->Used += ComponentList->ComponentSize;
+
+  Assert(Chunk->Used <= ComponentList->ChunkSize);
+
+  return ComponentBase;
 }
 
-entity* CreateCameraEntity(world* World, r32 AngleOfView, r32 AspectRatio )
+internal inline b32
+GetIndexFromFlag( u32 EntityFlags, u32* Index )
 {
-	entity* CameraEntity = NewEntity( World );
-	NewComponents( World, CameraEntity, COMPONENT_TYPE_CAMERA );
-	SetCameraComponent(CameraEntity->CameraComponent, AngleOfView, AspectRatio );
-	return CameraEntity;
+  bit_scan_result BitScan = FindLeastSignificantSetBit( EntityFlags );
+  *Index = BitScan.Index;
+  return BitScan.Found;
 }
+
+static inline entity* GetEntityFromID(entity_manager* EM, u32 EntityID)
+{
+  u32 EntityChunks = EntityID/EM->EntitiesPerChunk;
+  u32 EntityChunkSkips = EM->EntitycChunkCount - EntityChunks - 1;
+  em_chunk* EntityChunk = EM->EntityList;
+  for (u32 i = 0; i < EntityChunkSkips; ++i)
+  {
+    EntityChunk = EntityChunk->Previous;
+  }
+
+  u32 IDWithinChunk = EntityID % EM->EntitiesPerChunk;
+  entity* Entity = ( (entity*) EntityChunk->Memory ) + IDWithinChunk;
+  Assert(Entity->ID == EntityID);
+  return Entity;
+}
+
+void NewComponents(entity_manager* EM, u32 EntityID, u32 ComponentFlags)
+{
+  Assert( ComponentFlags );
+  Assert( ! ( ComponentFlags & ( ~(COMPONENT_FLAG_FINAL - 1) ) ) );
+  Assert(EntityID < EM->EntityCount);
+
+  entity* Entity = GetEntityFromID(EM, EntityID);
+
+  u32 ComponentsToAdd = ComponentFlags;
+  u32 ExistingComponents = Entity->ComponentFlags;
+  Assert((ComponentsToAdd & ExistingComponents) == COMPONENT_FLAG_NONE);
+  Entity->ComponentFlags = ComponentsToAdd | ExistingComponents;
+
+  entity_component_dlist* Sentinel = Entity->ComponentSentinel;
+
+  u32 ComponentIndex;
+  while(GetIndexFromFlag(ComponentsToAdd, &ComponentIndex))
+  {
+    Assert(ComponentIndex < 32);
+    u32 ComponentFlag = 1 << ComponentIndex;
+    Assert(EM->Components[ComponentIndex].ComponentTypeFlag == ComponentFlag)
+
+    component_base* ComponentBase = PushComponent(EM, ComponentIndex);
+    ComponentBase->TypeFlag = ComponentFlag;
+    ComponentBase->Entity = Entity;
+
+    entity_component_dlist* Element = PushStruct(&EM->Arena, entity_component_dlist);
+    Element->ComponentBase = ComponentBase;
+
+    // We want to insert components in order
+    // (why actually?, Just sort them after insertion)
+    // Shut up, complexity is fun.
+    // You shut up.
+
+    // Step to one before the Flag we want to insert
+    while(Sentinel->Next->ComponentBase && (Sentinel->Next->ComponentBase->TypeFlag < ComponentFlag))
+    {
+      Sentinel = Sentinel->Next;
+    }
+    DoubleLinkListInsertAfter( Sentinel, Element );
+    Sentinel = Element;
+
+    ComponentsToAdd = ComponentsToAdd - ComponentFlag;
+  }
+}
+
+u32 NewEntity( entity_manager* EM )
+{
+  em_chunk* Entities = EM->EntityList;
+
+  u32 EntitySize = sizeof(entity);
+  u32 ChunkSize = EM->EntitiesPerChunk * EntitySize;
+  midx SpaceLeft = ChunkSize - Entities->Used;
+  if (SpaceLeft < EntitySize)
+  {
+    Assert(SpaceLeft == 0);
+    EM->EntityList = PushStruct(&EM->Arena, em_chunk);
+    EM->EntityList->Memory = PushArray(&EM->Arena, ChunkSize, u8);
+    EM->EntityList->Previous = Entities;
+    Entities = EM->EntityList;
+    ++EM->EntitycChunkCount;
+  }
+
+  entity* NewEntity = (entity*)(Entities->Memory + Entities->Used);
+  Entities->Used += EntitySize; 
+  NewEntity->ID = EM->EntityCount++;
+  NewEntity->ComponentSentinel = PushStruct(&EM->Arena, entity_component_dlist);
+  DoubleLinkListInitiate(NewEntity->ComponentSentinel);
+
+  return NewEntity->ID;
+}
+
+u8* GetComponent(entity_manager* EM, u32 EntityID, u32 ComponentFlag)
+{
+  Assert( ComponentFlag != COMPONENT_FLAG_NONE );
+  entity* Entity = GetEntityFromID(EM,EntityID);
+  u8* Result = 0;
+  if( (Entity->ComponentFlags & ComponentFlag) != ComponentFlag )
+  {
+    return Result;
+  }
+
+  entity_component_dlist* Component = Entity->ComponentSentinel->Next;
+  while(Component->ComponentBase->TypeFlag != ComponentFlag)
+  {
+    Component = Component->Next;
+  }
+
+  Result = ((u8*) Component->ComponentBase ) + sizeof(component_base);
+  return Result;
+}
+
+

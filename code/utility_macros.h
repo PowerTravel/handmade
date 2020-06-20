@@ -15,16 +15,16 @@
 #define DoubleLinkListInsertAfter( Sentinel, Element ) \
 {                                        \
   Element->Previous = Sentinel;          \
-  Element->Previous->Next = Element;     \
   Element->Next = Sentinel->Next;        \
+  Element->Previous->Next = Element;     \
   Element->Next->Previous = Element;     \
 }
 
 #define DoubleLinkListInsertBefore( Sentinel, Element ) \
 {                                         \
   Element->Previous = Sentinel->Previous; \
-  Element->Previous->Next = Element;      \
   Element->Next = Sentinel;               \
+  Element->Previous->Next = Element;      \
   Element->Next->Previous = Element;      \
 }
 
