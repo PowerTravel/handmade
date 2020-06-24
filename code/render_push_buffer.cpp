@@ -226,6 +226,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
   game_asset_manager* AM = GlobalGameState->AssetManager;
 
   {
+    ScopedTransaction(EM);
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
     while(Next(EM, ComponentList))
     {
@@ -236,6 +237,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
   }
 
   {
+    ScopedTransaction(EM);
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_LIGHT | COMPONENT_FLAG_SPATIAL);
     while(Next(EM, ComponentList))
     {
@@ -253,6 +255,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
   }
 
   {
+    ScopedTransaction(EM);
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_RENDER | COMPONENT_FLAG_SPATIAL);
     while(Next(EM, ComponentList))
     {
@@ -278,6 +281,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
 
 #if SHOW_COLLIDER
   {
+    ScopedTransaction(EM);
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_COLLIDER);
     while(Next(EM, ComponentList))
     {

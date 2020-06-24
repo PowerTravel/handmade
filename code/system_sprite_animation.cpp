@@ -6,7 +6,9 @@ void SpriteAnimationSystemUpdate(world* World)
 {
   TIMED_FUNCTION();
   entity_manager* EM = GlobalGameState->EntityManager;
-  component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
+
+  ScopedTransaction(EM);
+  component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_SPRITE_ANIMATION);
   while(Next(EM, ComponentList))
   {
     component_sprite_animation* SpriteAnimation = (component_sprite_animation*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPRITE_ANIMATION);

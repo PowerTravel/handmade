@@ -88,17 +88,34 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   game_asset_manager* AssetManager = GlobalGameState->AssetManager;
   entity_manager* EM = GlobalGameState->EntityManager;
 
-  u32 TestEntity1 = NewEntity( EM );
-  NewComponents( EM, TestEntity1, 0x01 | 0x04 | 0x10 );
-  NewComponents( EM, TestEntity1, 0x02 | 0x08 | 0x20 );
+#if 0
+  for (int i = 0; i < 100; ++i)
+  {
+    u32 TestEntity = NewEntity( EM );
+    NewComponents( EM, TestEntity, COMPONENT_FLAG_CAMERA  | COMPONENT_FLAG_CONTROLLER );
+    if( (i % 5 ) == 0 || ((i % 5 ) == 1) )
+    {
+      NewComponents( EM, TestEntity, COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_COLLIDER );
+    }else{
+      NewComponents( EM, TestEntity, COMPONENT_FLAG_DYNAMICS | COMPONENT_FLAG_RENDER | COMPONENT_FLAG_SPRITE_ANIMATION);
+    }
+  }
 
-  u32 TestEntity2 = NewEntity( EM );
-  NewComponents( EM, TestEntity2, 0x01 | 0x20 );
-  NewComponents( EM, TestEntity2, 0x02 | 0x08 | 0x10 );
-
-  u32 TestEntity3 = NewEntity( EM );
-  NewComponents( EM, TestEntity3, 0x20 );
-  NewComponents( EM, TestEntity3, 0x02 | 0x08 | 0x10 );
+  {
+    ScopedTransaction(GlobalGameState->EntityManager);
+    component_result* Result = GetComponentsOfType(EM, COMPONENT_FLAG_COLLIDER | COMPONENT_FLAG_CAMERA);
+    while(Next(EM, Result))
+    {
+      component_collider* Collider = GetColliderComponent(Result);
+      component_camera* Camera = GetCameraComponent(Result);
+      component_sprite_animation* Anim = GetSpriteAnimationComponent(Result);
+      Assert(Collider);
+      Assert(Camera);
+      Assert(!Anim);
+    }
+  }
+  exit(0);
+#endif
 
   u32 ControllableCamera = NewEntity( EM );
   NewComponents( EM, ControllableCamera, COMPONENT_FLAG_CONTROLLER | COMPONENT_FLAG_CAMERA);
@@ -111,7 +128,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   component_controller* Controller = GetControllerComponent(ControllableCamera);
   Controller->Controller = GetController(Input, 1);
   Controller->Type = ControllerType_FlyingCamera;
- 
+
   u32 LightEntity = NewEntity( EM );
   NewComponents( EM, LightEntity, COMPONENT_FLAG_LIGHT | COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_RENDER);
   component_light* Light = GetLightComponent(LightEntity);
@@ -180,7 +197,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
         CubeSpatial->Position =  V3(xzSpace*i, ySpace*j, xzSpace*k);
         CubeSpatial->Rotation = RotateQuaternion( 0, V3(0,0,0) );
         CubeSpatial->Scale = V3(1, 1, 1);
-        
+
         component_collider* CubeCollider = GetColliderComponent(CubeEntity);
         CubeCollider->AssetHandle = CubeAssetHandle;
         CubeCollider->AABB = GetMeshAABB(AssetManager, CubeAssetHandle);
@@ -235,7 +252,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   component_sprite_animation* SpriteAnimation = GetSpriteAnimationComponent(SpriteAnimationEntity);
 
   hash_map<bitmap_coordinate> HeroCoordinates = LoadAdventurerSpriteSheetCoordinates( GameState->TransientArena );
-  
+
   bitmap* HeroSpriteSheet =  GetBitmap(GameState->AssetManager, HeroSpriteHandle);
   SpriteAnimation->Animation = hash_map< list<m4> >(&GameState->AssetManager->AssetArena,6);
 
@@ -297,7 +314,7 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
     GlobalGameState->ScreenWidthPixels  = (r32)RenderCommands->ResolutionWidthPixels;
     GlobalGameState->ScreenHeightPixels = (r32)RenderCommands->ResolutionHeightPixels;
 
-    CreateCollisionTestScene(GlobalGameState, Input);    
+    CreateCollisionTestScene(GlobalGameState, Input);
 
     Memory->GameState = GlobalGameState;
 
@@ -316,7 +333,7 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
   {
     RenderCommands->MainRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
   }
-    
+
   if(!RenderCommands->DebugRenderGroup)
   {
     // TODO: Right now DebugRenderGroup just solves the problem of drawing the overlay on top of everything else with a special shader.
@@ -324,7 +341,7 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
     //       Maybe DebugRenderGroup is something we want to move away from and consolidate into the DebugState.
     //       Is there a problem with the debug system piping it's drawing through the GameRenderingPipeline?
     //       I mean it already sort of does since it all gets drawn in RenderGroupToOutput.
-    RenderCommands->DebugRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);    
+    RenderCommands->DebugRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
   }
 }
 
@@ -341,9 +358,9 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
 
   Assert(Memory->GameState);
   Assert(Memory->GameState->AssetManager);
-  
+
   GlobalGameState = Memory->GameState;
-  
+
   EndTemporaryMemory(GlobalGameState->TransientTempMem);
   GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
 
@@ -395,16 +412,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)
 {
   GameOutputSound(SoundBuffer, 400);
-}
-
-internal inline aabb2f
-GetTimeBar(r32 TimeValue, r32 MaxTimeValue, r32 BarMaxLength, r32 BarWidth)
-{
-  r32 TimeFraction = TimeValue/MaxTimeValue;
-  v2 P0 = V2(-1,1-BarWidth);
-  v2 P1 = V2(-1 + TimeFraction * BarMaxLength, 1);
-  aabb2f Result = AABB2f(P0,P1);
-  return Result;
 }
 
 #include "debug.cpp"

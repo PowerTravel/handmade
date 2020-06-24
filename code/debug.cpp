@@ -488,7 +488,7 @@ void DebugMainWindow(game_input* GameInput)
   }
 
   // "Toggle AABBTree"
-  if(RightButtonReleased && DebugState->HotMenuItem == 4)
+  if(RightButtonReleased && DebugState->HotMenuItem == 5)
   {
     DebugState->ConfigAABBTree = !DebugState->ConfigAABBTree;
     DebugState->UpdateConfig = true;

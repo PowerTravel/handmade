@@ -220,6 +220,7 @@ void ControllerSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
   entity_manager* EM = GlobalGameState->EntityManager;
+  ScopedTransaction(EM);
   component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
   while(Next(EM, ComponentList))
   {

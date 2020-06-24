@@ -488,6 +488,8 @@ inline void IntegrateVelocities(world* World)
   TIMED_FUNCTION();
   r32 dt =  World->dtForFrame;
 
+  ScopedTransaction(GlobalGameState->EntityManager);
+
   component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_DYNAMICS);
   while(Next(GlobalGameState->EntityManager, ComponentList))
   {
@@ -511,6 +513,7 @@ internal aabb_tree BuildBroadPhaseTree( )
   TIMED_FUNCTION();
   aabb_tree Result = {};
   memory_arena* TransientArena = GlobalGameState->TransientArena;
+  ScopedTransaction(GlobalGameState->EntityManager);
   component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_COLLIDER);
   while(Next(GlobalGameState->EntityManager, ComponentList))
   {
@@ -539,7 +542,7 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
     r32 a = (r32) ColliderPair->A->ID;
     r32 b = (r32) ColliderPair->B->ID;
 
-    u32 CantorPair = GetCantorPair(a,  b);
+    u32 CantorPair = GetCantorPair(a, b);
     u32 ManifoldIndex = CantorPair % World->MaxNrManifolds;
     u32 HashMapCollisions = 0;
     contact_manifold* Manifold = 0;
@@ -821,6 +824,7 @@ IntegratePositions(world* World)
 {
   TIMED_FUNCTION();
 
+  ScopedTransaction(GlobalGameState->EntityManager);
   component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_DYNAMICS);
   while(Next(GlobalGameState->EntityManager,ComponentList))
   {

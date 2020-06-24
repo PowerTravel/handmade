@@ -7,24 +7,26 @@
 #include "bitmap.h"
 #include "data_containers.h"
 
-struct component_base;
-struct entity_component_dlist
+struct component_head;
+
+struct entity_component_chunk
 {
-  component_base* ComponentBase;
-  entity_component_dlist* Previous;
-  entity_component_dlist* Next;
+  u32 Types;
+  component_head** Components;
+
+  entity_component_chunk* Next;
 };
 struct entity
 {
   u32 ID;
   u32 ComponentFlags;
-  entity_component_dlist* ComponentSentinel;
+  entity_component_chunk* Components;
 };
 
-struct component_base
+struct component_head
 {
   entity* Entity;
-  u32 TypeFlag;
+  u32 Type;
 };
 
 struct component_camera
@@ -121,42 +123,29 @@ enum component_type
   COMPONENT_FLAG_FINAL              = 0x0100,
 };
 
-
-enum component_index
-{
-  COMPONENT_INDEX_CAMERA,
-  COMPONENT_INDEX_LIGHT,
-  COMPONENT_INDEX_CONTROLLER,
-  COMPONENT_INDEX_SPATIAL,
-  COMPONENT_INDEX_COLLIDER,
-  COMPONENT_INDEX_DYNAMICS,
-  COMPONENT_INDEX_RENDER,
-  COMPONENT_INDEX_SPRITE_ANIMATION,
-  COMPONENT_MAX_INDEX
-};
-
 struct em_chunk
 {
   midx Used;
   u8* Memory;
-  em_chunk* Previous;
+  em_chunk* Next;
 };
 
 struct component_list
 {
-  u32 ComponentTypeFlag;
-  u32 ComponentRequirement;
+  u32 Type;
+  u32 Requirement;
+  u32 Count;
   midx ComponentSize;
   midx ChunkSize;
-  em_chunk* Last;
+  em_chunk* First;
 };
 
 component_list ComponentList(u32 Flag, midx ComponentSize, midx ChunkComponentCount, u32 Requires)
 {
   component_list Result = {};
-  Result.ComponentTypeFlag = Flag;
-  Result.ComponentRequirement = Requires;
-  Result.ComponentSize = sizeof(component_base) + ComponentSize;
+  Result.Type = Flag;
+  Result.Requirement = Requires;
+  Result.ComponentSize = sizeof(component_head) + ComponentSize;
   Result.ChunkSize = ChunkComponentCount * Result.ComponentSize;
   return Result;
 }
@@ -164,76 +153,65 @@ component_list ComponentList(u32 Flag, midx ComponentSize, midx ChunkComponentCo
 struct entity_manager
 {
   memory_arena Arena;
+  temporary_memory TemporaryMemory;
 
   u32 EntityCount;
   u32 EntitiesPerChunk;
-  u32 EntitycChunkCount;
+  u32 EntityChunkCount;
   em_chunk* EntityList;
 
   u32 ComponentCount;
   component_list* Components;
 };
 
-entity_manager* CreateEntityManager( )
-{
-  entity_manager* Result = BootstrapPushStruct(entity_manager, Arena);
-
-  u32 CameraChunkCount = 10;
-  u32 LightChunkCount = 10;
-  u32 ControllerChunkCount = 4;
-  u32 EntityChunkCount = 128;
-
-  Result->ComponentCount = COMPONENT_MAX_INDEX;
-  Result->Components = PushArray( &Result->Arena, COMPONENT_MAX_INDEX, component_list);
-  Result->Components[COMPONENT_INDEX_CAMERA] = ComponentList(COMPONENT_FLAG_CAMERA, sizeof(component_camera), CameraChunkCount, COMPONENT_FLAG_NONE);
-  Result->Components[COMPONENT_INDEX_LIGHT] = ComponentList(COMPONENT_FLAG_LIGHT, sizeof(component_light), LightChunkCount, COMPONENT_FLAG_SPATIAL),
-  Result->Components[COMPONENT_INDEX_CONTROLLER] = ComponentList(COMPONENT_FLAG_CONTROLLER, sizeof(component_controller), ControllerChunkCount, COMPONENT_FLAG_NONE);
-  Result->Components[COMPONENT_INDEX_SPATIAL] = ComponentList(COMPONENT_FLAG_SPATIAL, sizeof(component_spatial), EntityChunkCount, COMPONENT_FLAG_NONE);
-  Result->Components[COMPONENT_INDEX_COLLIDER] = ComponentList(COMPONENT_FLAG_COLLIDER, sizeof(component_collider), EntityChunkCount, COMPONENT_FLAG_SPATIAL);
-  Result->Components[COMPONENT_INDEX_DYNAMICS] = ComponentList(COMPONENT_FLAG_DYNAMICS, sizeof(component_dynamics), EntityChunkCount, COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_COLLIDER);
-  Result->Components[COMPONENT_INDEX_RENDER] = ComponentList(COMPONENT_FLAG_RENDER, sizeof(component_render), EntityChunkCount, COMPONENT_FLAG_NONE);
-  Result->Components[COMPONENT_INDEX_SPRITE_ANIMATION] = ComponentList(COMPONENT_FLAG_SPRITE_ANIMATION, sizeof(component_sprite_animation), EntityChunkCount, COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_RENDER);
-
-  Result->EntityCount = 0;
-  Result->EntitycChunkCount = 1;
-  Result->EntitiesPerChunk = EntityChunkCount;
-  Result->EntityList = PushStruct( &Result->Arena, em_chunk);
-  Result->EntityList->Used = 0;
-  Result->EntityList->Memory = PushArray(&Result->Arena, Result->EntitiesPerChunk * sizeof(entity), u8);
-  Result->EntityList->Previous = 0;
-
-  return Result;
-}
-
+entity_manager* CreateEntityManager( );
 void NewComponents( entity_manager* EM, entity* Entity, u32 EntityFlags );
 u32 NewEntity( entity_manager* EM );
 
+void BeginTransactions(entity_manager* EM)
+{
+  CheckArena(&EM->Arena);
+  EM->TemporaryMemory = BeginTemporaryMemory(&EM->Arena);
+}
+
+void EndTransactions(entity_manager* EM)
+{
+  EndTemporaryMemory(EM->TemporaryMemory);
+  CheckArena(&EM->Arena);
+}
+
+#define ScopedTransaction(EntityManager) scoped_temporary_memory ScopedMemory_ = scoped_temporary_memory(&(EntityManager)->Arena)
+
+struct filtered_components
+{
+  u32 Count;
+  component_head* Heads;
+};
+
 struct component_result
 {
+  entity_manager* EM;
+  u32 MainType;
+  midx MainTypeSize;
+  u32 Types;
+  b32 Begun;
 
+  u32 ArrayCount;
+  u32 ArrayIndex;
+  u32 ComponentIndex;
+  filtered_components* FilteredArray;
 };
 
-component_result* GetComponentsOfType(entity_manager* EM, u32 ComponentFlags = 0)
-{
-  return 0;
-};
-
-bool Next(entity_manager* EM, component_result* ComponentList)
-{
-  return false;
-}
+component_result* GetComponentsOfType(entity_manager* EM, u32 ComponentFlags);
+b32 Next(entity_manager* EM, component_result* ComponentList);
 
 entity* GetEntity( u8* Component )
 {
-  component_base* Base = (component_base*) (Component - sizeof(component_base));
+  component_head* Base = (component_head*) (Component - sizeof(component_head));
   return Base->Entity;
 }
 
-u8* GetComponent(entity_manager* EM, component_result* ComponentList, u32 ComponentFlag)
-{
-  return 0;
-}
-
+u8* GetComponent(entity_manager* EM, component_result* ComponentList, u32 ComponentFlag);
 u8* GetComponent(entity_manager* EM, u32 EntityID, u32 ComponentFlag);
 
 

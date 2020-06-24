@@ -99,6 +99,7 @@ Pow( r32 Base, r32 Exponent )
   return Result;
 }
 
+
 struct bit_scan_result
 {
   b32 Found;
@@ -125,5 +126,19 @@ FindLeastSignificantSetBit( u32 Value )
   }
 
 #endif
+  return Result;
+}
+
+inline u32 GetSetBitCount(u32 Value)
+{
+  bit_scan_result BitScan = FindLeastSignificantSetBit(Value);
+  u32 Result = 0;
+  while(BitScan.Found)
+  {
+    ++Result;
+    u32 LeastSetBit = 1 << BitScan.Index;
+    Value -= LeastSetBit;
+    BitScan = FindLeastSignificantSetBit(Value);
+  }
   return Result;
 }
