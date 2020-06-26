@@ -56,7 +56,9 @@ internal inline entity* GetEntityFromID(entity_manager* EM, u32 EntityID)
   em_chunk* EntityChunk = EM->EntityList;
   u32 ChunkStartIdx = EM->EntitiesPerChunk * (EM->EntityChunkCount-1);
 
-  while(EntityID < ChunkStartIdx)
+  u32 EntityIndex = EntityID-1;
+
+  while(EntityIndex < ChunkStartIdx)
   {
     Assert(EntityChunk->Next);
     Assert(ChunkStartIdx>0);
@@ -66,7 +68,7 @@ internal inline entity* GetEntityFromID(entity_manager* EM, u32 EntityID)
 
   Assert(ChunkStartIdx< EM->EntityCount);
 
-  u32 IDWithinChunk = EntityID % EM->EntitiesPerChunk;
+  u32 IDWithinChunk = EntityIndex % EM->EntitiesPerChunk;
   entity* Entity = ( (entity*) EntityChunk->Memory ) + IDWithinChunk;
   Assert(Entity->ID == EntityID);
   return Entity;
@@ -104,13 +106,14 @@ void PopulateChunkWithComponents(entity_manager* EM, entity* Entity, entity_comp
 void NewComponents(entity_manager* EM, u32 EntityID, u32 ComponentFlags)
 {
   CheckArena(&EM->Arena);
-  Assert(EntityID < EM->EntityCount);
+  Assert(EntityID != 0);
+  Assert(EntityID <= EM->EntityCount);
   Assert( ! ( ComponentFlags & ( ~(COMPONENT_FLAG_FINAL - 1) ) ) );
 
   entity* Entity = GetEntityFromID(EM, EntityID);
   Assert(( ComponentFlags & Entity->ComponentFlags) == COMPONENT_FLAG_NONE);
   Entity->ComponentFlags = Entity->ComponentFlags | ComponentFlags;
-  
+
   entity_component_chunk* Chunk = GetNewComponentChunk(&EM->Arena, ComponentFlags);
   PopulateChunkWithComponents(EM, Entity, Chunk);
 
@@ -135,8 +138,8 @@ u32 NewEntity( entity_manager* EM )
   }
 
   entity* NewEntity = (entity*)(Entities->Memory + Entities->Used);
-  Entities->Used += EntitySize; 
-  NewEntity->ID = EM->EntityCount++;
+  Entities->Used += EntitySize;
+  NewEntity->ID = ++EM->EntityCount;
   NewEntity->Components = 0;
 
   return NewEntity->ID;
@@ -175,7 +178,7 @@ u32 GetOrderIndexOfBit(u32 BitSet, u32 Bit)
 }
 
 internal u8* GetComponent(entity_manager* EM, entity* Entity, u32 ComponentFlag)
-{ 
+{
   u8* Result = 0;
   if( !(Entity->ComponentFlags & ComponentFlag) )
   {
@@ -301,13 +304,13 @@ component_result* GetComponentsOfType(entity_manager* EM, u32 ComponentFlags)
 {
   if(EM->Arena.TempCount == 0)
   {
-    *((int*)0) = 0;  
+    *((int*)0) = 0;
   }
   component_list* SmallestList = GetListWithLowestCount(EM, ComponentFlags);
-  
+
   component_filter_list_entry* ReturnList;
   u32 ListCount = FilterForComponentTypes(EM, SmallestList, ComponentFlags, &ReturnList);
-  
+
   component_result* Result = PushStruct(&EM->Arena, component_result);
   Result->EM = EM;
   Result->MainType = SmallestList->Type;

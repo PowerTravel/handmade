@@ -152,12 +152,12 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
   entity_manager* EM = GlobalGameState->EntityManager;
   contact_manifold* Manifold = (contact_manifold*) Data;
 
-  component_spatial* SpatialA = (component_spatial*) GetComponent(EM, Manifold->A->ID, COMPONENT_FLAG_SPATIAL);
-  component_spatial* SpatialB = (component_spatial*) GetComponent(EM, Manifold->B->ID, COMPONENT_FLAG_SPATIAL);
-  component_collider* ColliderA = (component_collider*) GetComponent(EM, Manifold->A->ID, COMPONENT_FLAG_COLLIDER);
-  component_collider* ColliderB = (component_collider*) GetComponent(EM, Manifold->B->ID, COMPONENT_FLAG_COLLIDER);
-  component_dynamics* DynamicsA = (component_dynamics*) GetComponent(EM, Manifold->A->ID, COMPONENT_FLAG_DYNAMICS);
-  component_dynamics* DynamicsB = (component_dynamics*) GetComponent(EM, Manifold->B->ID, COMPONENT_FLAG_DYNAMICS);
+  component_spatial* SpatialA = (component_spatial*) GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_SPATIAL);
+  component_spatial* SpatialB = (component_spatial*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_SPATIAL);
+  component_collider* ColliderA = (component_collider*) GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_COLLIDER);
+  component_collider* ColliderB = (component_collider*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_COLLIDER);
+  component_dynamics* DynamicsA = (component_dynamics*) GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_DYNAMICS);
+  component_dynamics* DynamicsB = (component_dynamics*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_DYNAMICS);
   m4 ModelMatrixA = GetModelMatrix(SpatialA);
   m4 ModelMatrixB = GetModelMatrix(SpatialB);
   collider_mesh MeshA = GetColliderMesh(GlobalGameState->AssetManager, ColliderA->AssetHandle);
@@ -385,8 +385,8 @@ internal void RemoveInvalidContactPoints( world* World )
   entity_manager* EM = GlobalGameState->EntityManager;
   while (Manifold)
   {
-    component_spatial* SpatialA = (component_spatial*) GetComponent(EM, Manifold->A->ID, COMPONENT_FLAG_SPATIAL);
-    component_spatial* SpatialB = (component_spatial*) GetComponent(EM, Manifold->B->ID, COMPONENT_FLAG_SPATIAL);
+    component_spatial* SpatialA = (component_spatial*) GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_SPATIAL);
+    component_spatial* SpatialB = (component_spatial*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_SPATIAL);
     m4 ModelMatrixA = GetModelMatrix(SpatialA);
     m4 ModelMatrixB = GetModelMatrix(SpatialB);
 
@@ -446,8 +446,6 @@ internal void DoWarmStarting( world* World )
   while (Manifold)
   {
    // Warm starting
-    entity* A = Manifold->A;
-    entity* B = Manifold->B;
     for(u32 k = 0; k < Manifold->ContactCount; ++k)
     {
       contact_data* Contact = &Manifold->Contacts[k];
@@ -466,8 +464,8 @@ internal void DoWarmStarting( world* World )
       CachedData->AccumulatedLambdaN1 = 0;
       CachedData->AccumulatedLambdaN2 = 0;
 
-      component_dynamics* DynamicsA = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->A->ID, COMPONENT_FLAG_DYNAMICS);
-      component_dynamics* DynamicsB = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->B->ID, COMPONENT_FLAG_DYNAMICS);
+      component_dynamics* DynamicsA = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->EntityIDA, COMPONENT_FLAG_DYNAMICS);
+      component_dynamics* DynamicsB = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->EntityIDB, COMPONENT_FLAG_DYNAMICS);
       if(DynamicsA)
       {
         DynamicsA->LinearVelocity  += (DeltaV[0] + DeltaV1[0] + DeltaV[0]);
@@ -539,32 +537,30 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
   while( ColliderPair )
   {
     // Find a manifold memory slot for manifold made up of A and B;
-    r32 a = (r32) ColliderPair->A->ID;
-    r32 b = (r32) ColliderPair->B->ID;
+    r32 EntityIDA = (r32) ColliderPair->EntityIDA;
+    r32 EntityIDB = (r32) ColliderPair->EntityIDB;
 
-    u32 CantorPair = GetCantorPair(a, b);
+    u32 CantorPair = GetCantorPair(EntityIDA, EntityIDB);
     u32 ManifoldIndex = CantorPair % World->MaxNrManifolds;
     u32 HashMapCollisions = 0;
     contact_manifold* Manifold = 0;
-    entity* SrcA = ColliderPair->A;
-    entity* SrcB = ColliderPair->B;
     while( HashMapCollisions < World->MaxNrManifolds )
     {
       contact_manifold* ManifoldArraySlot = World->Manifolds + ManifoldIndex;
-      if(!ManifoldArraySlot->A)
+      if(!ManifoldArraySlot->EntityIDA)
       {
-        Assert(!ManifoldArraySlot->B)
+        Assert(!ManifoldArraySlot->EntityIDB)
         // Slot was empty
         Manifold = ManifoldArraySlot;
         ZeroStruct( *Manifold );
-        Manifold->A = ColliderPair->A;
-        Manifold->B = ColliderPair->B;
+        Manifold->EntityIDA = ColliderPair->EntityIDA;
+        Manifold->EntityIDB = ColliderPair->EntityIDB;
         Manifold->MaxContactCount = 4;
         Manifold->WorldArrayIndex = ManifoldIndex;
         break;
       }
-      else if(((SrcA->ID == ManifoldArraySlot->A->ID) && (SrcB->ID == ManifoldArraySlot->B->ID)) ||
-              ((SrcA->ID == ManifoldArraySlot->B->ID) && (SrcB->ID == ManifoldArraySlot->A->ID)))
+      else if(((EntityIDA == ManifoldArraySlot->EntityIDA) && (EntityIDB == ManifoldArraySlot->EntityIDB)) ||
+              ((EntityIDA == ManifoldArraySlot->EntityIDB) && (EntityIDB == ManifoldArraySlot->EntityIDA)))
       {
         Manifold = ManifoldArraySlot;
         Assert(Manifold->MaxContactCount == 4);
@@ -573,8 +569,8 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
       }else{
         TIMED_BLOCK(ContactArrayCollisions);
         ++HashMapCollisions;
-        Assert( !((SrcA->ID == ManifoldArraySlot->A->ID) && (SrcB->ID == ManifoldArraySlot->B->ID)) &&
-                !((SrcB->ID == ManifoldArraySlot->A->ID) && (SrcA->ID == ManifoldArraySlot->B->ID)) );
+        Assert( !((EntityIDA == ManifoldArraySlot->EntityIDA) && (EntityIDB == ManifoldArraySlot->EntityIDB)) &&
+                !((EntityIDB == ManifoldArraySlot->EntityIDA) && (EntityIDA == ManifoldArraySlot->EntityIDB)) );
         ManifoldIndex = (ManifoldIndex+1) % World->MaxNrManifolds;
       }
     }
@@ -634,15 +630,13 @@ SolveNonPenetrationConstraints(world* World)
   while(Manifold)
   {
     Assert(Manifold->ContactCount>0);
-    entity* A = Manifold->A;
-    entity* B = Manifold->B;
     for(u32 k = 0; k < Manifold->ContactCount; ++k)
     {
       v3 V[4] = {};
-      component_spatial* SpatialA = GetSpatialComponent(A->ID);
-      component_spatial* SpatialB = GetSpatialComponent(B->ID);
-      component_dynamics* DynamicsA = GetDynamicsComponent(A->ID);
-      component_dynamics* DynamicsB = GetDynamicsComponent(B->ID);
+      component_spatial* SpatialA = GetSpatialComponent(Manifold->EntityIDA);
+      component_spatial* SpatialB = GetSpatialComponent(Manifold->EntityIDB);
+      component_dynamics* DynamicsA = GetDynamicsComponent(Manifold->EntityIDA);
+      component_dynamics* DynamicsB = GetDynamicsComponent(Manifold->EntityIDB);
       if(DynamicsA)
       {
         V[0] = DynamicsA->LinearVelocity;
@@ -696,8 +690,8 @@ SolveFrictionalConstraints( world* World )
   while(Manifold)
   {
     Assert(Manifold->ContactCount>0);
-    component_dynamics* DynamicsA = GetDynamicsComponent(Manifold->A->ID);
-    component_dynamics* DynamicsB = GetDynamicsComponent(Manifold->B->ID);
+    component_dynamics* DynamicsA = GetDynamicsComponent(Manifold->EntityIDA);
+    component_dynamics* DynamicsB = GetDynamicsComponent(Manifold->EntityIDB);
     for(u32 k = 0; k < Manifold->ContactCount; ++k)
     {
       v3 V[4] = {};

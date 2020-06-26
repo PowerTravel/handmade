@@ -5,7 +5,7 @@
 inline internal bool
 IsLeaf( aabb_tree_node* Node )
 {
-  return Node->Entity!=0;
+  return Node->EntityID!=0;
 }
 
 inline internal memory_index
@@ -77,7 +77,7 @@ u32 GetAABBList(aabb_tree* Tree, aabb3f** Result)
     Head  = Pop(Head);
 
     aabb_tree_node* ParentNode = Get(Head);
-    
+
     *AABBList++ = CurrentNode->AABB;
     Assert(Count < Tree->Size);
     Count++;
@@ -119,8 +119,8 @@ broad_phase_result_stack* GetCollisionPairs( aabb_tree* Tree, u32* ResultStackSi
         if(AABBIntersects(&Left->AABB, &Right->AABB))
         {
           broad_phase_result_stack* NewResult = (broad_phase_result_stack*) PushStruct(GlobalGameState->TransientArena ,broad_phase_result_stack);
-          NewResult->A = Left->Entity;
-          NewResult->B = Right->Entity;
+          NewResult->EntityIDA = Left->EntityID;
+          NewResult->EntityIDB = Right->EntityID;
           NewResult->Previous = ResultHead;
           ResultHead = NewResult;
           ++(*ResultStackSize);
@@ -226,11 +226,11 @@ GetLeastVolumeincreaseBranch(aabb_tree_node* Parent,  aabb3f* LeafAABB)
   return Result;
 }
 
-void AABBTreeInsert( memory_arena* Arena, aabb_tree* Tree, entity* Entity , aabb3f& AABBWorldSpace )
+void AABBTreeInsert( memory_arena* Arena, aabb_tree* Tree, u32 EntityID , aabb3f& AABBWorldSpace )
 {
   TIMED_FUNCTION();
   aabb_tree_node* Leaf = (aabb_tree_node*) PushStruct(Arena, aabb_tree_node);
-  Leaf->Entity = Entity;
+  Leaf->EntityID = EntityID;
   Leaf->AABB   = AABBWorldSpace;
 
   if(Tree->Size == 0)

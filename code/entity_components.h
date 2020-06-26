@@ -18,7 +18,7 @@ struct entity_component_chunk
 };
 struct entity
 {
-  u32 ID;
+  u32 ID; // ID starts at 1. ID of 0 means no entity.
   u32 ComponentFlags;
   entity_component_chunk* Components;
 };
@@ -205,10 +205,10 @@ struct component_result
 component_result* GetComponentsOfType(entity_manager* EM, u32 ComponentFlags);
 b32 Next(entity_manager* EM, component_result* ComponentList);
 
-entity* GetEntity( u8* Component )
+u32 GetEntity( u8* Component )
 {
   component_head* Base = (component_head*) (Component - sizeof(component_head));
-  return Base->Entity;
+  return Base->Entity->ID;
 }
 
 u8* GetComponent(entity_manager* EM, component_result* ComponentList, u32 ComponentFlag);
