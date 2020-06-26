@@ -97,19 +97,18 @@ void PopulateContactData(const m4* AModelMat, const m4* BModelMat, epa_face* Fac
   ContactData->PenetrationDepth    = DistanceToClosestFace;
 }
 
-contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AModelMat, const collider_mesh* AMesh,
+contact_data EPACollisionResolution(memory_arena* Arena,
+                                    const m4* AModelMat, const collider_mesh* AMesh,
                                     const m4* BModelMat, const collider_mesh* BMesh,
                                     gjk_simplex* Simplex)
 {
   TIMED_FUNCTION();
-  temporary_memory TempMem = BeginTemporaryMemory(TemporaryArena);
 
   BlowUpSimplex(AModelMat, AMesh,
                 BModelMat, BMesh,
                 Simplex);
 
-  epa_mesh* Mesh = CreateSimplexMesh(TemporaryArena, Simplex);
-
+  epa_mesh* Mesh = CreateSimplexMesh(Arena, Simplex);
 
   epa_face* ClosestFace = 0;
   const v3 Origin = {};
@@ -147,8 +146,46 @@ contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AMod
   contact_data ContactData = {};
   PopulateContactData(AModelMat, BModelMat, ClosestFace, DistanceToClosestFace, &ContactData);
 
-  EndTemporaryMemory(TempMem);
-
   return ContactData;
 
+}
+
+contact_manifold* FindManifoldSlot(world_contact_chunk* Manifolds, u32 EntityIDA, u32 EntityIDB)
+{
+  u32 CantorPair = GetCantorPair(EntityIDA, EntityIDB);
+  u32 ManifoldIndex = CantorPair % Manifolds->MaxCount;
+  u32 HashMapCollisions = 0;
+  contact_manifold* ManifoldSlot = 0;
+  while( HashMapCollisions < Manifolds->MaxCount )
+  {
+    contact_manifold* ManifoldArraySlot = Manifolds->ManifoldVector + ManifoldIndex;
+    if(!ManifoldArraySlot->EntityIDA)
+    {
+      Assert(!ManifoldArraySlot->EntityIDB)
+      // Slot was empty
+      ManifoldSlot = ManifoldArraySlot;
+      ZeroStruct( *ManifoldSlot );
+      ManifoldSlot->EntityIDA = EntityIDA;
+      ManifoldSlot->EntityIDB = EntityIDB;
+      ManifoldSlot->MaxContactCount = 4;
+      ManifoldSlot->WorldArrayIndex = ManifoldIndex;
+      break;
+    }
+    else if(((EntityIDA == ManifoldArraySlot->EntityIDA) && (EntityIDB == ManifoldArraySlot->EntityIDB)) ||
+            ((EntityIDA == ManifoldArraySlot->EntityIDB) && (EntityIDB == ManifoldArraySlot->EntityIDA)))
+    {
+      ManifoldSlot = ManifoldArraySlot;
+      Assert(ManifoldSlot->MaxContactCount == 4);
+      Assert(ManifoldSlot->WorldArrayIndex == ManifoldIndex);
+      break;
+    }else{
+      TIMED_BLOCK(ContactArrayCollisions);
+      ++HashMapCollisions;
+      Assert( !((EntityIDA == ManifoldArraySlot->EntityIDA) && (EntityIDB == ManifoldArraySlot->EntityIDB)) &&
+              !((EntityIDB == ManifoldArraySlot->EntityIDA) && (EntityIDA == ManifoldArraySlot->EntityIDB)) );
+      ManifoldIndex = (ManifoldIndex+1) % Manifolds->MaxCount;
+    }
+  }
+  Assert(HashMapCollisions < Manifolds->MaxCount);
+  return ManifoldSlot;
 }

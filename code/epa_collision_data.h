@@ -48,53 +48,21 @@ struct world_contact_chunk
 {
   u32 MaxCount;
   u32 Count;
-  contact_manifold* Manifolds;
-  world_contact_chunk* Next;
+  contact_manifold* ManifoldVector;
+  contact_manifold* FirstManifold;
 };
 
-#if 0
-void GetManifoldIndex(world_contact_chunk* Contacts, u32 A, u32 B)
+world_contact_chunk* CreateWorldContactChunk(memory_arena* Arena, u32 MaxCount)
 {
-  u32 CantorPair = GetCantorPair(a, b);
-  u32 ManifoldIndex = CantorPair % World->MaxNrManifolds;
-  u32 HashMapCollisions = 0;
-  contact_manifold* Manifold = 0;
-  entity* SrcA = ColliderPair->A;
-  entity* SrcB = ColliderPair->B;
-  while( HashMapCollisions < World->MaxNrManifolds )
-  {
-    contact_manifold* ManifoldArraySlot = World->Manifolds + ManifoldIndex;
-    if(!ManifoldArraySlot->A)
-    {
-      Assert(!ManifoldArraySlot->B)
-      // Slot was empty
-      Manifold = ManifoldArraySlot;
-      ZeroStruct( *Manifold );
-      Manifold->A = ColliderPair->A;
-      Manifold->B = ColliderPair->B;
-      Manifold->MaxContactCount = 4;
-      Manifold->WorldArrayIndex = ManifoldIndex;
-      break;
-    }
-    else if(((SrcA->ID == ManifoldArraySlot->A->ID) && (SrcB->ID == ManifoldArraySlot->B->ID)) ||
-            ((SrcA->ID == ManifoldArraySlot->B->ID) && (SrcB->ID == ManifoldArraySlot->A->ID)))
-    {
-      Manifold = ManifoldArraySlot;
-      Assert(Manifold->MaxContactCount == 4);
-      Assert(Manifold->WorldArrayIndex == ManifoldIndex);
-      break;
-    }else{
-      TIMED_BLOCK(ContactArrayCollisions);
-      ++HashMapCollisions;
-      Assert( !((SrcA->ID == ManifoldArraySlot->A->ID) && (SrcB->ID == ManifoldArraySlot->B->ID)) &&
-              !((SrcB->ID == ManifoldArraySlot->A->ID) && (SrcA->ID == ManifoldArraySlot->B->ID)) );
-      ManifoldIndex = (ManifoldIndex+1) % World->MaxNrManifolds;
-    }
-  }
-  Assert(Manifold);
-  Assert(HashMapCollisions < World->MaxNrManifolds);
+  world_contact_chunk* Result = PushStruct(Arena,world_contact_chunk);
+  Result->MaxCount = MaxCount;
+  Result->Count = 0;
+  Result->ManifoldVector = PushArray(Arena, MaxCount, contact_manifold);
+  Result->FirstManifold = 0;
+  return Result;
 }
-#endif
 
-contact_data EPACollisionResolution(memory_arena* TemporaryArena, const m4* AModelMat, const collider_mesh* AMesh,
+contact_manifold* FindManifoldSlot(world_contact_chunk* Manifolds, u32 EntityIDA, u32 EntityIDB);
+contact_data EPACollisionResolution(memory_arena* Arena,
+                                    const m4* AModelMat, const collider_mesh* AMesh,
                                     const m4* BModelMat, const collider_mesh* BMesh, gjk_simplex* Simplex);

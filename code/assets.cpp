@@ -61,7 +61,7 @@ internal inline u32
 GetObjectAssetIndex(game_asset_manager* AssetManager, c8* Key)
 {
   u32 Result = StringToIndex(&AssetManager->Objects, Key);
-  return Result;  
+  return Result;
 }
 internal inline u32
 GetMaterialAssetIndex(game_asset_manager* AssetManager, c8* Key)
@@ -132,7 +132,7 @@ PushMaterialData(game_asset_manager* AssetManager, c8* Key, material SrcMaterial
 }
 
 internal void LoadPredefinedMaterials(game_asset_manager* AssetManager)
-{ 
+{
   u8 WhitePixel[4] = {255,255,255,255};
   u32 BitmapIndex = PushBitmapData(AssetManager, "null", 1, 1, 32, (void*)WhitePixel);
 
@@ -272,13 +272,13 @@ internal void stbtt_BakeFontBitmap(game_asset_manager* AssetManager)
   Assert(TTFFile.Contents);
   stbtt_GetScaledFontVMetrics((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
    FontMap->FontHeightPx, &FontMap->Ascent, &FontMap->Descent, &FontMap->LineGap);
-  
-  // Todo: Insetead of saving the 8bit font map to a 32 bit, write a custom shader for the 8bit 
+
+  // Todo: Insetead of saving the 8bit font map to a 32 bit, write a custom shader for the 8bit
   //       texture that can render it with colour.
   u32 BPP = 32;
   u32 Width = 1028;
   u32 Height = 1028;
-    
+
   u8* Pixels8BPP = PushArray(GlobalGameState->TransientArena, Width * Height, u8);
 
   s32 ret = stbtt_BakeFontBitmap((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
@@ -327,7 +327,7 @@ internal void LoadCubeAsset(game_asset_manager* AssetManager)
     PushIndexData(AssetManager,
       LoadedObjectGroup->GroupName,
       MeshIndex,
-      LoadedObjectGroup->Indeces->Count, 
+      LoadedObjectGroup->Indeces->Count,
       LoadedObjectGroup->Indeces->vi,
       LoadedObjectGroup->Indeces->ti,
       LoadedObjectGroup->Indeces->ni,
@@ -343,7 +343,7 @@ internal void LoadCubeAsset(game_asset_manager* AssetManager)
 
     u32 BitmapHandle = 0;
     if(SrcMaterial->MapKd)
-    {  
+    {
       c8 TexKey[128] = {};
       c8 Appendix[] = "_kd";
       str::CatStrings( SrcMaterial->NameLength, SrcMaterial->Name,
@@ -371,7 +371,7 @@ internal void LoadAssets(game_asset_manager* AssetManager)
   LoadPredefinedMaterials(AssetManager);
   LoadPredefinedMeshes(AssetManager);
   stbtt_BakeFontBitmap(AssetManager);
-  LoadCubeAsset(AssetManager);  
+  LoadCubeAsset(AssetManager);
   LoadHeroSpriteSheet(AssetManager);
 }
 
@@ -379,7 +379,7 @@ game_asset_manager* CreateAssetManager()
 {
   game_asset_manager* AssetManager = BootstrapPushStruct(game_asset_manager, AssetArena);
 
-  AssetManager->Instances.MaxCount = 256;
+  AssetManager->Instances.MaxCount = 1024;
   AssetManager->Instances.Values = (void**) PushArray(&AssetManager->AssetArena,
                                             AssetManager->Instances.MaxCount, void*);
   AssetManager->TemporaryInstancesBase = 0;

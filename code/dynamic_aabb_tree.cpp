@@ -257,3 +257,22 @@ void AABBTreeInsert( memory_arena* Arena, aabb_tree* Tree, u32 EntityID , aabb3f
   *CurrentNodePtr = Node;
   Tree->Size+=2;
 }
+
+aabb_tree BuildBroadPhaseTree()
+{
+  TIMED_FUNCTION();
+  aabb_tree Result = {};
+  memory_arena* TransientArena = GlobalGameState->TransientArena;
+  ScopedTransaction(GlobalGameState->EntityManager);
+  component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_COLLIDER);
+  while(Next(GlobalGameState->EntityManager, ComponentList))
+  {
+    component_spatial* Spatial = (component_spatial*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_SPATIAL);
+    component_collider* Collider = (component_collider*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_COLLIDER);
+    aabb3f AABBWorldSpace = TransformAABB( Collider->AABB, GetModelMatrix(Spatial) );
+    // TODO: Don't do a insert every timestep. Update an existing tree
+    AABBTreeInsert( TransientArena, &Result, GetEntity((u8*) Spatial), AABBWorldSpace );
+  }
+
+  return Result;
+}

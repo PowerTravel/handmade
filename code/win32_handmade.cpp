@@ -769,8 +769,7 @@ Win32BeginRecordingInput(win32_state *aState, s32 aRecordingIndex)
         aState->RecordingIndex = aRecordingIndex;
         win32_memory_block* Sentinel = &aState->MemorySentinel;
 
-        // TODO: Make Thread Safe!
-        // BeginTicketMutex(&aState.MemoryMutex);
+        BeginTicketMutex(&GlobalWin32State.MemoryMutex);
         for(win32_memory_block *SourceBlock = Sentinel->Next;
             SourceBlock != Sentinel;
             SourceBlock = SourceBlock->Next)
@@ -786,7 +785,7 @@ Win32BeginRecordingInput(win32_state *aState, s32 aRecordingIndex)
                 WriteFile(aState->RecordingHandle, BasePointer, (u32)DestBlock.Size, &BytesWritten, 0);
             }
         }
-        //EndTicketMutex(&aState.MemoryMutex);
+        EndTicketMutex(&GlobalWin32State.MemoryMutex);
 
         win32_saved_memory_block DestBlock = {};
         WriteFile(aState->RecordingHandle, &DestBlock, sizeof(DestBlock), &BytesWritten, 0);

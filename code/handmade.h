@@ -1,5 +1,6 @@
 #pragma once
 
+
 #include "platform.h"
 #include "debug.h"
 #include "memory.h"
@@ -8,9 +9,7 @@
 #include "dynamic_aabb_tree.h"
 #include "assets.h"
 #include "entity_components.h"
-
-struct entity;
-struct contact_manifold;
+#include "epa_collision_data.h"
 
 struct world
 {
@@ -21,11 +20,8 @@ struct world
 
   tile_map     TileMap;
 
-  u32 MaxNrManifolds;
-  contact_manifold* Manifolds;
-  contact_manifold* FirstContactManifold;
-
   aabb_tree BroadPhaseTree;
+  world_contact_chunk* ContactManifolds;
 };
 
 // This is to be a ginormous struct where we can set things we wanna access from everywhere.
@@ -36,7 +32,6 @@ struct game_state
 
   memory_arena* PersistentArena;
   memory_arena* TransientArena;
-
   temporary_memory TransientTempMem;
 
   game_asset_manager* AssetManager;

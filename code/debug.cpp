@@ -535,7 +535,6 @@ void PushDebugOverlay(game_input* GameInput)
     }
   }
 
-
   if(DebugState->Frames)
   {
     c8 StringBuffer[256] = {};
@@ -683,4 +682,3 @@ void PushDebugOverlay(game_input* GameInput)
     Line++;
   }
 #endif
- 

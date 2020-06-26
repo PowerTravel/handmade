@@ -16,9 +16,10 @@ struct entity_component_chunk
 
   entity_component_chunk* Next;
 };
+
 struct entity
 {
-  u32 ID; // ID starts at 1. ID of 0 means no entity.
+  u32 ID; // ID starts at 1. Index is ID-1
   u32 ComponentFlags;
   entity_component_chunk* Components;
 };

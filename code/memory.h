@@ -151,7 +151,7 @@ PushSize_( memory_arena *Arena, memory_index SizeInit, arena_push_params Params 
   memory_index Size = 0;
   if( Arena->CurrentBlock )
   {
-      Size = GetEffectiveSizeFor( Arena, SizeInit, Params );
+    Size = GetEffectiveSizeFor( Arena, SizeInit, Params );
   }
 
   if( !Arena->CurrentBlock ||

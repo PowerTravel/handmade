@@ -34,7 +34,7 @@ void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRec
 
   entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);
 
-  
+
   Body->ObjectIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::OBJECT, "quad");
   Body->Colour = Color;
   Body->TextureIndex = TextureIndex;
@@ -297,13 +297,11 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
 #endif
 
 #if SHOW_COLLISION_POINTS
-  contact_manifold* Manifold = World->FirstContactManifold;
+  contact_manifold* Manifold = World->ContactManifolds->FirstManifold;
   while(Manifold)
   {
     //TODO: Turn manifold into an entity
     Assert(Manifold->ContactCount);
-    entity* A = Manifold->A;
-    entity* B = Manifold->B;
     for( u32 j = 0; j <Manifold->ContactCount; ++j)
     {
       {
@@ -314,10 +312,10 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
         u32 TempHandle = GetTemporaryAssetHandle(AM);
         SetAsset(AM, asset_type::OBJECT, "voxel", TempHandle);
         SetAsset(AM, asset_type::MATERIAL, "blue", TempHandle);
-        
+
         entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
         Body->AssetHandle = TempHandle;
-        component_spatial* Spatial = (component_spatial*) GetComponent(EM, A->ID, COMPONENT_FLAG_SPATIAL);
+        component_spatial* Spatial = (component_spatial*) GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_SPATIAL);
         const m4 Rotation = GetRotationMatrix(Spatial->Rotation);
         const m4 Translation = GetTranslationMatrix(Spatial->Position);
         const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
@@ -341,7 +339,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
         entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
         Body->AssetHandle = TempHandle;
 
-        component_spatial* Spatial = (component_spatial*) GetComponent(EM, B->ID, COMPONENT_FLAG_SPATIAL);
+        component_spatial* Spatial = (component_spatial*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_SPATIAL);
         const m4 Rotation = GetRotationMatrix(Spatial->Rotation);
         const m4 Translation = GetTranslationMatrix(Spatial->Position);
         const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));

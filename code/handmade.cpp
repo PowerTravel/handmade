@@ -1,10 +1,34 @@
 /*
-  TODO: AssetSystem.
-    - Easy API to upload render assets to opengl
-        * Per Render Asset: Must know if it's loaded into GPU and what it's handle is.
-    - Easy API to add new assets
-    - Just ask interface, I want a Cube with blue surface.
-    - Render States. I want to render the cube filled with wire-mesh
+  TODO:
+  BUGS:
+    - A weird rotation-bug has crept into the angular integration.
+      Rotations seem to bleed over into scaling.
+    - Fix game-loop-memory allocation bug.
+      Pressing L activates game-looping. When the loop reloads win32-memory-allocation fails. No idea why, It seems
+      to have been like this for a long long time. Before debug-system.
+  Rendering:
+    - Easy switching and adding of shader-programs.
+    - Instance rendering, Want to group geometries together and do as few draw-calls as possible. (when possible, fonts, graphs for example, cubes too)
+      - Transforms, Texture-coordinates, Colours (as much data as possible) should be sent in buffers, not as Uniforms.
+    - Investigate raytracing
+  Assets:
+    - Separately built Asset file with multithreaded stream-loading. (Maybe using ASSIMP)
+    - Add a tag-system. I want to get a random asset with a specific tag. Predefined-Material for example.
+  Debug:
+    - Continue w decent Debug-interface.
+    - Time-Plots
+    - Item selection w mouse
+  Physics:
+    - Persistent AABB-tree
+    - Make gjk-epa sequential impulse work
+      - Make a super simple box - plane narrow-phase detection algorithm to help verify the sequential impulse algorithm.
+    - Make a 2D Collision system (Broad phase, narrow phase, collision resolution) (for fun)
+    - Make a point - point / point-line / point-plane / line-line / line-plane / plane-plane Collision detection
+    - Try algorithms other than sequential impulse.
+  General:
+    - Scene serialization
+    - Come up with a "demo-game" to implement using your engine.
+    - Editor interface
 */
 
 #include "handmade.h"
@@ -71,14 +95,11 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
   }
 }
 
-world* AllocateWorld( u32 NrMaxEntities, u32 NumManifolds = 4 )
+world* CreateWorld( u32 MaxNrManifolds )
 {
   world* World = PushStruct(GlobalGameState->PersistentArena, world);
   World->Arena = GlobalGameState->PersistentArena;
-
-  World->MaxNrManifolds = NumManifolds*NrMaxEntities;
-  World->Manifolds = (contact_manifold*)  PushSize( World->Arena, World->MaxNrManifolds*( sizeof(contact_manifold) ));
-  World->FirstContactManifold = 0;
+  World->ContactManifolds = CreateWorldContactChunk(World->Arena, MaxNrManifolds);
   return World;
 }
 
@@ -146,9 +167,9 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   SetAsset( GameState->AssetManager, asset_type::BITMAP,   "null",  LightRender->AssetHandle);  // Overrides texture
 
 
-#define State4
+#define State1
 #if defined(State1)
-  // Bug - producing state. Gets a broken mesh somewhere
+  // BUG: Bug-producing state. Rotation bleeds over into scaling
   r32 ySpace = 1;
   r32 xzSpace = 1;
   s32 iarr[] = {-0,1};
@@ -192,7 +213,6 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
           COMPONENT_FLAG_DYNAMICS);
 
         GetRenderComponent(CubeEntity)->AssetHandle = CubeAssetHandle;
-
         component_spatial* CubeSpatial = GetSpatialComponent(CubeEntity);
         CubeSpatial->Position =  V3(xzSpace*i, ySpace*j, xzSpace*k);
         CubeSpatial->Rotation = RotateQuaternion( 0, V3(0,0,0) );
@@ -309,7 +329,7 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
     GlobalGameState->AssetManager = CreateAssetManager();
     GlobalGameState->EntityManager = CreateEntityManager();
 
-    GlobalGameState->World = AllocateWorld(120, 32);
+    GlobalGameState->World = CreateWorld(2048);
 
     GlobalGameState->ScreenWidthPixels  = (r32)RenderCommands->ResolutionWidthPixels;
     GlobalGameState->ScreenHeightPixels = (r32)RenderCommands->ResolutionHeightPixels;

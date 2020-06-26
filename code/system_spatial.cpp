@@ -152,8 +152,8 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
   entity_manager* EM = GlobalGameState->EntityManager;
   contact_manifold* Manifold = (contact_manifold*) Data;
 
-  component_spatial* SpatialA = (component_spatial*) GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_SPATIAL);
-  component_spatial* SpatialB = (component_spatial*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_SPATIAL);
+  component_spatial* SpatialA   = (component_spatial*)  GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_SPATIAL);
+  component_spatial* SpatialB   = (component_spatial*)  GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_SPATIAL);
   component_collider* ColliderA = (component_collider*) GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_COLLIDER);
   component_collider* ColliderB = (component_collider*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_COLLIDER);
   component_dynamics* DynamicsA = (component_dynamics*) GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_DYNAMICS);
@@ -168,14 +168,16 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
       &ModelMatrixB, &MeshB);
 
   // Todo: Should we give each thread it's own Transient Arena?
+  // Note: GlobalGamestate->TransientArena is NOT thread safe, don't use it in any PLATFORM_WORK_QUEUE_CALLBACK.
   memory_arena Arena = {};
   temporary_memory TempMem = BeginTemporaryMemory(&Arena);
 
   if (NarrowPhaseResult.ContainsOrigin)
   {
-    contact_data NewContact = EPACollisionResolution(&Arena, &ModelMatrixA, &MeshA,
-                                                             &ModelMatrixB, &MeshB,
-                                                             &NarrowPhaseResult.Simplex);
+    contact_data NewContact = EPACollisionResolution(&Arena,
+                                                     &ModelMatrixA, &MeshA,
+                                                     &ModelMatrixB, &MeshB,
+                                                     &NarrowPhaseResult.Simplex);
 
     b32 FarEnough = true;
     for (u32 ContactIndex = 0; ContactIndex < Manifold->ContactCount; ++ContactIndex)
@@ -378,10 +380,10 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
   EndTemporaryMemory(TempMem);
 }
 
-internal void RemoveInvalidContactPoints( world* World )
+internal void RemoveInvalidContactPoints( contact_manifold* FirstManifold )
 {
   TIMED_FUNCTION();
-  contact_manifold* Manifold = World->FirstContactManifold;
+  contact_manifold* Manifold = FirstManifold;
   entity_manager* EM = GlobalGameState->EntityManager;
   while (Manifold)
   {
@@ -439,10 +441,10 @@ internal void RemoveInvalidContactPoints( world* World )
   }
 }
 
-internal void DoWarmStarting( world* World )
+internal void DoWarmStarting( contact_manifold* FirstManifold  )
 {
   TIMED_FUNCTION();
-  contact_manifold* Manifold = World->FirstContactManifold;
+  contact_manifold* Manifold = FirstManifold;
   while (Manifold)
   {
    // Warm starting
@@ -481,10 +483,9 @@ internal void DoWarmStarting( world* World )
   }
 }
 
-inline void IntegrateVelocities(world* World)
+inline void IntegrateVelocities( r32 dt )
 {
   TIMED_FUNCTION();
-  r32 dt =  World->dtForFrame;
 
   ScopedTransaction(GlobalGameState->EntityManager);
 
@@ -505,83 +506,22 @@ inline void IntegrateVelocities(world* World)
   }
 }
 
-
-internal aabb_tree BuildBroadPhaseTree( )
-{
-  TIMED_FUNCTION();
-  aabb_tree Result = {};
-  memory_arena* TransientArena = GlobalGameState->TransientArena;
-  ScopedTransaction(GlobalGameState->EntityManager);
-  component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_COLLIDER);
-  while(Next(GlobalGameState->EntityManager, ComponentList))
-  {
-    component_spatial* Spatial = (component_spatial*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_SPATIAL);
-    component_collider* Collider = (component_collider*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_COLLIDER);
-    aabb3f AABBWorldSpace = TransformAABB( Collider->AABB, GetModelMatrix(Spatial) );
-    // TODO: Don't do a insert every timestep. Update an existing tree
-    AABBTreeInsert( TransientArena, &Result, GetEntity((u8*) Spatial), AABBWorldSpace );
-  }
-
-  return Result;
-}
-
 internal void
-CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_stack* const BroadPhaseResultStack )
+CreateAndDoWork( world_contact_chunk* ContactChunk, u32 BroadPhaseResultCount, broad_phase_result_stack* const BroadPhaseResultStack )
 {
   TIMED_FUNCTION();
   broad_phase_result_stack* ColliderPair = BroadPhaseResultStack;
-  memory_arena* TransientArena = GlobalGameState->TransientArena;
-  contact_manifold** WorkArray = (contact_manifold**) PushArray(TransientArena, BroadPhaseResultCount, contact_manifold* );
+  contact_manifold** WorkArray = (contact_manifold**) PushArray(GlobalGameState->TransientArena, BroadPhaseResultCount, contact_manifold* );
   contact_manifold** WorkSlot = WorkArray;
-  World->FirstContactManifold = 0;
+  ContactChunk->FirstManifold = 0;
   while( ColliderPair )
   {
-    // Find a manifold memory slot for manifold made up of A and B;
-    r32 EntityIDA = (r32) ColliderPair->EntityIDA;
-    r32 EntityIDB = (r32) ColliderPair->EntityIDB;
-
-    u32 CantorPair = GetCantorPair(EntityIDA, EntityIDB);
-    u32 ManifoldIndex = CantorPair % World->MaxNrManifolds;
-    u32 HashMapCollisions = 0;
-    contact_manifold* Manifold = 0;
-    while( HashMapCollisions < World->MaxNrManifolds )
-    {
-      contact_manifold* ManifoldArraySlot = World->Manifolds + ManifoldIndex;
-      if(!ManifoldArraySlot->EntityIDA)
-      {
-        Assert(!ManifoldArraySlot->EntityIDB)
-        // Slot was empty
-        Manifold = ManifoldArraySlot;
-        ZeroStruct( *Manifold );
-        Manifold->EntityIDA = ColliderPair->EntityIDA;
-        Manifold->EntityIDB = ColliderPair->EntityIDB;
-        Manifold->MaxContactCount = 4;
-        Manifold->WorldArrayIndex = ManifoldIndex;
-        break;
-      }
-      else if(((EntityIDA == ManifoldArraySlot->EntityIDA) && (EntityIDB == ManifoldArraySlot->EntityIDB)) ||
-              ((EntityIDA == ManifoldArraySlot->EntityIDB) && (EntityIDB == ManifoldArraySlot->EntityIDA)))
-      {
-        Manifold = ManifoldArraySlot;
-        Assert(Manifold->MaxContactCount == 4);
-        Assert(Manifold->WorldArrayIndex == ManifoldIndex);
-        break;
-      }else{
-        TIMED_BLOCK(ContactArrayCollisions);
-        ++HashMapCollisions;
-        Assert( !((EntityIDA == ManifoldArraySlot->EntityIDA) && (EntityIDB == ManifoldArraySlot->EntityIDB)) &&
-                !((EntityIDB == ManifoldArraySlot->EntityIDA) && (EntityIDA == ManifoldArraySlot->EntityIDB)) );
-        ManifoldIndex = (ManifoldIndex+1) % World->MaxNrManifolds;
-      }
-    }
+    contact_manifold* Manifold = FindManifoldSlot(ContactChunk, ColliderPair->EntityIDA, ColliderPair->EntityIDB);
     Assert(Manifold);
-    Assert(HashMapCollisions < World->MaxNrManifolds);
 
     // Push the contact to the list.
-    Manifold->Next = World->FirstContactManifold;
-    World->FirstContactManifold = Manifold;
-    Assert(Manifold->Next != World->FirstContactManifold);
-    Assert(Manifold != Manifold->Next);
+    Manifold->Next = ContactChunk->FirstManifold;
+    ContactChunk->FirstManifold = Manifold;
 
     // Add it to the work array
     *WorkSlot = Manifold;
@@ -603,10 +543,10 @@ CreateAndDoWork( world* World, u32 BroadPhaseResultCount, broad_phase_result_sta
 #endif
 }
 
-internal void RemoveNonIntersectingManifolds(world* World)
+internal void RemoveNonIntersectingManifolds(world_contact_chunk* ContactChunk)
 {
   TIMED_FUNCTION();
-  contact_manifold** ManifoldPtr = &World->FirstContactManifold;
+  contact_manifold** ManifoldPtr = &ContactChunk->FirstManifold;
   while(*ManifoldPtr)
   {
     contact_manifold* Manifold = *ManifoldPtr;
@@ -623,10 +563,10 @@ internal void RemoveNonIntersectingManifolds(world* World)
 }
 
 internal void
-SolveNonPenetrationConstraints(world* World)
+SolveNonPenetrationConstraints(r32 dtForFrame, contact_manifold* FirstManifold)
 {
   TIMED_FUNCTION();
-  contact_manifold* Manifold = World->FirstContactManifold;
+  contact_manifold* Manifold = FirstManifold;
   while(Manifold)
   {
     Assert(Manifold->ContactCount>0);
@@ -657,7 +597,7 @@ SolveNonPenetrationConstraints(world* World)
       r32 PenetrationDepth = ContactPointDiff * ContactNormal;
 
       r32 Restitution       = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, ContactNormal, SLOP);
-      r32 Baumgarte         = getBaumgarteCoefficient(World->dtForFrame, BAUMGARTE_COEFFICIENT,  PenetrationDepth, SLOP);
+      r32 Baumgarte         = getBaumgarteCoefficient(dtForFrame, BAUMGARTE_COEFFICIENT,  PenetrationDepth, SLOP);
       r32 Lambda            = GetLambda( V, CachedData->J, CachedData->InvMJ, Baumgarte, Restitution);
       r32 OldCumulativeLambda = CachedData->AccumulatedLambda;
       CachedData->AccumulatedLambda += Lambda;
@@ -683,10 +623,10 @@ SolveNonPenetrationConstraints(world* World)
 }
 
 internal void
-SolveFrictionalConstraints( world* World )
+SolveFrictionalConstraints( contact_manifold* FirstManifold )
 {
   TIMED_FUNCTION();
-  contact_manifold* Manifold = World->FirstContactManifold;
+  contact_manifold* Manifold = FirstManifold;
   while(Manifold)
   {
     Assert(Manifold->ContactCount>0);
@@ -814,7 +754,7 @@ TimestepVelocityRungeKutta4(const r32 DeltaTime, const v3 LinearVelocity, const 
  }
 
 inline internal void
-IntegratePositions(world* World)
+IntegratePositions(r32 dtForFrame)
 {
   TIMED_FUNCTION();
 
@@ -825,7 +765,7 @@ IntegratePositions(world* World)
     component_spatial* S = GetSpatialComponent(ComponentList);
     component_dynamics* D = GetDynamicsComponent(ComponentList);
     #if 1
-    TimestepVelocityForwardEuler( World->dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
+    TimestepVelocityForwardEuler( dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
     #else
     TimestepVelocityRungeKutta4( World->dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
     S->Rotation = Normalize(S->Rotation);
@@ -837,33 +777,35 @@ void SpatialSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
 
-  RemoveInvalidContactPoints( World );
+  world_contact_chunk* WorldContacts =  World->ContactManifolds;
 
-  DoWarmStarting( World );
+  RemoveInvalidContactPoints( WorldContacts->FirstManifold );
 
-  IntegrateVelocities( World );
+  DoWarmStarting( WorldContacts->FirstManifold );
+
+  IntegrateVelocities( World->dtForFrame );
 
   World->BroadPhaseTree = BuildBroadPhaseTree( );
 
   u32 BroadPhaseResultCount = 0;
   broad_phase_result_stack* const BroadPhaseResultStack = GetCollisionPairs( &World->BroadPhaseTree, &BroadPhaseResultCount );
 
-  CreateAndDoWork( World, BroadPhaseResultCount,  BroadPhaseResultStack );
+  CreateAndDoWork( WorldContacts, BroadPhaseResultCount, BroadPhaseResultStack );
 
-  RemoveNonIntersectingManifolds(World);
+  RemoveNonIntersectingManifolds(WorldContacts);
 
   BEGIN_BLOCK(SolveConstraints);
-  if(World->FirstContactManifold)
+  if(WorldContacts->FirstManifold)
   {
     for (u32 i = 0; i < SLOVER_ITERATIONS; ++i)
     {
       // TODO: Process Constraints MultiThreaded
-      SolveNonPenetrationConstraints(World);
-      SolveFrictionalConstraints(World);
+      SolveNonPenetrationConstraints(World->dtForFrame, WorldContacts->FirstManifold);
+      SolveFrictionalConstraints(WorldContacts->FirstManifold);
     }
   }
   END_BLOCK(SolveConstraints);
 
-  IntegratePositions(World);
+  IntegratePositions(World->dtForFrame);
 
 }
