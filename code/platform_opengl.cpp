@@ -74,50 +74,55 @@ GLuint OpenGLCreateProgram( char* VertexShaderCode, char* FragmentShaderCode )
   return Program;
 }
 
-opengl_program2D OpenGLCreateShaderProgram2D()
+const c8* GetUniformName(open_gl_uniform Enum)
 {
-  char VertexShaderCode[] = {
-"#version  330 core\n\
-layout (location = 0) in vec3 vertice;\n\
-\n\
-uniform mat4 M;  // Model Matrix - Transforms points from ModelSpace to WorldSpace.\n\
-                 // Includes Translation, Rotation and Scaling\n\
-uniform mat4 V;  // View Matrix - Camera Position and Orientation in WorldSpace\n\
-uniform mat4 P;  // Projection Matrix - Scales the visible world into the unit cube.\n\
-\n\
-void main()\n\
-{\n\
-  gl_Position = P*V*M*vec4(vertice,1);\n\
-}\n\
-"};
-
-  char FragmentShaderCode[] ={
-"#version 330 core\n\
-out vec4 fragColor;\n\
-\n\
-uniform vec2 texCoord;\n\
-uniform sampler2D ourTexture;\n\
-\n\
-void main() \n\
-{\n\
-  fragColor = texture(ourTexture, texCoord);\n\
-}\n\
-"};
-
-  opengl_program2D Result = {};
-  Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
-  glUseProgram(Result.Program);
-  Result.M =  glGetUniformLocation(Result.Program, "M");
-  Result.P =  glGetUniformLocation(Result.Program, "P");
-  Result.V =  glGetUniformLocation(Result.Program, "V");
-  Result.texCoord   = glGetUniformLocation(Result.Program, "texCoord");
-  glUseProgram(0);
-
-  return Result;
+  local_persist c8* UniformLibrary[OPEN_GL_UNIFORM_COUNT];
+  UniformLibrary[(u32)open_gl_uniform::m4_Model] = "M";
+  UniformLibrary[(u32)open_gl_uniform::m4_Normal] = "NM";
+  UniformLibrary[(u32)open_gl_uniform::m4_Texture] = "TM";
+  UniformLibrary[(u32)open_gl_uniform::m4_Projection] = "P";
+  UniformLibrary[(u32)open_gl_uniform::m4_View] = "V";
+  UniformLibrary[(u32)open_gl_uniform::v4_AmbientProduct] = "ambientProduct";
+  UniformLibrary[(u32)open_gl_uniform::v4_DiffuseProduct] = "diffuseProduct";
+  UniformLibrary[(u32)open_gl_uniform::v4_SpecularProduct] = "specularProduct";
+  UniformLibrary[(u32)open_gl_uniform::v4_LightPosition] = "lightPosition";
+  UniformLibrary[(u32)open_gl_uniform::v4_CameraPosition] = "cameraPosition";
+  UniformLibrary[(u32)open_gl_uniform::v2_TextureCoordinate] = "texCoord";
+  UniformLibrary[(u32)open_gl_uniform::s_Shininess] = "shininess";
+  Assert(OPEN_GL_UNIFORM_COUNT==(u8)open_gl_uniform::count);
+  Assert(Enum < open_gl_uniform::count);
+  return UniformLibrary[(u32)Enum];
+}
+// OpenGL uses Column major convention.
+// Our math library uses Row major convention which means we need to transpose the
+// matrices AND reverse the order of multiplication.
+// Transpose(A*B) = Transpose(B) * Transpose(A)
+inline internal void DeclareUniform(opengl_program* Program, open_gl_uniform Enum)
+{
+  const c8* Name = GetUniformName(Enum);
+  Program->Uniforms[(u32)(Enum)] = glGetUniformLocation(Program->Program, Name);
+  Assert(Program->Uniforms[(u32)(Enum)] >= 0);
 }
 
+inline internal void SetUniformM4(opengl_program Program, open_gl_uniform Enum, m4 Matrix)
+{
+  s32 UniformID = Program.Uniforms[(u32)(Enum)];
+  glUniformMatrix4fv(UniformID, 1, GL_TRUE, Matrix.E);
+}
 
-opengl_program3D OpenGLCreateTexturedQuadOverlayShader()
+inline internal void SetUniformV4(opengl_program Program, open_gl_uniform Enum, v4 Vector)
+{
+  s32 UniformID = Program.Uniforms[(u32)(Enum)];
+  glUniform4fv(UniformID, 1, Vector.E);
+}
+
+inline internal void SetUniformS(opengl_program Program, open_gl_uniform Enum, r32 Scalar)
+{
+  s32 UniformID = Program.Uniforms[(u32)(Enum)];
+  glUniform1f(UniformID, Scalar);
+}
+
+opengl_program OpenGLCreateTexturedQuadOverlayProgram( )
 {
   char VertexShaderCode[] = {
 "#version  330 core\n\
@@ -151,20 +156,19 @@ void main() \n\
 }\n\
 "};
 
-  opengl_program3D Result = {};
+  opengl_program Result = {};
   Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
   glUseProgram(Result.Program);
-  Result.P =  glGetUniformLocation(Result.Program, "P");
-  Result.M =  glGetUniformLocation(Result.Program, "M");
-  Result.TM = glGetUniformLocation(Result.Program, "TM");
-  Result.ambientProduct  = glGetUniformLocation(Result.Program, "ambientProduct");
+  DeclareUniform(&Result, open_gl_uniform::m4_Projection);
+  DeclareUniform(&Result, open_gl_uniform::m4_Model);
+  DeclareUniform(&Result, open_gl_uniform::m4_Texture);
+  DeclareUniform(&Result, open_gl_uniform::v4_AmbientProduct);
   glUseProgram(0);
 
   return Result;
 }
 
-
-opengl_program3D OpenGLCreateShaderProgram3D()
+opengl_program OpenGLCreateProgram3D()
 {
    global_variable char VertexShaderCode[] = {
 "#version  330 core\n\
@@ -194,7 +198,6 @@ out vec2 texCoord;\n\
 void main()\n\
 {\n\
 \n\
-  gl_PointSize = 10.0;\n\
 // Variable Descriptions:\n\
 // N [Normal Vector], Object Space\n\
 // L [Light Vector] Unit vector of vertex to light in world space;\n\
@@ -233,25 +236,28 @@ void main() \n\
 }\n\
 "};
 
-  opengl_program3D Result = {};
+  opengl_program Result = {};
   Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
   glUseProgram(Result.Program);
-  Result.M =  glGetUniformLocation(Result.Program, "M");
-  Result.NM = glGetUniformLocation(Result.Program, "NM");
-  Result.TM = glGetUniformLocation(Result.Program, "TM");
-  Result.P =  glGetUniformLocation(Result.Program, "P");
-  Result.V =  glGetUniformLocation(Result.Program, "V");
-  Result.lightPosition   = glGetUniformLocation(Result.Program, "lightPosition");
-  Result.cameraPosition  = glGetUniformLocation(Result.Program, "cameraPosition");
-  Result.ambientProduct  = glGetUniformLocation(Result.Program, "ambientProduct");
-  Result.diffuseProduct  = glGetUniformLocation(Result.Program, "diffuseProduct");
-  Result.specularProduct = glGetUniformLocation(Result.Program, "specularProduct");
-  Result.attenuation     = glGetUniformLocation(Result.Program, "attenuation");
-  Result.shininess       = glGetUniformLocation(Result.Program, "shininess");
+
+
+  DeclareUniform(&Result, open_gl_uniform::m4_Projection);
+  DeclareUniform(&Result, open_gl_uniform::m4_View);
+  DeclareUniform(&Result, open_gl_uniform::m4_Model);
+  DeclareUniform(&Result, open_gl_uniform::m4_Normal);
+  DeclareUniform(&Result, open_gl_uniform::m4_Texture);
+  DeclareUniform(&Result, open_gl_uniform::v4_AmbientProduct);
+  DeclareUniform(&Result, open_gl_uniform::v4_DiffuseProduct);
+  DeclareUniform(&Result, open_gl_uniform::v4_SpecularProduct);
+  DeclareUniform(&Result, open_gl_uniform::v4_LightPosition);
+  DeclareUniform(&Result, open_gl_uniform::v4_CameraPosition);
+  DeclareUniform(&Result, open_gl_uniform::s_Shininess);
+
   glUseProgram(0);
 
   return  Result;
 }
+
 
 void OpenGLSendMeshToGPU( u32* VAO, u32* VBO, u32* EBO, const u32 NrIndeces, const u32* IndexData, const u32 NrVertecies, const opengl_vertex* VertexData)
 {
@@ -621,14 +627,14 @@ void BindTextureToGPU(bitmap* RenderTarget, book_keeper* BitmapKeeper)
 }
 
 
-void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memory_arena* TempArena,
-  entry_type_render_asset* AssetTest, v4 LightColor)
+void DrawAsset(opengl_program* Program, game_asset_manager* AssetManager, memory_arena* TempArena,
+  entry_type_render_asset* RenderableAsset, v4 LightColor)
 {
-  glUniformMatrix4fv(Program->M,  1, GL_TRUE, AssetTest->M.E);
-  glUniformMatrix4fv(Program->NM, 1, GL_TRUE, AssetTest->NM.E);
-  glUniformMatrix4fv(Program->TM, 1, GL_TRUE, AssetTest->TM.E);
+  SetUniformM4(*Program, open_gl_uniform::m4_Model, RenderableAsset->M);
+  SetUniformM4(*Program, open_gl_uniform::m4_Normal, RenderableAsset->NM);
+  SetUniformM4(*Program, open_gl_uniform::m4_Texture, RenderableAsset->TM);
 
-  u32 AssetHandle = AssetTest->AssetHandle;
+  u32 AssetHandle = RenderableAsset->AssetHandle;
 
   book_keeper* ObjectKeeper = 0;
   mesh_indeces* Object = GetObject(AssetManager, AssetHandle, &ObjectKeeper);
@@ -638,17 +644,17 @@ void DrawAsset(opengl_program3D* Program, game_asset_manager* AssetManager, memo
 
   material* Material   = GetMaterial(AssetManager, AssetHandle);
 
-  u32 SurfaceSmoothnes = 3;
+  u32 SurfaceSmoothness = 3;
   v4 AmbientColor   = Blend(&LightColor, &Material->AmbientColor);
   AmbientColor.W = 1;
   v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
   DiffuseColor.W = 1;
-  v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothnes + 8.f ) / (8.f*3.1415f);
+  v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothness + 8.f ) / (8.f*3.1415f);
   SpecularColor.W = 1;
-  glUniform4fv( Program->ambientProduct,  1, AmbientColor.E);
-  glUniform4fv( Program->diffuseProduct,  1, DiffuseColor.E);
-  glUniform4fv( Program->specularProduct, 1, SpecularColor.E);
-  glUniform1f(  Program->shininess, Material->Shininess);
+  SetUniformV4( *Program, open_gl_uniform::v4_AmbientProduct, AmbientColor);
+  SetUniformV4( *Program, open_gl_uniform::v4_DiffuseProduct, DiffuseColor);
+  SetUniformV4( *Program, open_gl_uniform::v4_SpecularProduct, SpecularColor);
+  SetUniformS(  *Program, open_gl_uniform::s_Shininess, Material->Shininess);
 
   book_keeper* BitmapKeeper = 0;
   bitmap* RenderTarget = GetBitmap(AssetManager, AssetHandle, &BitmapKeeper);
@@ -711,9 +717,10 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
 {
   render_group* RenderGroup = Commands->MainRenderGroup;
 
-  if(!Commands->RenderProgram3D.Program)
+  if(!Commands->ProgramCount)
   {
-    Commands->RenderProgram3D = OpenGLCreateShaderProgram3D();
+    Commands->Programs[Commands->ProgramCount++] = OpenGLCreateTexturedQuadOverlayProgram();
+    Commands->Programs[Commands->ProgramCount++] = OpenGLCreateProgram3D();
   }
 
   // Enable depth test
@@ -733,27 +740,21 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
   // TODO: Screen Width is now also used for the resolution. Should we decouple ScreenHeightPixels and ResolutionHeightPixels?
   r32 DesiredAspectRatio = 1.77968526f;
   DesiredAspectRatio = (r32)Commands->ScreenWidthPixels / (r32)Commands->ScreenHeightPixels;
   OpenGLSetViewport( DesiredAspectRatio, Commands->ScreenWidthPixels, Commands->ScreenHeightPixels );
 
-  // OpenGL uses Column major convention.
-  // Our math library uses Row major convention which means we need to transpose the
-  // matrices AND reverse the order of multiplication.
-  // Transpose(A*B) = Transpose(B) * Transpose(A)
-  m4 V = RenderGroup->ViewMatrix;
-  m4 P = RenderGroup->ProjectionMatrix;
-
   m4 Identity = M4Identity();
-  opengl_program3D* Prog = &Commands->RenderProgram3D;
-  glUseProgram( Commands->RenderProgram3D.Program);
+  opengl_program PhongShadingProgram = Commands->Programs[1];
+  glUseProgram( PhongShadingProgram.Program);
 
-  glUniformMatrix4fv(Prog->P,  1, GL_TRUE, P.E);
-  glUniformMatrix4fv(Prog->V,  1, GL_TRUE, V.E);
-  //glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, Identity.E);
-  v3 CameraPosition = GetPositionFromMatrix(&V);
-  glUniform4fv( Prog->cameraPosition, 1, CameraPosition.E);
+  SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Projection, RenderGroup->ProjectionMatrix);
+  SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_View, RenderGroup->ViewMatrix);
+
+  v3 CameraPosition = GetPositionFromMatrix(&RenderGroup->ViewMatrix);
+  SetUniformV4( PhongShadingProgram, open_gl_uniform::v4_CameraPosition, V4(CameraPosition,1));
   v4 LightColor    = V4(0,0,0,1);
 
   // For each render group
@@ -766,11 +767,9 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
     {
       case render_buffer_entry_type::LIGHT:
       {
-        r32 Attenuation = 1;
-        glUniform1f(  Prog->attenuation, Attenuation);
         entry_type_light* Light = (entry_type_light*) Body;
-        glUniform4fv( Prog->lightPosition,  1, (Light->M*V4(0,0,0,1)).E);
-        LightColor    = Light->Color;
+        SetUniformV4(PhongShadingProgram, open_gl_uniform::v4_LightPosition, Light->M*V4(0,0,0,1));
+        LightColor = Light->Color;
       }break;
     }
   }
@@ -785,7 +784,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
       case render_buffer_entry_type::RENDER_ASSET:
       {
         entry_type_render_asset* AssetTest = (entry_type_render_asset*) Body;
-        DrawAsset(Prog, RenderGroup->AssetManager, &RenderGroup->Arena, AssetTest, LightColor);
+        DrawAsset(&PhongShadingProgram, RenderGroup->AssetManager, &RenderGroup->Arena, AssetTest, LightColor);
       }break;
       case render_buffer_entry_type::LINE:
       {
@@ -830,8 +829,8 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         m4 M = TransMat*RotMat*ScaleMat;
 
         m4 TM = M4Identity();
-        glUniformMatrix4fv(Prog->M,  1, GL_TRUE, M.E);
-        glUniformMatrix4fv(Prog->TM, 1, GL_TRUE, TM.E);
+        SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Model, M);
+        SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Model, TM);
 
 
         u32 ObjectIndex = GetEnumeratedObjectIndex(RenderGroup->AssetManager, predefined_mesh::QUAD);
@@ -844,10 +843,10 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         // Todo:: The reason we need to always push a bitmap even if were not using it is because we keep
         //        using the same shader for everything. Fix switching of shaders.
         material* Material = GetMaterialFromIndex(RenderGroup->AssetManager, Line->MaterialIndex);
-        glUniform4fv( Prog->ambientProduct,  1, Material->AmbientColor.E);
-        glUniform4fv( Prog->diffuseProduct,  1, Material->DiffuseColor.E);
-        glUniform4fv( Prog->specularProduct, 1, Material->SpecularColor.E);
-        glUniform1f(  Prog->shininess, Material->Shininess);
+        SetUniformV4( PhongShadingProgram, open_gl_uniform::v4_AmbientProduct, Material->AmbientColor);
+        SetUniformV4( PhongShadingProgram, open_gl_uniform::v4_DiffuseProduct, Material->DiffuseColor);
+        SetUniformV4( PhongShadingProgram, open_gl_uniform::v4_SpecularProduct, Material->SpecularColor);
+        SetUniformS( PhongShadingProgram, open_gl_uniform::s_Shininess, Material->Shininess);
         book_keeper* BitmapKeeper = 0;
         // Funnily enough texture "null" maps to index 0.
         // However TODO: Make a quick lookup to bitmaps similar to GetEnumeratedObjectIndex
@@ -860,22 +859,13 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
   }
 
 
-
-  // DEBUG OVERLAY
-
-  local_persist opengl_program3D TextOverlay = {};
-  if(!TextOverlay.Program)
-  {
-    TextOverlay = OpenGLCreateTexturedQuadOverlayShader();
-  }
-
-  glUseProgram(TextOverlay.Program);
-
+  // OpenGLCreateTexturedQuadOverlayProgram
+  opengl_program DebugOverlay = Commands->Programs[0];
   RenderGroup = Commands->DebugRenderGroup;
 
-  glUniformMatrix4fv(TextOverlay.P,  1, GL_TRUE, RenderGroup->ProjectionMatrix.E);
-  //glUniformMatrix4fv(TextOverlay.V,  1, GL_TRUE, Identity.E);
-  //glUniformMatrix4fv(TextOverlay.TM, 1, GL_TRUE, Identity.E);
+  glUseProgram(DebugOverlay.Program);
+
+  SetUniformM4(DebugOverlay, open_gl_uniform::m4_Projection, RenderGroup->ProjectionMatrix);
 
   // No need to clearh the depth buffer if we disable depth test
   glDisable(GL_DEPTH_TEST);
@@ -895,8 +885,8 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
       case render_buffer_entry_type::OVERLAY_QUAD:
       {
         entry_type_overlay_quad* Quad = (entry_type_overlay_quad*) Body;
-        glUniformMatrix4fv(TextOverlay.M,  1, GL_TRUE, Quad->M.E);
-        glUniformMatrix4fv(TextOverlay.TM, 1, GL_TRUE, Quad->TM.E);
+        SetUniformM4(DebugOverlay, open_gl_uniform::m4_Model, Quad->M);
+        SetUniformM4(DebugOverlay, open_gl_uniform::m4_Texture, Quad->TM);
 
         book_keeper* ObjectKeeper = 0;
         mesh_indeces* Object = GetObjectFromIndex(RenderGroup->AssetManager, Quad->ObjectIndex, &ObjectKeeper);
@@ -904,7 +894,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
 
         PushMeshToGPU(&RenderGroup->Arena, Object, ObjectKeeper, MeshData);
 
-        glUniform4fv( TextOverlay.ambientProduct,  1, Quad->Colour.E);
+        SetUniformV4(DebugOverlay, open_gl_uniform::v4_AmbientProduct, Quad->Colour);
 
         book_keeper* BitmapKeeper = 0;
         bitmap* RenderTarget = GetBitmapFromIndex(RenderGroup->AssetManager, Quad->TextureIndex, &BitmapKeeper);

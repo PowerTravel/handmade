@@ -6,16 +6,16 @@
 #include "gjk_narrow_phase.h"
 #include "epa_collision_data.h"
 
-#define NEW_CONTACT_THRESHOLD 0.1f
-#define PERSISTENT_CONTACT_THRESHOLD 0.1f
-#define WARM_STARTING_FRACTION 0.61f
+#define NEW_CONTACT_THRESHOLD 0.05f
+#define PERSISTENT_CONTACT_THRESHOLD 0.05f
+#define WARM_STARTING_FRACTION 0.31f
 
 #define FRICTIONAL_COEFFICIENT 0.15f
 #define BAUMGARTE_COEFFICIENT  0.25f
 #define RESTITUTION_COEFFICIENT 0.0f
-#define SLOP 0.01f
+#define SLOP 0.002f
 
-#define SLOVER_ITERATIONS 4
+#define SLOVER_ITERATIONS 24
 
 list< aabb3f > GetOverlappingWallTiles(memory_arena* Arena, tile_map* TileMap, aabb3f* BoundingBox, v3 CollisionEnvelope = {} )
 {
@@ -766,8 +766,9 @@ IntegratePositions(r32 dtForFrame)
     component_dynamics* D = GetDynamicsComponent(ComponentList);
     #if 1
     TimestepVelocityForwardEuler( dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
+    S->Rotation = Normalize(S->Rotation);
     #else
-    TimestepVelocityRungeKutta4( World->dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
+    TimestepVelocityRungeKutta4( dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
     S->Rotation = Normalize(S->Rotation);
     #endif
   }

@@ -1,13 +1,11 @@
 /*
   TODO:
   BUGS:
-    - A weird rotation-bug has crept into the angular integration.
-      Rotations seem to bleed over into scaling.
     - Fix game-loop-memory allocation bug.
       Pressing L activates game-looping. When the loop reloads win32-memory-allocation fails. No idea why, It seems
       to have been like this for a long long time. Before debug-system.
   Rendering:
-    - Easy switching and adding of shader-programs.
+    - Shadows
     - Instance rendering, Want to group geometries together and do as few draw-calls as possible. (when possible, fonts, graphs for example, cubes too)
       - Transforms, Texture-coordinates, Colours (as much data as possible) should be sent in buffers, not as Uniforms.
     - Investigate raytracing
@@ -26,6 +24,7 @@
     - Make a point - point / point-line / point-plane / line-line / line-plane / plane-plane Collision detection
     - Try algorithms other than sequential impulse.
   General:
+    - A good looking demo scene
     - Scene serialization
     - Come up with a "demo-game" to implement using your engine.
     - Editor interface
@@ -237,9 +236,9 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     COMPONENT_FLAG_COLLIDER);
 
   u32 FloorHandle = GetAssetHandle(AssetManager);
-  SetAsset( AssetManager, asset_type::OBJECT, "cube1", FloorHandle);
-  SetAsset( AssetManager, asset_type::MATERIAL, "cube", FloorHandle );
-  SetAsset( AssetManager, asset_type::BITMAP, "cube_kd", FloorHandle );
+  SetAsset( AssetManager, asset_type::OBJECT, "voxel", FloorHandle);
+  SetAsset( AssetManager, asset_type::MATERIAL, "checker_board", FloorHandle );
+  SetAsset( AssetManager, asset_type::BITMAP, "checker_board", FloorHandle );
 
   GetRenderComponent(FloorEntity)->AssetHandle = FloorHandle;
 
@@ -250,6 +249,23 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   component_collider* FloorCollider = GetColliderComponent(FloorEntity);
   FloorCollider->AssetHandle = FloorHandle;
   FloorCollider->AABB = GetMeshAABB( AssetManager, FloorHandle);
+
+  u32 Teapot = NewEntity( EM );
+  NewComponents( EM, Teapot,
+    COMPONENT_FLAG_RENDER   |
+    COMPONENT_FLAG_SPATIAL);
+
+  u32 TeapotHandle = GetAssetHandle(AssetManager);
+  SetAsset( AssetManager, asset_type::OBJECT, "teapot", TeapotHandle);
+  SetAsset( AssetManager, asset_type::MATERIAL, "gold", TeapotHandle );
+  //SetAsset( AssetManager, asset_type::BITMAP, "checker_board", TeapotHandle );
+
+  GetRenderComponent(Teapot)->AssetHandle = TeapotHandle;
+
+  component_spatial* TeapotSpatial = GetSpatialComponent(Teapot);
+  TeapotSpatial->Position = V3( -2,1,0);
+  TeapotSpatial->Scale = V3( 0.1, 0.1, 0.1);
+
 
   u32 SpriteAnimationEntity = NewEntity( EM );
   NewComponents( EM, SpriteAnimationEntity,

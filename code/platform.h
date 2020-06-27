@@ -320,8 +320,8 @@ struct game_render_commands
   s32 ScreenWidthPixels;
   s32 ScreenHeightPixels;
 
-  opengl_program2D RenderProgram2D;
-  opengl_program3D RenderProgram3D;
+  u32 ProgramCount;
+  opengl_program Programs[16];
 
   render_group* MainRenderGroup;
   render_group* DebugRenderGroup;

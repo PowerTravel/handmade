@@ -119,35 +119,37 @@ struct opengl_info
 	b32 GL_blend_func_separate;
 };
 
-struct opengl_program3D
+// A big list of ALL possible uniform names
+enum class open_gl_uniform
 {
-	u32 Program;
-	s32 M;
-	s32 NM;// NoramlModel NM = Transpose( RigidInverse(M) )
-	s32 TM;// A transform Matrix for texture coordinates;
-	s32 P;
-	s32 V;
-
-	// Todo: Create hash-map for these with strings as keys
-	//hash_map<s32> Uniforms
-	s32 lightPosition;
-	s32 cameraPosition;
-	s32 ambientProduct;
-	s32 diffuseProduct;
-	s32 specularProduct;
-	s32 attenuation;
-	s32 shininess;
+  m4_Model,
+  m4_Normal,
+  m4_Texture,
+  m4_Projection,
+  m4_View,
+  v4_AmbientProduct,
+  v4_DiffuseProduct,
+  v4_SpecularProduct,
+  v4_LightPosition,
+  v4_CameraPosition,
+  v2_TextureCoordinate,
+  s_Shininess,
+  count  // 13
 };
 
-struct opengl_program2D
+#define OPEN_GL_UNIFORM_NAME_SIZE 32
+#define OPEN_GL_UNIFORM_COUNT 12
+
+struct uniform_map
+{
+	open_gl_uniform Enum;
+	c8 Name[OPEN_GL_UNIFORM_NAME_SIZE];
+};
+
+struct opengl_program
 {
 	u32 Program;
-	s32 M;
-	s32 P;
-	s32 V;
-
-	// Todo: Create hash-map for these with strings as keys
-	s32 texCoord;
+	s32 Uniforms[OPEN_GL_UNIFORM_COUNT];
 };
 
 struct opengl_buffer_object

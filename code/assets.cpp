@@ -114,8 +114,14 @@ PushIndexData(game_asset_manager* AssetManager, c8* Key, u32 MeshIndex, u32 Coun
   Indeces->MeshHandle = MeshIndex;
   Indeces->Count  = Count;
   Indeces->vi = (u32*) PushCopy(&AssetManager->AssetArena, Count * sizeof(u32), vi);
-  Indeces->ti = (u32*) PushCopy(&AssetManager->AssetArena, Count * sizeof(u32), ti);
-  Indeces->ni = (u32*) PushCopy(&AssetManager->AssetArena, Count * sizeof(u32), ni);
+  if(ti)
+  {
+    Indeces->ti = (u32*) PushCopy(&AssetManager->AssetArena, Count * sizeof(u32), ti);
+  }
+  if(ni)
+  {
+    Indeces->ni = (u32*) PushCopy(&AssetManager->AssetArena, Count * sizeof(u32), ni);
+  }
   Indeces->AABB = AABB;
   str::CopyStrings( str::StringLength( Key ), Key,
                     ArrayCount( Indeces->Name ), Indeces->Name );
@@ -358,12 +364,44 @@ internal void LoadCubeAsset(game_asset_manager* AssetManager)
   }
 }
 
-internal void LoadHeroSpriteSheet(game_asset_manager* AssetManager)
+internal void LoadTeapotAsset(game_asset_manager* AssetManager)
 {
-  bitmap* Bitmap = LoadTGA(&AssetManager->AssetArena,
+  memory_arena* AssetArena = &AssetManager->AssetArena;
+  obj_loaded_file* LoadedObjFile = ReadOBJFile( AssetArena, GlobalGameState->TransientArena,
+   "..\\handmade\\data\\teapot.obj");
+
+  mesh_data* MeshData = LoadedObjFile->MeshData;
+
+  u32 MeshIndex = PushMeshData(AssetManager,
+      MeshData->nv,  MeshData->v,
+      MeshData->nvn, MeshData->vn,
+      MeshData->nvt, MeshData->vt);
+
+  for (u32 i = 0; i < LoadedObjFile->ObjectCount; ++i)
+  {
+    obj_group* LoadedObjectGroup = LoadedObjFile->Objects + i;
+    Assert(LoadedObjectGroup->GroupName);
+    PushIndexData(AssetManager,
+      LoadedObjectGroup->GroupName,
+      MeshIndex,
+      LoadedObjectGroup->Indeces->Count,
+      LoadedObjectGroup->Indeces->vi,
+      LoadedObjectGroup->Indeces->ti,
+      LoadedObjectGroup->Indeces->ni,
+      LoadedObjectGroup->aabb);
+  }
+}
+internal void LoadBitmaps(game_asset_manager* AssetManager)
+{
+  bitmap* HeroBitmap = LoadTGA(&AssetManager->AssetArena,
         "..\\handmade\\data\\Platformer\\Adventurer\\adventurer-Sheet.tga" );
-  u32 BitmapHandle = PushBitmapData(AssetManager, "hero_sprite_sheet", Bitmap->Width, Bitmap->Height, Bitmap->BPP, Bitmap->Pixels);
-  PushMaterialData(AssetManager, "hero_sprite_sheet", CreateMaterial(V4(1,1,1,1),V4(1,1,1,1),V4(1,1,1,1),1,true, BitmapHandle));
+  u32 HeroBitmapHandle = PushBitmapData(AssetManager, "hero_sprite_sheet", HeroBitmap->Width, HeroBitmap->Height, HeroBitmap->BPP, HeroBitmap->Pixels);
+  PushMaterialData(AssetManager, "hero_sprite_sheet", CreateMaterial(V4(1,1,1,1),V4(1,1,1,1),V4(1,1,1,1),1,true, HeroBitmapHandle));
+
+  bitmap* CheckerBitmap = LoadTGA(&AssetManager->AssetArena,
+        "..\\handmade\\data\\checker_board.tga" );
+  u32 CheckerBitmapHandle = PushBitmapData(AssetManager, "checker_board", CheckerBitmap->Width, CheckerBitmap->Height, CheckerBitmap->BPP, CheckerBitmap->Pixels);
+  PushMaterialData(AssetManager, "checker_board", CreateMaterial(V4(1,1,1,1),V4(1,1,1,1),V4(1,1,1,1),1,true, CheckerBitmapHandle));
 }
 
 internal void LoadAssets(game_asset_manager* AssetManager)
@@ -372,7 +410,8 @@ internal void LoadAssets(game_asset_manager* AssetManager)
   LoadPredefinedMeshes(AssetManager);
   stbtt_BakeFontBitmap(AssetManager);
   LoadCubeAsset(AssetManager);
-  LoadHeroSpriteSheet(AssetManager);
+  LoadBitmaps(AssetManager);
+  LoadTeapotAsset(AssetManager);
 }
 
 game_asset_manager* CreateAssetManager()
