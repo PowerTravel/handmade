@@ -166,7 +166,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   SetAsset( GameState->AssetManager, asset_type::BITMAP,   "null",  LightRender->AssetHandle);  // Overrides texture
 
 
-#define State1
+#define State4
 #if defined(State1)
   // BUG: Bug-producing state. Rotation bleeds over into scaling
   r32 ySpace = 1;
@@ -224,7 +224,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
         component_dynamics* CubeDynamics = GetDynamicsComponent(CubeEntity);
         CubeDynamics->LinearVelocity  = V3(0,0,0);
         CubeDynamics->AngularVelocity = V3(0,0,0);
-        CubeDynamics->Mass = 2;
+        CubeDynamics->Mass = 1;
       }
     }
   }
@@ -250,22 +250,35 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   FloorCollider->AssetHandle = FloorHandle;
   FloorCollider->AABB = GetMeshAABB( AssetManager, FloorHandle);
 
+#if 1
   u32 Teapot = NewEntity( EM );
   NewComponents( EM, Teapot,
     COMPONENT_FLAG_RENDER   |
-    COMPONENT_FLAG_SPATIAL);
+    COMPONENT_FLAG_SPATIAL  |
+    COMPONENT_FLAG_COLLIDER |
+    COMPONENT_FLAG_DYNAMICS);
 
   u32 TeapotHandle = GetAssetHandle(AssetManager);
   SetAsset( AssetManager, asset_type::OBJECT, "teapot", TeapotHandle);
   SetAsset( AssetManager, asset_type::MATERIAL, "gold", TeapotHandle );
-  //SetAsset( AssetManager, asset_type::BITMAP, "checker_board", TeapotHandle );
-
+  SetAsset( AssetManager, asset_type::BITMAP, "checker_board", TeapotHandle );
   GetRenderComponent(Teapot)->AssetHandle = TeapotHandle;
 
-  component_spatial* TeapotSpatial = GetSpatialComponent(Teapot);
-  TeapotSpatial->Position = V3( -2,1,0);
-  TeapotSpatial->Scale = V3( 0.1, 0.1, 0.1);
 
+  component_spatial* TeapotSpatial = GetSpatialComponent(Teapot);
+  TeapotSpatial->Position = V3( -2,1,2);
+  TeapotSpatial->Scale = V3( 0.1, 0.1, 0.1);
+  TeapotSpatial->Rotation = RotateQuaternion( 0.5, V3(0.2,1,0) );
+
+  component_collider* TeapotCollider = GetColliderComponent(Teapot);
+  TeapotCollider->AssetHandle = TeapotHandle;
+  TeapotCollider->AABB = GetMeshAABB(AssetManager, TeapotHandle);
+
+  component_dynamics* TeapotDynamics = GetDynamicsComponent(Teapot);
+  TeapotDynamics->LinearVelocity  = V3(0,0,0);
+  TeapotDynamics->AngularVelocity = V3(0,0,0);
+  TeapotDynamics->Mass = 2;
+#endif
 
   u32 SpriteAnimationEntity = NewEntity( EM );
   NewComponents( EM, SpriteAnimationEntity,

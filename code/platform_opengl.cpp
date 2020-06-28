@@ -812,7 +812,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
                         xp.Y, yp.Y, zp.Y, 0,
                         xp.Z, yp.Z, zp.Z, 0,
                         0,   0,   0, 1);
-        
+
         r32 w  = Norm(End-Start);
         r32 h = Line->LineThickness;
 
@@ -830,7 +830,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
 
         m4 TM = M4Identity();
         SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Model, M);
-        SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Model, TM);
+        SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Texture, TM);
 
 
         u32 ObjectIndex = GetEnumeratedObjectIndex(RenderGroup->AssetManager, predefined_mesh::QUAD);
