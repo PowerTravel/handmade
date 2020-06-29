@@ -101,7 +101,7 @@ inline internal void DeclareUniform(opengl_program* Program, open_gl_uniform Enu
 {
   const c8* Name = GetUniformName(Enum);
   Program->Uniforms[(u32)(Enum)] = glGetUniformLocation(Program->Program, Name);
-  Assert(Program->Uniforms[(u32)(Enum)] >= 0);
+ // Assert(Program->Uniforms[(u32)(Enum)] >= 0);
 }
 
 inline internal void SetUniformM4(opengl_program Program, open_gl_uniform Enum, m4 Matrix)
@@ -167,6 +167,114 @@ void main() \n\
 
   return Result;
 }
+
+
+opengl_program OpenGLCreateTextProgram( )
+{
+  char VertexShaderCode[] = {
+"#version  330 core\n\
+layout (location = 0) in vec3 vertice;\n\
+layout (location = 2) in vec2 textureCoordinate;\n\
+layout (location = 3) in vec4 C;\n\
+layout (location = 4) in mat4 M;\n\
+layout (location = 9) in mat4 TM;\n\
+\n\
+uniform mat4 P;  // Projection Matrix - Transforms points from ScreenSpace to UnitQube.\n\
+out vec2 texCoord;\n\
+out vec4 color;\n\
+\n\
+void main()\n\
+{\n\
+  gl_Position = P*M*vec4(vertice,1);\n\
+  vec4 tmpTex = TM*vec4(textureCoordinate,0,1);\n\
+  texCoord = vec2(tmpTex.x,tmpTex.y);\n\
+  color = C;\n\
+}\n\
+"};
+
+  char FragmentShaderCode[] ={
+"#version 330 core\n\
+out vec4 fragColor;\n\
+in vec2 texCoord;\n\
+in vec4 color;\n\
+\n\
+uniform sampler2D ourTexture;\n\
+\n\
+void main() \n\
+{\n\
+  fragColor = texture(ourTexture, texCoord) * color;\n\
+}\n\
+"};
+
+  opengl_program Result = {};
+  Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
+  glUseProgram(Result.Program);
+  DeclareUniform(&Result, open_gl_uniform::m4_Projection);
+  glUseProgram(0);
+
+  return Result;
+}
+
+
+opengl_program OpenGLCreateInstanceTestProgram( )
+{
+  char VertexShaderCode[] = {
+"#version  330 core\n\
+uniform mat4 P;  // Projection Matrix - Transforms points from ScreenSpace to UnitQube.\n\
+layout (location = 0) in vec3 vertice;\n\
+layout (location = 2) in vec2 textureCoordinate;\n\
+layout (location = 3) in vec2 quadPos;\n\
+layout (location = 4) in vec2 quadDim;\n\
+layout (location = 5) in vec2 uvPos;\n\
+layout (location = 6) in vec2 uvDim;\n\
+layout (location = 7) in vec4 color;\n\
+out vec4 vertexColor;\n\
+out vec2 texCoord;\n\
+void main()\n\
+{\n\
+  mat3 projection;\n\
+  projection[0] = vec3(P[0].x,0,0);\n\
+  projection[1] = vec3(0,P[1].y,0);\n\
+  projection[2] = vec3(P[3].x,P[3].y,1);\n\
+\n\
+  mat3 quadTransform;\n\
+  quadTransform[0] = vec3(quadDim.x, 0, 0);\n\
+  quadTransform[1] = vec3(0, quadDim.y, 0);\n\
+  quadTransform[2] = vec3(quadPos.xy, 1);\n\
+\n\
+  mat3 uvTransform;\n\
+  uvTransform[0] = vec3(uvDim.x, 0, 0);\n\
+  uvTransform[1] = vec3(0, uvDim.y, 0);\n\
+  uvTransform[2] = vec3(uvPos.xy, 1);\n\
+\n\
+  gl_Position = vec4((projection*quadTransform*vec3(vertice.xy,1)).xy,0,1);\n\
+  texCoord = (uvTransform*vec3(textureCoordinate.xy,1)).xy;\n\
+  vertexColor = color;\n\
+}\n\
+"};
+
+  char FragmentShaderCode[] ={
+"#version 330 core\n\
+out vec4 fragColor;\n\
+in vec4 vertexColor;\n\
+in vec2 texCoord;\n\
+uniform sampler2D ourTexture;\n\
+void main() \n\
+{\n\
+  fragColor = texture(ourTexture, texCoord) * vertexColor;\n\
+}\n\
+"};
+
+  opengl_program Result = {};
+  Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
+  glUseProgram(Result.Program);
+  DeclareUniform(&Result, open_gl_uniform::m4_Projection);
+  glUseProgram(0);
+
+  return Result;
+}
+
+
 
 opengl_program OpenGLCreateProgram3D()
 {
@@ -304,11 +412,11 @@ void OpenGLSendMeshToGPU( u32* VAO, u32* VBO, u32* EBO, const u32 NrIndeces, con
   // Say how to interpret the data in the VBO
   // The currently bound VBO is implicitly attached to the VAO at the glVertexAttribPointer call
   glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) NULL);           // Vertecis
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, v));  // Vertecis
   glEnableVertexAttribArray(1);
-  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) sizeof(v3) );    // Normals
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, vn) );   // Normals
   glEnableVertexAttribArray(2);
-  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) (2*sizeof(v3))); // Textures
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, vt)); // Textures
 
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EffectiveEBO);
@@ -396,6 +504,12 @@ void OpenGLInitExtensions()
     // Will take as input LinearRGB and convert to sRGB Space.
     // sRGB = Pow(LinearRGB, 1/2.2)
     // glEnable(GL_FRAMEBUFFER_SRGB);
+  }
+
+  if(Info.GL_blend_func_separate)
+  {
+    // Not sure I want this
+    //glEnable(GL_BLEND);
   }
 
   if(Info.GL_blend_func_separate)
@@ -712,6 +826,16 @@ v3 GetPositionFromMatrix( const m4* M )
   return V3(Column(inv,3));
 }
 
+
+struct text_data
+{
+  v2 QuadPos;
+  v2 QuadDim;
+  v2 UVPos;
+  v2 UVDim;
+  v4 Color;
+};
+
 internal void
 OpenGLRenderGroupToOutput( game_render_commands* Commands)
 {
@@ -721,15 +845,16 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
   {
     Commands->Programs[Commands->ProgramCount++] = OpenGLCreateTexturedQuadOverlayProgram();
     Commands->Programs[Commands->ProgramCount++] = OpenGLCreateProgram3D();
+    Commands->Programs[Commands->ProgramCount++] = OpenGLCreateTextProgram();
+    Commands->Programs[Commands->ProgramCount++] = OpenGLCreateInstanceTestProgram();
   }
 
   // Enable depth test
   glEnable(GL_DEPTH_TEST);
-  // Enable Textures
+  // Enable 2D Textures
   glEnable(GL_TEXTURE_2D);
-  // Activates the gl_PointSize = 10.0; variable in the shader
-  // TODO: Remove this, use a billboard instead
-  glEnable(GL_PROGRAM_POINT_SIZE);
+  // Enable 3D Textures
+  glEnable(GL_TEXTURE_3D);
   // Accept fragment if it closer to the camera than the former one
   glDepthFunc(GL_LESS);
 
@@ -739,6 +864,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
   glClearColor(R,G,B, 1.f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glEnable(GL_BLEND);
+  
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   // TODO: Screen Width is now also used for the resolution. Should we decouple ScreenHeightPixels and ResolutionHeightPixels?
@@ -901,46 +1027,122 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
         BindTextureToGPU(RenderTarget, BitmapKeeper);
 
         Assert(ObjectKeeper->BufferHandle.VAO);
-        OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
+        OpenGLDraw( ObjectKeeper->BufferHandle.VAO, DATA_TYPE_TRIANGLE, Object->Count, 0 );
       }break;
-      /*
-      case render_buffer_entry_type::RENDER_ASSET:
-      {
-        entry_type_render_asset* AssetTest = (entry_type_render_asset*) Body;
-        glUniformMatrix4fv(TextOverlay.M,  1, GL_TRUE, AssetTest->M.E);
-        glUniformMatrix4fv(TextOverlay.TM, 1, GL_TRUE, AssetTest->TM.E);
-
-        u32 AssetHandle = AssetTest->AssetHandle;
-        book_keeper* ObjectKeeper = 0;
-        mesh_indeces* Object = GetObject(RenderGroup->AssetManager, AssetHandle, &ObjectKeeper);
-        mesh_data* MeshData = GetMesh(RenderGroup->AssetManager, AssetHandle);
-
-        PushMeshToGPU(&RenderGroup->Arena, Object, ObjectKeeper, MeshData);
-
-
-        material* Material = GetMaterial(RenderGroup->AssetManager, AssetHandle);
-        glUniform4fv( TextOverlay.ambientProduct,  1, Material->AmbientColor.E);
-        glUniform4fv( TextOverlay.diffuseProduct,  1, Material->DiffuseColor.E);
-        glUniform4fv( TextOverlay.specularProduct, 1, Material->SpecularColor.E);
-        //glUniform1f(  TextOverlay.shininess, Material->Shininess);
-
-
-        book_keeper* BitmapKeeper = 0;
-        bitmap* RenderTarget = GetBitmap(RenderGroup->AssetManager, AssetHandle, &BitmapKeeper);
-        BindTextureToGPU(RenderTarget, BitmapKeeper);
-
-        Assert(ObjectKeeper->BufferHandle.VAO);
-        OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
-
-      }break;
-      */
     }
   }
-}
-#if 1
 
-void DisplayBitmapViaOpenGL( u32 Width, u32 Height, void* Memory )
+
+
+    // OpenGLCreateTexturedQuadOverlayProgram
+  opengl_program TextRender = Commands->Programs[3];
+  RenderGroup = Commands->DebugRenderGroup;
+  if( !RenderGroup->First) {return;}
+
+  glUseProgram(TextRender.Program);
+
+
 {
+  SetUniformM4(TextRender, open_gl_uniform::m4_Projection, RenderGroup->ProjectionMatrix);
+  
+  u32 ObjectIndex = 0;
+  u32 TextureIndex = 0;
+  u32 InstanceCount = 0;
+  for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
+  {
+    u8* Head = (u8*) Entry;
+    u8* Body = Head + sizeof(push_buffer_header);
+    if(Entry->Type == render_buffer_entry_type::TEXT)
+    {
+      entry_type_text* Text = (entry_type_text*) Body;
+      ObjectIndex = Text->ObjectIndex;
+      TextureIndex = Text->TextureIndex;
+      ++InstanceCount;
+    }
+  }
+  local_persist r32 fameidx = 0;
+  ++fameidx;
+  temporary_memory TempMem = BeginTemporaryMemory(&RenderGroup->Arena);
+  text_data* Buffer = PushArray(&RenderGroup->Arena, InstanceCount, text_data);
+  u32 InstnceIndex = 0;
+  for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
+  {
+    u8* Head = (u8*) Entry;
+    u8* Body = Head + sizeof(push_buffer_header);
+    if(Entry->Type == render_buffer_entry_type::TEXT)
+    {
+      entry_type_text* Text = (entry_type_text*) Body;
+
+      text_data TexData = {};
+      TexData.Color = V4(1,1,1,1);
+      TexData.QuadPos = Text->QuadPos;
+      TexData.QuadDim = Text->QuadDim;
+      TexData.UVPos = Text->UVPos;
+      TexData.UVDim = Text->UVDim;
+      Buffer[InstnceIndex] = TexData;
+      ++InstnceIndex;
+    }
+  }
+
+  book_keeper* ObjectKeeper = 0;
+  mesh_indeces* Object = GetObjectFromIndex(RenderGroup->AssetManager, ObjectIndex, &ObjectKeeper);
+  mesh_data* MeshData = GetMeshFromIndex(RenderGroup->AssetManager, Object->MeshHandle);
+
+  // Should be handled by AssetManager?
+  // Like, when an entity requests an asset, it get flagged as "In use" and the asset Manager makes sure it
+  // gets sent to the GPU. Here we just want to 
+  PushMeshToGPU(&RenderGroup->Arena, Object, ObjectKeeper, MeshData);
+
+
+  local_persist u32 instanceVBO = 0;
+  if(!instanceVBO)
+  {
+    glBindVertexArray( ObjectKeeper->BufferHandle.VAO );
+
+    glGenBuffers(1, &instanceVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+    glEnableVertexAttribArray(3);
+    glEnableVertexAttribArray(4);
+    glEnableVertexAttribArray(5);
+    glEnableVertexAttribArray(6);
+    glEnableVertexAttribArray(7);
+
+    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,QuadPos)));
+    glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,QuadDim)));
+    glVertexAttribPointer(5, 2, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,UVPos)));
+    glVertexAttribPointer(6, 2, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,UVDim)));
+    glVertexAttribPointer(7, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)OffsetOf(text_data,Color));
+
+    glVertexAttribDivisor(3, 1);
+    glVertexAttribDivisor(4, 1);
+    glVertexAttribDivisor(5, 1);
+    glVertexAttribDivisor(6, 1);
+    glVertexAttribDivisor(7, 1);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glBindVertexArray(0);
+  }
+
+
+  
+  book_keeper* BitmapKeeper = 0;
+  bitmap* RenderTarget = GetBitmapFromIndex(RenderGroup->AssetManager, TextureIndex, &BitmapKeeper);
+
+  // The Texture is bound to this Index
+  BindTextureToGPU(RenderTarget, BitmapKeeper);
+  Assert(ObjectKeeper->BufferHandle.VAO);
+
+  // The geometry and instance buffer is bound to this Index
+  glBindVertexArray( ObjectKeeper->BufferHandle.VAO );
+  
+  glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+  u32 BufferSize = sizeof(text_data)*InstanceCount;
+  // TODO: Investigate BufferSubData
+  glBufferData(GL_ARRAY_BUFFER, BufferSize, Buffer, GL_STREAM_DRAW);
+  EndTemporaryMemory(TempMem);
+
+  glDrawElementsInstanced( GL_TRIANGLES, Object->Count, GL_UNSIGNED_INT, 0, InstanceCount);
+  glBindVertexArray(0);
 }
 
-#endif
+}

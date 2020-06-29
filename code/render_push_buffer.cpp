@@ -34,12 +34,38 @@ void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRec
 
   entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);
 
-
   Body->ObjectIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::OBJECT, "quad");
   Body->Colour = Color;
   Body->TextureIndex = TextureIndex;
   Body->M  = QuadTranslate * QuadScale;
   Body->TM = TextureTranslate * TextureScale;
+}
+
+void DEBUGPushText(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRect, v4 Color)
+{
+  const m4 TextureTranslate = GetTranslationMatrix(V4(TextureRect.X,TextureRect.Y,0,1));
+  const m4 TextureScale     = GetScaleMatrix(V4(TextureRect.W, TextureRect.H,1,0));
+  const m4 QuadTranslate    = GetTranslationMatrix(V4(QuadRect.X, QuadRect.Y,0,1));
+  const m4 QuadScale        = GetScaleMatrix(V4(QuadRect.W, QuadRect.H,1,0));
+
+  push_buffer_header* Header = PushNewHeader( RenderGroup );
+  Header->Type = render_buffer_entry_type::TEXT;
+  Header->RenderState = RENDER_STATE_FILL;
+  
+  entry_type_text* Body = PushStruct(&RenderGroup->Arena, entry_type_text);
+  // TODO: These are static for all textures, make it so that we don't have to do this lookup for every element
+  Body->TextureIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::BITMAP, "debug_font");
+  //Body->TextureIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::BITMAP, "checker_board");
+  Body->ObjectIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::OBJECT, "quad");
+  Body->Colour = Color;
+  Body->M  = QuadTranslate * QuadScale;
+  Body->TM = TextureTranslate * TextureScale;
+
+  Body->UVDim  = V2(TextureRect.W, TextureRect.H);
+  Body->UVPos  = V2(TextureRect.X,TextureRect.Y);
+  
+  Body->QuadDim  = V2(QuadRect.W, QuadRect.H);
+  Body->QuadPos  = V2(QuadRect.X, QuadRect.Y);
 }
 
 rect2f DEBUGTextSize(r32 x, r32 y, render_group* RenderGroup, c8* String)
@@ -128,7 +154,7 @@ void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* Str
       GlyphOffset.Y *= ScreenScaleFactor;
       GlyphOffset.W *= ScreenScaleFactor;
       GlyphOffset.H *= ScreenScaleFactor;
-      DEBUGPushQuad(RenderGroup, GlyphOffset, TextureRect, V4(1,1,1,1), FontMap->BitmapIndex);
+      DEBUGPushText(RenderGroup, GlyphOffset, TextureRect, V4(1,1,1,1));
     }
     PixelPosX += CH->xadvance;
     ++String;

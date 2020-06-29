@@ -27,6 +27,7 @@
 #define GL_SAMPLE_COVERAGE_VALUE          0x80AA
 #define GL_SAMPLE_COVERAGE_INVERT         0x80AB
 #define GL_TEXTURE_2D_MULTISAMPLE         0x9100
+#define GL_TEXTURE_3D                     0x806F
 #define GL_MAX_SAMPLES                    0x8D57
 #define GL_MAX_COLOR_TEXTURE_SAMPLES      0x910E
 #define GL_MAX_DEPTH_TEXTURE_SAMPLES      0x910F

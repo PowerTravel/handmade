@@ -70,6 +70,7 @@ typedef void WINAPI gl_vertex_attrib_i_pointer( GLuint index, GLint size, GLenum
 typedef void WINAPI gl_vertex_attrib_l_pointer( GLuint index, GLint size, GLenum type, GLsizei stride, const GLvoid * pointer);
 typedef void WINAPI gl_enable_vertex_attrib_array( GLuint index);
 typedef void WINAPI gl_disable_vertex_attrib_array( GLuint index);
+typedef void WINAPI gl_vertex_attrib_divisor(GLuint index, GLuint divisor);
 typedef void WINAPI gl_enable_vertex_array_attrib( GLuint vaobj, GLuint index);
 typedef void WINAPI gl_disable_vertex_array_attrib( GLuint vaobj, GLuint index);
 
@@ -82,6 +83,7 @@ global_variable gl_vertex_attrib_i_pointer* glVertexAttribIPointer;
 global_variable gl_vertex_attrib_l_pointer* glVertexAttribLPointer;
 global_variable gl_enable_vertex_attrib_array* glEnableVertexAttribArray;
 global_variable gl_disable_vertex_attrib_array* glDisableVertexAttribArray;
+global_variable gl_vertex_attrib_divisor* glVertexAttribDivisor;
 global_variable gl_enable_vertex_array_attrib* glEnableVertexArrayAttrib;
 global_variable gl_disable_vertex_array_attrib* glDisableVertexArrayAttrib;
 
@@ -107,6 +109,9 @@ global_variable gl_delete_buffer* glDeleteBuffers;
 
 typedef void WINAPI gl_draw_elements(GLenum mode, GLsizei count, GLenum type, const GLvoid * indices);
 global_variable gl_draw_elements*  glDrawElementsA;
+
+typedef void WINAPI gl_draw_elements_instanced(GLenum mode, GLsizei count, GLenum type, const GLvoid * indices, GLsizei instancecount);
+global_variable gl_draw_elements_instanced*  glDrawElementsInstanced;
 
 typedef void WINAPI gl_draw_elements_base_vertex ( GLenum mode, GLsizei count, GLenum type, GLvoid *indices, GLint basevertex );
 global_variable gl_draw_elements_base_vertex* glDrawElementsBaseVertex;
@@ -298,6 +303,7 @@ Win32InitOpenGL(HWND Window)
     glVertexAttribLPointer      = GetOpenGLFunction( gl_vertex_attrib_l_pointer,     "glVertexAttribLPointer");
     glEnableVertexAttribArray   = GetOpenGLFunction( gl_enable_vertex_attrib_array,  "glEnableVertexAttribArray");
     glDisableVertexAttribArray  = GetOpenGLFunction( gl_disable_vertex_attrib_array, "glDisableVertexAttribArray");
+    glVertexAttribDivisor       = GetOpenGLFunction( gl_vertex_attrib_divisor,       "glVertexAttribDivisor");
     glEnableVertexArrayAttrib   = GetOpenGLFunction( gl_enable_vertex_array_attrib,  "glEnableVertexArrayAttrib");
     glDisableVertexArrayAttrib  = GetOpenGLFunction( gl_disable_vertex_array_attrib, "glDisableVertexArrayAttrib");
     glGenBuffers                = GetOpenGLFunction( gl_gen_buffers,                 "glGenBuffers");
@@ -307,6 +313,7 @@ Win32InitOpenGL(HWND Window)
     glIsBuffer                  = GetOpenGLFunction( gl_is_buffer,                   "glIsBuffer");
     glDeleteBuffers             = GetOpenGLFunction( gl_delete_buffer,               "glDeleteBuffers");
     glDrawElementsA             = GetOpenGLFunction( gl_draw_elements,               "glDrawElements");
+    glDrawElementsInstanced     = GetOpenGLFunction( gl_draw_elements_instanced,     "glDrawElementsInstanced");
     glDrawElementsBaseVertex    = GetOpenGLFunction( gl_draw_elements_base_vertex,   "glDrawElementsBaseVertex" );
     glGetUniformLocation        = GetOpenGLFunction( gl_get_uniform_location,        "glGetUniformLocation");
     glUniform1f                 = GetOpenGLFunction( gl_uniform_1f,                  "glUniform1f");

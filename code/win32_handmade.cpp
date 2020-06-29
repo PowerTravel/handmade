@@ -525,20 +525,12 @@ Win32DisplayBufferInWindow( game_render_commands* Commands, HDC aDeviceContext )
     TargetBitMap.Height = GlobalBackBuffer.Height;
     TargetBitMap.Pixels = GlobalBackBuffer.Memory;
 
-    // Clear Screen
-//    DrawRectangle(&TargetBitMap, 0, 0, (r32)TargetBitMap.Width, (r32)TargetBitMap.Height, 1, 1, 1);
-
-    // What was here?
-//    (&TargetBitMap, 1, 1, (r32)TargetBitMap.Width - 2, (r32)TargetBitMap.Height - 2, 0.3, 0.3, 0.3);
-
-//    DrawTriangles( Commands, &TargetBitMap );
-
     if(DisplayViaHardware)
     {
 
-      DisplayBitmapViaOpenGL( GlobalBackBuffer.Width, GlobalBackBuffer.Height, GlobalBackBuffer.Memory );
+      //DisplayBitmapViaOpenGL( GlobalBackBuffer.Width, GlobalBackBuffer.Height, GlobalBackBuffer.Memory );
 
-      SwapBuffers(aDeviceContext);
+      //SwapBuffers(aDeviceContext);
     }else{
       s32 WindowWidth = Commands->ScreenWidthPixels;
       s32 WindowHeight = Commands->ScreenHeightPixels;

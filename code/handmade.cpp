@@ -6,14 +6,22 @@
       to have been like this for a long long time. Before debug-system.
   Rendering:
     - Shadows
-    - Instance rendering, Want to group geometries together and do as few draw-calls as possible. (when possible, fonts, graphs for example, cubes too)
+    (working on) Instance rendering, Want to group geometries together and do as few draw-calls as possible. (when possible, fonts, graphs for example, cubes too)
       - Transforms, Texture-coordinates, Colours (as much data as possible) should be sent in buffers, not as Uniforms.
     - Investigate raytracing
+    - Use 3d Textures and let indexed rendering also specify the depth
   Assets:
     - Separately built Asset file with multithreaded stream-loading. (Maybe using ASSIMP)
     - Add a tag-system. I want to get a random asset with a specific tag. Predefined-Material for example.
+    - Let asset system gather up all the assets (geoms, textures, etx) needed and send them to the gpu in one go at start.
+      - What is to be rendered should be known at the start so we can let the asset manager produce all 'active' assets so the
+        renderer can uppload them to the gpu.
+      - Benefits include:
+        * Can be extended later to stream textures.
+        * More defined responsibilities.
+        
   Debug:
-    - Continue w decent Debug-interface.
+    (working on) Continue w decent Debug-interface.
     - Time-Plots
     - Item selection w mouse
   Physics:
