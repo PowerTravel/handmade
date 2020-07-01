@@ -3,8 +3,9 @@
 #include "entity_components.h"
 #include "epa_collision_data.h"
 
-push_buffer_header* PushNewHeader(render_group* RenderGroup)
+push_buffer_header* PushNewHeader(render_group* RenderGroup, render_buffer_entry_type Type, u32 RenderState)
 {
+  Assert(ArrayCount(RenderGroup->BufferCounts) >= (u32)render_buffer_entry_type::COUNT);
   RenderGroup->ElementCount++;
 
   push_buffer_header* NewEntryHeader = PushStruct(&RenderGroup->Arena, push_buffer_header);
@@ -18,6 +19,10 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup)
     RenderGroup->Last->Next = NewEntryHeader;
     RenderGroup->Last = NewEntryHeader;
   }
+  NewEntryHeader->Type = Type;
+  NewEntryHeader->RenderState = RenderState;
+
+  RenderGroup->BufferCounts[(u32) Type]++;
   return NewEntryHeader;
 }
 
@@ -28,10 +33,7 @@ void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRec
   const m4 QuadTranslate    = GetTranslationMatrix(V4(QuadRect.X, QuadRect.Y,0,1));
   const m4 QuadScale        = GetScaleMatrix(V4(QuadRect.W, QuadRect.H,1,0));
 
-  push_buffer_header* Header = PushNewHeader( RenderGroup );
-  Header->Type = render_buffer_entry_type::OVERLAY_QUAD;
-  Header->RenderState = RENDER_STATE_FILL;
-
+  push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::OVERLAY_QUAD, RENDER_STATE_FILL);
   entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);
 
   Body->ObjectIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::OBJECT, "quad");
@@ -43,10 +45,7 @@ void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRec
 
 void DEBUGPushText(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRect, v4 Color)
 {
-  push_buffer_header* Header = PushNewHeader( RenderGroup );
-  Header->Type = render_buffer_entry_type::TEXT;
-  Header->RenderState = RENDER_STATE_FILL;
-  
+  push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::TEXT, RENDER_STATE_FILL);
   entry_type_text* Body = PushStruct(&RenderGroup->Arena, entry_type_text);
   Body->QuadRect  = QuadRect;
   Body->UVRect  = TextureRect;
@@ -166,6 +165,7 @@ void ResetRenderGroup(render_group* RenderGroup)
   RenderGroup->ElementCount = 0;
   RenderGroup->First = 0;
   RenderGroup->Last = 0;
+  ZeroArray(ArrayCount(RenderGroup->BufferCounts), RenderGroup->BufferCounts);
 }
 
 render_group* InitiateRenderGroup(game_state* GameState, r32 ScreenWidth, r32 ScreenHeight)
@@ -186,9 +186,7 @@ render_group* InitiateRenderGroup(game_state* GameState, r32 ScreenWidth, r32 Sc
 internal inline void
 PushLine(render_group* RenderGroup, v3 Start, v3 End, r32 LineThickness, u32 MaterialIndex)
 {
-  push_buffer_header* Header = PushNewHeader( RenderGroup );
-  Header->Type = render_buffer_entry_type::LINE;
-  Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;;
+  push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::LINE, RENDER_STATE_CULL_BACK | RENDER_STATE_FILL );
   entry_type_line* Body = PushStruct(&RenderGroup->Arena, entry_type_line);
   Body->Start = Start;
   Body->End = End;
@@ -219,7 +217,6 @@ PushBoxFrame(render_group* RenderGroup, m4 M, aabb3f AABB, r32 LineThickness, u3
   PushLine(RenderGroup, P[5], P[6], LineThickness, MaterialIndex);
   PushLine(RenderGroup, P[6], P[7], LineThickness, MaterialIndex);
   PushLine(RenderGroup, P[7], P[4], LineThickness, MaterialIndex);
-
   // Joining Lines
   PushLine(RenderGroup, P[0], P[4], LineThickness, MaterialIndex);
   PushLine(RenderGroup, P[1], P[5], LineThickness, MaterialIndex);
@@ -256,9 +253,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
       component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
       Assert(Spatial);
 
-      push_buffer_header* Header = PushNewHeader( RenderGroup );
-      Header->Type = render_buffer_entry_type::LIGHT;
-
+      push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::LIGHT, 0 );
       entry_type_light* Body = PushStruct(&RenderGroup->Arena, entry_type_light);
       Body->Color  = Light->Color;
       Body->M      = GetModelMatrix(Spatial);
@@ -273,9 +268,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
       component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL );
       component_render* Render = (component_render*) GetComponent(EM, ComponentList, COMPONENT_FLAG_RENDER );
 
-      push_buffer_header* Header = PushNewHeader( RenderGroup );
-      Header->Type = render_buffer_entry_type::RENDER_ASSET;
-      Header->RenderState = RENDER_STATE_CULL_BACK | RENDER_STATE_FILL;
+      push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_CULL_BACK | RENDER_STATE_FILL);
       entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
       Body->AssetHandle = Render->AssetHandle;
       Body->M  = GetModelMatrix(Spatial);
@@ -316,9 +309,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
     for( u32 j = 0; j <Manifold->ContactCount; ++j)
     {
       {
-        push_buffer_header* Header = PushNewHeader( RenderGroup );
-        Header->Type = render_buffer_entry_type::RENDER_ASSET;
-        Header->RenderState = RENDER_STATE_FILL;
+        push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK );
 
         u32 TempHandle = GetTemporaryAssetHandle(AM);
         SetAsset(AM, asset_type::OBJECT, "voxel", TempHandle);
@@ -330,18 +321,11 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
         const m4 Rotation = GetRotationMatrix(Spatial->Rotation);
         const m4 Translation = GetTranslationMatrix(Spatial->Position);
         const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
-        #if 1
         Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].A_ContactWorldSpace,1))*Scale;
-        #else
-        // This is not working for some reason
-        Body->M  = Translation*GetTranslationMatrix(Manifold->Contacts[j].A_ContactModelSpace)*Rotation*Scale;
-        #endif
         Body->NM = Transpose(RigidInverse(Body->M));
       }
       {
-        push_buffer_header* Header = PushNewHeader( RenderGroup );
-        Header->Type = render_buffer_entry_type::RENDER_ASSET;
-        Header->RenderState = RENDER_STATE_FILL;
+        push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK );
 
         u32 TempHandle = GetTemporaryAssetHandle(AM);
         SetAsset(AM, asset_type::OBJECT, "voxel", TempHandle);
@@ -354,11 +338,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
         const m4 Rotation = GetRotationMatrix(Spatial->Rotation);
         const m4 Translation = GetTranslationMatrix(Spatial->Position);
         const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
-        #if 1
         Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].B_ContactWorldSpace,1))*Scale;
-        #else
-        Body->M  =  Translation*GetTranslationMatrix(Manifold->Contacts[j].B_ContactModelSpace)*Rotation*Scale;
-        #endif
         Body->NM = Transpose(RigidInverse(Body->M));
       }
     }

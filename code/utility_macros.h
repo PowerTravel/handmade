@@ -38,8 +38,21 @@
 
 #define CopyArray( Count, Source, Dest ) utils::Copy( (Count)*sizeof( *(Source) ), ( Source ), ( Dest ) )
 
+#define ZeroStruct( Instance ) utils::ZeroSize( sizeof( Instance ), &( Instance ) )
+#define ZeroArray( Count, Pointer ) utils::ZeroSize( Count*sizeof( ( Pointer )[0] ), Pointer )
+
 namespace utils
 {
+  inline void
+  ZeroSize( memory_index Size, void *Ptr )
+  {
+    u8 *Byte = (u8*) Ptr;
+    while(Size--)
+    {
+      *Byte++ = 0;
+    }
+  }
+
   inline void* Copy(midx aSize, void* SourceInit, void* DestInit)
   {
     u8 *Source = (u8 *)SourceInit;

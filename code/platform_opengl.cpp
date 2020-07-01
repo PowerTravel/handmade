@@ -991,23 +991,12 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
 
 {
   SetUniformM4(TextRender, open_gl_uniform::m4_Projection, RenderGroup->ProjectionMatrix);
-  
-  u32 InstanceCount = 0;
-  for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
-  {
-    u8* Head = (u8*) Entry;
-    u8* Body = Head + sizeof(push_buffer_header);
-    if(Entry->Type == render_buffer_entry_type::TEXT)
-    {
-      entry_type_text* Text = (entry_type_text*) Body;
-      ++InstanceCount;
-    }
-  }
 
   local_persist r32 fameidx = 0;
   ++fameidx;
   temporary_memory TempMem = BeginTemporaryMemory(&RenderGroup->Arena);
-  text_data* Buffer = PushArray(&RenderGroup->Arena, InstanceCount, text_data);
+  u32 TextEntries = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::TEXT];
+  text_data* Buffer = PushArray(&RenderGroup->Arena, TextEntries, text_data);
   u32 InstnceIndex = 0;
   for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
   {
@@ -1073,12 +1062,12 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
   glBindVertexArray( ObjectKeeper->BufferHandle.VAO );
   
   glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-  u32 BufferSize = sizeof(text_data)*InstanceCount;
+  u32 BufferSize = sizeof(text_data)*TextEntries;
   // TODO: Investigate BufferSubData
   glBufferData(GL_ARRAY_BUFFER, BufferSize, Buffer, GL_STREAM_DRAW);
   EndTemporaryMemory(TempMem);
 
-  glDrawElementsInstanced( GL_TRIANGLES, Object->Count, GL_UNSIGNED_INT, 0, InstanceCount);
+  glDrawElementsInstanced( GL_TRIANGLES, Object->Count, GL_UNSIGNED_INT, 0, TextEntries);
   glBindVertexArray(0);
 }
 

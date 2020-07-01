@@ -131,18 +131,6 @@ GetEffectiveSizeFor( memory_arena *Arena, memory_index SizeInit, arena_push_para
   return( Size );
 }
 
-#define ZeroStruct( Instance ) ZeroSize( sizeof( Instance ), &( Instance ) )
-#define ZeroArray( Count, Pointer ) ZeroSize( Count*sizeof( ( Pointer )[0] ), Pointer )
-inline void
-ZeroSize( memory_index Size, void *Ptr )
-{
-  u8 *Byte = (u8*) Ptr;
-  while(Size--)
-  {
-    *Byte++ = 0;
-  }
-}
-
 inline void *
 PushSize_( memory_arena *Arena, memory_index SizeInit, arena_push_params Params = DefaultArenaParams() )
 {
@@ -188,7 +176,7 @@ PushSize_( memory_arena *Arena, memory_index SizeInit, arena_push_params Params 
 
   if( Params.Flags & ArenaFlag_ClearToZero )
   {
-    ZeroSize( SizeInit, Result );
+    utils::ZeroSize( SizeInit, Result );
   }
 
   return( Result );

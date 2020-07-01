@@ -24,6 +24,7 @@
     (working on) Continue w decent Debug-interface.
     - Time-Plots
     - Item selection w mouse
+    - Continue on caseys Stream, he gets rid of the __COUNT__ macro gimmic which we also use at some point.
   Physics:
     - Persistent AABB-tree
     - Make gjk-epa sequential impulse work

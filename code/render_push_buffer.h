@@ -11,7 +11,8 @@ enum class render_buffer_entry_type
   RENDER_ASSET,
   OVERLAY_QUAD,
   LINE,
-  TEXT
+  TEXT,
+  COUNT
 };
 
 enum data_type
@@ -111,6 +112,8 @@ struct render_group
   game_asset_manager* AssetManager;
   push_buffer_header* First;
   push_buffer_header* Last;
+
+  u32 BufferCounts[16];
 };
 
 render_group* InitiateRenderGroup(game_state* GameState, r32 ScreenWidth, r32 ScreenHeight);
