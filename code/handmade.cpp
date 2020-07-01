@@ -65,6 +65,7 @@ platform_api Platform;
 #include "system_spatial.cpp"
 #include "system_camera.cpp"
 #include "assets.cpp"
+#include "asset_loading.cpp"
 
 #include "debug.h"
 

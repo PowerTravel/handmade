@@ -311,8 +311,6 @@ EndTicketMutex(ticket_mutex* Mutex)
   AtomicAddu64(&Mutex->Serving, 1);
 }
 
-
-struct render_group;
 struct game_render_commands
 {
   s32 ResolutionWidthPixels;
@@ -323,8 +321,8 @@ struct game_render_commands
   u32 ProgramCount;
   opengl_program Programs[16];
 
-  render_group* MainRenderGroup;
-  render_group* DebugRenderGroup;
+  struct render_group* MainRenderGroup;
+  struct render_group* DebugRenderGroup;
 };
 
 struct game_sound_output_buffer

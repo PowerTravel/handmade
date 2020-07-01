@@ -141,9 +141,6 @@ struct game_asset_manager
   u32* EnumeratedMeshes;
 };
 
-// Creation (Maybe separate DDL later)
-game_asset_manager* CreateAssetManager();
-
 // Game Layer API
 u32 GetAssetHandle(game_asset_manager* AssetManager);
 void SetAsset(game_asset_manager* AssetManager, asset_type AssetType, char* Name, u32 Handle);

@@ -2,7 +2,7 @@
 #include "render_push_buffer.h"
 #include "math/affine_transformations.h"
 #include "bitmap.h"
-
+#include "assets.cpp"
 global_variable u32 TextureBindCount = 0;
 
 internal GLuint OpenGLLoadShader( char* SourceCode, GLenum ShaderType )
@@ -168,66 +168,16 @@ void main() \n\
   return Result;
 }
 
-
-opengl_program OpenGLCreateTextProgram( )
-{
-  char VertexShaderCode[] = {
-"#version  330 core\n\
-layout (location = 0) in vec3 vertice;\n\
-layout (location = 2) in vec2 textureCoordinate;\n\
-layout (location = 3) in vec4 C;\n\
-layout (location = 4) in mat4 M;\n\
-layout (location = 9) in mat4 TM;\n\
-\n\
-uniform mat4 P;  // Projection Matrix - Transforms points from ScreenSpace to UnitQube.\n\
-out vec2 texCoord;\n\
-out vec4 color;\n\
-\n\
-void main()\n\
-{\n\
-  gl_Position = P*M*vec4(vertice,1);\n\
-  vec4 tmpTex = TM*vec4(textureCoordinate,0,1);\n\
-  texCoord = vec2(tmpTex.x,tmpTex.y);\n\
-  color = C;\n\
-}\n\
-"};
-
-  char FragmentShaderCode[] ={
-"#version 330 core\n\
-out vec4 fragColor;\n\
-in vec2 texCoord;\n\
-in vec4 color;\n\
-\n\
-uniform sampler2D ourTexture;\n\
-\n\
-void main() \n\
-{\n\
-  fragColor = texture(ourTexture, texCoord) * color;\n\
-}\n\
-"};
-
-  opengl_program Result = {};
-  Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
-  glUseProgram(Result.Program);
-  DeclareUniform(&Result, open_gl_uniform::m4_Projection);
-  glUseProgram(0);
-
-  return Result;
-}
-
-
-opengl_program OpenGLCreateInstanceTestProgram( )
+opengl_program OpenGLCreateTextProgram()
 {
   char VertexShaderCode[] = {
 "#version  330 core\n\
 uniform mat4 P;  // Projection Matrix - Transforms points from ScreenSpace to UnitQube.\n\
 layout (location = 0) in vec3 vertice;\n\
 layout (location = 2) in vec2 textureCoordinate;\n\
-layout (location = 3) in vec2 quadPos;\n\
-layout (location = 4) in vec2 quadDim;\n\
-layout (location = 5) in vec2 uvPos;\n\
-layout (location = 6) in vec2 uvDim;\n\
-layout (location = 7) in vec4 color;\n\
+layout (location = 3) in vec4 quadRect;\n\
+layout (location = 4) in vec4 uvRect;\n\
+layout (location = 5) in vec4 color;\n\
 out vec4 vertexColor;\n\
 out vec2 texCoord;\n\
 void main()\n\
@@ -238,14 +188,14 @@ void main()\n\
   projection[2] = vec3(P[3].x,P[3].y,1);\n\
 \n\
   mat3 quadTransform;\n\
-  quadTransform[0] = vec3(quadDim.x, 0, 0);\n\
-  quadTransform[1] = vec3(0, quadDim.y, 0);\n\
-  quadTransform[2] = vec3(quadPos.xy, 1);\n\
+  quadTransform[0] = vec3(quadRect.z, 0, 0); // z=Width\n\
+  quadTransform[1] = vec3(0, quadRect.w, 0); // w=Height\n\
+  quadTransform[2] = vec3(quadRect.xy, 1);   // x,y = x,y\n\
 \n\
   mat3 uvTransform;\n\
-  uvTransform[0] = vec3(uvDim.x, 0, 0);\n\
-  uvTransform[1] = vec3(0, uvDim.y, 0);\n\
-  uvTransform[2] = vec3(uvPos.xy, 1);\n\
+  uvTransform[0] = vec3(uvRect.z, 0, 0);\n\
+  uvTransform[1] = vec3(0, uvRect.w, 0);\n\
+  uvTransform[2] = vec3(uvRect.xy, 1);\n\
 \n\
   gl_Position = vec4((projection*quadTransform*vec3(vertice.xy,1)).xy,0,1);\n\
   texCoord = (uvTransform*vec3(textureCoordinate.xy,1)).xy;\n\
@@ -829,10 +779,8 @@ v3 GetPositionFromMatrix( const m4* M )
 
 struct text_data
 {
-  v2 QuadPos;
-  v2 QuadDim;
-  v2 UVPos;
-  v2 UVDim;
+  rect2f QuadRect;
+  rect2f UVRect;
   v4 Color;
 };
 
@@ -846,7 +794,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
     Commands->Programs[Commands->ProgramCount++] = OpenGLCreateTexturedQuadOverlayProgram();
     Commands->Programs[Commands->ProgramCount++] = OpenGLCreateProgram3D();
     Commands->Programs[Commands->ProgramCount++] = OpenGLCreateTextProgram();
-    Commands->Programs[Commands->ProgramCount++] = OpenGLCreateInstanceTestProgram();
   }
 
   // Enable depth test
@@ -1035,7 +982,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
 
 
     // OpenGLCreateTexturedQuadOverlayProgram
-  opengl_program TextRender = Commands->Programs[3];
+  opengl_program TextRender = Commands->Programs[2];
   RenderGroup = Commands->DebugRenderGroup;
   if( !RenderGroup->First) {return;}
 
@@ -1045,8 +992,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
 {
   SetUniformM4(TextRender, open_gl_uniform::m4_Projection, RenderGroup->ProjectionMatrix);
   
-  u32 ObjectIndex = 0;
-  u32 TextureIndex = 0;
   u32 InstanceCount = 0;
   for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
   {
@@ -1055,11 +1000,10 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
     if(Entry->Type == render_buffer_entry_type::TEXT)
     {
       entry_type_text* Text = (entry_type_text*) Body;
-      ObjectIndex = Text->ObjectIndex;
-      TextureIndex = Text->TextureIndex;
       ++InstanceCount;
     }
   }
+
   local_persist r32 fameidx = 0;
   ++fameidx;
   temporary_memory TempMem = BeginTemporaryMemory(&RenderGroup->Arena);
@@ -1072,22 +1016,21 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
     if(Entry->Type == render_buffer_entry_type::TEXT)
     {
       entry_type_text* Text = (entry_type_text*) Body;
-
       text_data TexData = {};
+      TexData.QuadRect = Text->QuadRect;
+      TexData.UVRect = Text->UVRect;
       TexData.Color = V4(1,1,1,1);
-      TexData.QuadPos = Text->QuadPos;
-      TexData.QuadDim = Text->QuadDim;
-      TexData.UVPos = Text->UVPos;
-      TexData.UVDim = Text->UVDim;
       Buffer[InstnceIndex] = TexData;
       ++InstnceIndex;
     }
   }
 
+  // TODO: Make these lookups fast
   book_keeper* ObjectKeeper = 0;
+  u32 ObjectIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::OBJECT, "quad");
   mesh_indeces* Object = GetObjectFromIndex(RenderGroup->AssetManager, ObjectIndex, &ObjectKeeper);
   mesh_data* MeshData = GetMeshFromIndex(RenderGroup->AssetManager, Object->MeshHandle);
-
+  
   // Should be handled by AssetManager?
   // Like, when an entity requests an asset, it get flagged as "In use" and the asset Manager makes sure it
   // gets sent to the GPU. Here we just want to 
@@ -1107,27 +1050,21 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
     glEnableVertexAttribArray(6);
     glEnableVertexAttribArray(7);
 
-    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,QuadPos)));
-    glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,QuadDim)));
-    glVertexAttribPointer(5, 2, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,UVPos)));
-    glVertexAttribPointer(6, 2, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,UVDim)));
-    glVertexAttribPointer(7, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)OffsetOf(text_data,Color));
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,QuadRect)));
+    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,UVRect)));
+    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)OffsetOf(text_data,Color));
 
     glVertexAttribDivisor(3, 1);
     glVertexAttribDivisor(4, 1);
     glVertexAttribDivisor(5, 1);
-    glVertexAttribDivisor(6, 1);
-    glVertexAttribDivisor(7, 1);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glBindVertexArray(0);
   }
 
-
-  
+  u32 TextureIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::BITMAP, "debug_font");
   book_keeper* BitmapKeeper = 0;
   bitmap* RenderTarget = GetBitmapFromIndex(RenderGroup->AssetManager, TextureIndex, &BitmapKeeper);
-
   // The Texture is bound to this Index
   BindTextureToGPU(RenderTarget, BitmapKeeper);
   Assert(ObjectKeeper->BufferHandle.VAO);

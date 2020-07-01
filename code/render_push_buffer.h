@@ -48,20 +48,9 @@ struct entry_type_overlay_quad
 
 struct entry_type_text
 {
-  u32 TextureIndex;
-  u32 ObjectIndex;
-  m4 M;
-  m4 TM;
-
+  rect2f QuadRect;
+  rect2f UVRect;
   v4 Colour;
-  // UVScale takes an uv from [0,0],[1,1] (The whole texture) to [0,0][UVDim.X, UVDim.Y]
-  v2 UVDim;
-  // UVOffset takes an uv from [0,0][UVDimX, UVDimY] (Bottom left) to [UVPos.X,UVPos.X][UVPos.X + UVDimX, UVPos.Y + UVDimY]
-  v2 UVPos;
-  // QuadDim takes a quad from [-0.5,-0.5],[0.5,0.5] (The Unit Quad) to [-QuadDim.X/2,-QuadDim.Y/2][QuadDim.X/2,QuadDim.Y/2]
-  v2 QuadDim;
-  // UVOffset takes an uv from [-QuadDim.X/2,-QuadDim.Y/2][QuadDim.X/2,QuadDim.Y/2] to [QuadPos.X-QuadDim.X/2,QuadPos.Y-QuadDim.Y/2][QuadPos.X+QuadDim.X/2,QuadPos.YQuadDim.Y/2]
-  v2 QuadPos;
 };
 
 struct entry_type_light
