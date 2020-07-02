@@ -10,9 +10,6 @@
 #include "types.h"
 #include "intrinsics.h"
 #include "string.h"
-#include "platform_opengl.h"
-
-
 
 struct win32_offscreen_buffer
 {

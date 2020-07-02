@@ -45,6 +45,7 @@ struct entry_type_overlay_quad
   u32 ObjectIndex;
   m4 M;
   m4 TM;
+  rect2f QuadRect;
 };
 
 struct entry_type_text

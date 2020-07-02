@@ -41,6 +41,7 @@ void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRec
   Body->TextureIndex = TextureIndex;
   Body->M  = QuadTranslate * QuadScale;
   Body->TM = TextureTranslate * TextureScale;
+  Body->QuadRect = QuadRect;
 }
 
 void DEBUGPushText(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRect, v4 Color)

@@ -1852,7 +1852,15 @@ WinMain(  HINSTANCE aInstance,
 
     if (WindowHandle != NULL)
     {
-      Win32InitOpenGL(WindowHandle);
+      game_render_commands RenderCommands = {};
+      HDC DeviceContext = GetDC(WindowHandle);
+      win32_window_dimension Dimension = Win32GetWindowDimension(  WindowHandle );
+      RenderCommands.ResolutionWidthPixels  = GlobalBackBuffer.Width;
+      RenderCommands.ResolutionHeightPixels = GlobalBackBuffer.Height;
+      RenderCommands.ScreenWidthPixels = Dimension.Width;
+      RenderCommands.ScreenHeightPixels = Dimension.Height;
+      ReleaseDC( WindowHandle, DeviceContext);
+      RenderCommands.OpenGL = Win32InitOpenGL(WindowHandle);
 
       // TODO: How do we reliably query this on windows?
       s32 MonitorRefreshHz = 60;
@@ -1995,20 +2003,10 @@ WinMain(  HINSTANCE aInstance,
                                                  TempGameCodeDLLFullPath,
                                                  TempGameCodeLockFullPath);
 
-        game_render_commands RenderCommands = {};
-
         LARGE_INTEGER FrameMarkerClock = {};
         while(GlobalRunning)
         {
           NewInput->ExecutableReloaded = false;
-
-          HDC DeviceContext = GetDC(WindowHandle);
-          win32_window_dimension Dimension = Win32GetWindowDimension(  WindowHandle );
-          RenderCommands.ResolutionWidthPixels  = GlobalBackBuffer.Width;
-          RenderCommands.ResolutionHeightPixels = GlobalBackBuffer.Height;
-          RenderCommands.ScreenWidthPixels = Dimension.Width;
-          RenderCommands.ScreenHeightPixels = Dimension.Height;
-          ReleaseDC( WindowHandle, DeviceContext);
 
           BEGIN_BLOCK(LoadGameCode);
           //TODO: Find out why we need a 2-3 sec wait for loop live code editing to work

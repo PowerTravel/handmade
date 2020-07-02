@@ -124,37 +124,37 @@ inline internal void SetUniformS(opengl_program Program, open_gl_uniform Enum, r
 
 opengl_program OpenGLCreateTexturedQuadOverlayProgram( )
 {
-  char VertexShaderCode[] = {
-"#version  330 core\n\
-layout (location = 0) in vec3 vertice;\n\
-layout (location = 2) in vec2 textureCoordinate;\n\
-\n\
-uniform mat4 P;  // Projection Matrix - Transforms points from ScreenSpace to UnitQube.\n\
-uniform mat4 M;  // Model Matrix - Transforms points from ModelSpace to WorldSpace.\n\
-uniform mat4 TM; // Texture Model Matrix. Shifts texture coordinates in a bitmap\n\
-out vec2 texCoord;\n\
-\n\
-void main()\n\
-{\n\
-  gl_Position = P*M*vec4(vertice,1);\n\
-  vec4 tmpTex = TM*vec4(textureCoordinate,0,1);\n\
-  texCoord = vec2(tmpTex.x,tmpTex.y);\n\
-}\n\
-"};
+  char VertexShaderCode[] = R"FOO(
+#version  330 core
+layout (location = 0) in vec3 vertice;
+layout (location = 2) in vec2 textureCoordinate;
 
-  char FragmentShaderCode[] ={
-"#version 330 core\n\
-out vec4 fragColor;\n\
-\n\
-in vec2 texCoord;\n\
-uniform sampler2D ourTexture;\n\
-uniform vec4 ambientProduct;\n\
-\n\
-void main() \n\
-{\n\
-  fragColor = texture(ourTexture, texCoord) * ambientProduct;\n\
-}\n\
-"};
+uniform mat4 P;  // Projection Matrix - Transforms points from ScreenSpace to UnitQube.
+uniform mat4 M;  // Model Matrix - Transforms points from ModelSpace to WorldSpace.
+uniform mat4 TM; // Texture Model Matrix. Shifts texture coordinates in a bitmap
+out vec2 texCoord;
+
+void main()
+{
+  gl_Position = P*M*vec4(vertice,1);
+  vec4 tmpTex = TM*vec4(textureCoordinate,0,1);
+  texCoord = vec2(tmpTex.x,tmpTex.y);
+}
+)FOO";
+
+  char FragmentShaderCode[] = R"FOO(
+#version 330 core
+out vec4 fragColor;
+
+in vec2 texCoord;
+uniform sampler2D ourTexture;
+uniform vec4 ambientProduct;
+
+void main() 
+{
+  fragColor = texture(ourTexture, texCoord) * ambientProduct;
+}
+)FOO";
 
   opengl_program Result = {};
   Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
@@ -170,50 +170,98 @@ void main() \n\
 
 opengl_program OpenGLCreateTextProgram()
 {
-  char VertexShaderCode[] = {
-"#version  330 core\n\
-uniform mat4 P;  // Projection Matrix - Transforms points from ScreenSpace to UnitQube.\n\
-layout (location = 0) in vec3 vertice;\n\
-layout (location = 2) in vec2 textureCoordinate;\n\
-layout (location = 3) in vec4 quadRect;\n\
-layout (location = 4) in vec4 uvRect;\n\
-layout (location = 5) in vec4 color;\n\
-out vec4 vertexColor;\n\
-out vec2 texCoord;\n\
-void main()\n\
-{\n\
-  mat3 projection;\n\
-  projection[0] = vec3(P[0].x,0,0);\n\
-  projection[1] = vec3(0,P[1].y,0);\n\
-  projection[2] = vec3(P[3].x,P[3].y,1);\n\
-\n\
-  mat3 quadTransform;\n\
-  quadTransform[0] = vec3(quadRect.z, 0, 0); // z=Width\n\
-  quadTransform[1] = vec3(0, quadRect.w, 0); // w=Height\n\
-  quadTransform[2] = vec3(quadRect.xy, 1);   // x,y = x,y\n\
-\n\
-  mat3 uvTransform;\n\
-  uvTransform[0] = vec3(uvRect.z, 0, 0);\n\
-  uvTransform[1] = vec3(0, uvRect.w, 0);\n\
-  uvTransform[2] = vec3(uvRect.xy, 1);\n\
-\n\
-  gl_Position = vec4((projection*quadTransform*vec3(vertice.xy,1)).xy,0,1);\n\
-  texCoord = (uvTransform*vec3(textureCoordinate.xy,1)).xy;\n\
-  vertexColor = color;\n\
-}\n\
-"};
+  char VertexShaderCode[] = R"FOO(
+#version  330 core
+uniform mat4 P;  // Projection Matrix - Transforms points from ScreenSpace to UnitQube.
+layout (location = 0) in vec3 vertice;
+layout (location = 2) in vec2 textureCoordinate;
+layout (location = 3) in vec4 quadRect;
+layout (location = 4) in vec4 uvRect;
+layout (location = 5) in vec4 color;
+out vec4 vertexColor;
+out vec2 texCoord;
+void main()
+{
+  mat3 projection;
+  projection[0] = vec3(P[0].x,0,0);
+  projection[1] = vec3(0,P[1].y,0);
+  projection[2] = vec3(P[3].x,P[3].y,1);
 
-  char FragmentShaderCode[] ={
-"#version 330 core\n\
-out vec4 fragColor;\n\
-in vec4 vertexColor;\n\
-in vec2 texCoord;\n\
-uniform sampler2D ourTexture;\n\
-void main() \n\
-{\n\
-  fragColor = texture(ourTexture, texCoord) * vertexColor;\n\
-}\n\
-"};
+  mat3 quadTransform;
+  quadTransform[0] = vec3(quadRect.z, 0, 0); // z=Width
+  quadTransform[1] = vec3(0, quadRect.w, 0); // w=Height
+  quadTransform[2] = vec3(quadRect.xy, 1);   // x,y = x,y
+
+  mat3 uvTransform;
+  uvTransform[0] = vec3(uvRect.z, 0, 0);
+  uvTransform[1] = vec3(0, uvRect.w, 0);
+  uvTransform[2] = vec3(uvRect.xy, 1);
+
+  gl_Position = vec4((projection*quadTransform*vec3(vertice.xy,1)).xy,0,1);
+  texCoord = (uvTransform*vec3(textureCoordinate.xy,1)).xy;
+  vertexColor = color;
+}
+)FOO";
+
+  char* FragmentShaderCode = R"FOO(
+#version 330 core
+out vec4 fragColor;
+in vec4 vertexColor;
+in vec2 texCoord;
+uniform sampler2D ourTexture;
+void main() 
+{
+  fragColor = texture(ourTexture, texCoord) * vertexColor;
+}
+)FOO";
+
+  opengl_program Result = {};
+  Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
+  glUseProgram(Result.Program);
+  DeclareUniform(&Result, open_gl_uniform::m4_Projection);
+  glUseProgram(0);
+
+  return Result;
+}
+
+// TODO, merge this shader and OpenGLCreateTextProgram when we support 3D textures and can index the 
+//       white texture and the font map and send the texture idx in the instancing array
+opengl_program OpenGLCreateUntexturedQuadOverlayQuadProgram()
+{
+  char VertexShaderCode[] = R"FOO(
+#version  330 core
+uniform mat4 P;  // Projection Matrix - Transforms points from ScreenSpace to UnitQube.
+layout (location = 0) in vec3 vertice;
+layout (location = 3) in vec4 quadRect;
+layout (location = 4) in vec4 color;
+out vec4 vertexColor;
+void main()
+{
+  mat3 projection;
+  projection[0] = vec3(P[0].x,0,0);
+  projection[1] = vec3(0,P[1].y,0);
+  projection[2] = vec3(P[3].x,P[3].y,1);
+
+  mat3 quadTransform;
+  quadTransform[0] = vec3(quadRect.z, 0, 0); // z=Width
+  quadTransform[1] = vec3(0, quadRect.w, 0); // w=Height
+  quadTransform[2] = vec3(quadRect.xy, 1);   // x,y = x,y
+
+  gl_Position = vec4((projection*quadTransform*vec3(vertice.xy,1)).xy,0,1);
+  vertexColor = color;
+}
+)FOO";
+
+  char FragmentShaderCode[] = R"FOO(
+#version 330 core
+out vec4 fragColor;
+in vec4 vertexColor;
+void main() 
+{
+  fragColor = vertexColor;
+}
+)FOO";
+
 
   opengl_program Result = {};
   Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
@@ -228,71 +276,71 @@ void main() \n\
 
 opengl_program OpenGLCreateProgram3D()
 {
-   global_variable char VertexShaderCode[] = {
-"#version  330 core\n\
-layout (location = 0) in vec3 vertice;\n\
-layout (location = 1) in vec3 verticeNormal;\n\
-layout (location = 2) in vec2 textureCoordinate;\n\
-\n\
-uniform mat4 M;  // Model Matrix - Transforms points from ModelSpace to WorldSpace.\n\
-                 // Includes Translation, Rotation and Scaling\n\
-uniform mat4 NM; // Normal Model Matrix = Transpose( RigidInverse(M) );\n\
-                 // Keeps normals correct under shearing scaling\n\
-uniform mat4 TM; // Texture Model Matrix. Shifts texture coordinates in a bitmap\n\
-uniform mat4 V;  // View Matrix - Camera Position and Orientation in WorldSpace\n\
-uniform mat4 P;  // Projection Matrix - Scales the visible world into the unit cube.\n\
-\n\
-// Premultiplied color values\n\
-uniform vec4 ambientProduct, diffuseProduct, specularProduct; \n\
-\n\
-uniform vec4 lightPosition;  // World space\n\
-uniform vec4 cameraPosition; // World space\n\
-\n\
-uniform float shininess; // Shininess of material\n\
-\n\
-out vec4 vertexColor;\n\
-out vec2 texCoord;\n\
-\n\
-void main()\n\
-{\n\
-\n\
-// Variable Descriptions:\n\
-// N [Normal Vector], Object Space\n\
-// L [Light Vector] Unit vector of vertex to light in world space;\n\
-// E [Eye Vector]   Unit vector of vertex to camera in world space;\n\
-// H [Half Vector]  Unit vector pointing between between L and E;\n\
-\n\
-  vec4 Vertice = M * vec4(vertice,1);\n\
-  vec4 N = normalize( NM * vec4(verticeNormal,0) );\n\
-  vec4 L = normalize( lightPosition - Vertice );\n\
-  float Kd = max(dot(L,N), 0.0);\n\
-\n\
-  vec4 E = normalize( cameraPosition - Vertice );\n\
-  vec4 H = normalize(L+E);\n\
-  float Ks = pow(max(dot(H,N), 0.0 ), shininess);\n\
-\n\
-  vertexColor = ambientProduct + Kd*(diffuseProduct + Ks*specularProduct);\n\
-\n\
-  vec4 tmpTex = TM*vec4(textureCoordinate,0,1);\n\
-  texCoord = vec2(tmpTex.x,tmpTex.y);\n\
-  gl_Position = P*V*Vertice;\n\
-}\n\
-"};
+   char* VertexShaderCode =
+R"FOO(
+#version  330 core
+layout (location = 0) in vec3 vertice;
+layout (location = 1) in vec3 verticeNormal;
+layout (location = 2) in vec2 textureCoordinate;
 
-  global_variable char FragmentShaderCode[] =
-  {
-"#version 330 core\n\
-in vec4  vertexColor;\n\
-in vec2  texCoord;\n\
-out vec4 fragColor;\n\
-\n\
-uniform sampler2D ourTexture;\n\
-\n\
-void main() \n\
-{\n\
-  fragColor = texture(ourTexture, texCoord) * vertexColor;\n\
-}\n\
-"};
+uniform mat4 M;  // Model Matrix - Transforms points from ModelSpace to WorldSpace.
+                 // Includes Translation, Rotation and Scaling
+uniform mat4 NM; // Normal Model Matrix = Transpose( RigidInverse(M) );
+                 // Keeps normals correct under shearing scaling
+uniform mat4 TM; // Texture Model Matrix. Shifts texture coordinates in a bitmap
+uniform mat4 V;  // View Matrix - Camera Position and Orientation in WorldSpace
+uniform mat4 P;  // Projection Matrix - Scales the visible world into the unit cube.
+
+// Premultiplied color values
+uniform vec4 ambientProduct, diffuseProduct, specularProduct; 
+
+uniform vec4 lightPosition;  // World space
+uniform vec4 cameraPosition; // World space
+
+uniform float shininess; // Shininess of material
+
+out vec4 vertexColor;
+out vec2 texCoord;
+
+void main()
+{
+
+// Variable Descriptions:
+// N [Normal Vector], Object Space
+// L [Light Vector] Unit vector of vertex to light in world space;
+// E [Eye Vector]   Unit vector of vertex to camera in world space;
+// H [Half Vector]  Unit vector pointing between between L and E;
+
+  vec4 Vertice = M * vec4(vertice,1);
+  vec4 N = normalize( NM * vec4(verticeNormal,0) );
+  vec4 L = normalize( lightPosition - Vertice );
+  float Kd = max(dot(L,N), 0.0);
+
+  vec4 E = normalize( cameraPosition - Vertice );
+  vec4 H = normalize(L+E);
+  float Ks = pow(max(dot(H,N), 0.0 ), shininess);
+
+  vertexColor = ambientProduct + Kd*(diffuseProduct + Ks*specularProduct);
+
+  vec4 tmpTex = TM*vec4(textureCoordinate,0,1);
+  texCoord = vec2(tmpTex.x,tmpTex.y);
+  gl_Position = P*V*Vertice;
+}
+)FOO";
+
+  char* FragmentShaderCode = R"FOO(
+#version 330 core
+in vec4  vertexColor;
+in vec2  texCoord;
+out vec4 fragColor;
+
+uniform sampler2D ourTexture;
+
+void main() 
+{
+  fragColor = texture(ourTexture, texCoord) * vertexColor;
+}
+)FOO";
 
   opengl_program Result = {};
   Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
@@ -314,6 +362,13 @@ void main() \n\
   glUseProgram(0);
 
   return  Result;
+}
+
+void InitOpenGL(open_gl* OpenGL)
+{
+  OpenGL->PhongShadingProgram = OpenGLCreateProgram3D();
+  OpenGL->QuadOverlayProgram = OpenGLCreateUntexturedQuadOverlayQuadProgram();
+  OpenGL->TextOverlayProgram = OpenGLCreateTextProgram();
 }
 
 
@@ -784,17 +839,16 @@ struct text_data
   v4 Color;
 };
 
+struct overlay_quad_data
+{
+  rect2f QuadRect;
+  v4 Color;
+};
+
 internal void
 OpenGLRenderGroupToOutput( game_render_commands* Commands)
 {
   render_group* RenderGroup = Commands->MainRenderGroup;
-
-  if(!Commands->ProgramCount)
-  {
-    Commands->Programs[Commands->ProgramCount++] = OpenGLCreateTexturedQuadOverlayProgram();
-    Commands->Programs[Commands->ProgramCount++] = OpenGLCreateProgram3D();
-    Commands->Programs[Commands->ProgramCount++] = OpenGLCreateTextProgram();
-  }
 
   // Enable depth test
   glEnable(GL_DEPTH_TEST);
@@ -820,7 +874,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
   OpenGLSetViewport( DesiredAspectRatio, Commands->ScreenWidthPixels, Commands->ScreenHeightPixels );
 
   m4 Identity = M4Identity();
-  opengl_program PhongShadingProgram = Commands->Programs[1];
+  opengl_program PhongShadingProgram = Commands->OpenGL.PhongShadingProgram;
   glUseProgram( PhongShadingProgram.Program);
 
   SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Projection, RenderGroup->ProjectionMatrix);
@@ -932,143 +986,133 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
   }
 
 
-  // OpenGLCreateTexturedQuadOverlayProgram
-  opengl_program DebugOverlay = Commands->Programs[0];
-  RenderGroup = Commands->DebugRenderGroup;
-
-  glUseProgram(DebugOverlay.Program);
-
-  SetUniformM4(DebugOverlay, open_gl_uniform::m4_Projection, RenderGroup->ProjectionMatrix);
-
-  // No need to clearh the depth buffer if we disable depth test
-  glDisable(GL_DEPTH_TEST);
-  // Enable Textures
-  glEnable(GL_TEXTURE_2D);
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-  // For each render group
-  for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
-  {
-    u8* Head = (u8*) Entry;
-    u8* Body = Head + sizeof(push_buffer_header);
-    setOpenGLState(Entry->RenderState);
-    switch(Entry->Type)
-    {
-      case render_buffer_entry_type::OVERLAY_QUAD:
-      {
-        entry_type_overlay_quad* Quad = (entry_type_overlay_quad*) Body;
-        SetUniformM4(DebugOverlay, open_gl_uniform::m4_Model, Quad->M);
-        SetUniformM4(DebugOverlay, open_gl_uniform::m4_Texture, Quad->TM);
-
-        book_keeper* ObjectKeeper = 0;
-        mesh_indeces* Object = GetObjectFromIndex(RenderGroup->AssetManager, Quad->ObjectIndex, &ObjectKeeper);
-        mesh_data* MeshData = GetMeshFromIndex(RenderGroup->AssetManager, Object->MeshHandle);
-
-        PushMeshToGPU(&RenderGroup->Arena, Object, ObjectKeeper, MeshData);
-
-        SetUniformV4(DebugOverlay, open_gl_uniform::v4_AmbientProduct, Quad->Colour);
-
-        book_keeper* BitmapKeeper = 0;
-        bitmap* RenderTarget = GetBitmapFromIndex(RenderGroup->AssetManager, Quad->TextureIndex, &BitmapKeeper);
-        BindTextureToGPU(RenderTarget, BitmapKeeper);
-
-        Assert(ObjectKeeper->BufferHandle.VAO);
-        OpenGLDraw( ObjectKeeper->BufferHandle.VAO, DATA_TYPE_TRIANGLE, Object->Count, 0 );
-      }break;
-    }
-  }
-
-
-
-    // OpenGLCreateTexturedQuadOverlayProgram
-  opengl_program TextRender = Commands->Programs[2];
+  
   RenderGroup = Commands->DebugRenderGroup;
   if( !RenderGroup->First) {return;}
-
-  glUseProgram(TextRender.Program);
-
-
-{
-  SetUniformM4(TextRender, open_gl_uniform::m4_Projection, RenderGroup->ProjectionMatrix);
-
-  local_persist r32 fameidx = 0;
-  ++fameidx;
   temporary_memory TempMem = BeginTemporaryMemory(&RenderGroup->Arena);
-  u32 TextEntries = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::TEXT];
-  text_data* Buffer = PushArray(&RenderGroup->Arena, TextEntries, text_data);
-  u32 InstnceIndex = 0;
-  for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
+
   {
-    u8* Head = (u8*) Entry;
-    u8* Body = Head + sizeof(push_buffer_header);
-    if(Entry->Type == render_buffer_entry_type::TEXT)
+    // TODO: Make these lookups fast
+    book_keeper* ObjectKeeper = 0;
+    u32 QuadIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::OBJECT, "quad");
+    mesh_indeces* QuadObject = GetObjectFromIndex(RenderGroup->AssetManager, QuadIndex, &ObjectKeeper);
+    mesh_data* QuadMesh = GetMeshFromIndex(RenderGroup->AssetManager, QuadObject->MeshHandle);
+    PushMeshToGPU(&RenderGroup->Arena, QuadObject, ObjectKeeper, QuadMesh);
+
+
+    u32 TextEntries = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::TEXT];
+    u32 OverlayQuadEntries = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::OVERLAY_QUAD];
+    text_data* TextBuffer = PushArray(&RenderGroup->Arena, TextEntries, text_data);
+    overlay_quad_data* QuadBuffer = PushArray(&RenderGroup->Arena, OverlayQuadEntries, overlay_quad_data);
+    u32 QuadInstnceIndex = 0;
+    u32 TextInstnceIndex = 0;
+    for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
     {
-      entry_type_text* Text = (entry_type_text*) Body;
-      text_data TexData = {};
-      TexData.QuadRect = Text->QuadRect;
-      TexData.UVRect = Text->UVRect;
-      TexData.Color = V4(1,1,1,1);
-      Buffer[InstnceIndex] = TexData;
-      ++InstnceIndex;
+      u8* Head = (u8*) Entry;
+      u8* Body = Head + sizeof(push_buffer_header);
+      switch(Entry->Type)
+      {
+        case render_buffer_entry_type::OVERLAY_QUAD:
+        {
+          entry_type_overlay_quad* Quad = (entry_type_overlay_quad*) Body;
+         
+          overlay_quad_data QuadData = {};
+          QuadData.QuadRect = Quad->QuadRect;
+          QuadData.Color = Quad->Colour;
+          QuadBuffer[QuadInstnceIndex++] = QuadData;
+        }break;
+        case render_buffer_entry_type::TEXT:
+        {
+          text_data TexData = {};
+          entry_type_text* Text = (entry_type_text*) Body;
+          TexData.QuadRect = Text->QuadRect;
+          TexData.UVRect = Text->UVRect;
+          TexData.Color = V4(1,1,1,1);
+          TextBuffer[TextInstnceIndex++] = TexData;
+        }break;
+      }
     }
-  }
 
-  // TODO: Make these lookups fast
-  book_keeper* ObjectKeeper = 0;
-  u32 ObjectIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::OBJECT, "quad");
-  mesh_indeces* Object = GetObjectFromIndex(RenderGroup->AssetManager, ObjectIndex, &ObjectKeeper);
-  mesh_data* MeshData = GetMeshFromIndex(RenderGroup->AssetManager, Object->MeshHandle);
-  
-  // Should be handled by AssetManager?
-  // Like, when an entity requests an asset, it get flagged as "In use" and the asset Manager makes sure it
-  // gets sent to the GPU. Here we just want to 
-  PushMeshToGPU(&RenderGroup->Arena, Object, ObjectKeeper, MeshData);
+    local_persist u32 quadInstanceVBO = 0;
+    local_persist u32 textInstanceVBO = 0;
+    if(!quadInstanceVBO)
+    {
+      glGenBuffers(1, &quadInstanceVBO);
+      glGenBuffers(1, &textInstanceVBO);
+    }
 
+    opengl_program QuadOverlayProgram = Commands->OpenGL.QuadOverlayProgram;
+    glUseProgram(QuadOverlayProgram.Program);
+    SetUniformM4(QuadOverlayProgram, open_gl_uniform::m4_Projection, RenderGroup->ProjectionMatrix);
 
-  local_persist u32 instanceVBO = 0;
-  if(!instanceVBO)
-  {
+    // No need to clearh the depth buffer if we disable depth test
+    glDisable(GL_DEPTH_TEST);
+    // Enable Textures
+    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    // The geometry and instance buffer is bound to this Index
     glBindVertexArray( ObjectKeeper->BufferHandle.VAO );
+    glBindBuffer(GL_ARRAY_BUFFER, quadInstanceVBO);
+    glEnableVertexAttribArray(3);
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(overlay_quad_data), (void *)(OffsetOf(overlay_quad_data,QuadRect)));
+    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(overlay_quad_data), (void *)OffsetOf(overlay_quad_data,Color));
+    glVertexAttribDivisor(3, 1);
+    glVertexAttribDivisor(4, 1);
+    //glBindBuffer(GL_ARRAY_BUFFER, 0);
+    u32 QuadBufferSize = sizeof(overlay_quad_data)*OverlayQuadEntries;
+    // TODO: Investigate BufferSubData
+    glBufferData(GL_ARRAY_BUFFER, QuadBufferSize, QuadBuffer, GL_STREAM_DRAW);
 
-    glGenBuffers(1, &instanceVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+
+    glDrawElementsInstanced( GL_TRIANGLES, QuadObject->Count, GL_UNSIGNED_INT, 0, OverlayQuadEntries);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
+    opengl_program TextRenderProgram = Commands->OpenGL.TextOverlayProgram;
+    glUseProgram(TextRenderProgram.Program);
+
+    SetUniformM4(TextRenderProgram, open_gl_uniform::m4_Projection, RenderGroup->ProjectionMatrix);    
+
+    u32 TextureIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::BITMAP, "debug_font");
+    book_keeper* BitmapKeeper = 0;
+    bitmap* RenderTarget = GetBitmapFromIndex(RenderGroup->AssetManager, TextureIndex, &BitmapKeeper);
+    // The Texture is bound to this Index
+    BindTextureToGPU(RenderTarget, BitmapKeeper);
+
+    // The geometry and instance buffer is bound to this Index
+    glBindVertexArray( ObjectKeeper->BufferHandle.VAO );
+    glBindBuffer(GL_ARRAY_BUFFER, textInstanceVBO);
     glEnableVertexAttribArray(3);
     glEnableVertexAttribArray(4);
     glEnableVertexAttribArray(5);
-    glEnableVertexAttribArray(6);
-    glEnableVertexAttribArray(7);
-
     glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,QuadRect)));
     glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,UVRect)));
     glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)OffsetOf(text_data,Color));
-
     glVertexAttribDivisor(3, 1);
     glVertexAttribDivisor(4, 1);
     glVertexAttribDivisor(5, 1);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    u32 TextBufferSize = sizeof(text_data)*TextEntries;
 
+    glBufferData(GL_ARRAY_BUFFER, TextBufferSize, TextBuffer, GL_STREAM_DRAW);
+
+
+
+    // glDrawElementsInstanced is used when we have two buffers (1 Buffer with a geometry and another buffer with Instance Data )
+    // https://stackoverflow.com/questions/24516993/is-it-possible-to-use-index-buffer-objects-ibo-with-the-function-glmultidrawe
+    
+    // glDrawElements uses 1 VertexBuffer and 1 IndexBuffer and draws the VertexBuffer using an offset into IndexBuffer
+    
+    // glMultiDrawElements uses 1 VertexBuffer and 1 IndexBuffer and draws n number of whats in the VertexBuffer using an offset into IndexBuffer specific for each n
+    
+    // glDrawElementsInstanced uses 2 VertexBuffers and 1 IndexBuffer. 1 VertexBuffer is coupled with the IndexBuffer and the other VertexBuffer has data to be applied per element
+    glDrawElementsInstanced( GL_TRIANGLES, QuadObject->Count, GL_UNSIGNED_INT, 0, TextEntries);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
   }
 
-  u32 TextureIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::BITMAP, "debug_font");
-  book_keeper* BitmapKeeper = 0;
-  bitmap* RenderTarget = GetBitmapFromIndex(RenderGroup->AssetManager, TextureIndex, &BitmapKeeper);
-  // The Texture is bound to this Index
-  BindTextureToGPU(RenderTarget, BitmapKeeper);
-  Assert(ObjectKeeper->BufferHandle.VAO);
-
-  // The geometry and instance buffer is bound to this Index
-  glBindVertexArray( ObjectKeeper->BufferHandle.VAO );
-  
-  glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
-  u32 BufferSize = sizeof(text_data)*TextEntries;
-  // TODO: Investigate BufferSubData
-  glBufferData(GL_ARRAY_BUFFER, BufferSize, Buffer, GL_STREAM_DRAW);
   EndTemporaryMemory(TempMem);
-
-  glDrawElementsInstanced( GL_TRIANGLES, Object->Count, GL_UNSIGNED_INT, 0, TextEntries);
-  glBindVertexArray(0);
-}
 
 }

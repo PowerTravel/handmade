@@ -116,6 +116,8 @@ global_variable gl_draw_elements_instanced*  glDrawElementsInstanced;
 typedef void WINAPI gl_draw_elements_base_vertex ( GLenum mode, GLsizei count, GLenum type, GLvoid *indices, GLint basevertex );
 global_variable gl_draw_elements_base_vertex* glDrawElementsBaseVertex;
 
+typedef void gl_multi_draw_elements(GLenum mode, const GLsizei * count,GLenum type, const void * const * indices, GLsizei drawcount);
+global_variable gl_multi_draw_elements* glMultiDrawElements;
 
 typedef GLint WINAPI gl_get_uniform_location(GLuint program, const GLchar *name);
 typedef void WINAPI gl_uniform_1f(GLint location, GLfloat v0);
@@ -204,7 +206,14 @@ void* _GetOpenGLFunction( char* name )
 
 #define GetOpenGLFunction( type, name ) ( (type*) _GetOpenGLFunction( name ))
 
-internal void
+internal void*
+Win32RenderAlloc(umm Size)
+{
+  void* Result = VirtualAlloc(0, Size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+  return Result;
+}
+
+internal open_gl
 Win32InitOpenGL(HWND Window)
 {
   HDC  WindowDC = GetDC(Window);
@@ -315,6 +324,7 @@ Win32InitOpenGL(HWND Window)
     glDrawElementsA             = GetOpenGLFunction( gl_draw_elements,               "glDrawElements");
     glDrawElementsInstanced     = GetOpenGLFunction( gl_draw_elements_instanced,     "glDrawElementsInstanced");
     glDrawElementsBaseVertex    = GetOpenGLFunction( gl_draw_elements_base_vertex,   "glDrawElementsBaseVertex" );
+    glMultiDrawElements         = GetOpenGLFunction( gl_multi_draw_elements,         "glMultiDrawElements" );
     glGetUniformLocation        = GetOpenGLFunction( gl_get_uniform_location,        "glGetUniformLocation");
     glUniform1f                 = GetOpenGLFunction( gl_uniform_1f,                  "glUniform1f");
     glUniform2f                 = GetOpenGLFunction( gl_uniform_2f,                  "glUniform2f");
@@ -349,9 +359,14 @@ Win32InitOpenGL(HWND Window)
     glUniformMatrix4x2fv        = GetOpenGLFunction( gl_uniform_matrix_4x2fv,        "glUniformMatrix4x2fv");
     glUniformMatrix3x4fv        = GetOpenGLFunction( gl_uniform_matrix_3x4fv,        "glUniformMatrix3x4fv");
     glUniformMatrix4x3fv        = GetOpenGLFunction( gl_uniform_matrix_4x3fv,        "glUniformMatrix4x3fv");
+
   }else{
     INVALID_CODE_PATH
   }
   ReleaseDC(Window, WindowDC);
+
+  open_gl OpenGL = {};
+  InitOpenGL(&OpenGL);
+  return OpenGL;
 
 }

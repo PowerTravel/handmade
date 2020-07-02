@@ -138,6 +138,7 @@ enum class open_gl_uniform
   count  // 13
 };
 
+
 #define OPEN_GL_UNIFORM_NAME_SIZE 32
 #define OPEN_GL_UNIFORM_COUNT 12
 
@@ -150,6 +151,7 @@ struct uniform_map
 struct opengl_program
 {
 	u32 Program;
+  u32 VAO;
 	s32 Uniforms[OPEN_GL_UNIFORM_COUNT];
 };
 
@@ -162,4 +164,29 @@ struct opengl_buffer_object
 	u32 FaceBuffer;
 };
 
+
+struct open_gl
+{
+  // Render Programs
+  bool Initialized;
+  opengl_program PhongShadingProgram;
+  opengl_program QuadOverlayProgram;
+  opengl_program TextOverlayProgram;
+
+  // Frame Buffers (Intermediate Render Targets)
+
+  // Texture Queue (Keeping all our textures?)
+
+  // Non-Instanced Geoms
+  // Single VAO InstancedVertexArray (For textured vertices)
+  // Single IndexArray (Each object has an offset into this array)
+
+
+  // Instanced Geoms 
+  // Single VAO InstancedVertexArray (For shared object data) (geometries, uv-coords, normals)
+  // Single IndexArray
+  // Single VAO InstanceArray        (For per object data, position, color, texture index) 
+};
+
+void InitOpenGL(open_gl* OpenGL);
 void OpenGLInitExtensions();
