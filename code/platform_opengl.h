@@ -90,7 +90,20 @@
 #define GL_CLAMP_TO_EDGE                  0x812F
 #define GL_MIRRORED_REPEAT                0x8370
 
+#define GL_TEXTURE_2D_ARRAY               0x8C1A
+
+#define GL_TEXTURE0                       0x84C0
+#define GL_TEXTURE1                       0x84C1
+#define GL_TEXTURE2                       0x84C2
+#define GL_TEXTURE3                       0x84C3
+#define GL_TEXTURE4                       0x84C4
+#define GL_TEXTURE5                       0x84C5
+#define GL_TEXTURE6                       0x84C6
+#define GL_TEXTURE7                       0x84C7
+
 #include "math/vector_math.h"
+
+
 
 struct opengl_handles
 {
@@ -168,7 +181,12 @@ struct opengl_buffer_object
 struct open_gl
 {
   // Render Programs
-  bool Initialized;
+  opengl_info Info;
+  
+  u32 DefaultInternalTextureFormat;
+  u32 DefaultTextureFormat;
+  u32 MaxTextureCount;
+
   opengl_program PhongShadingProgram;
   opengl_program QuadOverlayProgram;
   opengl_program TextOverlayProgram;
@@ -176,6 +194,10 @@ struct open_gl
   // Frame Buffers (Intermediate Render Targets)
 
   // Texture Queue (Keeping all our textures?)
+
+  // Special Textures
+  u32 SignleWhitePixelTexture;
+  u32 TextureArray;
 
   // Non-Instanced Geoms
   // Single VAO InstancedVertexArray (For textured vertices)
@@ -189,4 +211,4 @@ struct open_gl
 };
 
 void InitOpenGL(open_gl* OpenGL);
-void OpenGLInitExtensions();
+

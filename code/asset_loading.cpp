@@ -145,8 +145,8 @@ internal void stbtt_BakeFontBitmap(game_asset_manager* AssetManager)
   // Todo: Insetead of saving the 8bit font map to a 32 bit, write a custom shader for the 8bit
   //       texture that can render it with colour.
   u32 BPP = 32;
-  u32 Width = 1028;
-  u32 Height = 1028;
+  u32 Width = 512;
+  u32 Height = 512;
 
   u8* Pixels8BPP = PushArray(GlobalGameState->TransientArena, Width * Height, u8);
 

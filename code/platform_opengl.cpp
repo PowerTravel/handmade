@@ -28,7 +28,8 @@ internal GLuint OpenGLLoadShader( char* SourceCode, GLenum ShaderType )
     snprintf((char*)Tmp, CompileMessageSize, "%s", CompileMessage);
     //VirtualFree(CompileMessage, 0, MEM_RELEASE );
     //VirtualFree(Tmp, 0, MEM_RELEASE );
-    Assert(0);
+    OutputDebugStringA(CompileMessage);
+    //Assert(0);
     exit(1);
   }
   #endif
@@ -58,16 +59,17 @@ GLuint OpenGLCreateProgram( char* VertexShaderCode, char* FragmentShaderCode )
   glGetProgramiv(Program, GL_LINK_STATUS, &Linked);
   if( !Linked )
   {
-    void* ProgramMessage;
+    char* ProgramMessage;
     GLint ProgramMessageSize;
     glGetProgramiv( Program, GL_INFO_LOG_LENGTH, &ProgramMessageSize );
 
-    ProgramMessage = VirtualAlloc(0, ProgramMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-    void* Tmp      = VirtualAlloc(0, ProgramMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+    ProgramMessage = (char*) VirtualAlloc(0, ProgramMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+    char* Tmp      = (char*) VirtualAlloc(0, ProgramMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
     glGetProgramInfoLog(Program, ProgramMessageSize, NULL, (GLchar*) ProgramMessage);
     snprintf((char*)Tmp, ProgramMessageSize, "%s",(char*) ProgramMessage);
-    VirtualFree(ProgramMessage, 0, MEM_RELEASE );
-    VirtualFree(Tmp, 0, MEM_RELEASE );
+    OutputDebugStringA(ProgramMessage);
+    //VirtualFree(ProgramMessage, 0, MEM_RELEASE );
+    //VirtualFree(Tmp, 0, MEM_RELEASE );
     exit(1);
   }
 
@@ -209,9 +211,12 @@ out vec4 fragColor;
 in vec4 vertexColor;
 in vec2 texCoord;
 uniform sampler2D ourTexture;
+uniform sampler2DArray TextureSampler;
 void main() 
 {
-  fragColor = texture(ourTexture, texCoord) * vertexColor;
+  //fragColor = texture(ourTexture, texCoord) * vertexColor;
+  vec3 ArrayUV = vec3(texCoord.x, texCoord.y, 0);
+  fragColor = texture(TextureSampler, ArrayUV) * vertexColor;
 }
 )FOO";
 
@@ -364,11 +369,164 @@ void main()
   return  Result;
 }
 
+internal opengl_info
+OpenGLGetExtensions()
+{
+  opengl_info Result = {};
+
+  Result.Vendor   = (char*) glGetString(GL_VENDOR);
+  Result.Renderer = (char*) glGetString(GL_RENDERER);
+  Result.Version  = (char*) glGetString(GL_VERSION);
+
+  Result.ShadingLanguageVersion = (char*) glGetString(GL_SHADING_LANGUAGE_VERSION);
+  Result.Extensions = (char*) glGetString(GL_EXTENSIONS);
+
+  u32 ExtensionsStringLength = str::StringLength( Result.Extensions );
+  char* ExtensionStart = Result.Extensions;
+  char* Tokens = " \t\n";
+  char* ExtensionEnd   = str::FindFirstOf( Tokens, ExtensionStart );
+  while( ExtensionStart )
+  {
+    u64 ExtensionStringLength =  ExtensionEnd ? (u64) (ExtensionEnd - ExtensionStart) : (u64) (ExtensionStart - ExtensionsStringLength);
+
+        // NOTE: EXT_texture_sRGB_decode has been core since 2.1
+    if( str::Contains( str::StringLength( "EXT_texture_sRGB_decode" ), "EXT_texture_sRGB_decode",
+           ExtensionStringLength, ExtensionStart ) )
+    {
+      Result.EXT_texture_sRGB_decode = true;
+    }
+    if( str::Contains( str::StringLength( "GL_ARB_framebuffer_sRGB" ), "GL_ARB_framebuffer_sRGB",
+           ExtensionStringLength, ExtensionStart ) )
+    {
+      Result.GL_ARB_framebuffer_sRGB = true;
+    }
+
+    if( str::Contains( str::StringLength( "GL_ARB_vertex_shader" ), "GL_ARB_vertex_shader",
+           ExtensionStringLength, ExtensionStart ) )
+    {
+      Result.GL_ARB_vertex_shader = true;
+    }
+
+    if( str::Contains( str::StringLength( "GL_EXT_blend_func_separate" ), "GL_EXT_blend_func_separate",
+          ExtensionStringLength, ExtensionStart ) )
+    {
+      Result.GL_blend_func_separate = true;
+    }
+
+    ExtensionStart = str::FindFirstNotOf(Tokens, ExtensionEnd);
+    ExtensionEnd   = str::FindFirstOf( Tokens, ExtensionStart );
+  }
+
+  return Result;
+}
+
+opengl_info OpenGLInitExtensions()
+{
+  opengl_info Info = OpenGLGetExtensions();
+  if(Info.EXT_texture_sRGB_decode)
+  {
+    //OpenGLDefaultInternalTextureFormat = GL_SRGB8_ALPHA8;
+  }
+
+  if(Info.GL_ARB_framebuffer_sRGB)
+  {
+    // Will take as input LinearRGB and convert to sRGB Space.
+    // sRGB = Pow(LinearRGB, 1/2.2)
+    // glEnable(GL_FRAMEBUFFER_SRGB);
+  }
+
+  if(Info.GL_blend_func_separate)
+  {
+    // Not sure I want this
+    //glEnable(GL_BLEND);
+  }
+
+  if(Info.GL_blend_func_separate)
+  {
+    // Not sure I want this
+    //glEnable(GL_BLEND);
+  }
+  return Info;
+}
+
+#define TEXTURE_ARRAY_DIM 512;
+#define NORMAL_TEXTURE_COUNT 256;
+
 void InitOpenGL(open_gl* OpenGL)
 {
+  OpenGL->Info = OpenGLInitExtensions();
+  OpenGL->DefaultInternalTextureFormat = GL_RGBA8;
+  OpenGL->DefaultTextureFormat = GL_RGBA;
+  OpenGL->DefaultTextureFormat = GL_BGRA_EXT;
+  OpenGL->MaxTextureCount = NORMAL_TEXTURE_COUNT;
   OpenGL->PhongShadingProgram = OpenGLCreateProgram3D();
   OpenGL->QuadOverlayProgram = OpenGLCreateUntexturedQuadOverlayQuadProgram();
   OpenGL->TextOverlayProgram = OpenGLCreateTextProgram();
+
+  OpenGL->SignleWhitePixelTexture = 0;
+  glGenTextures(1, &OpenGL->SignleWhitePixelTexture);
+  glBindTexture(GL_TEXTURE_2D, OpenGL->SignleWhitePixelTexture);
+  u8 WhitePixel[4] = {0xFF,0xFF,0xFF,0xFF};
+  glTexImage2D(GL_TEXTURE_2D, 0, OpenGL->DefaultInternalTextureFormat, 1, 1, 0, OpenGL->DefaultTextureFormat, GL_UNSIGNED_BYTE, WhitePixel);
+
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+
+  glGenTextures(1, &OpenGL->TextureArray);
+  glBindTexture(GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
+
+  b32 highesMipLevelReached = false;
+  
+  u32 ImageWidth = TEXTURE_ARRAY_DIM;
+  u32 ImageHeight = TEXTURE_ARRAY_DIM;
+
+#if 0
+    // Using a miplevel of 1 for debug
+     glTexImage3D(GL_TEXTURE_2D_ARRAY,
+      0,
+      OpenGL->DefaultInternalTextureFormat,
+      ImageWidth, ImageHeight, OpenGL->MaxTextureCount, 0,
+      OpenGL->DefaultTextureFormat, GL_UNSIGNED_BYTE, 0);
+
+    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+#else
+  u32 mipLevel = 0;
+  while(!highesMipLevelReached)
+  {
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, mipLevel, OpenGL->DefaultInternalTextureFormat,
+      ImageWidth, ImageHeight, OpenGL->MaxTextureCount, 0,
+      OpenGL->DefaultTextureFormat, GL_UNSIGNED_BYTE, 0);
+
+    if((ImageWidth == 1) && (ImageHeight == 1))
+    {
+      highesMipLevelReached = true;
+      ImageWidth  = 0;
+      ImageHeight = 0;
+    }
+    mipLevel++;
+    ImageWidth =  (ImageWidth>1)  ?  (ImageWidth+1)/2  : ImageWidth;
+    ImageHeight = (ImageHeight>1) ?  (ImageHeight+1)/2 : ImageHeight;
+  }
+  //glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+  //glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+  //glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+  //glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT );
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT );
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+  glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+
+  //glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+  //glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  //glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  //glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#endif
 }
 
 
@@ -444,86 +602,7 @@ void OpenGLDraw( u32 VertexArrayObject, u32 ElementType, u32 nrVertecies, u32 Of
   glBindVertexArray(0);
 }
 
-internal opengl_info
-OpenGLGetExtensions()
-{
-  opengl_info Result = {};
 
-  Result.Vendor   = (char*) glGetString(GL_VENDOR);
-  Result.Renderer = (char*) glGetString(GL_RENDERER);
-  Result.Version  = (char*) glGetString(GL_VERSION);
-
-  Result.ShadingLanguageVersion = (char*) glGetString(GL_SHADING_LANGUAGE_VERSION);
-  Result.Extensions = (char*) glGetString(GL_EXTENSIONS);
-
-  u32 ExtensionsStringLength = str::StringLength( Result.Extensions );
-  char* ExtensionStart = Result.Extensions;
-  char* Tokens = " \t\n";
-  char* ExtensionEnd   = str::FindFirstOf( Tokens, ExtensionStart );
-  while( ExtensionStart )
-  {
-    u64 ExtensionStringLength =  ExtensionEnd ? (u64) (ExtensionEnd - ExtensionStart) : (u64) (ExtensionStart - ExtensionsStringLength);
-
-        // NOTE: EXT_texture_sRGB_decode has been core since 2.1
-    if( str::Contains( str::StringLength( "EXT_texture_sRGB_decode" ), "EXT_texture_sRGB_decode",
-           ExtensionStringLength, ExtensionStart ) )
-    {
-      Result.EXT_texture_sRGB_decode = true;
-    }
-    if( str::Contains( str::StringLength( "GL_ARB_framebuffer_sRGB" ), "GL_ARB_framebuffer_sRGB",
-           ExtensionStringLength, ExtensionStart ) )
-    {
-      Result.GL_ARB_framebuffer_sRGB = true;
-    }
-
-    if( str::Contains( str::StringLength( "GL_ARB_vertex_shader" ), "GL_ARB_vertex_shader",
-           ExtensionStringLength, ExtensionStart ) )
-    {
-      Result.GL_ARB_vertex_shader = true;
-    }
-
-    if( str::Contains( str::StringLength( "GL_EXT_blend_func_separate" ), "GL_EXT_blend_func_separate",
-          ExtensionStringLength, ExtensionStart ) )
-    {
-      Result.GL_blend_func_separate = true;
-    }
-
-    ExtensionStart = str::FindFirstNotOf(Tokens, ExtensionEnd);
-    ExtensionEnd   = str::FindFirstOf( Tokens, ExtensionStart );
-  }
-
-  return Result;
-}
-
-void OpenGLInitExtensions()
-{
-  opengl_info Info = OpenGLGetExtensions();
-  OpenGLDefaultInternalTextureFormat = GL_RGBA8;
-  if(Info.EXT_texture_sRGB_decode)
-  {
-    OpenGLDefaultInternalTextureFormat = GL_SRGB8_ALPHA8;
-  }
-
-  if(Info.GL_ARB_framebuffer_sRGB)
-  {
-    // Will take as input LinearRGB and convert to sRGB Space.
-    // sRGB = Pow(LinearRGB, 1/2.2)
-    // glEnable(GL_FRAMEBUFFER_SRGB);
-  }
-
-  if(Info.GL_blend_func_separate)
-  {
-    // Not sure I want this
-    //glEnable(GL_BLEND);
-  }
-
-  if(Info.GL_blend_func_separate)
-  {
-    // Not sure I want this
-    //glEnable(GL_BLEND);
-  }
-
-}
 
 void OpenGLSetViewport( r32 ViewPortAspectRatio, s32 WindowWidth, s32 WindowHeight )
 {
@@ -872,7 +951,7 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
   r32 DesiredAspectRatio = 1.77968526f;
   DesiredAspectRatio = (r32)Commands->ScreenWidthPixels / (r32)Commands->ScreenHeightPixels;
   OpenGLSetViewport( DesiredAspectRatio, Commands->ScreenWidthPixels, Commands->ScreenHeightPixels );
-
+  glActiveTexture(GL_TEXTURE0);
   m4 Identity = M4Identity();
   opengl_program PhongShadingProgram = Commands->OpenGL.PhongShadingProgram;
   glUseProgram( PhongShadingProgram.Program);
@@ -999,7 +1078,6 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
     mesh_data* QuadMesh = GetMeshFromIndex(RenderGroup->AssetManager, QuadObject->MeshHandle);
     PushMeshToGPU(&RenderGroup->Arena, QuadObject, ObjectKeeper, QuadMesh);
 
-
     u32 TextEntries = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::TEXT];
     u32 OverlayQuadEntries = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::OVERLAY_QUAD];
     text_data* TextBuffer = PushArray(&RenderGroup->Arena, TextEntries, text_data);
@@ -1076,11 +1154,33 @@ OpenGLRenderGroupToOutput( game_render_commands* Commands)
 
     SetUniformM4(TextRenderProgram, open_gl_uniform::m4_Projection, RenderGroup->ProjectionMatrix);    
 
-    u32 TextureIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::BITMAP, "debug_font");
-    book_keeper* BitmapKeeper = 0;
-    bitmap* RenderTarget = GetBitmapFromIndex(RenderGroup->AssetManager, TextureIndex, &BitmapKeeper);
-    // The Texture is bound to this Index
-    BindTextureToGPU(RenderTarget, BitmapKeeper);
+    local_persist b32 FontDataAddedToTextures = false;
+    if(!FontDataAddedToTextures)
+    {
+      FontDataAddedToTextures = true;
+
+      u32 FontTextureIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::BITMAP, "debug_font");
+      bitmap* FontRenderTarget = GetBitmapFromIndex(RenderGroup->AssetManager, FontTextureIndex);
+      
+      glBindTexture(GL_TEXTURE_2D_ARRAY, Commands->OpenGL.TextureArray);
+      u32 MipLevel = 0;
+      u32 TextureSlot = 0;
+      glTexSubImage3D(GL_TEXTURE_2D_ARRAY,
+        MipLevel,
+        0, 0, 0, // x0,y0,TextureSlot
+        FontRenderTarget->Width, FontRenderTarget->Height, 1,
+        Commands->OpenGL.DefaultTextureFormat, GL_UNSIGNED_BYTE, FontRenderTarget->Pixels);
+
+
+      u32 NullTextureIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::BITMAP, "null");
+      bitmap* NullRenderTarget = GetBitmapFromIndex(RenderGroup->AssetManager, FontTextureIndex);
+      
+      glTexSubImage3D(GL_TEXTURE_2D_ARRAY,
+        MipLevel,
+        0, 0, 1, // x0,y0,TextureSlot
+        NullRenderTarget->Width, NullRenderTarget->Height, 1,
+        Commands->OpenGL.DefaultTextureFormat, GL_UNSIGNED_BYTE, NullRenderTarget->Pixels);
+    }
 
     // The geometry and instance buffer is bound to this Index
     glBindVertexArray( ObjectKeeper->BufferHandle.VAO );

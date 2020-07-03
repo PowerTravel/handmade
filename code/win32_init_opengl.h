@@ -189,6 +189,14 @@ global_variable gl_uniform_matrix_4x2fv* glUniformMatrix4x2fv;
 global_variable gl_uniform_matrix_3x4fv* glUniformMatrix3x4fv;
 global_variable gl_uniform_matrix_4x3fv* glUniformMatrix4x3fv;
 
+typedef void WINAPI gl_tex_image_3d ( GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const void * data);
+global_variable gl_tex_image_3d* glTexImage3D;
+
+typedef void WINAPI gl_tex_sub_image_3d( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const void * pixels);
+global_variable gl_tex_sub_image_3d* glTexSubImage3D;
+
+typedef void WINAPI gl_active_texture(GLenum texture);
+global_variable gl_active_texture* glActiveTexture;
 
 void* _GetOpenGLFunction( char* name )
 {
@@ -277,14 +285,7 @@ Win32InitOpenGL(HWND Window)
       INVALID_CODE_PATH
     }
 
-    OpenGLInitExtensions();
 
-    wglSwapInterval = GetOpenGLFunction( wgl_swap_interval_ext, "wglSwapIntervalEXT");
-    // Sets the VSync on
-    if(wglSwapInterval)
-    {
-      wglSwapInterval(1);
-    }
 
     glBlendEquationSeparate     = GetOpenGLFunction( gl_blend_equation_separate,     "glBlendEquationSeparate");
     glCreateProgram             = GetOpenGLFunction( gl_create_program,              "glCreateProgram");
@@ -359,11 +360,21 @@ Win32InitOpenGL(HWND Window)
     glUniformMatrix4x2fv        = GetOpenGLFunction( gl_uniform_matrix_4x2fv,        "glUniformMatrix4x2fv");
     glUniformMatrix3x4fv        = GetOpenGLFunction( gl_uniform_matrix_3x4fv,        "glUniformMatrix3x4fv");
     glUniformMatrix4x3fv        = GetOpenGLFunction( gl_uniform_matrix_4x3fv,        "glUniformMatrix4x3fv");
-
+    glTexImage3D                = GetOpenGLFunction( gl_tex_image_3d,                "glTexImage3D");
+    glTexSubImage3D             = GetOpenGLFunction( gl_tex_sub_image_3d,            "glTexSubImage3D");
+    glActiveTexture             = GetOpenGLFunction( gl_active_texture,              "glActiveTexture");
+//    glTexStorage3D              = GetOpenGLFunction( gl_tex_storage_3d,              "glTexStorage3D");
   }else{
     INVALID_CODE_PATH
   }
   ReleaseDC(Window, WindowDC);
+
+  wglSwapInterval = GetOpenGLFunction( wgl_swap_interval_ext, "wglSwapIntervalEXT");
+  // Sets the VSync on
+  if(wglSwapInterval)
+  {
+    wglSwapInterval(1);
+  }
 
   open_gl OpenGL = {};
   InitOpenGL(&OpenGL);
