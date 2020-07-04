@@ -103,8 +103,6 @@
 
 #include "math/vector_math.h"
 
-
-
 struct opengl_handles
 {
 	u32 VAO;
@@ -199,15 +197,50 @@ struct open_gl
   u32 SignleWhitePixelTexture;
   u32 TextureArray;
 
+
+  u32 BufferSize;
+
+  // Triangle Streams
+  // Good for rendering sets of small objects
+  // One draw call for the whole buffer, few uniforms (if we sort per TextureIndex maybe it can be a uniform)
+  // {{px,py,pz},{nx,ny,nz},{u,v}, {r,g,b,a}, TextureIndex}
+  u32 TexturedVerticeVAO;
+  u32 TexturedVerticeArray;
+  u32 TexturedIndexArray;
+
+
   // Non-Instanced Geoms
   // Single VAO InstancedVertexArray (For textured vertices)
   // Single IndexArray (Each object has an offset into this array)
+  // Good for rendering Small (<1000) number of Large geometries with similar transforms.
+  // (Transforms are sent with uniforms)
+  u32 ElementVAO;
+
+  u32 ElementVBOOffset;
+  u32 ElementVBO;
+
+  u32 ElementEBOOffset;
+  u32 ElementEBO;
+
+
 
 
   // Instanced Geoms 
   // Single VAO InstancedVertexArray (For shared object data) (geometries, uv-coords, normals)
   // Single IndexArray
   // Single VAO InstanceArray        (For per object data, position, color, texture index) 
+  // Good for rendering Large (>1000) number of Large geometries with similar transforms.
+  // (Transforms are sent with uniforms)
+  u32 InstancedObject;
+  u32 InstancedVerticeBuffer;
+  u32 InstancedDataBuffer;
+  u32 InstancedIndexBuffer;
+
+
+
+
+
+
 };
 
 void InitOpenGL(open_gl* OpenGL);

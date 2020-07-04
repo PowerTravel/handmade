@@ -4,6 +4,7 @@
     - Fix game-loop-memory allocation bug.
       Pressing L activates game-looping. When the loop reloads win32-memory-allocation fails. No idea why, It seems
       to have been like this for a long long time. Before debug-system.
+    - Quads texturer renderas på sniskan
   Rendering:
     - Shadows
     (working on) Instance rendering, Want to group geometries together and do as few draw-calls as possible. (when possible, fonts, graphs for example, cubes too)
@@ -205,7 +206,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 #endif
   u32 RollingIndex = 0;
   u32 CubeAssetHandle = GetAssetHandle( GameState->AssetManager);
-  SetAsset( AssetManager, asset_type::OBJECT, "cube1", CubeAssetHandle );
+  SetAsset( AssetManager, asset_type::OBJECT, "voxel", CubeAssetHandle );
   SetAsset( AssetManager, asset_type::MATERIAL, "cube", CubeAssetHandle );
   SetAsset( AssetManager, asset_type::BITMAP, "cube_kd", CubeAssetHandle );
   for (s32 i = iarr[0]; i < iarr[1]; ++i)
@@ -299,14 +300,14 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   u32 HeroSpriteHandle = GetAssetHandle(AssetManager);
   SetAsset( AssetManager, asset_type::OBJECT, "quad", HeroSpriteHandle);
   SetAsset( AssetManager, asset_type::BITMAP, "hero_sprite_sheet", HeroSpriteHandle);
-  SetAsset( AssetManager, asset_type::MATERIAL, "cube", HeroSpriteHandle );
+  SetAsset( AssetManager, asset_type::MATERIAL, "white", HeroSpriteHandle );
 
   GetRenderComponent(SpriteAnimationEntity)->AssetHandle = HeroSpriteHandle;
 
   component_spatial* SpriteSpatial = GetSpatialComponent(SpriteAnimationEntity);
   SpriteSpatial->Position = V3( -0,  8, 8);
   SpriteSpatial->Rotation = RotateQuaternion( Pi32, V3(0,1,0) );
-  SpriteSpatial->Scale    = V3( 18, 18, 1);
+  SpriteSpatial->Scale    = V3( 18, 18, 0);
 
   component_sprite_animation* SpriteAnimation = GetSpriteAnimationComponent(SpriteAnimationEntity);
 
@@ -376,6 +377,7 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
     CreateCollisionTestScene(GlobalGameState, Input);
 
     Memory->GameState = GlobalGameState;
+    RenderCommands->AssetManager = GlobalGameState->AssetManager;
 
     for (s32 ControllerIndex = 0;
     ControllerIndex < ArrayCount(Input->Controllers);
@@ -390,7 +392,7 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
 
   if(!RenderCommands->MainRenderGroup)
   {
-    RenderCommands->MainRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
+    RenderCommands->MainRenderGroup = InitiateRenderGroup((r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
   }
 
   if(!RenderCommands->DebugRenderGroup)
@@ -400,7 +402,7 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
     //       Maybe DebugRenderGroup is something we want to move away from and consolidate into the DebugState.
     //       Is there a problem with the debug system piping it's drawing through the GameRenderingPipeline?
     //       I mean it already sort of does since it all gets drawn in RenderGroupToOutput.
-    RenderCommands->DebugRenderGroup = InitiateRenderGroup(Memory->GameState, (r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
+    RenderCommands->DebugRenderGroup = InitiateRenderGroup((r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
   }
 }
 

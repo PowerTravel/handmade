@@ -43,29 +43,29 @@ internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
   {
     v3 v[] =
     {
-      V3(-0.5, -0.5, 0),
-      V3( 0.5, -0.5, 0),
-      V3( 0.5,  0.5, 0),
-      V3(-0.5,  0.5, 0)
+      V3(-0.5,-0.5, 0),
+      V3( 0.5,-0.5, 0),
+      V3(-0.5, 0.5, 0),
+      V3( 0.5, 0.5, 0),
     };
     v3 vn[] =
     {
-      V3( 0, 0, 1),
+      V3( 0, 0, 1)
     };
     v2 vt[] =
     {
       V2( 0, 0),
       V2( 1, 0),
-      V2( 1, 1),
-      V2( 0, 1)
+      V2( 0, 1),
+      V2( 1, 1)
     };
     u32 MeshIndex = PushMeshData(AssetManager,
       ArrayCount(v),  v,
       ArrayCount(vn), vn,
       ArrayCount(vt), vt);
 
-    u32 vi[] = {0,1,2,0,2,3};
-    u32 ti[] = {0,1,2,0,2,3};
+    u32 vi[] = {0,1,2,2,1,3};
+    u32 ti[] = {0,1,2,2,1,3};
     u32 ni[] = {0,0,0,0,0,0};
     aabb3f AABB = AABB3f(V3(-0.5, -0.5, 0), V3( 0.5,  0.5, 0));
     u32 ObjectIndex = PushIndexData(AssetManager, "quad", MeshIndex, ArrayCount(vi), vi, ti, ni, AABB);
@@ -310,6 +310,9 @@ game_asset_manager* CreateAssetManager()
 
   AssetManager->EnumeratedMeshes = PushArray(&AssetManager->AssetArena,
                                             (u32)predefined_mesh::COUNT, u32);
+
+  AssetManager->ObjectPendingLoadCount = 0;
+  AssetManager->BitmapPendingLoadCount = 0;
 
   LoadAssets(AssetManager);
 

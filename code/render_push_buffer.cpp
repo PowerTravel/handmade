@@ -36,7 +36,7 @@ void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRec
   push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::OVERLAY_QUAD, RENDER_STATE_FILL);
   entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);
 
-  Body->ObjectIndex = GetAssetIndex(RenderGroup->AssetManager, asset_type::OBJECT, "quad");
+  Body->ObjectIndex = GetAssetIndex(GlobalGameState->AssetManager, asset_type::OBJECT, "quad");
   Body->Colour = Color;
   Body->TextureIndex = TextureIndex;
   Body->M  = QuadTranslate * QuadScale;
@@ -169,11 +169,10 @@ void ResetRenderGroup(render_group* RenderGroup)
   ZeroArray(ArrayCount(RenderGroup->BufferCounts), RenderGroup->BufferCounts);
 }
 
-render_group* InitiateRenderGroup(game_state* GameState, r32 ScreenWidth, r32 ScreenHeight)
+render_group* InitiateRenderGroup(r32 ScreenWidth, r32 ScreenHeight)
 {
   render_group* Result = BootstrapPushStruct(render_group, Arena);
   Result->PushBufferMemory = BeginTemporaryMemory(&Result->Arena);
-  Result->AssetManager = GameState->AssetManager;
   Result->ScreenWidth = ScreenWidth;
   Result->ScreenHeight = ScreenHeight;
   ResetRenderGroup(Result);

@@ -110,7 +110,6 @@ struct render_group
   memory_arena Arena;
   temporary_memory PushBufferMemory;
 
-  game_asset_manager* AssetManager;
   push_buffer_header* First;
   push_buffer_header* Last;
 

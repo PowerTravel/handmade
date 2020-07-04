@@ -320,6 +320,7 @@ struct game_render_commands
 
   open_gl OpenGL;
 
+  struct game_asset_manager* AssetManager;
   struct render_group* MainRenderGroup;
   struct render_group* DebugRenderGroup;
 };

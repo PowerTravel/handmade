@@ -8,12 +8,19 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "externals/stb_truetype.h"
 
+struct buffer_location
+{
+  u32 Count;
+  u8* Index;
+  u32 VertexOffset;
+};
+
 struct book_keeper
 {
   opengl_handles BufferHandle;
+  buffer_location Location;
   b32 Loaded;
-  b32 Exists;
-  b32 Dirty;
+  u32 ReferenceCount;
 };
 
 struct mesh_data
@@ -81,8 +88,18 @@ struct stb_font_map
   stbtt_bakedchar* CharData;
 };
 
+
+// TODO: Get rid of asset_instance/
+// Let whatever thing that wants a reference
+// to an asset keep track of it themselves
 struct asset_instance
 {
+
+  // TODO: have a struct for each type of handle
+  // object_handle{ Value }
+  // material_handle{ Value }
+  // texture_handle{ Value }
+  // to enforce typesaftey. (meybe we can even remove the need for asset_type and use the handle type as a proxy)
   u32 ObjectIndex;
   u32 MaterialIndex;
   u32 TextureIndex;
@@ -120,6 +137,12 @@ struct asset_hash_map
   void** Values;
 };
 
+struct pending_asset
+{
+  u32 Handle;
+  asset_type Type;
+};
+
 struct game_asset_manager
 {
   memory_arena AssetArena;
@@ -136,6 +159,12 @@ struct game_asset_manager
   book_keeper* ObjectKeeper;
   book_keeper* BitmapKeeper;
 
+  u32 ObjectPendingLoadCount;
+  u32 ObjectPendingLoad[256];
+
+  u32 BitmapPendingLoadCount;
+  u32 BitmapPendingLoad[256];
+
   stb_font_map FontMap;
 
   u32* EnumeratedMeshes;
@@ -145,108 +174,31 @@ struct game_asset_manager
 u32 GetAssetHandle(game_asset_manager* AssetManager);
 void SetAsset(game_asset_manager* AssetManager, asset_type AssetType, char* Name, u32 Handle);
 u32 GetTemporaryAssetHandle(game_asset_manager* AssetManager);
-void CopyAssets(game_asset_manager* AssetManager, u32 SrcHandle, u32 DstHandle);
+
+collider_mesh GetColliderMesh( game_asset_manager* AssetManager, u32 Handle);
+aabb3f GetMeshAABB(game_asset_manager* AssetManager, u32 Handle);
+
 u32 GetAssetIndex(game_asset_manager* AssetManager, asset_type AssetType, char* Key);
+
 void ResetAssetManagerTemporaryInstances(game_asset_manager* AssetManager);
 
+void CopyAssets(game_asset_manager* AssetManager, u32 SrcHandle, u32 DstHandle);
 
 // GL Layer API
-inline u32
-GetEnumeratedObjectIndex(game_asset_manager* AssetManager, predefined_mesh MeshType)
-{
-  u32 Result = AssetManager->EnumeratedMeshes[(u32)MeshType];
-  return Result;
-}
+inline u32 GetEnumeratedObjectIndex(game_asset_manager* AssetManager, predefined_mesh MeshType);
 
-internal asset_instance* GetAssetInstance(game_asset_manager* AssetManager, u32 Handle)
-{
-  Assert(Handle < AssetManager->Instances.Count + AssetManager->TemporaryInstancesCount);
-  asset_instance* Result = (asset_instance*) AssetManager->Instances.Values[Handle];
-  Assert(Result);
-  return Result;
-}
+mesh_indeces* GetObject(game_asset_manager* AssetManager, u32 Handle, book_keeper** Keeper = NULL );
+bitmap* GetBitmap(game_asset_manager* AssetManager, u32 Handle, book_keeper** Keeper = NULL );
+mesh_data* GetMesh(game_asset_manager* AssetManager, u32 Handle);
+material* GetMaterial(game_asset_manager* AssetManager, u32 Handle);
 
-inline mesh_indeces* GetObjectFromIndex(game_asset_manager* AssetManager, u32 Index, book_keeper** Keeper = NULL )
-{
-  Assert(Index < AssetManager->Objects.MaxCount);
-  mesh_indeces* Result = (mesh_indeces*) AssetManager->Objects.Values[Index];
-  Assert(Result);
+inline mesh_indeces* GetObjectFromIndex(game_asset_manager* AssetManager, u32 Index, book_keeper** Keeper = NULL );
+inline bitmap* GetBitmapFromIndex(game_asset_manager* AssetManager, u32 Index, book_keeper** Keeper = NULL );
+inline mesh_data* GetMeshFromIndex(game_asset_manager* AssetManager, u32 Index);
+inline material* GetMaterialFromIndex(game_asset_manager* AssetManager, u32 Index );
 
-  if(Keeper) *Keeper = AssetManager->ObjectKeeper + Index;
 
-  return Result;
-}
 
-mesh_indeces* GetObject(game_asset_manager* AssetManager, u32 Handle, book_keeper** Keeper = NULL )
-{
-  asset_instance* Instance = GetAssetInstance(AssetManager, Handle);
-  mesh_indeces* Result = GetObjectFromIndex(AssetManager, Instance->ObjectIndex, Keeper);
-  return Result;
-};
 
-inline mesh_data* GetMeshFromIndex(game_asset_manager* AssetManager, u32 Index)
-{
-  Assert(Index < AssetManager->Meshes.Count);
-  mesh_data* Result = (mesh_data*) AssetManager->Meshes.Values[Index];
-  Assert(Result);
-  return Result;
-}
 
-mesh_data* GetMesh(game_asset_manager* AssetManager, u32 Handle)
-{
-  mesh_indeces* Object = GetObject(AssetManager, Handle );
-  mesh_data* Result = GetMeshFromIndex(AssetManager, Object->MeshHandle);
-  return Result;
-}
 
-collider_mesh GetColliderMesh( game_asset_manager* AssetManager, u32 Handle)
-{
-  mesh_indeces* Object = GetObject(AssetManager, Handle);
-  mesh_data* Data = GetMesh(AssetManager, Handle);
-  collider_mesh Result = {};
-  Result.nv = Data->nv;
-  Result.v = Data->v;
-  Result.nvi = Object->Count;
-  Result.vi = Object->vi;
-  return Result;
-}
-
-aabb3f GetMeshAABB(game_asset_manager* AssetManager, u32 Handle)
-{
-  mesh_indeces* Object = GetObject(AssetManager, Handle);
-  return Object->AABB;
-}
-
-inline material* GetMaterialFromIndex(game_asset_manager* AssetManager, u32 Index )
-{
-  Assert(Index < AssetManager->Materials.MaxCount);
-  material* Result = (material*) AssetManager->Materials.Values[Index];
-  Assert(Result);
-  return Result;
-}
-
-material* GetMaterial(game_asset_manager* AssetManager, u32 Handle )
-{
-  asset_instance* Instance = GetAssetInstance(AssetManager, Handle);
-  material* Result = GetMaterialFromIndex(AssetManager, Instance->MaterialIndex );
-  return Result;
-};
-
-inline bitmap* GetBitmapFromIndex(game_asset_manager* AssetManager, u32 Index, book_keeper** Keeper = NULL )
-{
-  Assert(Index < AssetManager->Bitmaps.MaxCount);
-  bitmap* Result = (bitmap*) AssetManager->Bitmaps.Values[Index];
-
-  Assert(Result);
-
-  if(Keeper) *Keeper = AssetManager->BitmapKeeper + Index;
-
-  return Result;
-}
-
-bitmap* GetBitmap(game_asset_manager* AssetManager, u32 Handle, book_keeper** Keeper = NULL )
-{
-  asset_instance* Instance = GetAssetInstance(AssetManager, Handle);
-  bitmap* Result = GetBitmapFromIndex(AssetManager, Instance->TextureIndex, Keeper);
-  return Result;
-}
