@@ -6,14 +6,14 @@
 #include "gjk_narrow_phase.h"
 #include "epa_collision_data.h"
 
-#define NEW_CONTACT_THRESHOLD 0.05f
-#define PERSISTENT_CONTACT_THRESHOLD 0.05f
+#define NEW_CONTACT_THRESHOLD 0.15f
+#define PERSISTENT_CONTACT_THRESHOLD 0.15f
 #define WARM_STARTING_FRACTION 0.31f
 
 #define FRICTIONAL_COEFFICIENT 0.15f
 #define BAUMGARTE_COEFFICIENT  0.25f
 #define RESTITUTION_COEFFICIENT 0.0f
-#define SLOP 0.002f
+#define SLOP 0.012f
 
 #define SLOVER_ITERATIONS 24
 

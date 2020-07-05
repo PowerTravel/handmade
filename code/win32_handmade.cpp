@@ -503,7 +503,7 @@ u32 GlobalOpenVAO = 0;
 internal void
 Win32DisplayBufferInWindow( game_render_commands* Commands, HDC aDeviceContext )
 {
-
+  TIMED_FUNCTION();
   b32 InHardware = true;
   b32 InModernOpenGL = true;
   b32 DisplayViaHardware = true;

@@ -34,15 +34,15 @@ struct entry_type_line
 {
   v3 Start;
   v3 End;
-  u32 MaterialIndex;
+  material_handle MaterialHandle;
   r32 LineThickness;
 };
 
 struct entry_type_overlay_quad
 {
   v4 Colour;
-  u32 TextureIndex;
-  u32 ObjectIndex;
+  bitmap_handle BitmapHandle;
+  object_handle ObjectHandle;
   m4 M;
   m4 TM;
   rect2f QuadRect;
@@ -63,7 +63,12 @@ struct entry_type_light
 
 struct entry_type_render_asset
 {
-  u32 AssetHandle;
+  instance_handle AssetHandle;
+
+  material_handle MaterialHandle;
+  object_handle ObjectHandle;
+  bitmap_handle BitmapHandle;
+
   m4 M;
   m4 NM;
   m4 TM;

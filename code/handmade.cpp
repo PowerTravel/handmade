@@ -4,7 +4,7 @@
     - Fix game-loop-memory allocation bug.
       Pressing L activates game-looping. When the loop reloads win32-memory-allocation fails. No idea why, It seems
       to have been like this for a long long time. Before debug-system.
-    - Quads texturer renderas på sniskan
+    - Collision detection breaks when we have several boxes
   Rendering:
     - Shadows
     (working on) Instance rendering, Want to group geometries together and do as few draw-calls as possible. (when possible, fonts, graphs for example, cubes too)
@@ -149,7 +149,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 #endif
 
   u32 ControllableCamera = NewEntity( EM );
-  NewComponents( EM, ControllableCamera, COMPONENT_FLAG_CONTROLLER | COMPONENT_FLAG_CAMERA);
+  NewComponents( EM, ControllableCamera, COMPONENT_FLAG_CONTROLLER | COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_CAMERA);
   component_camera* Camera = GetCameraComponent(ControllableCamera);
   r32 AspectRatio = GameState->ScreenWidthPixels / GameState->ScreenHeightPixels;
   r32 FieldOfView =  90;
@@ -177,7 +177,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   SetAsset( GameState->AssetManager, asset_type::BITMAP,   "null",  LightRender->AssetHandle);  // Overrides texture
 
 
-#define State4
+#define State1
 #if defined(State1)
   // BUG: Bug-producing state. Rotation bleeds over into scaling
   r32 ySpace = 1;
@@ -205,8 +205,8 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   s32 karr[] = {-0,1};
 #endif
   u32 RollingIndex = 0;
-  u32 CubeAssetHandle = GetAssetHandle( GameState->AssetManager);
-  SetAsset( AssetManager, asset_type::OBJECT, "voxel", CubeAssetHandle );
+  instance_handle CubeAssetHandle = GetAssetHandle( GameState->AssetManager);
+  SetAsset( AssetManager, asset_type::OBJECT, "cube1", CubeAssetHandle );
   SetAsset( AssetManager, asset_type::MATERIAL, "cube", CubeAssetHandle );
   SetAsset( AssetManager, asset_type::BITMAP, "cube_kd", CubeAssetHandle );
   for (s32 i = iarr[0]; i < iarr[1]; ++i)
@@ -246,7 +246,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     COMPONENT_FLAG_SPATIAL  |
     COMPONENT_FLAG_COLLIDER);
 
-  u32 FloorHandle = GetAssetHandle(AssetManager);
+  instance_handle FloorHandle = GetAssetHandle(AssetManager);
   SetAsset( AssetManager, asset_type::OBJECT, "voxel", FloorHandle);
   SetAsset( AssetManager, asset_type::MATERIAL, "checker_board", FloorHandle );
   SetAsset( AssetManager, asset_type::BITMAP, "checker_board", FloorHandle );
@@ -269,7 +269,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     COMPONENT_FLAG_COLLIDER |
     COMPONENT_FLAG_DYNAMICS);
 
-  u32 TeapotHandle = GetAssetHandle(AssetManager);
+  instance_handle TeapotHandle = GetAssetHandle(AssetManager);
   SetAsset( AssetManager, asset_type::OBJECT, "teapot", TeapotHandle);
   SetAsset( AssetManager, asset_type::MATERIAL, "gold", TeapotHandle );
   SetAsset( AssetManager, asset_type::BITMAP, "checker_board", TeapotHandle );
@@ -297,7 +297,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     COMPONENT_FLAG_RENDER           |
     COMPONENT_FLAG_SPATIAL);
 
-  u32 HeroSpriteHandle = GetAssetHandle(AssetManager);
+  instance_handle HeroSpriteHandle = GetAssetHandle(AssetManager);
   SetAsset( AssetManager, asset_type::OBJECT, "quad", HeroSpriteHandle);
   SetAsset( AssetManager, asset_type::BITMAP, "hero_sprite_sheet", HeroSpriteHandle);
   SetAsset( AssetManager, asset_type::MATERIAL, "white", HeroSpriteHandle );

@@ -6,6 +6,7 @@
 
 #include "bitmap.h"
 #include "data_containers.h"
+#include "Assets.h"
 
 struct component_head;
 
@@ -83,7 +84,7 @@ struct component_collider
 {
   // Always in Model Space
   aabb3f AABB;
-  u32 AssetHandle;
+  instance_handle AssetHandle;
 };
 
 struct component_dynamics
@@ -96,7 +97,7 @@ struct component_dynamics
 
 struct component_render
 {
-  u32 AssetHandle;
+  instance_handle AssetHandle;
 };
 
 // TODO: Move to AssetManager.

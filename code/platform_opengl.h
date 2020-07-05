@@ -176,6 +176,10 @@ struct opengl_buffer_object
 };
 
 
+#define TEXTURE_ARRAY_DIM 512
+#define NORMAL_TEXTURE_COUNT 256
+#define SPECIAL_TEXTURE_COUNT 64
+
 struct open_gl
 {
   // Render Programs
@@ -183,7 +187,6 @@ struct open_gl
   
   u32 DefaultInternalTextureFormat;
   u32 DefaultTextureFormat;
-  u32 MaxTextureCount;
 
   opengl_program PhongShadingProgram;
   opengl_program QuadOverlayProgram;
@@ -195,8 +198,14 @@ struct open_gl
 
   // Special Textures
   u32 SignleWhitePixelTexture;
+  
+  u32 MaxTextureCount;
+  u32 TextureCount;
   u32 TextureArray;
-
+  
+  u32 MaxSpecialTextureCount;
+  u32 SpecialTextureCount;
+  u32 SpecialTextures[SPECIAL_TEXTURE_COUNT];
 
   u32 BufferSize;
 

@@ -443,7 +443,7 @@ void DebugMainWindow(game_input* GameInput)
       //TextBox
       //r32 X0 = Rect.X + Rect.W/2.f;
       //r32 Y0 = Rect.Y + Rect.H/2.f;
-      DEBUGPushQuad(GlobalDebugRenderGroup, TextBox, TexQuad, Color, 0);
+      DEBUGPushQuad(GlobalDebugRenderGroup, TextBox, TexQuad, Color);
       DEBUGTextOutAt(TextPosX-TextBox.W*0.5f, TextPosY-TextBox.H*0.5f, GlobalDebugRenderGroup, MenuItems[MenuItemIdx]);
     }
   }
@@ -584,7 +584,7 @@ void PushDebugOverlay(game_input* GameInput)
       rect2f Rect2 = Rect;
       Rect2.X += Rect2.W/2.f;
       Rect2.Y += Rect2.H/2.f;
-      DEBUGPushQuad(GlobalDebugRenderGroup, Rect2, TexQuad, Color, 0);
+      DEBUGPushQuad(GlobalDebugRenderGroup, Rect2, TexQuad, Color);
 
       if((GameInput->MouseX >= Rect.X) && (GameInput->MouseX <= Rect.X+Rect.W) &&
          (GameInput->MouseY >= Rect.Y) && (GameInput->MouseY <= Rect.Y+Rect.H))

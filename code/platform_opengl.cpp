@@ -184,8 +184,51 @@ void main()
   return Result;
 }
 
-// TODO, merge this shader and OpenGLCreateTextProgram when we support 3D textures and can index the 
-//       white texture and the font map and send the texture idx in the instancing array
+#if 0
+opengl_program OpenGLCreateTextProgram()
+{
+  char VertexShaderCode[] = R"FOO(
+#version  330 core
+uniform mat4 P;
+uniform mat4 V;
+layout (location = 3) in vec3 start;
+layout (location = 4) in vec3 end;
+layout (location = 5) in int  color;
+out vec4 vertexColor;
+void main()
+{
+
+  gl_Position = vec4((projection*quadTransform*vec3(vertice.xy,1)).xy,0,1);
+  texCoord = (uvTransform*vec3(textureCoordinate.xy,1)).xy;
+  vertexColor = color;
+}
+)FOO";
+
+  char* FragmentShaderCode = R"FOO(
+#version 330 core
+out vec4 fragColor;
+in vec4 vertexColor;
+in vec2 texCoord;
+uniform sampler2D ourTexture;
+uniform sampler2DArray TextureSampler;
+void main() 
+{
+  //fragColor = texture(ourTexture, texCoord) * vertexColor;
+  vec3 ArrayUV = vec3(texCoord.x, texCoord.y, 0);
+  fragColor = texture(TextureSampler, ArrayUV) * vertexColor;
+}
+)FOO";
+
+  opengl_program Result = {};
+  Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
+  glUseProgram(Result.Program);
+  DeclareUniform(&Result, open_gl_uniform::m4_Projection);
+  glUseProgram(0);
+
+  return Result;
+}
+#endif
+
 opengl_program OpenGLCreateUntexturedQuadOverlayQuadProgram()
 {
   char VertexShaderCode[] = R"FOO(
@@ -404,9 +447,6 @@ opengl_info OpenGLInitExtensions()
   return Info;
 }
 
-#define TEXTURE_ARRAY_DIM 512;
-#define NORMAL_TEXTURE_COUNT 256;
-
 void InitOpenGL(open_gl* OpenGL)
 {
   OpenGL->Info = OpenGLInitExtensions();
@@ -414,6 +454,7 @@ void InitOpenGL(open_gl* OpenGL)
   OpenGL->DefaultTextureFormat = GL_RGBA;
   OpenGL->DefaultTextureFormat = GL_BGRA_EXT;
   OpenGL->MaxTextureCount = NORMAL_TEXTURE_COUNT;
+  OpenGL->MaxSpecialTextureCount = SPECIAL_TEXTURE_COUNT;
   OpenGL->PhongShadingProgram = OpenGLCreateProgram3D();
   OpenGL->QuadOverlayProgram = OpenGLCreateUntexturedQuadOverlayQuadProgram();
   OpenGL->TextOverlayProgram = OpenGLCreateTextProgram();
@@ -437,6 +478,18 @@ void InitOpenGL(open_gl* OpenGL)
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT );
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+
+  ////
+
+  glGenTextures(OpenGL->MaxSpecialTextureCount, OpenGL->SpecialTextures);
+  for (int i = 0; i < SPECIAL_TEXTURE_COUNT; ++i)
+  {
+    glBindTexture(GL_TEXTURE_2D, OpenGL->SpecialTextures[i]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
+  }
 
   ////
 
@@ -734,7 +787,7 @@ CreateGLVertexBuffer( memory_arena* TemporaryMemory,
 }
 
 void PushMeshToGPU(memory_arena* TempArena,
-  mesh_indeces* Object, book_keeper* ObjectKeeper, mesh_data* MeshData)
+  mesh_indeces* Object, buffer_keeper* ObjectKeeper, mesh_data* MeshData)
 {
   if(!ObjectKeeper->Loaded)
   {
@@ -757,9 +810,9 @@ void PushMeshToGPU(memory_arena* TempArena,
 
     gl_vertex_buffer GLBuffer =  CreateGLVertexBuffer(TempArena, nvi, vi, ti, ni, v, vt, vn);
 
-    OpenGLSendMeshToGPU(&ObjectKeeper->BufferHandle.VAO,
-                        &ObjectKeeper->BufferHandle.VBO,
-                        &ObjectKeeper->BufferHandle.EBO,
+    OpenGLSendMeshToGPU(&ObjectKeeper->VAO,
+                        &ObjectKeeper->VBO,
+                        &ObjectKeeper->EBO,
                         GLBuffer.IndexCount, GLBuffer.Indeces,
                         GLBuffer.VertexCount, GLBuffer.VertexData);
     ObjectKeeper->Loaded = true;
@@ -768,19 +821,19 @@ void PushMeshToGPU(memory_arena* TempArena,
   }
 }
 
-void BindTextureToGPU(bitmap* RenderTarget, book_keeper* BitmapKeeper)
+void BindTextureToGPU(bitmap* RenderTarget, bitmap_keeper* BitmapKeeper)
 {
   Assert(RenderTarget);
   Assert(RenderTarget->BPP == 32);
   if(!BitmapKeeper->Loaded)
   {
-    Assert(!BitmapKeeper->BufferHandle.TextureHandle);
+    Assert(!BitmapKeeper->TextureHandle);
     BitmapKeeper->Loaded = true;
     // Generate a texture slot
-    glGenTextures(1, &BitmapKeeper->BufferHandle.TextureHandle);
+    glGenTextures(1, &BitmapKeeper->TextureHandle);
 
     // Enable texture slot
-    glBindTexture( GL_TEXTURE_2D, BitmapKeeper->BufferHandle.TextureHandle );
+    glBindTexture( GL_TEXTURE_2D, BitmapKeeper->TextureHandle );
 
     // Set texture environment state:
     // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
@@ -798,8 +851,7 @@ void BindTextureToGPU(bitmap* RenderTarget, book_keeper* BitmapKeeper)
               RenderTarget->Pixels);
   }
 
-  glBindTexture( GL_TEXTURE_2D, BitmapKeeper->BufferHandle.TextureHandle );
-
+  glBindTexture( GL_TEXTURE_2D, BitmapKeeper->TextureHandle );
 }
 
 
@@ -810,9 +862,9 @@ void DrawAsset(opengl_program* Program, game_asset_manager* AssetManager, memory
   SetUniformM4(*Program, open_gl_uniform::m4_Normal, RenderableAsset->NM);
   SetUniformM4(*Program, open_gl_uniform::m4_Texture, RenderableAsset->TM);
 
-  u32 AssetHandle = RenderableAsset->AssetHandle;
+  instance_handle AssetHandle = RenderableAsset->AssetHandle;
 
-  book_keeper* ObjectKeeper = 0;
+  buffer_keeper* ObjectKeeper = 0;
   mesh_indeces* Object = GetObject(AssetManager, AssetHandle, &ObjectKeeper);
   mesh_data* MeshData = GetMesh(AssetManager, AssetHandle);
 
@@ -832,12 +884,12 @@ void DrawAsset(opengl_program* Program, game_asset_manager* AssetManager, memory
   SetUniformV4( *Program, open_gl_uniform::v4_SpecularProduct, SpecularColor);
   SetUniformS(  *Program, open_gl_uniform::s_Shininess, Material->Shininess);
 
-  book_keeper* BitmapKeeper = 0;
+  bitmap_keeper* BitmapKeeper = 0;
   bitmap* RenderTarget = GetBitmap(AssetManager, AssetHandle, &BitmapKeeper);
   BindTextureToGPU(RenderTarget, BitmapKeeper);
 
-  Assert(ObjectKeeper->BufferHandle.VAO);
-  OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
+  Assert(ObjectKeeper->VAO);
+  OpenGLDraw( ObjectKeeper->VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
 }
 
 void OpenGLPushBufferData(memory_arena* TemporaryMemory, render_buffer* Buffer)
@@ -901,30 +953,6 @@ struct overlay_quad_data
   rect2f QuadRect;
   v4 Color;
 };
-#if 0
-void RenderBeginFrame(game_render_commands* Commands)
-{
-  game_asset_manager* AssetManager = Commands->AssetManager;
-  open_gl* OpenGL = Commands->MainRenderGroup;
-
-  for(render_bitmap* RenderBitmap = GetPendingBitmap(AssetManager);
-                     RenderBitmap = Next(AssetManager, RenderBitmap)
-                                    IsValid(RenderBitmap))
-  {
-    u32 BufferOffset = SendToGpu(OpenGL, RenderBitmap);
-    FinalizeTransfer(AssetManager, RenderBitmap, BufferOffset);  
-  }
-
-  for(render_mesh* RenderMesh = GetPendingMesh(AssetManager);
-                   RenderMesh = Next(AssetManager, RenderMesh)
-                                IsValid(RenderMesh))
-  {
-    u32 BufferOffset = SendToGpu(OpenGL, RenderMesh);
-    FinalizeTransfer(AssetManager, RenderMesh, BufferOffset);
-  }
-}
-#endif
-
 
 struct mesh_vertex
 {
@@ -941,18 +969,19 @@ struct textured_vertex
 };
 
 
-void PushObjectToGPU(open_gl* OpenGL, game_asset_manager* AssetManager, u32 Idx)
-{
-  u32 ObjectHandle = AssetManager->ObjectPendingLoad[Idx];
-  // TODO: Now we only suport one set of indeces per mesh. We want to keep separate track of indeces and meshes
-  //       Several indeces can point to one mesh
-  book_keeper* ObjectKeeper = 0;
-  mesh_indeces* Object = GetObjectFromIndex(AssetManager, ObjectHandle, &ObjectKeeper);
-  mesh_data* MeshData = GetMesh(AssetManager, Object->MeshHandle);
+void PushObjectToGPU(open_gl* OpenGL, game_asset_manager* AssetManager, object_handle ObjectHandle)
+{ 
+  buffer_keeper* ObjectKeeper = 0;
+  mesh_indeces* Object = GetAsset(AssetManager, ObjectHandle, &ObjectKeeper);
+  
+  buffer_keeper* MeshKeeper = 0;
+  mesh_data* MeshData = GetAsset(AssetManager, Object->MeshHandle, &MeshKeeper);
 
   temporary_memory TempMem = BeginTemporaryMemory(&AssetManager->AssetArena);
 
   Assert(Object->Count && Object->vi && Object->ti && Object->ni && MeshData->v && MeshData->vt && MeshData->vn);
+
+  // Each object within a mesh gets a copy of the mesh, not good.
   gl_vertex_buffer GLBuffer =  CreateGLVertexBuffer(&AssetManager->AssetArena, 
     Object->Count,
     Object->vi,
@@ -986,21 +1015,53 @@ void PushObjectToGPU(open_gl* OpenGL, game_asset_manager* AssetManager, u32 Idx)
                    (GLvoid*) GLBuffer.Indeces);  // Data
   Assert((OpenGL->ElementEBOOffset + EBOSize) < OpenGL->BufferSize);
 
+  Assert(ObjectKeeper->ReferenceCount);
+  ObjectKeeper->Count = GLBuffer.IndexCount;
+  ObjectKeeper->Index = ((u8*) 0 + EBOOffset);
+  ObjectKeeper->VertexOffset = VBOOffset/sizeof(opengl_vertex);
+
   glBindVertexArray(0);
-
   EndTemporaryMemory(TempMem);
-
-  ObjectKeeper->Location.Count = GLBuffer.IndexCount;
-  ObjectKeeper->Location.Index = ((u8*) 0 + EBOOffset);
-  ObjectKeeper->Location.VertexOffset = VBOOffset/sizeof(opengl_vertex);
-  int a = 10;
 }
-void PushBitmapToGPU()
+
+void PushBitmapToGPU(open_gl* OpenGL, game_asset_manager* AssetManager, bitmap_handle BitmapHandle)
 {
+  bitmap_keeper* BitmapKeeper = 0;
+  bitmap* RenderTarget = GetAsset(AssetManager, BitmapHandle, &BitmapKeeper);
+
+  Assert(RenderTarget->BPP == 32);
+
+  if(!RenderTarget->Special)
+  {
+    glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray );
+    u32 MipLevel = 0;
+    u32 TextureSlot = 0;
+    BitmapKeeper->Special = false;
+    BitmapKeeper->TextureSlot = OpenGL->TextureCount++;
+    Assert(OpenGL->TextureCount < OpenGL->MaxTextureCount);
+
+    glTexSubImage3D(GL_TEXTURE_2D_ARRAY,
+      MipLevel,
+      0, 0, 0, // x0,y0,TextureSlot
+      RenderTarget->Width, RenderTarget->Height, 1,
+      OpenGL->DefaultTextureFormat, GL_UNSIGNED_BYTE, RenderTarget->Pixels);
+  }else{
+
+    BitmapKeeper->TextureSlot = OpenGL->SpecialTextureCount++;
+    BitmapKeeper->Special = true;
+    Assert(OpenGL->SpecialTextureCount < OpenGL->MaxSpecialTextureCount);
+    glBindTexture( GL_TEXTURE_2D, OpenGL->SpecialTextures[BitmapKeeper->TextureSlot] );
+    glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
+            RenderTarget->Width,  RenderTarget->Height,
+            0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
+            RenderTarget->Pixels);
+  }
 
 }
+
 void OpenGLRenderGroupToOutput( game_render_commands* Commands)
 {
+  TIMED_FUNCTION();
   render_group* RenderGroup = Commands->MainRenderGroup;
   game_asset_manager* AssetManager = Commands->AssetManager;
   open_gl* OpenGL = &Commands->OpenGL;
@@ -1008,54 +1069,16 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
   for (u32 i = 0; i < AssetManager->ObjectPendingLoadCount; ++i)
   {
     // PushObject
-    PushObjectToGPU(OpenGL, AssetManager, i);
-
+    PushObjectToGPU(OpenGL, AssetManager, AssetManager->ObjectPendingLoad[i]);
   }
   AssetManager->ObjectPendingLoadCount = 0;
 
   for (u32 i = 0; i < AssetManager->BitmapPendingLoadCount; ++i)
   {
     // PushObject
-    PushBitmapToGPU();
+    PushBitmapToGPU(OpenGL, AssetManager, AssetManager->BitmapPendingLoad[i]);
   }
   AssetManager->BitmapPendingLoadCount = 0;
-#if 0
-  // Send everything to gpu
-  u32 ObjectHandles[256] = {};
-  u32 ObjectIndex = 0;
-  u32 BitMapHandles[256] = {};
-  u32 BitMapIndex = 0;
-  u32 NrLines = 0;
-  for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
-  {
-    u8* Head = (u8*) Entry;
-    u8* Body = Head + sizeof(push_buffer_header);
-    switch(Entry->Type)
-    {
-      case render_buffer_entry_type::RENDER_ASSET:
-      {
-        // ObjectBuffer
-        u32 AssetHandle = RenderableAsset->AssetHandle;
-        book_keeper* ObjectKeeper = 0;
-        GetObject(AssetManager, AssetHandle, &ObjectKeeper);
-        if(!ObjectKeeper->Loaded)
-        {
-          ObjectHandles[ObjectIndex++] = AssetHandle;
-        }
-
-        book_keeper* BitmapKeeper = 0;
-        GetBitmap(AssetManager, AssetHandle, &BitmapKeeper);
-        if(!BitmapKeeper->Loaded)
-        {
-          BitMapHandles[BitMapIndex++] = AssetHandle;
-        }
-      }break;
-      case render_buffer_entry_type::LINE:
-      {
-        ++NrLines;
-      }break;
-  }
-#endif
 
   // Accept fragment if it closer to the camera than the former one
   // Enable depth test
@@ -1114,109 +1137,42 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
       case render_buffer_entry_type::RENDER_ASSET:
       {
         entry_type_render_asset* AssetTest = (entry_type_render_asset*) Body;
-        #if 0
-        DrawAsset(&PhongShadingProgram, AssetManager, &RenderGroup->Arena, AssetTest, LightColor);
-        #else
-          SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Model, AssetTest->M);
-          SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Normal, AssetTest->NM);
-          SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Texture, AssetTest->TM);
+        SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Model, AssetTest->M);
+        SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Normal, AssetTest->NM);
+        SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Texture, AssetTest->TM);
 
-          u32 AssetHandle = AssetTest->AssetHandle;
-          material* Material   = GetMaterial(AssetManager, AssetHandle);
-          u32 SurfaceSmoothness = 3;
-          v4 AmbientColor   = Blend(&LightColor, &Material->AmbientColor);
-          AmbientColor.W = 1;
-          v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
-          DiffuseColor.W = 1;
-          v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothness + 8.f ) / (8.f*3.1415f);
-          SpecularColor.W = 1;
-          
-          SetUniformV4(PhongShadingProgram, open_gl_uniform::v4_AmbientProduct, AmbientColor);
-          SetUniformV4(PhongShadingProgram, open_gl_uniform::v4_DiffuseProduct, DiffuseColor);
-          SetUniformV4(PhongShadingProgram, open_gl_uniform::v4_SpecularProduct, SpecularColor);
-          SetUniformS( PhongShadingProgram, open_gl_uniform::s_Shininess, Material->Shininess);
+        instance_handle AssetHandle = AssetTest->AssetHandle;
+        material* Material = GetMaterial(AssetManager, AssetHandle);
+        u32 SurfaceSmoothness = 3;
+        v4 AmbientColor = Blend(&LightColor, &Material->AmbientColor);
+        AmbientColor.W = 1;
+        v4 DiffuseColor = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
+        DiffuseColor.W = 1;
+        v4 SpecularColor = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothness + 8.f ) / (8.f*3.1415f);
+        SpecularColor.W = 1;
 
-          book_keeper* BitmapKeeper = 0;
-          bitmap* RenderTarget = GetBitmap(AssetManager, AssetHandle, &BitmapKeeper);
-          BindTextureToGPU(RenderTarget, BitmapKeeper);
+        SetUniformV4(PhongShadingProgram, open_gl_uniform::v4_AmbientProduct, AmbientColor);
+        SetUniformV4(PhongShadingProgram, open_gl_uniform::v4_DiffuseProduct, DiffuseColor);
+        SetUniformV4(PhongShadingProgram, open_gl_uniform::v4_SpecularProduct, SpecularColor);
+        SetUniformS(PhongShadingProgram, open_gl_uniform::s_Shininess, Material->Shininess);
 
-          book_keeper* ObjectKeeper = 0;
-          mesh_indeces* Object = GetObject(AssetManager, AssetHandle, &ObjectKeeper);
-          glBindVertexArray( OpenGL->ElementVAO );
-
-          // TODO: Use Unsinged Short
-          glDrawElementsBaseVertex( GL_TRIANGLES, ObjectKeeper->Location.Count, GL_UNSIGNED_INT,
-            (GLvoid*)(ObjectKeeper->Location.Index),
-             ObjectKeeper->Location.VertexOffset);
-          glBindVertexArray(0);
-        #endif
-      }break;
-      case render_buffer_entry_type::LINE:
-      {
-        entry_type_line* Line = (entry_type_line*) Body;
-        v3 Start = Line->Start;
-        v3 End = Line->End;
-
-        v3 xp = Normalize(End-Start);
-        v3 vc = Normalize(CameraPosition - Start);
-
-        // Make sure vc and x are not parallel
-        if( Abs( (vc * xp) - 1.0f ) <  0.0001f )
+        bitmap_keeper* BitmapKeeper = 0;
+        bitmap* RenderTarget = GetBitmap(AssetManager, AssetHandle, &BitmapKeeper);
+        
+        if(BitmapKeeper->Special)
         {
-          break;
+          glBindTexture( GL_TEXTURE_2D, OpenGL->SpecialTextures[BitmapKeeper->TextureSlot]);
         }
 
-        v3 yp = Normalize(CrossProduct(vc, xp));
-        v3 zp = Normalize(CrossProduct(xp, yp));
+        buffer_keeper* ObjectKeeper = 0;
+        mesh_indeces* Object = GetObject(AssetManager, AssetHandle, &ObjectKeeper);
+        glBindVertexArray( OpenGL->ElementVAO );
 
-        // Rotates from WorldCoordinateSystem to NewCoordinateSystem
-        // RotMat * V3(1,0,0) = xp
-        // RotMat * V3(0,1,0) = yp
-        // RotMat * V3(0,0,1) = zp
-        m4 RotMat = M4( xp.X, yp.X, zp.X, 0,
-                        xp.Y, yp.Y, zp.Y, 0,
-                        xp.Z, yp.Z, zp.Z, 0,
-                        0,   0,   0, 1);
-
-        r32 w  = Norm(End-Start);
-        r32 h = Line->LineThickness;
-
-        m4 ScaleMat = M4Identity();
-        ScaleMat.E[0] = w;
-        ScaleMat.E[5] = h;
-
-        v3 MidPoint = (Start + End) / 2;
-        m4 TransMat = M4Identity();
-        TransMat.E[3]  = MidPoint.X;
-        TransMat.E[7]  = MidPoint.Y;
-        TransMat.E[11] = MidPoint.Z;
-
-        m4 M = TransMat*RotMat*ScaleMat;
-
-        m4 TM = M4Identity();
-        SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Model, M);
-        SetUniformM4(PhongShadingProgram, open_gl_uniform::m4_Texture, TM);
-
-
-        u32 ObjectIndex = GetEnumeratedObjectIndex(AssetManager, predefined_mesh::QUAD);
-        book_keeper* ObjectKeeper = 0;
-        mesh_indeces* Object = GetObjectFromIndex(AssetManager, ObjectIndex, &ObjectKeeper);
-        mesh_data* MeshData = GetMeshFromIndex(AssetManager, Object->MeshHandle);
-
-        PushMeshToGPU(&RenderGroup->Arena, Object, ObjectKeeper, MeshData);
-
-        material* Material = GetMaterialFromIndex(AssetManager, Line->MaterialIndex);
-        SetUniformV4( PhongShadingProgram, open_gl_uniform::v4_AmbientProduct, Material->AmbientColor);
-        SetUniformV4( PhongShadingProgram, open_gl_uniform::v4_DiffuseProduct, Material->DiffuseColor);
-        SetUniformV4( PhongShadingProgram, open_gl_uniform::v4_SpecularProduct, Material->SpecularColor);
-        SetUniformS( PhongShadingProgram, open_gl_uniform::s_Shininess, Material->Shininess);
-        book_keeper* BitmapKeeper = 0;
-        // Funnily enough texture "null" maps to index 0.
-        // However TODO: Make a quick lookup to bitmaps similar to GetEnumeratedObjectIndex
-        bitmap* RenderTarget = GetBitmapFromIndex(AssetManager, 0, &BitmapKeeper);
-        BindTextureToGPU(RenderTarget, BitmapKeeper);
-
-        OpenGLDraw( ObjectKeeper->BufferHandle.VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
+        // TODO: Use Unsinged Short
+        glDrawElementsBaseVertex( GL_TRIANGLES, ObjectKeeper->Count, GL_UNSIGNED_INT,
+          (GLvoid*)(ObjectKeeper->Index),
+           ObjectKeeper->VertexOffset);
+        glBindVertexArray(0);
       }break;
     }
   }
@@ -1229,10 +1185,10 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
 
   {
     // TODO: Make these lookups fast
-    book_keeper* ObjectKeeper = 0;
-    u32 QuadIndex = GetAssetIndex(AssetManager, asset_type::OBJECT, "quad");
-    mesh_indeces* QuadObject = GetObjectFromIndex(AssetManager, QuadIndex, &ObjectKeeper);
-    mesh_data* QuadMesh = GetMeshFromIndex(AssetManager, QuadObject->MeshHandle);
+    buffer_keeper* ObjectKeeper = 0;
+    object_handle ObjectHandle =  GetEnumeratedObjectHandle(AssetManager, predefined_mesh::QUAD);
+    mesh_indeces* QuadObject = GetAsset(AssetManager, ObjectHandle, &ObjectKeeper);
+    mesh_data* QuadMesh = GetAsset(AssetManager, QuadObject->MeshHandle);
     PushMeshToGPU(&RenderGroup->Arena, QuadObject, ObjectKeeper, QuadMesh);
 
     u32 TextEntries = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::TEXT];
@@ -1288,7 +1244,7 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // The geometry and instance buffer is bound to this Index
-    glBindVertexArray( ObjectKeeper->BufferHandle.VAO );
+    glBindVertexArray( ObjectKeeper->VAO );
     glBindBuffer(GL_ARRAY_BUFFER, quadInstanceVBO);
     glEnableVertexAttribArray(3);
     glEnableVertexAttribArray(4);
@@ -1315,8 +1271,9 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
     {
       FontDataAddedToTextures = true;
 
-      u32 FontTextureIndex = GetAssetIndex(AssetManager, asset_type::BITMAP, "debug_font");
-      bitmap* FontRenderTarget = GetBitmapFromIndex(AssetManager, FontTextureIndex);
+      bitmap_handle FontHandle;
+      GetHandle(AssetManager, "debug_font", &FontHandle);
+      bitmap* FontRenderTarget = GetAsset(AssetManager, FontHandle);
       
       glBindTexture(GL_TEXTURE_2D_ARRAY, Commands->OpenGL.TextureArray);
       u32 MipLevel = 0;
@@ -1329,7 +1286,7 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
     }
 
     // The geometry and instance buffer is bound to this Index
-    glBindVertexArray( ObjectKeeper->BufferHandle.VAO );
+    glBindVertexArray( ObjectKeeper->VAO );
     glBindBuffer(GL_ARRAY_BUFFER, textInstanceVBO);
     glEnableVertexAttribArray(3);
     glEnableVertexAttribArray(4);

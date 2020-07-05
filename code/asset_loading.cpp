@@ -3,38 +3,38 @@
 internal void LoadPredefinedMaterials(game_asset_manager* AssetManager)
 {
   u8 WhitePixel[4] = {255,255,255,255};
-  u32 BitmapIndex = PushBitmapData(AssetManager, "null", 1, 1, 32, (void*)WhitePixel);
+  PushBitmapData(AssetManager, "null", 1, 1, 32, (void*)WhitePixel, true);
 
-  PushMaterialData(AssetManager, "white",           CreateMaterial(V4(1.0,      1.0,      1.0,      1), V4( 1.0,      1.0,        1.0,        1), V4( 1.0,        1.0,        1.0,        1), 1.0,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "red",             CreateMaterial(V4(1.0,      0.0,      0.0,      1), V4( 1.0,      0.0,        0.0,        1), V4( 1.0,        0.0,        0.0,        1), 1.0,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "green",           CreateMaterial(V4(0.0,      1.0,      0.0,      1), V4( 0.0,      1.0,        0.0,        1), V4( 0.0,        1.0,        0.0,        1), 1.0,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "blue",            CreateMaterial(V4(0.0,      0.0,      1.0,      1), V4( 0.0,      0.0,        1.0,        1), V4( 0.0,        0.0,        1.0,        1), 1.0,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "emerald",         CreateMaterial(V4(0.0215,   0.1745,   0.0215,   1), V4( 0.07568,  0.61424,    0.07568,    1), V4( 0.633,      0.727811,   0.633,      1), 0.6,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "jade",            CreateMaterial(V4(0.135,    0.2225,   0.1575,   1), V4( 0.54,     0.89,       0.63,       1), V4( 0.316228,   0.316228,   0.316228,   1), 0.1,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "obsidian",        CreateMaterial(V4(0.05375,  0.05,     0.06625,  1), V4( 0.18275,  0.17,       0.22525,    1), V4( 0.332741,   0.328634,   0.3,        1), 0.3,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "pearl",           CreateMaterial(V4(0.25,     0.20725,  0.20725,  1), V4( 1.0,      0.829,      0.829,      1), V4( 0.296648,   0.296648,   0.088,      1), 0.088,      false, BitmapIndex));
-  PushMaterialData(AssetManager, "ruby",            CreateMaterial(V4(0.1745,   0.01175,  0.01175,  1), V4( 0.61424,  0.04136,    0.04136,    1), V4( 0.727811,   0.626959,   0.6,        1), 0.6,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "turquoise",       CreateMaterial(V4(0.1,      0.18725,  0.1745,   1), V4( 0.396,    0.74151,    0.69102,    1), V4( 0.297254,   0.30829,    0.1,        1), 0.1,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "brass",           CreateMaterial(V4(0.329412, 0.223529, 0.027451, 1), V4( 0.780392, 0.568627,   0.113725,   1), V4( 0.992157,   0.941176,   0.21794872, 1), 0.21794872, false, BitmapIndex));
-  PushMaterialData(AssetManager, "bronze",          CreateMaterial(V4(0.2125,   0.1275,   0.054,    1), V4( 0.714,    0.4284,     0.18144,    1), V4( 0.393548,   0.271906,   0.2,        1), 0.2,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "chrome",          CreateMaterial(V4(0.25,     0.25,     0.25,     1), V4( 0.4,      0.4,        0.4,        1), V4( 0.774597,   0.774597,   0.6,        1), 0.6,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "compper",         CreateMaterial(V4(0.19125,  0.0735,   0.0225,   1), V4( 0.7038,   0.27048,    0.0828,     1), V4( 0.256777,   0.137622,   0.1,        1), 0.1,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "gold",            CreateMaterial(V4(0.24725,  0.1995,   0.0745,   1), V4( 0.75164,  0.60648,    0.22648,    1), V4( 0.628281,   0.555802,   0.4,        1), 0.4,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "silver",          CreateMaterial(V4(0.19225,  0.19225,  0.19225,  1), V4( 0.50754,  0.50754,    0.50754,    1), V4( 0.508273,   0.508273,   0.4,        1), 0.4,        false, BitmapIndex));
-  PushMaterialData(AssetManager, "black_plastic",   CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.01,     0.01,       0.01,       1), V4( 0.50,       0.50,       0.25,       1), 0.25,       false, BitmapIndex));
-  PushMaterialData(AssetManager, "cyan_plastic",    CreateMaterial(V4(0.0,      0.1,      0.06,     1), V4( 0.0,      0.50980392, 0.50980392, 1), V4( 0.50196078, 0.50196078, 0.25,       1), 0.25,       false, BitmapIndex));
-  PushMaterialData(AssetManager, "green_plastic",   CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.1,      0.35,       0.1,        1), V4( 0.45,       0.55,       0.25,       1), 0.25,       false, BitmapIndex));
-  PushMaterialData(AssetManager, "red_plastic",     CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.5,      0.0,        0.0,        1), V4( 0.7,        0.6,        0.25,       1), 0.25,       false, BitmapIndex));
-  PushMaterialData(AssetManager, "blue_plastic",    CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.0,      0.0,        0.5,        1), V4( 0.6,        0.6,        0.25,       1), 0.25,       false, BitmapIndex));
-  PushMaterialData(AssetManager, "white_plastic",   CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.55,     0.55,       0.55,       1), V4( 0.70,       0.70,       0.25,       1), 0.25,       false, BitmapIndex));
-  PushMaterialData(AssetManager, "yellow_plastic",  CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.5,      0.5,        0.0,        1), V4( 0.60,       0.60,       0.25,       1), 0.25,       false, BitmapIndex));
-  PushMaterialData(AssetManager, "black_rubber",    CreateMaterial(V4(0.02,     0.02,     0.02,     1), V4( 0.01,     0.01,       0.01,       1), V4( 0.4,        0.4,        0.078125,   1), 0.078125,   false, BitmapIndex));
-  PushMaterialData(AssetManager, "cyan_rubber",     CreateMaterial(V4(0.0,      0.05,     0.05,     1), V4( 0.4,      0.5,        0.5,        1), V4( 0.04,       0.7,        0.078125,   1), 0.078125,   false, BitmapIndex));
-  PushMaterialData(AssetManager, "green_rubber",    CreateMaterial(V4(0.0,      0.05,     0.0,      1), V4( 0.4,      0.5,        0.4,        1), V4( 0.04,       0.7,        0.078125,   1), 0.078125,   false, BitmapIndex));
-  PushMaterialData(AssetManager, "red_rubber",      CreateMaterial(V4(0.05,     0.0,      0.0,      1), V4( 0.5,      0.4,        0.4,        1), V4( 0.7,        0.04,       0.078125,   1), 0.078125,   false, BitmapIndex));
-  PushMaterialData(AssetManager, "blue_rubber",     CreateMaterial(V4(0.00,     0.0,      0.05,     1), V4( 0.4,      0.4,        0.5,        1), V4( 0.04,       0.04,       0.078125,   1), 0.078125,   false, BitmapIndex));
-  PushMaterialData(AssetManager, "white_rubber",    CreateMaterial(V4(0.05,     0.05,     0.05,     1), V4( 0.5,      0.5,        0.5,        1), V4( 0.7,        0.7,        0.078125,   1), 0.078125,   false, BitmapIndex));
-  PushMaterialData(AssetManager, "yellow_rubber",   CreateMaterial(V4(0.05,     0.05,     0.0,      1), V4( 0.5,      0.5,        0.4,        1), V4( 0.7,        0.7,        0.078125,   1), 0.078125,   false, BitmapIndex));
+  PushMaterialData(AssetManager, "white",           CreateMaterial(V4(1.0,      1.0,      1.0,      1), V4( 1.0,      1.0,        1.0,        1), V4( 1.0,        1.0,        1.0,        1), 1.0,        false));
+  PushMaterialData(AssetManager, "red",             CreateMaterial(V4(1.0,      0.0,      0.0,      1), V4( 1.0,      0.0,        0.0,        1), V4( 1.0,        0.0,        0.0,        1), 1.0,        false));
+  PushMaterialData(AssetManager, "green",           CreateMaterial(V4(0.0,      1.0,      0.0,      1), V4( 0.0,      1.0,        0.0,        1), V4( 0.0,        1.0,        0.0,        1), 1.0,        false));
+  PushMaterialData(AssetManager, "blue",            CreateMaterial(V4(0.0,      0.0,      1.0,      1), V4( 0.0,      0.0,        1.0,        1), V4( 0.0,        0.0,        1.0,        1), 1.0,        false));
+  PushMaterialData(AssetManager, "emerald",         CreateMaterial(V4(0.0215,   0.1745,   0.0215,   1), V4( 0.07568,  0.61424,    0.07568,    1), V4( 0.633,      0.727811,   0.633,      1), 0.6,        false));
+  PushMaterialData(AssetManager, "jade",            CreateMaterial(V4(0.135,    0.2225,   0.1575,   1), V4( 0.54,     0.89,       0.63,       1), V4( 0.316228,   0.316228,   0.316228,   1), 0.1,        false));
+  PushMaterialData(AssetManager, "obsidian",        CreateMaterial(V4(0.05375,  0.05,     0.06625,  1), V4( 0.18275,  0.17,       0.22525,    1), V4( 0.332741,   0.328634,   0.3,        1), 0.3,        false));
+  PushMaterialData(AssetManager, "pearl",           CreateMaterial(V4(0.25,     0.20725,  0.20725,  1), V4( 1.0,      0.829,      0.829,      1), V4( 0.296648,   0.296648,   0.088,      1), 0.088,      false));
+  PushMaterialData(AssetManager, "ruby",            CreateMaterial(V4(0.1745,   0.01175,  0.01175,  1), V4( 0.61424,  0.04136,    0.04136,    1), V4( 0.727811,   0.626959,   0.6,        1), 0.6,        false));
+  PushMaterialData(AssetManager, "turquoise",       CreateMaterial(V4(0.1,      0.18725,  0.1745,   1), V4( 0.396,    0.74151,    0.69102,    1), V4( 0.297254,   0.30829,    0.1,        1), 0.1,        false));
+  PushMaterialData(AssetManager, "brass",           CreateMaterial(V4(0.329412, 0.223529, 0.027451, 1), V4( 0.780392, 0.568627,   0.113725,   1), V4( 0.992157,   0.941176,   0.21794872, 1), 0.21794872, false));
+  PushMaterialData(AssetManager, "bronze",          CreateMaterial(V4(0.2125,   0.1275,   0.054,    1), V4( 0.714,    0.4284,     0.18144,    1), V4( 0.393548,   0.271906,   0.2,        1), 0.2,        false));
+  PushMaterialData(AssetManager, "chrome",          CreateMaterial(V4(0.25,     0.25,     0.25,     1), V4( 0.4,      0.4,        0.4,        1), V4( 0.774597,   0.774597,   0.6,        1), 0.6,        false));
+  PushMaterialData(AssetManager, "compper",         CreateMaterial(V4(0.19125,  0.0735,   0.0225,   1), V4( 0.7038,   0.27048,    0.0828,     1), V4( 0.256777,   0.137622,   0.1,        1), 0.1,        false));
+  PushMaterialData(AssetManager, "gold",            CreateMaterial(V4(0.24725,  0.1995,   0.0745,   1), V4( 0.75164,  0.60648,    0.22648,    1), V4( 0.628281,   0.555802,   0.4,        1), 0.4,        false));
+  PushMaterialData(AssetManager, "silver",          CreateMaterial(V4(0.19225,  0.19225,  0.19225,  1), V4( 0.50754,  0.50754,    0.50754,    1), V4( 0.508273,   0.508273,   0.4,        1), 0.4,        false));
+  PushMaterialData(AssetManager, "black_plastic",   CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.01,     0.01,       0.01,       1), V4( 0.50,       0.50,       0.25,       1), 0.25,       false));
+  PushMaterialData(AssetManager, "cyan_plastic",    CreateMaterial(V4(0.0,      0.1,      0.06,     1), V4( 0.0,      0.50980392, 0.50980392, 1), V4( 0.50196078, 0.50196078, 0.25,       1), 0.25,       false));
+  PushMaterialData(AssetManager, "green_plastic",   CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.1,      0.35,       0.1,        1), V4( 0.45,       0.55,       0.25,       1), 0.25,       false));
+  PushMaterialData(AssetManager, "red_plastic",     CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.5,      0.0,        0.0,        1), V4( 0.7,        0.6,        0.25,       1), 0.25,       false));
+  PushMaterialData(AssetManager, "blue_plastic",    CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.0,      0.0,        0.5,        1), V4( 0.6,        0.6,        0.25,       1), 0.25,       false));
+  PushMaterialData(AssetManager, "white_plastic",   CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.55,     0.55,       0.55,       1), V4( 0.70,       0.70,       0.25,       1), 0.25,       false));
+  PushMaterialData(AssetManager, "yellow_plastic",  CreateMaterial(V4(0.0,      0.0,      0.0,      1), V4( 0.5,      0.5,        0.0,        1), V4( 0.60,       0.60,       0.25,       1), 0.25,       false));
+  PushMaterialData(AssetManager, "black_rubber",    CreateMaterial(V4(0.02,     0.02,     0.02,     1), V4( 0.01,     0.01,       0.01,       1), V4( 0.4,        0.4,        0.078125,   1), 0.078125,   false));
+  PushMaterialData(AssetManager, "cyan_rubber",     CreateMaterial(V4(0.0,      0.05,     0.05,     1), V4( 0.4,      0.5,        0.5,        1), V4( 0.04,       0.7,        0.078125,   1), 0.078125,   false));
+  PushMaterialData(AssetManager, "green_rubber",    CreateMaterial(V4(0.0,      0.05,     0.0,      1), V4( 0.4,      0.5,        0.4,        1), V4( 0.04,       0.7,        0.078125,   1), 0.078125,   false));
+  PushMaterialData(AssetManager, "red_rubber",      CreateMaterial(V4(0.05,     0.0,      0.0,      1), V4( 0.5,      0.4,        0.4,        1), V4( 0.7,        0.04,       0.078125,   1), 0.078125,   false));
+  PushMaterialData(AssetManager, "blue_rubber",     CreateMaterial(V4(0.00,     0.0,      0.05,     1), V4( 0.4,      0.4,        0.5,        1), V4( 0.04,       0.04,       0.078125,   1), 0.078125,   false));
+  PushMaterialData(AssetManager, "white_rubber",    CreateMaterial(V4(0.05,     0.05,     0.05,     1), V4( 0.5,      0.5,        0.5,        1), V4( 0.7,        0.7,        0.078125,   1), 0.078125,   false));
+  PushMaterialData(AssetManager, "yellow_rubber",   CreateMaterial(V4(0.05,     0.05,     0.0,      1), V4( 0.5,      0.5,        0.4,        1), V4( 0.7,        0.7,        0.078125,   1), 0.078125,   false));
 }
 
 internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
@@ -59,7 +59,7 @@ internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
       V2( 0, 1),
       V2( 1, 1)
     };
-    u32 MeshIndex = PushMeshData(AssetManager,
+    mesh_handle MeshHandle = PushMeshData(AssetManager,
       ArrayCount(v),  v,
       ArrayCount(vn), vn,
       ArrayCount(vt), vt);
@@ -68,8 +68,8 @@ internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
     u32 ti[] = {0,1,2,2,1,3};
     u32 ni[] = {0,0,0,0,0,0};
     aabb3f AABB = AABB3f(V3(-0.5, -0.5, 0), V3( 0.5,  0.5, 0));
-    u32 ObjectIndex = PushIndexData(AssetManager, "quad", MeshIndex, ArrayCount(vi), vi, ti, ni, AABB);
-    AssetManager->EnumeratedMeshes[(u32)predefined_mesh::QUAD] = ObjectIndex;
+    object_handle ObjectHandle = PushIndexData(AssetManager, "quad", MeshHandle, ArrayCount(vi), vi, ti, ni, AABB);
+    AssetManager->EnumeratedMeshes[(u32)predefined_mesh::QUAD] = ObjectHandle;
   }
 
   {
@@ -103,7 +103,7 @@ internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
       V2( 0, 1)
     };
 
-    u32 MeshIndex = PushMeshData(AssetManager,
+    mesh_handle MeshHandle = PushMeshData(AssetManager,
       ArrayCount(v),  v,
       ArrayCount(vn), vn,
       ArrayCount(vt), vt);
@@ -112,8 +112,8 @@ internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
     u32 ti[] = {0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2,0,1,3,3,1,2};
     u32 ni[] = {0,0,0,0,0,0,1,1,1,1,1,1,2,2,2,2,2,2,3,3,3,3,3,3,4,4,4,4,4,4,5,5,5,5,5,5};
     aabb3f AABB = AABB3f(V3(-0.5, -0.5, -0.5), V3( 0.5, 0.5, 0.5));
-    u32 ObjectIndex = PushIndexData(AssetManager, "voxel", MeshIndex, ArrayCount(vi), vi, ti, ni, AABB);
-    AssetManager->EnumeratedMeshes[(u32)predefined_mesh::VOXEL] = ObjectIndex;
+    object_handle ObjectHandle = PushIndexData(AssetManager, "voxel", MeshHandle, ArrayCount(vi), vi, ti, ni, AABB);
+    AssetManager->EnumeratedMeshes[(u32)predefined_mesh::VOXEL] = ObjectHandle;
   }
 
 }
@@ -171,7 +171,7 @@ internal void stbtt_BakeFontBitmap(game_asset_manager* AssetManager)
     *Pixels++ = PixelData;
     SrcPixel++;
   }
-  FontMap->BitmapIndex = PushBitmapData(AssetManager, "debug_font", Width, Height, BPP, BasePixel);
+  FontMap->BitmapHandle = PushBitmapData(AssetManager, "debug_font", Width, Height, BPP, BasePixel, false);
 
   Platform.DEBUGPlatformFreeFileMemory(&Thread, TTFFile.Contents);
 }
@@ -184,7 +184,7 @@ internal void LoadCubeAsset(game_asset_manager* AssetManager)
 
   mesh_data* MeshData = LoadedObjFile->MeshData;
 
-  u32 MeshIndex = PushMeshData(AssetManager,
+  mesh_handle MeshHandle = PushMeshData(AssetManager,
       MeshData->nv,  MeshData->v,
       MeshData->nvn, MeshData->vn,
       MeshData->nvt, MeshData->vt);
@@ -195,7 +195,7 @@ internal void LoadCubeAsset(game_asset_manager* AssetManager)
     Assert(LoadedObjectGroup->GroupName);
     PushIndexData(AssetManager,
       LoadedObjectGroup->GroupName,
-      MeshIndex,
+      MeshHandle,
       LoadedObjectGroup->Indeces->Count,
       LoadedObjectGroup->Indeces->vi,
       LoadedObjectGroup->Indeces->ti,
@@ -210,7 +210,7 @@ internal void LoadCubeAsset(game_asset_manager* AssetManager)
     Assert(SrcMaterial->NameLength < 120);
     Assert(SrcMaterial->Name);
 
-    u32 BitmapHandle = 0;
+    bitmap_handle BitmapHandle = {};
     if(SrcMaterial->MapKd)
     {
       c8 TexKey[128] = {};
@@ -219,10 +219,10 @@ internal void LoadCubeAsset(game_asset_manager* AssetManager)
         ArrayCount(Appendix), Appendix, ArrayCount(TexKey),  TexKey );
       BitmapHandle = PushBitmapData(AssetManager, TexKey,
         SrcMaterial->MapKd->Width, SrcMaterial->MapKd->Height,
-        SrcMaterial->MapKd->BPP,   SrcMaterial->MapKd->Pixels);
+        SrcMaterial->MapKd->BPP,   SrcMaterial->MapKd->Pixels, true);
     }
 
-    material Material = CreateMaterial(*SrcMaterial->Ka, *SrcMaterial->Kd, *SrcMaterial->Ks, *SrcMaterial->Ns, false, BitmapHandle);
+    material Material = CreateMaterial(*SrcMaterial->Ka, *SrcMaterial->Kd, *SrcMaterial->Ks, *SrcMaterial->Ns, false);
     PushMaterialData(AssetManager, SrcMaterial->Name, Material);
   }
 }
@@ -231,13 +231,13 @@ internal void LoadBitmaps(game_asset_manager* AssetManager)
 {
   bitmap* HeroBitmap = LoadTGA(&AssetManager->AssetArena,
         "..\\handmade\\data\\Platformer\\Adventurer\\adventurer-Sheet.tga" );
-  u32 HeroBitmapHandle = PushBitmapData(AssetManager, "hero_sprite_sheet", HeroBitmap->Width, HeroBitmap->Height, HeroBitmap->BPP, HeroBitmap->Pixels);
-  PushMaterialData(AssetManager, "hero_sprite_sheet", CreateMaterial(V4(1,1,1,1),V4(1,1,1,1),V4(1,1,1,1),1,true, HeroBitmapHandle));
+  bitmap_handle HeroBitmapHandle = PushBitmapData(AssetManager, "hero_sprite_sheet", HeroBitmap->Width, HeroBitmap->Height, HeroBitmap->BPP, HeroBitmap->Pixels, true);
+  PushMaterialData(AssetManager, "hero_sprite_sheet", CreateMaterial(V4(1,1,1,1),V4(1,1,1,1),V4(1,1,1,1),1,true));
 
   bitmap* CheckerBitmap = LoadTGA(&AssetManager->AssetArena,
         "..\\handmade\\data\\checker_board.tga" );
-  u32 CheckerBitmapHandle = PushBitmapData(AssetManager, "checker_board", CheckerBitmap->Width, CheckerBitmap->Height, CheckerBitmap->BPP, CheckerBitmap->Pixels);
-  PushMaterialData(AssetManager, "checker_board", CreateMaterial(V4(1,1,1,1),V4(1,1,1,1),V4(1,1,1,1),1,true, CheckerBitmapHandle));
+  bitmap_handle CheckerBitmapHandle = PushBitmapData(AssetManager, "checker_board", CheckerBitmap->Width, CheckerBitmap->Height, CheckerBitmap->BPP, CheckerBitmap->Pixels, true);
+  PushMaterialData(AssetManager, "checker_board", CreateMaterial(V4(1,1,1,1),V4(1,1,1,1),V4(1,1,1,1),1,true));
 }
 
 internal void LoadTeapotAsset(game_asset_manager* AssetManager)
@@ -248,7 +248,7 @@ internal void LoadTeapotAsset(game_asset_manager* AssetManager)
 
   mesh_data* MeshData = LoadedObjFile->MeshData;
 
-  u32 MeshIndex = PushMeshData(AssetManager,
+  mesh_handle MeshHandle = PushMeshData(AssetManager,
       MeshData->nv,  MeshData->v,
       MeshData->nvn, MeshData->vn,
       MeshData->nvt, MeshData->vt);
@@ -259,7 +259,7 @@ internal void LoadTeapotAsset(game_asset_manager* AssetManager)
     Assert(LoadedObjectGroup->GroupName);
     PushIndexData(AssetManager,
       LoadedObjectGroup->GroupName,
-      MeshIndex,
+      MeshHandle,
       LoadedObjectGroup->Indeces->Count,
       LoadedObjectGroup->Indeces->vi,
       LoadedObjectGroup->Indeces->ti,
@@ -291,25 +291,27 @@ game_asset_manager* CreateAssetManager()
   AssetManager->Meshes.MaxCount = 64;
   AssetManager->Meshes.Values = (void**) PushArray(&AssetManager->AssetArena,
                                   AssetManager->Meshes.MaxCount, mesh_data);
+  AssetManager->MeshKeeper = PushArray(&AssetManager->AssetArena,
+                                      AssetManager->Meshes.MaxCount, buffer_keeper);
+
 
   AssetManager->Objects.MaxCount = 64;
   AssetManager->Objects.Values = (void**) PushArray(&AssetManager->AssetArena,
                                             AssetManager->Objects.MaxCount, void*);
   AssetManager->ObjectKeeper = PushArray(&AssetManager->AssetArena,
-                                            AssetManager->Objects.MaxCount, book_keeper);
+                                            AssetManager->Objects.MaxCount, buffer_keeper);
 
   AssetManager->Materials.MaxCount = 64;
   AssetManager->Materials.Values = (void**) PushArray( &AssetManager->AssetArena,
                                             AssetManager->Materials.MaxCount, void*);
-
   AssetManager->Bitmaps.MaxCount = 64;
   AssetManager->Bitmaps.Values = (void**) PushArray( &AssetManager->AssetArena,
                                             AssetManager->Materials.MaxCount, void*);
   AssetManager->BitmapKeeper = PushArray(&AssetManager->AssetArena,
-                                            AssetManager->Materials.MaxCount, book_keeper);
+                                            AssetManager->Materials.MaxCount, bitmap_keeper);
 
   AssetManager->EnumeratedMeshes = PushArray(&AssetManager->AssetArena,
-                                            (u32)predefined_mesh::COUNT, u32);
+                                            (u32)predefined_mesh::COUNT, object_handle);
 
   AssetManager->ObjectPendingLoadCount = 0;
   AssetManager->BitmapPendingLoadCount = 0;

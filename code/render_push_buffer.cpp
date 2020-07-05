@@ -26,7 +26,7 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup, render_buffer_entry
   return NewEntryHeader;
 }
 
-void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRect, v4 Color, u32 TextureIndex)
+void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRect, v4 Color)
 {
   const m4 TextureTranslate = GetTranslationMatrix(V4(TextureRect.X,TextureRect.Y,0,1));
   const m4 TextureScale     = GetScaleMatrix(V4(TextureRect.W, TextureRect.H,1,0));
@@ -36,9 +36,9 @@ void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRec
   push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::OVERLAY_QUAD, RENDER_STATE_FILL);
   entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);
 
-  Body->ObjectIndex = GetAssetIndex(GlobalGameState->AssetManager, asset_type::OBJECT, "quad");
+  GetHandle(GlobalGameState->AssetManager, "quad", &Body->ObjectHandle);
   Body->Colour = Color;
-  Body->TextureIndex = TextureIndex;
+  Body->BitmapHandle = {};
   Body->M  = QuadTranslate * QuadScale;
   Body->TM = TextureTranslate * TextureScale;
   Body->QuadRect = QuadRect;
@@ -120,7 +120,7 @@ void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* Str
   game_asset_manager* AssetManager =  GlobalGameState->AssetManager;
   stb_font_map* FontMap = &AssetManager->FontMap;
 
-  bitmap* BitMap = GetBitmapFromIndex(AssetManager, FontMap->BitmapIndex);
+  bitmap* BitMap = GetAsset(AssetManager, FontMap->BitmapHandle);
   stbtt_aligned_quad Quad  = {};
 
   const r32 ScreenScaleFactor = 1.f / RenderGroup->ScreenHeight;
@@ -184,23 +184,58 @@ render_group* InitiateRenderGroup(r32 ScreenWidth, r32 ScreenHeight)
 
 
 internal inline void
-PushLine(render_group* RenderGroup, v3 Start, v3 End, r32 LineThickness, u32 MaterialIndex)
+PushLine(render_group* RenderGroup, v3 Start, v3 End, v3 CameraPosition, r32 LineThickness, c8* MaterialName)
 {
-  push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::LINE, RENDER_STATE_CULL_BACK | RENDER_STATE_FILL );
-  entry_type_line* Body = PushStruct(&RenderGroup->Arena, entry_type_line);
-  Body->Start = Start;
-  Body->End = End;
-  Body->LineThickness = LineThickness;
-  // TODO: Add setting like this to make the line be drawn with the same width on screen
-  //       no matter how far away it is from the camera.
-  // Body->ConstantWidth = false;
-  Body->MaterialIndex = MaterialIndex;
+  v3 xAxis = Normalize(End-Start);
+  v3 cameraDir = Normalize(CameraPosition - Start);
+
+  // Make sure cameraDir and xAxis are not parallel
+  if( Abs( (cameraDir * xAxis) - 1.0f ) <  0.0001f )
+  {
+    return;
+  }
+
+  v3 yAxis = Normalize(CrossProduct(cameraDir, xAxis));
+  v3 zAxis = Normalize(CrossProduct(xAxis, yAxis));
+
+  // Rotates from WorldCoordinateSystem to NewCoordinateSystem
+  // RotMat * V3(1,0,0) = xp
+  // RotMat * V3(0,1,0) = yp
+  // RotMat * V3(0,0,1) = zp
+  m4 RotMat = M4( xAxis.X, yAxis.X, zAxis.X, 0,
+                  xAxis.Y, yAxis.Y, zAxis.Y, 0,
+                  xAxis.Z, yAxis.Z, zAxis.Z, 0,
+                  0,   0,   0, 1);
+
+  r32 Length  = Norm(End-Start);
+
+  m4 ScaleMat = M4Identity();
+  ScaleMat.E[0] = Length;
+  ScaleMat.E[5] = LineThickness;
+
+  v3 MidPoint = (Start + End) / 2;
+  m4 TransMat = M4Identity();
+  TransMat.E[3]  = MidPoint.X;
+  TransMat.E[7]  = MidPoint.Y;
+  TransMat.E[11] = MidPoint.Z;
+
+  push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_CULL_BACK | RENDER_STATE_FILL );
+  entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
+
+  instance_handle TempHandle = GetTemporaryAssetHandle(GlobalGameState->AssetManager);
+  SetAsset(GlobalGameState->AssetManager, asset_type::OBJECT, "quad", TempHandle);
+  SetAsset(GlobalGameState->AssetManager, asset_type::MATERIAL, MaterialName, TempHandle);
+  SetAsset(GlobalGameState->AssetManager, asset_type::BITMAP, "null", TempHandle);
+  Body->AssetHandle = TempHandle;
+  Body->M = TransMat*RotMat*ScaleMat;
+  Body->NM = Transpose(RigidInverse(Body->M));
+  Body->TM = M4Identity();
 }
 
 internal inline void
-PushBoxFrame(render_group* RenderGroup, m4 M, aabb3f AABB, r32 LineThickness, u32 MaterialIndex)
+PushBoxFrame(render_group* RenderGroup, m4 M, aabb3f AABB, v3 CameraPosition, r32 LineThickness, c8* MaterialName)
 {
-  v3 P[8] = {};;
+  v3 P[8] = {};
   GetAABBVertices(&AABB, P);
   for(u32 i = 0; i < ArrayCount(P); ++i)
   {
@@ -208,20 +243,20 @@ PushBoxFrame(render_group* RenderGroup, m4 M, aabb3f AABB, r32 LineThickness, u3
   }
 
   // Negative Z
-  PushLine(RenderGroup, P[0], P[1], LineThickness, MaterialIndex);
-  PushLine(RenderGroup, P[1], P[2], LineThickness, MaterialIndex);
-  PushLine(RenderGroup, P[2], P[3], LineThickness, MaterialIndex);
-  PushLine(RenderGroup, P[3], P[0], LineThickness, MaterialIndex);
+  PushLine(RenderGroup, P[0], P[1], CameraPosition, LineThickness, MaterialName);
+  PushLine(RenderGroup, P[1], P[2], CameraPosition, LineThickness, MaterialName);
+  PushLine(RenderGroup, P[2], P[3], CameraPosition, LineThickness, MaterialName);
+  PushLine(RenderGroup, P[3], P[0], CameraPosition, LineThickness, MaterialName);
   // Positive Z
-  PushLine(RenderGroup, P[4], P[5], LineThickness, MaterialIndex);
-  PushLine(RenderGroup, P[5], P[6], LineThickness, MaterialIndex);
-  PushLine(RenderGroup, P[6], P[7], LineThickness, MaterialIndex);
-  PushLine(RenderGroup, P[7], P[4], LineThickness, MaterialIndex);
+  PushLine(RenderGroup, P[4], P[5], CameraPosition, LineThickness, MaterialName);
+  PushLine(RenderGroup, P[5], P[6], CameraPosition, LineThickness, MaterialName);
+  PushLine(RenderGroup, P[6], P[7], CameraPosition, LineThickness, MaterialName);
+  PushLine(RenderGroup, P[7], P[4], CameraPosition, LineThickness, MaterialName);
   // Joining Lines
-  PushLine(RenderGroup, P[0], P[4], LineThickness, MaterialIndex);
-  PushLine(RenderGroup, P[1], P[5], LineThickness, MaterialIndex);
-  PushLine(RenderGroup, P[2], P[6], LineThickness, MaterialIndex);
-  PushLine(RenderGroup, P[3], P[7], LineThickness, MaterialIndex);
+  PushLine(RenderGroup, P[0], P[4], CameraPosition, LineThickness, MaterialName);
+  PushLine(RenderGroup, P[1], P[5], CameraPosition, LineThickness, MaterialName);
+  PushLine(RenderGroup, P[2], P[6], CameraPosition, LineThickness, MaterialName);
+  PushLine(RenderGroup, P[3], P[7], CameraPosition, LineThickness, MaterialName);
 
 }
 
@@ -233,6 +268,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
   entity_manager* EM = GlobalGameState->EntityManager;
   game_asset_manager* AM = GlobalGameState->AssetManager;
 
+  v3 CameraPosition = {};
   {
     ScopedTransaction(EM);
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
@@ -241,6 +277,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
       component_camera* Camera = (component_camera*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CAMERA);
       RenderGroup->ProjectionMatrix = Camera->P;
       RenderGroup->ViewMatrix       = Camera->V;
+      CameraPosition = V3(Column(RigidInverse(Camera->V),3));
     }
   }
 
@@ -294,8 +331,8 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
       m4 M = GetModelMatrix(Spatial);
       aabb3f AABB = Collider->AABB;
       r32 LineThickness = 0.03;
-      u32 MaterialIndex = GetAssetIndex(AM, asset_type::MATERIAL, "jade");
-      PushBoxFrame(RenderGroup, M, AABB, LineThickness, MaterialIndex);
+      
+      PushBoxFrame(RenderGroup, M, AABB, CameraPosition, LineThickness, "jade");
     }
   }
 #endif
@@ -311,7 +348,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
       {
         push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK );
 
-        u32 TempHandle = GetTemporaryAssetHandle(AM);
+        instance_handle TempHandle = GetTemporaryAssetHandle(AM);
         SetAsset(AM, asset_type::OBJECT, "voxel", TempHandle);
         SetAsset(AM, asset_type::MATERIAL, "blue", TempHandle);
 
@@ -327,7 +364,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
       {
         push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK );
 
-        u32 TempHandle = GetTemporaryAssetHandle(AM);
+        instance_handle TempHandle = GetTemporaryAssetHandle(AM);
         SetAsset(AM, asset_type::OBJECT, "voxel", TempHandle);
         SetAsset(AM, asset_type::MATERIAL, "white", TempHandle);
 
@@ -352,8 +389,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
   for(u32 Idx = 0; Idx < Count; ++Idx)
   {
     r32 LineThickness = 0.03;
-    u32 MaterialIndex = GetAssetIndex(AM, asset_type::MATERIAL, "jade");
-    PushBoxFrame(RenderGroup, M4Identity(), *AABBTree++, LineThickness, MaterialIndex);
+    PushBoxFrame(RenderGroup, M4Identity(), *AABBTree++, CameraPosition, LineThickness, "ruby");
   }
 #endif
 
