@@ -105,30 +105,11 @@
 
 typedef u32 glHandle;
 
-struct opengl_handles
-{
-	u32 VAO;
-	u32 VBO;
-	u32 EBO;
-	u32 TextureHandle;
-};
-
 struct opengl_vertex
 {
 	v3 v;
 	v3 vn;
 	v2 vt;
-};
-
-struct opengl_textured_vertex
-{
-  v3 v;
-  v3 vn;
-  v2 vt;
-  v4 color;
-    
-  // Could be per triangle
-  u16 TextureIndex;
 };
 
 
@@ -145,50 +126,27 @@ struct opengl_info
 	b32 GL_blend_func_separate;
 };
 
-// A big list of ALL possible uniform names
-enum class open_gl_uniform
-{
-  m4_Model,
-  m4_Normal,
-  m4_Texture,
-  m4_Projection,
-  m4_View,
-  v4_AmbientProduct,
-  v4_DiffuseProduct,
-  v4_SpecularProduct,
-  v4_LightPosition,
-  v4_CameraPosition,
-  v2_TextureCoordinate,
-  s_Shininess,
-  count  // 13
-};
-
-
 #define OPEN_GL_UNIFORM_NAME_SIZE 32
-#define OPEN_GL_UNIFORM_COUNT 12
-
-struct uniform_map
-{
-	open_gl_uniform Enum;
-	c8 Name[OPEN_GL_UNIFORM_NAME_SIZE];
-};
+#define OPEN_GL_UNIFORM_COUNT 13
 
 struct opengl_program
 {
 	u32 Program;
-  u32 VAO;
-	s32 Uniforms[OPEN_GL_UNIFORM_COUNT];
-};
 
-struct opengl_buffer_object
-{
-	u32 VertexArrayObject;
-	u32 VertexBuffer;
-	u32 UVBuffer;
-	u32 NormalBuffer;
-	u32 FaceBuffer;
+  u32 ModelMat;
+  u32 NormalMat;
+  u32 TextureMat;
+  u32 ProjectionMat;
+  u32 ViewMat;
+  u32 AmbientProduct;
+  u32 DiffuseProduct;
+  u32 SpecularProduct;
+  u32 LightPosition;
+  u32 CameraPosition;
+  u32 UVCoordinate;
+  u32 Shininess;
+  u32 TextureIndex;
 };
-
 
 struct text_data
 {
@@ -202,7 +160,6 @@ struct overlay_quad_data
   rect2f QuadRect;
   v4 Color;
 };
-
 
 
 #define TEXTURE_ARRAY_DIM 512
@@ -230,11 +187,11 @@ struct open_gl
   
   u32 MaxTextureCount;
   u32 TextureCount;
-  u32 TextureArray;
+  glHandle TextureArray;
   
   u32 MaxSpecialTextureCount;
   u32 SpecialTextureCount;
-  u32 SpecialTextures[SPECIAL_TEXTURE_COUNT];
+  glHandle SpecialTextures[SPECIAL_TEXTURE_COUNT];
 
   u32 BufferSize;
 
@@ -256,17 +213,6 @@ struct open_gl
   u32 QuadBaseOffset;
   glHandle TextVAO;
   u32 TextBaseOffset;
-
-  // Instanced Geoms 
-  // Single VAO InstancedVertexArray (For shared object data) (geometries, uv-coords, normals)
-  // Single IndexArray
-  // Single VAO InstanceArray        (For per object data, position, color, texture index) (Flera för olika datatyper?)
-  // Good for rendering Large (>1000) number of Large geometries with similar transforms.
-  ///  u32 InstanceVAO;
-  ///  u32 InstanceVBO;
-  ///  u32 InstanceDataVAO;
-  ///  u32 InstancedEBO;
-
 };
 
 void InitOpenGL(open_gl* OpenGL);

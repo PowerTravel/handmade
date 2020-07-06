@@ -5,7 +5,21 @@ internal void LoadPredefinedMaterials(game_asset_manager* AssetManager)
   u8 WhitePixel[4] = {255,255,255,255};
   PushBitmapData(AssetManager, "null", 1, 1, 32, (void*)WhitePixel, true);
 
-  PushMaterialData(AssetManager, "white",           CreateMaterial(V4(1.0,      1.0,      1.0,      1), V4( 1.0,      1.0,        1.0,        1), V4( 1.0,        1.0,        1.0,        1), 1.0,        false));
+  //u32 WhiteTexture[256][256];
+  //for (int i = 0; i < 256; ++i)
+  //{
+  //  for (int j = 0; j < 256; ++j)
+  //  {
+  //    u8* rgb = (u8*) &WhiteTexture[i][j];
+  //    *rgb++ = 0xFF;
+  //    *rgb++ = 0xFF;
+  //    *rgb++ = 0xFF;
+  //    *rgb++ = 0xFF;
+  //  }
+  //}
+  //PushBitmapData(AssetManager, "null2", 256, 256, 32, (void*)WhiteTexture, false);
+
+  PushMaterialData(AssetManager, "white",           CreateMaterial(V4(0.1,      0.1,      0.1,      1), V4( 0.1,      0.1,        0.1,        1), V4( 0.1,        0.1,        0.1,        1), 1.0,        false));
   PushMaterialData(AssetManager, "red",             CreateMaterial(V4(1.0,      0.0,      0.0,      1), V4( 1.0,      0.0,        0.0,        1), V4( 1.0,        0.0,        0.0,        1), 1.0,        false));
   PushMaterialData(AssetManager, "green",           CreateMaterial(V4(0.0,      1.0,      0.0,      1), V4( 0.0,      1.0,        0.0,        1), V4( 0.0,        1.0,        0.0,        1), 1.0,        false));
   PushMaterialData(AssetManager, "blue",            CreateMaterial(V4(0.0,      0.0,      1.0,      1), V4( 0.0,      0.0,        1.0,        1), V4( 0.0,        0.0,        1.0,        1), 1.0,        false));
@@ -171,7 +185,8 @@ internal void stbtt_BakeFontBitmap(game_asset_manager* AssetManager)
     *Pixels++ = PixelData;
     SrcPixel++;
   }
-  FontMap->BitmapHandle = PushBitmapData(AssetManager, "debug_font", Width, Height, BPP, BasePixel, false);
+  PushBitmapData(AssetManager, "debug_font", Width, Height, BPP, BasePixel, false);
+  GetHandle(AssetManager, "debug_font", &FontMap->BitmapHandle);
 
   Platform.DEBUGPlatformFreeFileMemory(&Thread, TTFFile.Contents);
 }
@@ -291,8 +306,8 @@ game_asset_manager* CreateAssetManager()
   AssetManager->Meshes.MaxCount = 64;
   AssetManager->Meshes.Values = (void**) PushArray(&AssetManager->AssetArena,
                                   AssetManager->Meshes.MaxCount, mesh_data);
-  AssetManager->MeshKeeper = PushArray(&AssetManager->AssetArena,
-                                      AssetManager->Meshes.MaxCount, buffer_keeper);
+  //AssetManager->MeshKeeper = PushArray(&AssetManager->AssetArena,
+  //                                    AssetManager->Meshes.MaxCount, buffer_keeper);
 
 
   AssetManager->Objects.MaxCount = 64;

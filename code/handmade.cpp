@@ -6,23 +6,19 @@
       to have been like this for a long long time. Before debug-system.
     - Collision detection breaks when we have several boxes
   Rendering:
-    - Shadows
-    (working on) Instance rendering, Want to group geometries together and do as few draw-calls as possible. (when possible, fonts, graphs for example, cubes too)
-      - Transforms, Texture-coordinates, Colours (as much data as possible) should be sent in buffers, not as Uniforms.
-    - Investigate raytracing
-    - Use 3d Textures and let indexed rendering also specify the depth
+    - Nice Lines (https://blog.mapbox.com/drawing-antialiased-lines-with-opengl-8766f34192dc)
+    - Proper Diffuse Textures, BumpMapping
+    - MipMapping
+    - Depth Peeling and Anti Ailising
+    - Environment skybox
+    - Global Illumination
+      - Investigate raytracing
+      - Shadows
   Assets:
     - Separately built Asset file with multithreaded stream-loading. (Maybe using ASSIMP)
-    - Add a tag-system. I want to get a random asset with a specific tag. Predefined-Material for example.
-    - Let asset system gather up all the assets (geoms, textures, etx) needed and send them to the gpu in one go at start.
-      - What is to be rendered should be known at the start so we can let the asset manager produce all 'active' assets so the
-        renderer can uppload them to the gpu.
-      - Benefits include:
-        * Can be extended later to stream textures.
-        * More defined responsibilities.
-        
+    - Add a tag-system. I want to get a random asset with a specific tag.
   Debug:
-    (working on) Continue w decent Debug-interface.
+    * Continue w decent Debug-interface.
     - Time-Plots
     - Item selection w mouse
     - Continue on caseys Stream, he gets rid of the __COUNT__ macro gimmic which we also use at some point.
@@ -166,7 +162,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   component_spatial* LightSpatial = GetSpatialComponent(LightEntity);
   component_render* LightRender = GetRenderComponent(LightEntity);
 
-  Light->Color = 0.6*V4(1,1,1,1);
+  Light->Color = 2.7*V4(1,1,1,1);
 
   LightSpatial->Position = V3(1,1,1);
   LightSpatial->Scale    = V3( 0.3, 0.3, 0.3);

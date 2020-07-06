@@ -188,11 +188,25 @@ void GetHandle(game_asset_manager* AssetManager, char* Key, bitmap_handle* Handl
 {
   Assert(Key && Handle);
   Handle->Value = GetBitmapAssetIndex(AssetManager, Key);
+
+  bitmap_keeper* BitmapKeeper =  AssetManager->BitmapKeeper + Handle->Value;
+  if(!BitmapKeeper->Referenced)
+  {
+    BitmapKeeper->Referenced = true;
+    AssetManager->BitmapPendingLoad[AssetManager->BitmapPendingLoadCount++] = *Handle;
+  }
 }
 void GetHandle(game_asset_manager* AssetManager, char* Key, object_handle* Handle)
 {
   Assert(Key && Handle);
   Handle->Value = GetObjectAssetIndex(AssetManager, Key);
+
+  buffer_keeper* ObjectKeeper = AssetManager->ObjectKeeper + Handle->Value;
+  if(!ObjectKeeper->Referenced)
+  {
+    ObjectKeeper->Referenced = true;
+    AssetManager->ObjectPendingLoad[AssetManager->ObjectPendingLoadCount++] = *Handle;
+  }
 }
 void GetHandle(game_asset_manager* AssetManager, char* Key, material_handle* Handle)
 {
@@ -209,18 +223,21 @@ GetAsset(game_asset_manager* AssetManager, object_handle Handle, buffer_keeper**
   mesh_indeces* Result = Objects[Handle.Value];
   Assert(Result);
 
-  if(Keeper) *Keeper = AssetManager->ObjectKeeper + Handle.Value;
+
+  buffer_keeper* ObjectKeeper = AssetManager->ObjectKeeper + Handle.Value;
+  Assert(ObjectKeeper->Referenced);
+  if(Keeper) *Keeper = ObjectKeeper;
 
   return Result;
 }
 inline mesh_data*
-GetAsset(game_asset_manager* AssetManager, mesh_handle Handle, buffer_keeper** Keeper)
+GetAsset(game_asset_manager* AssetManager, mesh_handle Handle)//, buffer_keeper** Keeper)
 {
   Assert(Handle.Value < AssetManager->Meshes.Count);
   mesh_data** MeshData = (mesh_data**) AssetManager->Meshes.Values;
   mesh_data* Result = MeshData[Handle.Value];
 
-  if(Keeper) *Keeper = AssetManager->MeshKeeper + Handle.Value;
+ // if(Keeper) *Keeper = AssetManager->MeshKeeper + Handle.Value;
 
   Assert(Result);
   return Result;
@@ -243,7 +260,9 @@ GetAsset(game_asset_manager* AssetManager, bitmap_handle Handle, bitmap_keeper**
 
   Assert(Result);
 
-  if(Keeper) *Keeper = AssetManager->BitmapKeeper + Handle.Value;
+  bitmap_keeper* BitmapKeeper = AssetManager->BitmapKeeper + Handle.Value;
+  Assert(BitmapKeeper->Referenced);
+  if(Keeper) *Keeper = BitmapKeeper;
 
   return Result;
 }
@@ -266,10 +285,10 @@ GetObject(game_asset_manager* AssetManager, instance_handle Handle, buffer_keepe
   return Result;
 };
 inline mesh_data*
-GetMesh(game_asset_manager* AssetManager, instance_handle Handle, buffer_keeper** Keeper)
+GetMesh(game_asset_manager* AssetManager, instance_handle Handle)//, buffer_keeper** Keeper)
 {
   mesh_indeces* Object = GetObject(AssetManager, Handle );
-  mesh_data* Result = GetAsset(AssetManager, Object->MeshHandle, Keeper);
+  mesh_data* Result = GetAsset(AssetManager, Object->MeshHandle);//, Keeper);
   return Result;
 }
 
@@ -312,43 +331,17 @@ void SetAsset(game_asset_manager* AssetManager, asset_type AssetType, char* Name
   {
     case asset_type::OBJECT:
     {
-      Instance->ObjectHandle.Value = GetObjectAssetIndex(AssetManager, Name);
-
-      buffer_keeper* ObjectKeeper = 0;
-      mesh_indeces* Indeces = GetAsset(AssetManager, Instance->ObjectHandle, &ObjectKeeper);
-
-      u32 InitialObjectCount = ObjectKeeper->ReferenceCount++;
-      if(InitialObjectCount == 0)
-      {
-        AssetManager->ObjectPendingLoad[AssetManager->ObjectPendingLoadCount++] = Instance->ObjectHandle;
-      }
-
-//      buffer_keeper* MeshKeeper = 0;
-//      GetAsset(AssetManager, Indeces->MeshHandle, &MeshKeeper);
-//      u32 InitialMeshCount = MeshKeeper->ReferenceCount++;
-//      if(InitialMeshCount == 0)
-//      {
-//        AssetManager->MeshPendingLoad[AssetManager->MeshPendingLoadCount++] = Indeces->MeshHandle;
-//      }
-
+      GetHandle(AssetManager, Name, &Instance->ObjectHandle);
       Assert(IsKeySet(&AssetManager->Objects, Instance->ObjectHandle.Value));
     }break;
     case asset_type::BITMAP:
     {
-      Instance->BitmapHandle.Value = GetBitmapAssetIndex(AssetManager, Name);
-
-      bitmap_keeper* Keeper = 0;
-      GetAsset(AssetManager, Instance->BitmapHandle, &Keeper);
-      u32 InitialCount = Keeper->ReferenceCount++;
-      if(InitialCount == 0)
-      {
-        AssetManager->BitmapPendingLoad[AssetManager->BitmapPendingLoadCount++] = Instance->BitmapHandle;
-      }
+      GetHandle(AssetManager, Name, &Instance->BitmapHandle);
       Assert(IsKeySet(&AssetManager->Bitmaps, Instance->BitmapHandle.Value));
     }break;
     case asset_type::MATERIAL:
     {
-      Instance->MaterialHandle.Value = GetMaterialAssetIndex(AssetManager, Name);
+      GetHandle(AssetManager, Name, &Instance->MaterialHandle);
       Assert(IsKeySet(&AssetManager->Materials, Instance->MaterialHandle.Value));
     }break;
 

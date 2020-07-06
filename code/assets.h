@@ -50,7 +50,7 @@ struct bitmap_keeper
 
   u32 TextureSlot;
   b32 Special;
-  u32 ReferenceCount;
+  b32 Referenced;
 };
 
 struct buffer_keeper
@@ -63,7 +63,7 @@ struct buffer_keeper
   u32 Count;
   u8* Index;
   u32 VertexOffset;
-  u32 ReferenceCount;
+  b32 Referenced;
 };
 
 struct mesh_data
@@ -183,7 +183,7 @@ struct game_asset_manager
   asset_hash_map Materials;
 
   buffer_keeper* ObjectKeeper;
-  buffer_keeper* MeshKeeper;
+  //buffer_keeper* MeshKeeper;
   bitmap_keeper* BitmapKeeper;
 
   u32 ObjectPendingLoadCount;
@@ -218,12 +218,12 @@ void GetHandle(game_asset_manager* AssetManager, char* Key, object_handle* Handl
 void GetHandle(game_asset_manager* AssetManager, char* Key, material_handle* Handle);
 
 mesh_indeces* GetObject(game_asset_manager* AssetManager, instance_handle Handle, buffer_keeper** Keeper = NULL );
-mesh_data* GetMesh(game_asset_manager* AssetManager, instance_handle Handle, buffer_keeper** Keeper = NULL);
+mesh_data* GetMesh(game_asset_manager* AssetManager, instance_handle Handle);//, buffer_keeper** Keeper = NULL);
 bitmap* GetBitmap(game_asset_manager* AssetManager, instance_handle Handle, bitmap_keeper** Keeper = NULL );
 material* GetMaterial(game_asset_manager* AssetManager, instance_handle Handle);
 
 inline mesh_indeces* GetAsset(game_asset_manager* AssetManager, object_handle Handle, buffer_keeper** Keeper = NULL);
-inline mesh_data* GetAsset(game_asset_manager* AssetManager, mesh_handle Index, buffer_keeper** Keeper = NULL);
+inline mesh_data* GetAsset(game_asset_manager* AssetManager, mesh_handle Index);//, buffer_keeper** Keeper = NULL);
 inline bitmap* GetAsset(game_asset_manager* AssetManager, bitmap_handle Handle, bitmap_keeper** Keeper = NULL);
 inline material* GetAsset(game_asset_manager* AssetManager, material_handle Handle, u32 Index );
 
