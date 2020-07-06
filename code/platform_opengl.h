@@ -103,6 +103,8 @@
 
 #include "math/vector_math.h"
 
+typedef u32 glHandle;
+
 struct opengl_handles
 {
 	u32 VAO;
@@ -188,6 +190,21 @@ struct opengl_buffer_object
 };
 
 
+struct text_data
+{
+  rect2f QuadRect;
+  rect2f UVRect;
+  v4 Color;
+};
+
+struct overlay_quad_data
+{
+  rect2f QuadRect;
+  v4 Color;
+};
+
+
+
 #define TEXTURE_ARRAY_DIM 512
 #define NORMAL_TEXTURE_COUNT 256
 #define SPECIAL_TEXTURE_COUNT 64
@@ -221,38 +238,34 @@ struct open_gl
 
   u32 BufferSize;
 
-  // Triangle Streams
-  // Good for rendering sets of small objects
-  // One draw call for the whole buffer, few uniforms (if we sort per TextureIndex maybe it can be a uniform)
-  // {{px,py,pz},{nx,ny,nz},{u,v}, {r,g,b,a}, TextureIndex}
-  u32 StreamVAO;
-  u32 StreamVBO;
-  u32 StreamEBO;
-
-
   // Non-Instanced Geoms
   // Single VAO InstancedVertexArray (For textured vertices)
   // Single IndexArray (Each object has an offset into this array)
   // Good for rendering Small (<1000) number of Large geometries with similar transforms.
   // (Transforms are sent with uniforms)
-  u32 ElementVAO;
-
+  
+  glHandle ElementVAO;
   u32 ElementVBOOffset;
-  u32 ElementVBO;
+  glHandle ElementVBO;
 
   u32 ElementEBOOffset;
-  u32 ElementEBO;
+  glHandle ElementEBO;
 
+  glHandle InstanceVBO;
+  glHandle QuadVAO;
+  u32 QuadBaseOffset;
+  glHandle TextVAO;
+  u32 TextBaseOffset;
 
   // Instanced Geoms 
   // Single VAO InstancedVertexArray (For shared object data) (geometries, uv-coords, normals)
   // Single IndexArray
   // Single VAO InstanceArray        (For per object data, position, color, texture index) (Flera för olika datatyper?)
   // Good for rendering Large (>1000) number of Large geometries with similar transforms.
-  u32 InstanceVAO;
-  u32 InstanceVBO;
-  u32 InstanceDataVAO;
-  u32 InstancedEBO;
+  ///  u32 InstanceVAO;
+  ///  u32 InstanceVBO;
+  ///  u32 InstanceDataVAO;
+  ///  u32 InstancedEBO;
 
 };
 
