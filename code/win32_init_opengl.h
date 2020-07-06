@@ -118,6 +118,8 @@ global_variable gl_draw_elements_instanced*  glDrawElementsInstanced;
 typedef void WINAPI gl_draw_elements_base_vertex ( GLenum mode, GLsizei count, GLenum type, GLvoid *indices, GLint basevertex );
 global_variable gl_draw_elements_base_vertex* glDrawElementsBaseVertex;
 
+typedef void WINAPI gl_draw_elements_instanced_base_vertex( GLenum mode, GLsizei count, GLenum type, void *indices, GLsizei instancecount, GLint basevertex);
+global_variable gl_draw_elements_instanced_base_vertex* glDrawElementsInstancedBaseVertex;
 typedef void gl_multi_draw_elements(GLenum mode, const GLsizei * count,GLenum type, const void * const * indices, GLsizei drawcount);
 global_variable gl_multi_draw_elements* glMultiDrawElements;
 
@@ -328,6 +330,7 @@ Win32InitOpenGL(HWND Window)
     glDrawElementsA             = GetOpenGLFunction( gl_draw_elements,               "glDrawElements");
     glDrawElementsInstanced     = GetOpenGLFunction( gl_draw_elements_instanced,     "glDrawElementsInstanced");
     glDrawElementsBaseVertex    = GetOpenGLFunction( gl_draw_elements_base_vertex,   "glDrawElementsBaseVertex" );
+    glDrawElementsInstancedBaseVertex = GetOpenGLFunction( gl_draw_elements_instanced_base_vertex,   "glDrawElementsInstancedBaseVertex" );
     glMultiDrawElements         = GetOpenGLFunction( gl_multi_draw_elements,         "glMultiDrawElements" );
     glGetUniformLocation        = GetOpenGLFunction( gl_get_uniform_location,        "glGetUniformLocation");
     glUniform1f                 = GetOpenGLFunction( gl_uniform_1f,                  "glUniform1f");

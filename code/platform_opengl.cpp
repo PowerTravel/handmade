@@ -184,50 +184,6 @@ void main()
   return Result;
 }
 
-#if 0
-opengl_program OpenGLCreateTextProgram()
-{
-  char VertexShaderCode[] = R"FOO(
-#version  330 core
-uniform mat4 P;
-uniform mat4 V;
-layout (location = 3) in vec3 start;
-layout (location = 4) in vec3 end;
-layout (location = 5) in int  color;
-out vec4 vertexColor;
-void main()
-{
-
-  gl_Position = vec4((projection*quadTransform*vec3(vertice.xy,1)).xy,0,1);
-  texCoord = (uvTransform*vec3(textureCoordinate.xy,1)).xy;
-  vertexColor = color;
-}
-)FOO";
-
-  char* FragmentShaderCode = R"FOO(
-#version 330 core
-out vec4 fragColor;
-in vec4 vertexColor;
-in vec2 texCoord;
-uniform sampler2D ourTexture;
-uniform sampler2DArray TextureSampler;
-void main() 
-{
-  //fragColor = texture(ourTexture, texCoord) * vertexColor;
-  vec3 ArrayUV = vec3(texCoord.x, texCoord.y, 0);
-  fragColor = texture(TextureSampler, ArrayUV) * vertexColor;
-}
-)FOO";
-
-  opengl_program Result = {};
-  Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
-  glUseProgram(Result.Program);
-  DeclareUniform(&Result, open_gl_uniform::m4_Projection);
-  glUseProgram(0);
-
-  return Result;
-}
-#endif
 
 opengl_program OpenGLCreateUntexturedQuadOverlayQuadProgram()
 {
@@ -304,7 +260,7 @@ uniform float shininess; // Shininess of material
 
 out vec4 vertexColor;
 out vec2 texCoord;
-
+out vec4 highlightColor;
 void main()
 {
 
@@ -323,7 +279,8 @@ void main()
   vec4 H = normalize(L+E);
   float Ks = pow(max(dot(H,N), 0.0 ), shininess);
 
-  vertexColor = ambientProduct + Kd*(diffuseProduct + Ks*specularProduct);
+  vertexColor = ambientProduct;
+  highlightColor =  Kd*(diffuseProduct + Ks*specularProduct);
 
   vec4 tmpTex = TM*vec4(textureCoordinate,0,1);
   texCoord = vec2(tmpTex.x,tmpTex.y);
@@ -335,13 +292,21 @@ void main()
 #version 330 core
 in vec4  vertexColor;
 in vec2  texCoord;
+in vec4  highlightColor;
+
 out vec4 fragColor;
 
 uniform sampler2D ourTexture;
 
 void main() 
 {
-  fragColor = texture(ourTexture, texCoord) * vertexColor;
+  vec4 tc = texture(ourTexture, texCoord);
+  float blend = 0.6;
+  fragColor.x = tc.x * vertexColor.x * blend;
+  fragColor.y = tc.y * vertexColor.y * blend;
+  fragColor.z = tc.z * vertexColor.z * blend;
+  fragColor.w = tc.w;
+  fragColor = fragColor + highlightColor;
 }
 )FOO";
 
@@ -821,96 +786,6 @@ void PushMeshToGPU(memory_arena* TempArena,
   }
 }
 
-void BindTextureToGPU(bitmap* RenderTarget, bitmap_keeper* BitmapKeeper)
-{
-  Assert(RenderTarget);
-  Assert(RenderTarget->BPP == 32);
-  if(!BitmapKeeper->Loaded)
-  {
-    Assert(!BitmapKeeper->TextureHandle);
-    BitmapKeeper->Loaded = true;
-    // Generate a texture slot
-    glGenTextures(1, &BitmapKeeper->TextureHandle);
-
-    // Enable texture slot
-    glBindTexture( GL_TEXTURE_2D, BitmapKeeper->TextureHandle );
-
-    // Set texture environment state:
-    // See documantation here: https://www.khronos.org/registry/OpenGL-Refpages/gl4/html/glTexParameter.xhtml
-
-    // Parameters set with glTexParameter affects the currently bound texture object,
-    // and stays with the texture object until changed.
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,  GL_MIRRORED_REPEAT );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,  GL_MIRRORED_REPEAT );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST );
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST );
-
-    glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
-              RenderTarget->Width,  RenderTarget->Height,
-              0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
-              RenderTarget->Pixels);
-  }
-
-  glBindTexture( GL_TEXTURE_2D, BitmapKeeper->TextureHandle );
-}
-
-
-void DrawAsset(opengl_program* Program, game_asset_manager* AssetManager, memory_arena* TempArena,
-  entry_type_render_asset* RenderableAsset, v4 LightColor)
-{
-  SetUniformM4(*Program, open_gl_uniform::m4_Model, RenderableAsset->M);
-  SetUniformM4(*Program, open_gl_uniform::m4_Normal, RenderableAsset->NM);
-  SetUniformM4(*Program, open_gl_uniform::m4_Texture, RenderableAsset->TM);
-
-  instance_handle AssetHandle = RenderableAsset->AssetHandle;
-
-  buffer_keeper* ObjectKeeper = 0;
-  mesh_indeces* Object = GetObject(AssetManager, AssetHandle, &ObjectKeeper);
-  mesh_data* MeshData = GetMesh(AssetManager, AssetHandle);
-
-  PushMeshToGPU(TempArena, Object, ObjectKeeper, MeshData);
-
-  material* Material   = GetMaterial(AssetManager, AssetHandle);
-
-  u32 SurfaceSmoothness = 3;
-  v4 AmbientColor   = Blend(&LightColor, &Material->AmbientColor);
-  AmbientColor.W = 1;
-  v4 DiffuseColor   = Blend(&LightColor, &Material->DiffuseColor) * (1.f / 3.1415f);
-  DiffuseColor.W = 1;
-  v4 SpecularColor  = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothness + 8.f ) / (8.f*3.1415f);
-  SpecularColor.W = 1;
-  SetUniformV4( *Program, open_gl_uniform::v4_AmbientProduct, AmbientColor);
-  SetUniformV4( *Program, open_gl_uniform::v4_DiffuseProduct, DiffuseColor);
-  SetUniformV4( *Program, open_gl_uniform::v4_SpecularProduct, SpecularColor);
-  SetUniformS(  *Program, open_gl_uniform::s_Shininess, Material->Shininess);
-
-  bitmap_keeper* BitmapKeeper = 0;
-  bitmap* RenderTarget = GetBitmap(AssetManager, AssetHandle, &BitmapKeeper);
-  BindTextureToGPU(RenderTarget, BitmapKeeper);
-
-  Assert(ObjectKeeper->VAO);
-  OpenGLDraw( ObjectKeeper->VAO,  DATA_TYPE_TRIANGLE, Object->Count, 0 );
-}
-
-void OpenGLPushBufferData(memory_arena* TemporaryMemory, render_buffer* Buffer)
-{
-  temporary_memory TempMem = BeginTemporaryMemory(TemporaryMemory);
-  if(!Buffer->Fill)
-  {
-    return;
-  }
-
-  gl_vertex_buffer GLBuffer =  CreateGLVertexBuffer(TemporaryMemory,
-    Buffer->nvi, Buffer->vi, Buffer->ti, Buffer->ni,
-    Buffer->v, Buffer->vt, Buffer->vn);
-
-  u32* VAO = Buffer->VAO;
-  u32* VBO = Buffer->VBO;
-  OpenGLSendMeshToGPU(VAO, VBO, NULL, GLBuffer.IndexCount, GLBuffer.Indeces, GLBuffer.VertexCount, GLBuffer.VertexData);
-
-  EndTemporaryMemory(TempMem);
-}
-
 internal void setOpenGLState(u32 State)
 {
   if(State & RENDER_STATE_CULL_BACK)
@@ -1080,17 +955,17 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
   }
   AssetManager->BitmapPendingLoadCount = 0;
 
-  // Accept fragment if it closer to the camera than the former one
-  // Enable depth test
-  glEnable(GL_DEPTH_TEST);
-  glDepthFunc(GL_LESS);
-
   r32 R = 0x1E / (r32) 0xFF;
   r32 G = 0x46 / (r32) 0xFF;
   r32 B = 0x5A / (r32) 0xFF;
   glClearColor(R,G,B, 1.f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glEnable(GL_BLEND);
+
+  // Accept fragment if it closer to the camera than the former one
+  // Enable depth test
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_LESS);
   
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -1258,6 +1133,8 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
     glBufferData(GL_ARRAY_BUFFER, QuadBufferSize, QuadBuffer, GL_STREAM_DRAW);
 
     glDrawElementsInstanced( GL_TRIANGLES, QuadObject->Count, GL_UNSIGNED_INT, 0, OverlayQuadEntries);
+    glDisableVertexAttribArray(3);
+    glDisableVertexAttribArray(4);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
@@ -1312,7 +1189,14 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
     
     // glDrawElementsInstanced uses 2 VertexBuffers and 1 IndexBuffer. 1 VertexBuffer is coupled with the IndexBuffer and the other VertexBuffer has data to be applied per element
     glDrawElementsInstanced( GL_TRIANGLES, QuadObject->Count, GL_UNSIGNED_INT, 0, TextEntries);
+
+//    glDrawElementsInstancedBaseVertex( GL_TRIANGLES, ObjectKeeper->Count, GL_UNSIGNED_INT,
+//          (GLvoid*)(ObjectKeeper->Index),
+//           ObjectKeeper->VertexOffset);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glDisableVertexAttribArray(3);
+    glDisableVertexAttribArray(4);
+    glDisableVertexAttribArray(5);
     glBindVertexArray(0);
   }
 

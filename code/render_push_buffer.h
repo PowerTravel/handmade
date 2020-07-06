@@ -65,33 +65,9 @@ struct entry_type_render_asset
 {
   instance_handle AssetHandle;
 
-  material_handle MaterialHandle;
-  object_handle ObjectHandle;
-  bitmap_handle BitmapHandle;
-
   m4 M;
   m4 NM;
   m4 TM;
-};
-
-struct render_buffer
-{
-  b32 Fill;
-  u32* VAO;
-  u32* VBO;
-  u32 nvi;   // Nr Indeces
-  u32* vi;   // Vertex Indeces
-  u32* ti;   // Texture Indeces
-  u32* ni;   // Normal Indeces
-
-  u32 nv;    // Nr Verices
-  v3* v;     // Vertices
-
-  u32 nvn;   // Nr Vertice Normals
-  v3* vn;    // Vertice Normals
-
-  u32 nvt;   // Nr Trxture Vertices
-  v2* vt;    // Texture Vertices
 };
 
 struct push_buffer_header

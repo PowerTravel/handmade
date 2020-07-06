@@ -48,8 +48,8 @@ void DEBUGPushText(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRec
 {
   push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::TEXT, RENDER_STATE_FILL);
   entry_type_text* Body = PushStruct(&RenderGroup->Arena, entry_type_text);
-  Body->QuadRect  = QuadRect;
-  Body->UVRect  = TextureRect;
+  Body->QuadRect = QuadRect;
+  Body->UVRect = TextureRect;
   Body->Colour = Color;
 }
 
