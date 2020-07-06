@@ -118,6 +118,18 @@ struct opengl_vertex
 	v2 vt;
 };
 
+struct opengl_textured_vertex
+{
+  v3 v;
+  v3 vn;
+  v2 vt;
+  v4 color;
+    
+  // Could be per triangle
+  u16 TextureIndex;
+};
+
+
 struct opengl_info
 {
 	char* Vendor;
@@ -213,9 +225,9 @@ struct open_gl
   // Good for rendering sets of small objects
   // One draw call for the whole buffer, few uniforms (if we sort per TextureIndex maybe it can be a uniform)
   // {{px,py,pz},{nx,ny,nz},{u,v}, {r,g,b,a}, TextureIndex}
-  u32 TexturedVerticeVAO;
-  u32 TexturedVerticeArray;
-  u32 TexturedIndexArray;
+  u32 StreamVAO;
+  u32 StreamVBO;
+  u32 StreamEBO;
 
 
   // Non-Instanced Geoms
@@ -232,23 +244,15 @@ struct open_gl
   u32 ElementEBO;
 
 
-
-
   // Instanced Geoms 
   // Single VAO InstancedVertexArray (For shared object data) (geometries, uv-coords, normals)
   // Single IndexArray
-  // Single VAO InstanceArray        (For per object data, position, color, texture index) 
+  // Single VAO InstanceArray        (For per object data, position, color, texture index) (Flera för olika datatyper?)
   // Good for rendering Large (>1000) number of Large geometries with similar transforms.
-  // (Transforms are sent with uniforms)
-  u32 InstancedObject;
-  u32 InstancedVerticeBuffer;
-  u32 InstancedDataBuffer;
-  u32 InstancedIndexBuffer;
-
-
-
-
-
+  u32 InstanceVAO;
+  u32 InstanceVBO;
+  u32 InstanceDataVAO;
+  u32 InstancedEBO;
 
 };
 

@@ -500,6 +500,9 @@ void InitOpenGL(open_gl* OpenGL)
 #endif
 
 
+
+
+
     // Gen and Bind VAO Containing opengl_vertex
     // The generated and bound VBOs will be implicitly attached to the VAO at the glVertexAttribPointer call
     glGenVertexArrays(1, &OpenGL->ElementVAO);
@@ -523,6 +526,22 @@ void InitOpenGL(open_gl* OpenGL)
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, OpenGL->BufferSize, 0, GL_DYNAMIC_DRAW);
 
     glBindVertexArray(0);
+
+
+
+    glGenVertexArrays(1,&OpenGL->StreamVAO);
+    glBindVertexArray(OpenGL->StreamVAO);
+
+    glGenBuffers(1, &OpenGL->StreamVBO);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, v));  // Vertecis
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, vn) );   // Normals
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, vt)); // Textures
+
+
+    glGenBuffers(1, &OpenGL->StreamEBO);
 }
 
 
@@ -1056,55 +1075,131 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
   
   RenderGroup = Commands->DebugRenderGroup;
   if( !RenderGroup->First) {return;}
+ 
   temporary_memory TempMem = BeginTemporaryMemory(&RenderGroup->Arena);
 
   {
-    // TODO: Make these lookups fast
     buffer_keeper* ObjectKeeper = 0;
     object_handle ObjectHandle =  GetEnumeratedObjectHandle(AssetManager, predefined_mesh::QUAD);
     mesh_indeces* QuadObject = GetAsset(AssetManager, ObjectHandle, &ObjectKeeper);
     mesh_data* QuadMesh = GetAsset(AssetManager, QuadObject->MeshHandle);
     PushMeshToGPU(&RenderGroup->Arena, QuadObject, ObjectKeeper, QuadMesh);
 
-    u32 TextEntries = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::TEXT];
-    u32 OverlayQuadEntries = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::OVERLAY_QUAD];
-    text_data* TextBuffer = PushArray(&RenderGroup->Arena, TextEntries, text_data);
-    overlay_quad_data* QuadBuffer = PushArray(&RenderGroup->Arena, OverlayQuadEntries, overlay_quad_data);
-    u32 QuadInstnceIndex = 0;
-    u32 TextInstnceIndex = 0;
-    for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
-    {
-      u8* Head = (u8*) Entry;
-      u8* Body = Head + sizeof(push_buffer_header);
-      switch(Entry->Type)
-      {
-        case render_buffer_entry_type::OVERLAY_QUAD:
-        {
-          entry_type_overlay_quad* Quad = (entry_type_overlay_quad*) Body;
-         
-          overlay_quad_data QuadData = {};
-          QuadData.QuadRect = Quad->QuadRect;
-          QuadData.Color = Quad->Colour;
-          QuadBuffer[QuadInstnceIndex++] = QuadData;
-        }break;
-        case render_buffer_entry_type::TEXT:
-        {
-          text_data TexData = {};
-          entry_type_text* Text = (entry_type_text*) Body;
-          TexData.QuadRect = Text->QuadRect;
-          TexData.UVRect = Text->UVRect;
-          TexData.Color = V4(1,1,1,1);
-          TextBuffer[TextInstnceIndex++] = TexData;
-        }break;
-      }
-    }
+   
 
     local_persist u32 quadInstanceVBO = 0;
-    local_persist u32 textInstanceVBO = 0;
+    local_persist u32 textVAO = 0;
+    local_persist u32 quadVAO = 0;
+    u32 QuadBaseOffset = 0;
+    u32 TextBaseOffset = Megabytes(1)/2;
+    // Set up VAO and VBO
     if(!quadInstanceVBO)
     {
       glGenBuffers(1, &quadInstanceVBO);
-      glGenBuffers(1, &textInstanceVBO);
+      glBindBuffer(GL_ARRAY_BUFFER, quadInstanceVBO);
+      glBufferData(GL_ARRAY_BUFFER, Megabytes(1), 0, GL_STREAM_DRAW);
+
+      glGenVertexArrays(1, &quadVAO);
+
+      glBindVertexArray(quadVAO);
+
+      glBindBuffer(GL_ARRAY_BUFFER, ObjectKeeper->VBO);
+      // The quadVAO now implicitly binds these parameters to whatever VBO is currently bound (ObjectKeeper->VBO)
+      glEnableVertexAttribArray(0);
+      glEnableVertexAttribArray(1);
+      glEnableVertexAttribArray(2);
+      glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, v));
+      glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, vn));
+      glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, vt));
+
+      // Bind the element array to the VAO
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ObjectKeeper->EBO);
+
+      glBindBuffer(GL_ARRAY_BUFFER, quadInstanceVBO);
+      // The quadVAO now implicitly binds these parameters to whatever VBO is currently bound (quadInstanceVBO)
+      glEnableVertexAttribArray(3);
+      glEnableVertexAttribArray(4);
+      glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(overlay_quad_data), (void *)(QuadBaseOffset + OffsetOf(overlay_quad_data,QuadRect)));
+      glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(overlay_quad_data), (void *)(QuadBaseOffset + OffsetOf(overlay_quad_data,Color)));
+      glVertexAttribDivisor(3, 1);
+      glVertexAttribDivisor(4, 1);
+
+
+      glGenVertexArrays(1, &textVAO);
+      glBindVertexArray(textVAO);
+
+      glBindBuffer(GL_ARRAY_BUFFER, ObjectKeeper->VBO);
+      // The textVAO now implicitly binds these parameters to whatever VBO is currently bound (ObjectKeeper->VBO)
+      glEnableVertexAttribArray(0);
+      glEnableVertexAttribArray(1);
+      glEnableVertexAttribArray(2);
+      glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, v));
+      glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, vn));
+      glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, vt));
+
+      // Bind the element array to the VAO
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ObjectKeeper->EBO);
+
+      glBindBuffer(GL_ARRAY_BUFFER, quadInstanceVBO);
+      // The textVAO now implicitly binds these parameters to whatever VBO is currently bound (quadInstanceVBO)
+      glEnableVertexAttribArray(3);
+      glEnableVertexAttribArray(4);
+      glEnableVertexAttribArray(5);
+      glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(TextBaseOffset + OffsetOf(text_data,QuadRect)));
+      glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(TextBaseOffset + OffsetOf(text_data,UVRect)));
+      glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(TextBaseOffset + OffsetOf(text_data,Color)));
+      glVertexAttribDivisor(3, 1);
+      glVertexAttribDivisor(4, 1);
+      glVertexAttribDivisor(5, 1);
+    }
+
+    u32 TextEntryCount = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::TEXT];
+    u32 OverlayQuadEntryCount = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::OVERLAY_QUAD];
+    { // Send data to VBO
+      text_data* TextBuffer = PushArray(&RenderGroup->Arena, TextEntryCount, text_data);
+      overlay_quad_data* QuadBuffer = PushArray(&RenderGroup->Arena, OverlayQuadEntryCount, overlay_quad_data);
+      u32 QuadInstnceIndex = 0;
+      u32 TextInstnceIndex = 0;
+      for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
+      {
+        u8* Head = (u8*) Entry;
+        u8* Body = Head + sizeof(push_buffer_header);
+        switch(Entry->Type)
+        {
+          case render_buffer_entry_type::OVERLAY_QUAD:
+          {
+            entry_type_overlay_quad* Quad = (entry_type_overlay_quad*) Body;
+           
+            overlay_quad_data QuadData = {};
+            QuadData.QuadRect = Quad->QuadRect;
+            QuadData.Color = Quad->Colour;
+            QuadBuffer[QuadInstnceIndex++] = QuadData;
+          }break;
+          case render_buffer_entry_type::TEXT:
+          {
+            text_data TexData = {};
+            entry_type_text* Text = (entry_type_text*) Body;
+            TexData.QuadRect = Text->QuadRect;
+            TexData.UVRect = Text->UVRect;
+            TexData.Color = V4(1,1,1,1);
+            TextBuffer[TextInstnceIndex++] = TexData;
+          }break;
+        }
+      }
+
+      u32 QuadBufferSize = sizeof(overlay_quad_data)*OverlayQuadEntryCount;
+      u32 TextBufferSize = sizeof(text_data)*TextEntryCount;
+      glBindBuffer(GL_ARRAY_BUFFER, quadInstanceVBO);
+
+      glBufferSubData( GL_ARRAY_BUFFER,        // Target
+                       QuadBaseOffset,         // Offset
+                       QuadBufferSize,         // Size
+                       (GLvoid*) QuadBuffer);  // Data
+      glBufferSubData( GL_ARRAY_BUFFER,        // Target
+                       TextBaseOffset,         // Offset
+                       TextBufferSize,         // Size
+                       (GLvoid*) TextBuffer);  // Data
+
     }
 
     opengl_program QuadOverlayProgram = Commands->OpenGL.QuadOverlayProgram;
@@ -1118,24 +1213,14 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // The geometry and instance buffer is bound to this Index
-    glBindVertexArray( ObjectKeeper->VAO );
-    glBindBuffer(GL_ARRAY_BUFFER, quadInstanceVBO);
-    glEnableVertexAttribArray(3);
-    glEnableVertexAttribArray(4);
-    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(overlay_quad_data), (void *)(OffsetOf(overlay_quad_data,QuadRect)));
-    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(overlay_quad_data), (void *)OffsetOf(overlay_quad_data,Color));
-    glVertexAttribDivisor(3, 1);
-    glVertexAttribDivisor(4, 1);
-    //glBindBuffer(GL_ARRAY_BUFFER, 0);
-    u32 QuadBufferSize = sizeof(overlay_quad_data)*OverlayQuadEntries;
-    // TODO: Investigate BufferSubData
-    glBufferData(GL_ARRAY_BUFFER, QuadBufferSize, QuadBuffer, GL_STREAM_DRAW);
+    glBindVertexArray( quadVAO );
 
-    glDrawElementsInstanced( GL_TRIANGLES, QuadObject->Count, GL_UNSIGNED_INT, 0, OverlayQuadEntries);
-    glDisableVertexAttribArray(3);
-    glDisableVertexAttribArray(4);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glDrawElementsInstanced(
+      GL_TRIANGLES,           // How to interpret the vertex-data
+      QuadObject->Count,      // Nr Indeces per Element
+      GL_UNSIGNED_INT,        // Index Data Type
+      0,                      // Pointer somewhere in the index buffer
+      OverlayQuadEntryCount); // How many Elements to draw
     glBindVertexArray(0);
 
     opengl_program TextRenderProgram = Commands->OpenGL.TextOverlayProgram;
@@ -1162,24 +1247,6 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
         Commands->OpenGL.DefaultTextureFormat, GL_UNSIGNED_BYTE, FontRenderTarget->Pixels);
     }
 
-    // The geometry and instance buffer is bound to this Index
-    glBindVertexArray( ObjectKeeper->VAO );
-    glBindBuffer(GL_ARRAY_BUFFER, textInstanceVBO);
-    glEnableVertexAttribArray(3);
-    glEnableVertexAttribArray(4);
-    glEnableVertexAttribArray(5);
-    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,QuadRect)));
-    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OffsetOf(text_data,UVRect)));
-    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)OffsetOf(text_data,Color));
-    glVertexAttribDivisor(3, 1);
-    glVertexAttribDivisor(4, 1);
-    glVertexAttribDivisor(5, 1);
-    u32 TextBufferSize = sizeof(text_data)*TextEntries;
-
-    glBufferData(GL_ARRAY_BUFFER, TextBufferSize, TextBuffer, GL_STREAM_DRAW);
-
-
-
     // glDrawElementsInstanced is used when we have two buffers (1 Buffer with a geometry and another buffer with Instance Data )
     // https://stackoverflow.com/questions/24516993/is-it-possible-to-use-index-buffer-objects-ibo-with-the-function-glmultidrawe
     
@@ -1188,16 +1255,18 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
     // glMultiDrawElements uses 1 VertexBuffer and 1 IndexBuffer and draws n number of whats in the VertexBuffer using an offset into IndexBuffer specific for each n
     
     // glDrawElementsInstanced uses 2 VertexBuffers and 1 IndexBuffer. 1 VertexBuffer is coupled with the IndexBuffer and the other VertexBuffer has data to be applied per element
-    glDrawElementsInstanced( GL_TRIANGLES, QuadObject->Count, GL_UNSIGNED_INT, 0, TextEntries);
-
+    glBindVertexArray(textVAO);
+    glDrawElementsInstanced(
+      GL_TRIANGLES,       // How to interpret the vertex-data  
+      QuadObject->Count,  // Nr Indeces per Element  
+      GL_UNSIGNED_INT,    // Index Data Type  
+      0,                  // Pointer somewhere in the index buffer
+      TextEntryCount);    // How many Elements to draw
+    glBindVertexArray(0);
 //    glDrawElementsInstancedBaseVertex( GL_TRIANGLES, ObjectKeeper->Count, GL_UNSIGNED_INT,
 //          (GLvoid*)(ObjectKeeper->Index),
 //           ObjectKeeper->VertexOffset);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glDisableVertexAttribArray(3);
-    glDisableVertexAttribArray(4);
-    glDisableVertexAttribArray(5);
-    glBindVertexArray(0);
+    
   }
 
   EndTemporaryMemory(TempMem);
