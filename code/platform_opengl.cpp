@@ -34,8 +34,8 @@ internal GLuint OpenGLLoadShader( char* SourceCode, GLenum ShaderType )
     char* Tmp      = (char*) VirtualAlloc(0, CompileMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
     glGetShaderInfoLog(ShaderHandle, CompileMessageSize, NULL, (GLchar*) CompileMessage);
     snprintf((char*)Tmp, CompileMessageSize, "%s", CompileMessage);
-    //VirtualFree(CompileMessage, 0, MEM_RELEASE );
-    //VirtualFree(Tmp, 0, MEM_RELEASE );
+    VirtualFree(CompileMessage, 0, MEM_RELEASE );
+    VirtualFree(Tmp, 0, MEM_RELEASE );
     OutputDebugStringA(CompileMessage);
     //Assert(0);
     exit(1);
@@ -378,7 +378,7 @@ void InitOpenGL(open_gl* OpenGL)
   OpenGL->QuadOverlayProgram = OpenGLCreateUntexturedQuadOverlayQuadProgram();
   OpenGL->TextOverlayProgram = OpenGLCreateTextProgram();
 
-  OpenGL->BufferSize = Megabytes(8);
+  OpenGL->BufferSize = Megabytes(1);
 
   // Enable 2D Textures
   glEnable(GL_TEXTURE_2D);
@@ -974,6 +974,16 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
         u8* Body = Head + sizeof(push_buffer_header);
         switch(Entry->Type)
         {
+          #if 0
+          case render_buffer_entry_type::OVERLAY_LINE:
+          {
+            entry_type_overlay_line* Quad = (entry_type_overlay_quad*) Body;
+            overlay_line_data LineData = {};
+            LineData.QuadRect = Quad->QuadRect;
+            LineData.Color = Quad->Colour;
+            LineBuffer[QuadInstnceIndex++] = LineData;
+          }break;
+          #endif
           case render_buffer_entry_type::OVERLAY_QUAD:
           {
             entry_type_overlay_quad* Quad = (entry_type_overlay_quad*) Body;

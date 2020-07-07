@@ -97,6 +97,36 @@ DEBUG_PLATFORM_EXECUTE_SYSTEM_COMMAND(DEBUGExecuteSystemCommand)
   return Result;
 }
 
+#include <stdarg.h>
+DEBUG_PLATFORM_FORMAT_STRING(DEBUGFormatString)
+{
+  va_list args;
+  va_start(args, FormatString);
+  u32 Result = _vsnprintf_s(
+    Buffer,
+    SizeOfBuffer,
+    CharCount,
+    FormatString,
+    args);
+  va_end(args);
+  return Result;
+}
+
+DEBUG_PLATFORM_PRINT(DEBUGPrint)
+{
+  va_list args;
+  c8 Buffer[2048] = {};
+  va_start(args, DebugString);
+  u32 Result = _vsnprintf_s(
+    Buffer,
+    sizeof(Buffer),
+    _TRUNCATE,
+    DebugString,
+    args);
+  va_end(args);
+  OutputDebugStringA(Buffer);
+}
+
 DEBUG_PLATFORM_GET_PROCESS_STATE(DEBUGGetProcessState)
 {
   debug_process_state Result = {};
@@ -1783,6 +1813,7 @@ WinMain(  HINSTANCE aInstance,
     CloseHandle(ThreadHandle);
   }
 
+#if 0
   Win32AddEntry(&HighPriorityQueue, DoWorkerWork, "A0");
   Win32AddEntry(&HighPriorityQueue, DoWorkerWork, "A1");
   Win32AddEntry(&HighPriorityQueue, DoWorkerWork, "A2");
@@ -1791,7 +1822,7 @@ WinMain(  HINSTANCE aInstance,
   Win32AddEntry(&HighPriorityQueue, DoWorkerWork, "A5");
   Win32AddEntry(&HighPriorityQueue, DoWorkerWork, "A6");
   Win32CompleteAllWork(&HighPriorityQueue);
-
+#endif
 
   Win32GetEXEFileName(&GlobalWin32State);
 
@@ -1822,10 +1853,11 @@ WinMain(  HINSTANCE aInstance,
 #if HANDMADE_INTERNAL
   DEBUGGlobalShowCursor = true;
 #endif
-  WNDCLASSA WindowClass = {};
+  
 
   Win32ResizeDIBSection(&GlobalBackBuffer, MONITOR_WIDTH, MONITOR_HEIGHT);
-
+  
+  WNDCLASSA WindowClass = {};
   WindowClass.style = CS_HREDRAW|CS_VREDRAW;//|CS_OWNDC;
   WindowClass.lpfnWndProc = MainWindowCallback;
   WindowClass.hInstance = aPrevInstance;
@@ -1914,6 +1946,8 @@ WinMain(  HINSTANCE aInstance,
       GameMemory.PlatformAPI.DEBUGPlatformAppendToFile    = DEBUGPlatformAppendToFile;
       GameMemory.PlatformAPI.DEBUGExecuteSystemCommand    = DEBUGExecuteSystemCommand;
       GameMemory.PlatformAPI.DEBUGGetProcessState         = DEBUGGetProcessState;
+      GameMemory.PlatformAPI.DEBUGFormatString            = DEBUGFormatString;
+      GameMemory.PlatformAPI.DEBUGPrint                   = DEBUGPrint;
 
       GameMemory.PlatformAPI.HighPriorityQueue = &HighPriorityQueue;
 

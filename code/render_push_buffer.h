@@ -38,13 +38,18 @@ struct entry_type_line
   r32 LineThickness;
 };
 
+
+struct entry_type_overlay_line
+{
+  v4 Colour;
+  v2 p0;
+  v2 p1;
+  r32 Thickness;
+};
+
 struct entry_type_overlay_quad
 {
   v4 Colour;
-  bitmap_handle BitmapHandle;
-  object_handle ObjectHandle;
-  m4 M;
-  m4 TM;
   rect2f QuadRect;
 };
 

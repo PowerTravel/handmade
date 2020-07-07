@@ -288,6 +288,14 @@ void CopyStrings(  memory_index SourceCount, char* Source,
 
   *Dest ='\0';
 }
+void CopyStringsUnchecked( c8* Source, c8* Dest )
+{
+  while(*Source!= '\0')
+  {
+    *Dest++ = *Source++;
+  }
+  *Dest = '\0';
+}
 
 void CatStrings( const memory_index SourceACount, const char* SourceA,
       const memory_index SourceBCount, const char* SourceB,

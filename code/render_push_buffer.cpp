@@ -26,21 +26,34 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup, render_buffer_entry
   return NewEntryHeader;
 }
 
-void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRect, v4 Color)
+#if 0
+void DEBUGPushLine(render_group* RenderGroup, rect2f QuadRect, v2 p0, v2 p1, r32 Thickness, v4 Color)
 {
+  rect2f TextureRect = Rect2f(0,0,1,1);
   const m4 TextureTranslate = GetTranslationMatrix(V4(TextureRect.X,TextureRect.Y,0,1));
   const m4 TextureScale     = GetScaleMatrix(V4(TextureRect.W, TextureRect.H,1,0));
-  const m4 QuadTranslate    = GetTranslationMatrix(V4(QuadRect.X, QuadRect.Y,0,1));
-  const m4 QuadScale        = GetScaleMatrix(V4(QuadRect.W, QuadRect.H,1,0));
 
-  push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::OVERLAY_QUAD, RENDER_STATE_FILL);
-  entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);
+  v2 Line = p1-p0;
+  r32 Angle = ATan2(Line.Y, Line.X);
 
+  const m4 QuadScale        = GetScaleMatrix(V4(Norm(Line), Thickness,1,0));
+  const m4 QuadRotation     = GetRotationMatrix( Angle, V4(0,0,0,1));
+  const m4 QuadTranslate    = GetTranslationMatrix(V4(p0.X, p0.Y,0,1));
+  
+  entry_type_overlay_line* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_line);
   GetHandle(GlobalGameState->AssetManager, "quad", &Body->ObjectHandle);
   Body->Colour = Color;
   Body->BitmapHandle = {};
-  Body->M  = QuadTranslate * QuadScale;
+  Body->M  = QuadTranslate * QuadRotation * QuadScale;
   Body->TM = TextureTranslate * TextureScale;
+  Body->QuadRect = QuadRect;
+}
+#endif
+void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, v4 Color)
+{
+  push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::OVERLAY_QUAD, RENDER_STATE_FILL);
+  entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);
+  Body->Colour = Color;
   Body->QuadRect = QuadRect;
 }
 
@@ -113,7 +126,7 @@ GetSTBGlyphRect(r32 xPosPx, r32 yPosPx, stbtt_bakedchar* CH )
   return Result;
 }
 
-void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* String)
+void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* String, v4 Color = V4(1,1,1,1))
 {
   r32 PixelPosX = CanPosX*RenderGroup->ScreenHeight;
   r32 PixelPosY = CanPosY*RenderGroup->ScreenHeight;
@@ -139,7 +152,7 @@ void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* Str
       GlyphOffset.Y *= ScreenScaleFactor;
       GlyphOffset.W *= ScreenScaleFactor;
       GlyphOffset.H *= ScreenScaleFactor;
-      DEBUGPushText(RenderGroup, GlyphOffset, TextureRect, V4(1,1,1,1));
+      DEBUGPushText(RenderGroup, GlyphOffset, TextureRect,Color);
     }
     PixelPosX += CH->xadvance;
     ++String;
@@ -348,12 +361,10 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
       {
         push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK );
 
-        instance_handle TempHandle = GetTemporaryAssetHandle(AM);
-        SetAsset(AM, asset_type::OBJECT, "voxel", TempHandle);
-        SetAsset(AM, asset_type::MATERIAL, "blue", TempHandle);
 
         entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-        Body->AssetHandle = TempHandle;
+        GetHandle(AM,"voxel", &Body->Object);
+        GetHandle(AM, "blue", &Body->Material);
         component_spatial* Spatial = (component_spatial*) GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_SPATIAL);
         const m4 Rotation = GetRotationMatrix(Spatial->Rotation);
         const m4 Translation = GetTranslationMatrix(Spatial->Position);
@@ -364,12 +375,9 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
       {
         push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK );
 
-        instance_handle TempHandle = GetTemporaryAssetHandle(AM);
-        SetAsset(AM, asset_type::OBJECT, "voxel", TempHandle);
-        SetAsset(AM, asset_type::MATERIAL, "white", TempHandle);
-
         entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-        Body->AssetHandle = TempHandle;
+        GetHandle(AM, "voxel", &Body->Object);
+        GetHandle(AM, "white", &Body->Material);
 
         component_spatial* Spatial = (component_spatial*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_SPATIAL);
         const m4 Rotation = GetRotationMatrix(Spatial->Rotation);

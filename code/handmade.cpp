@@ -1,10 +1,12 @@
 /*
   TODO:
   BUGS:
+    - Make things work with arbitrary screensize (we have desired aspect ratio hardcoded evertwhere, (Add as global variable?))
     - Fix game-loop-memory allocation bug.
       Pressing L activates game-looping. When the loop reloads win32-memory-allocation fails. No idea why, It seems
       to have been like this for a long long time. Before debug-system.
     - Collision detection breaks when we have several boxes
+    - Sending out %s or %f to Platform.DEBUGPrint crashes the program.
   Rendering:
     - Nice Lines (https://blog.mapbox.com/drawing-antialiased-lines-with-opengl-8766f34192dc)
     - Proper Diffuse Textures, BumpMapping
@@ -34,6 +36,11 @@
     - Scene serialization
     - Come up with a "demo-game" to implement using your engine.
     - Editor interface
+  Intrinsics:
+    Round( r32 Real32 )
+    Roof( r32 Real32 )
+    Floor( r32 Real32 )
+
 */
 
 #include "handmade.h"
@@ -437,6 +444,7 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
   Also called 'name mangling' or 'name decoration'. The actual function names are visible in the outputted .map file
   i the build directory.
 */
+
 
 
 // Signature is

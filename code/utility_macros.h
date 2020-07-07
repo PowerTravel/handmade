@@ -2,6 +2,40 @@
 
 #include "intrinsics.h"
 
+// Our re-implementation of msvc's _va_args
+
+#if 0
+#ifndef _ADDRESSOF
+// Get the address of v
+#define _ADDRESSOF(v) (&(v))
+#endif
+#ifndef _INTSIZEOF
+// Rounds to the nearest int
+#define _INTSIZEOF(n) ( ( sizeof(n) + sizeof(int)-1) & ~(sizeof(int)-1) )
+#endif
+
+#ifndef _crt_va_start
+// Initiate the pointer ap to where the arguments of function v start
+#define _crt_va_start(ap,v) ( ap = (va_list)_ADDRESSOF(v) + _INTSIZEOF(v))
+#endif
+#ifndef _crt_va_arg
+// Advance the pointer ap forward (by type size) but return the original position
+#define _crt_va_arg(ap,t) ( *(t *) ((ap +=  _INTSIZEOF(t) ) - _INTSIZEOF(t))
+#endif
+#ifndef _crt_va_end
+// Set ap to null
+#define _crt_va_end(ap) ( ap += (va_list)0)
+#endif
+
+
+internal u32
+FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
+{
+  char* At = Format;
+  while(At[0])
+  va_arg();
+}
+#endif
 
 #define GetCantorPair(a,b) ((u32) ( (1/2.f) * ((a) + (b)) * ((a) + (b) + 1) + (b) ))
 #define Clamp(Val, Min, Max) ((Val) < (Min)) ? (Min) : (((Val) > (Max)) ? (Max) : (Val))

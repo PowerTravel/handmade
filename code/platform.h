@@ -136,6 +136,11 @@ typedef DEBUG_PLATFORM_EXECUTE_SYSTEM_COMMAND( debug_platform_execute_system_com
 #define DEBUG_PLATFORM_GET_PROCESS_STATE(name) debug_process_state name(debug_executing_process Process)
 typedef DEBUG_PLATFORM_GET_PROCESS_STATE( debug_platform_get_process_state );
 
+#define DEBUG_PLATFORM_FORMAT_STRING(name) u32 name(c8* Buffer, midx SizeOfBuffer, midx CharCount, const c8* FormatString, ... )
+typedef DEBUG_PLATFORM_FORMAT_STRING(debug_platform_format_string);
+
+#define DEBUG_PLATFORM_PRINT(name) void name(const c8* DebugString, ...)
+typedef DEBUG_PLATFORM_PRINT(debug_platform_print);
 
 
 #endif // HANDMADE_INTERNAL
@@ -556,9 +561,11 @@ struct platform_api
       debug_platform_append_to_file*         DEBUGPlatformAppendToFile;
       debug_platform_execute_system_command* DEBUGExecuteSystemCommand;
       debug_platform_get_process_state*      DEBUGGetProcessState;
+      debug_platform_format_string*          DEBUGFormatString;
+      debug_platform_print*                  DEBUGPrint;
+      
 //     }
 
-//    debug_platform_get_process_state *DEBUGGetProcessState;
 //    debug_platform_get_memory_stats *DEBUGGetMemoryStats;
 
 };

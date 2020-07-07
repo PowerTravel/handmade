@@ -163,8 +163,8 @@ struct overlay_quad_data
 
 
 #define TEXTURE_ARRAY_DIM 512
-#define NORMAL_TEXTURE_COUNT 256
-#define SPECIAL_TEXTURE_COUNT 64
+#define NORMAL_TEXTURE_COUNT 32
+#define SPECIAL_TEXTURE_COUNT 32
 
 struct open_gl
 {

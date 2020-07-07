@@ -32,13 +32,15 @@ inline r32
 Round( r32 Real32 )
 {
   // NOTE(Jakob): ROUNDF IS SLOW!!
+  // return floor(d + 0.5);
   r32 Result = roundf( Real32 );
   return Result;
 }
 
 inline r32
-Roof( r32 Real32 )
+Ciel( r32 Real32 )
 {
+  // i= 32768 - (int)(32768. - fp);
   r32 Result = ceilf( Real32 );
   return Result;
 }
@@ -46,6 +48,7 @@ Roof( r32 Real32 )
 inline r32
 Floor( r32 Real32 )
 {
+  // i= (int)(fp + 32768.) - 32768;
   r32 Result = floorf( Real32 );
   return Result;
 }
@@ -98,7 +101,6 @@ Pow( r32 Base, r32 Exponent )
   r32 Result = (r32) powf( Base, Exponent );
   return Result;
 }
-
 
 struct bit_scan_result
 {
