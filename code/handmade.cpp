@@ -167,10 +167,9 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   LightSpatial->Position = V3(1,1,1);
   LightSpatial->Scale    = V3( 0.3, 0.3, 0.3);
 
-  LightRender->AssetHandle = GetAssetHandle(GameState->AssetManager);
-  SetAsset( GameState->AssetManager, asset_type::OBJECT,   "voxel", LightRender->AssetHandle);
-  SetAsset( GameState->AssetManager, asset_type::MATERIAL, "white", LightRender->AssetHandle);  // May have a texture
-  SetAsset( GameState->AssetManager, asset_type::BITMAP,   "null",  LightRender->AssetHandle);  // Overrides texture
+  GetHandle(AssetManager, "voxel", &LightRender->Object);
+  GetHandle(AssetManager, "white", &LightRender->Material);
+  GetHandle(AssetManager, "null",  &LightRender->Bitmap);
 
 
 #define State1
@@ -200,11 +199,14 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   s32 jarr[] = {-0,1};
   s32 karr[] = {-0,1};
 #endif
-  u32 RollingIndex = 0;
-  instance_handle CubeAssetHandle = GetAssetHandle( GameState->AssetManager);
-  SetAsset( AssetManager, asset_type::OBJECT, "cube1", CubeAssetHandle );
-  SetAsset( AssetManager, asset_type::MATERIAL, "cube", CubeAssetHandle );
-  SetAsset( AssetManager, asset_type::BITMAP, "cube_kd", CubeAssetHandle );
+
+
+  bitmap_handle BitmapHandle;
+  object_handle ObjectHandle;
+  material_handle MaterialHandle;
+  GetHandle( AssetManager, "cube1",   &ObjectHandle );
+  GetHandle( AssetManager, "cube",    &MaterialHandle );
+  GetHandle( AssetManager, "cube_kd", &BitmapHandle );
   for (s32 i = iarr[0]; i < iarr[1]; ++i)
   {
     for (s32 j = jarr[0]; j < jarr[1]; ++j)
@@ -218,15 +220,19 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
           COMPONENT_FLAG_COLLIDER |
           COMPONENT_FLAG_DYNAMICS);
 
-        GetRenderComponent(CubeEntity)->AssetHandle = CubeAssetHandle;
+        component_render* CubeRender = GetRenderComponent(CubeEntity);
+        CubeRender->Object = ObjectHandle;
+        CubeRender->Bitmap = BitmapHandle;
+        CubeRender->Material = MaterialHandle;
+
         component_spatial* CubeSpatial = GetSpatialComponent(CubeEntity);
         CubeSpatial->Position =  V3(xzSpace*i, ySpace*j, xzSpace*k);
         CubeSpatial->Rotation = RotateQuaternion( 0, V3(0,0,0) );
         CubeSpatial->Scale = V3(1, 1, 1);
 
         component_collider* CubeCollider = GetColliderComponent(CubeEntity);
-        CubeCollider->AssetHandle = CubeAssetHandle;
-        CubeCollider->AABB = GetMeshAABB(AssetManager, CubeAssetHandle);
+        CubeCollider->Object = ObjectHandle;
+        CubeCollider->AABB = GetMeshAABB(AssetManager, ObjectHandle);
 
         component_dynamics* CubeDynamics = GetDynamicsComponent(CubeEntity);
         CubeDynamics->LinearVelocity  = V3(0,0,0);
@@ -242,20 +248,18 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     COMPONENT_FLAG_SPATIAL  |
     COMPONENT_FLAG_COLLIDER);
 
-  instance_handle FloorHandle = GetAssetHandle(AssetManager);
-  SetAsset( AssetManager, asset_type::OBJECT, "voxel", FloorHandle);
-  SetAsset( AssetManager, asset_type::MATERIAL, "checker_board", FloorHandle );
-  SetAsset( AssetManager, asset_type::BITMAP, "checker_board", FloorHandle );
-
-  GetRenderComponent(FloorEntity)->AssetHandle = FloorHandle;
+  component_render* FloorRender = GetRenderComponent(FloorEntity);
+  GetHandle( AssetManager, "voxel",   &FloorRender->Object);
+  GetHandle( AssetManager, "checker_board", &FloorRender->Material);
+  GetHandle( AssetManager, "checker_board", &FloorRender->Bitmap );
 
   component_spatial* FloorSpatial = GetSpatialComponent(FloorEntity);
   FloorSpatial->Position = V3( 0,-2, 0);
   FloorSpatial->Scale = V3( 18, 1, 18);
 
   component_collider* FloorCollider = GetColliderComponent(FloorEntity);
-  FloorCollider->AssetHandle = FloorHandle;
-  FloorCollider->AABB = GetMeshAABB( AssetManager, FloorHandle);
+  FloorCollider->Object = FloorRender->Object;
+  FloorCollider->AABB = GetMeshAABB( AssetManager, FloorRender->Object);
 
 #if 1
   u32 Teapot = NewEntity( EM );
@@ -265,12 +269,11 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     COMPONENT_FLAG_COLLIDER |
     COMPONENT_FLAG_DYNAMICS);
 
-  instance_handle TeapotHandle = GetAssetHandle(AssetManager);
-  SetAsset( AssetManager, asset_type::OBJECT, "teapot", TeapotHandle);
-  SetAsset( AssetManager, asset_type::MATERIAL, "gold", TeapotHandle );
-  SetAsset( AssetManager, asset_type::BITMAP, "checker_board", TeapotHandle );
-  GetRenderComponent(Teapot)->AssetHandle = TeapotHandle;
 
+  component_render* TeapotRender = GetRenderComponent(Teapot);
+  GetHandle( AssetManager, "teapot",   &TeapotRender->Object);
+  GetHandle( AssetManager, "gold", &TeapotRender->Material);
+  GetHandle( AssetManager, "checker_board", &TeapotRender->Bitmap );
 
   component_spatial* TeapotSpatial = GetSpatialComponent(Teapot);
   TeapotSpatial->Position = V3( -2,1,2);
@@ -278,8 +281,8 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   TeapotSpatial->Rotation = RotateQuaternion( 0.5, V3(0.2,1,0) );
 
   component_collider* TeapotCollider = GetColliderComponent(Teapot);
-  TeapotCollider->AssetHandle = TeapotHandle;
-  TeapotCollider->AABB = GetMeshAABB(AssetManager, TeapotHandle);
+  TeapotCollider->Object = TeapotRender->Object;
+  TeapotCollider->AABB = GetMeshAABB(AssetManager, TeapotRender->Object);
 
   component_dynamics* TeapotDynamics = GetDynamicsComponent(Teapot);
   TeapotDynamics->LinearVelocity  = V3(0,0,0);
@@ -293,12 +296,11 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     COMPONENT_FLAG_RENDER           |
     COMPONENT_FLAG_SPATIAL);
 
-  instance_handle HeroSpriteHandle = GetAssetHandle(AssetManager);
-  SetAsset( AssetManager, asset_type::OBJECT, "quad", HeroSpriteHandle);
-  SetAsset( AssetManager, asset_type::BITMAP, "hero_sprite_sheet", HeroSpriteHandle);
-  SetAsset( AssetManager, asset_type::MATERIAL, "white", HeroSpriteHandle );
+  component_render* AnimationRender = GetRenderComponent(SpriteAnimationEntity);
+  GetHandle( AssetManager, "quad",   &AnimationRender->Object);
+  GetHandle( AssetManager, "white", &AnimationRender->Material);
+  GetHandle( AssetManager, "hero_sprite_sheet", &AnimationRender->Bitmap );
 
-  GetRenderComponent(SpriteAnimationEntity)->AssetHandle = HeroSpriteHandle;
 
   component_spatial* SpriteSpatial = GetSpatialComponent(SpriteAnimationEntity);
   SpriteSpatial->Position = V3( -0,  8, 8);
@@ -309,7 +311,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 
   hash_map<bitmap_coordinate> HeroCoordinates = LoadAdventurerSpriteSheetCoordinates( GameState->TransientArena );
 
-  bitmap* HeroSpriteSheet =  GetBitmap(GameState->AssetManager, HeroSpriteHandle);
+  bitmap* HeroSpriteSheet =  GetAsset(GameState->AssetManager, AnimationRender->Bitmap);
   SpriteAnimation->Animation = hash_map< list<m4> >(&GameState->AssetManager->AssetArena,6);
 
   list<m4> Idle1(&GameState->AssetManager->AssetArena);
@@ -426,8 +428,6 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
 
   RenderCommands->DebugRenderGroup->ScreenWidth  = (r32) RenderCommands->ScreenWidthPixels;
   RenderCommands->DebugRenderGroup->ScreenHeight = (r32) RenderCommands->ScreenHeightPixels;
-
-  ResetAssetManagerTemporaryInstances(GlobalGameState->AssetManager);
 };
 
 /*

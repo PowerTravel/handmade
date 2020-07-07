@@ -913,8 +913,7 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
         glUniformMatrix4fv(PhongShadingProgram.NormalMat, 1, GL_TRUE, AssetTest->NM.E);
         glUniformMatrix4fv(PhongShadingProgram.TextureMat, 1, GL_TRUE, AssetTest->TM.E);
 
-        instance_handle AssetHandle = AssetTest->AssetHandle;
-        material* Material = GetMaterial(AssetManager, AssetHandle);
+        material* Material = GetAsset(AssetManager, AssetTest->Material);
         u32 SurfaceSmoothness = 3;
         v4 AmbientColor = Blend(&LightColor, &Material->AmbientColor);
         AmbientColor.W = 1;
@@ -930,7 +929,7 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
         glUniform1f(PhongShadingProgram.Shininess,  Material->Shininess);
 
         bitmap_keeper* BitmapKeeper = 0;
-        GetBitmap(AssetManager, AssetHandle, &BitmapKeeper);
+        GetAsset(AssetManager, AssetTest->Bitmap, &BitmapKeeper);
         
         if(BitmapKeeper->Special)
         {
@@ -940,7 +939,7 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
         }
 
         buffer_keeper* ObjectKeeper = 0;
-        mesh_indeces* Object = GetObject(AssetManager, AssetHandle, &ObjectKeeper);
+        mesh_indeces* Object = GetAsset(AssetManager, AssetTest->Object, &ObjectKeeper);
         
 
         // TODO: Use Unsinged Short

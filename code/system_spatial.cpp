@@ -160,8 +160,8 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
   component_dynamics* DynamicsB = (component_dynamics*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_DYNAMICS);
   m4 ModelMatrixA = GetModelMatrix(SpatialA);
   m4 ModelMatrixB = GetModelMatrix(SpatialB);
-  collider_mesh MeshA = GetColliderMesh(GlobalGameState->AssetManager, ColliderA->AssetHandle);
-  collider_mesh MeshB = GetColliderMesh(GlobalGameState->AssetManager, ColliderB->AssetHandle);
+  collider_mesh MeshA = GetColliderMesh(GlobalGameState->AssetManager, ColliderA->Object);
+  collider_mesh MeshB = GetColliderMesh(GlobalGameState->AssetManager, ColliderB->Object);
 
   gjk_collision_result NarrowPhaseResult = GJKCollisionDetection(
       &ModelMatrixA, &MeshA,

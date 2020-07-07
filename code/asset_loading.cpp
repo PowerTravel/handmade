@@ -297,18 +297,9 @@ game_asset_manager* CreateAssetManager()
 {
   game_asset_manager* AssetManager = BootstrapPushStruct(game_asset_manager, AssetArena);
 
-  AssetManager->Instances.MaxCount = 1024;
-  AssetManager->Instances.Values = (void**) PushArray(&AssetManager->AssetArena,
-                                            AssetManager->Instances.MaxCount, void*);
-  AssetManager->TemporaryInstancesBase = 0;
-  AssetManager->TemporaryInstancesCount = 0;
-
   AssetManager->Meshes.MaxCount = 64;
   AssetManager->Meshes.Values = (void**) PushArray(&AssetManager->AssetArena,
                                   AssetManager->Meshes.MaxCount, mesh_data);
-  //AssetManager->MeshKeeper = PushArray(&AssetManager->AssetArena,
-  //                                    AssetManager->Meshes.MaxCount, buffer_keeper);
-
 
   AssetManager->Objects.MaxCount = 64;
   AssetManager->Objects.Values = (void**) PushArray(&AssetManager->AssetArena,

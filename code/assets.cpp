@@ -17,7 +17,7 @@ void* AllocateValue_(memory_arena* Arena, midx Size, void** Values, u32 Index, u
   return Result;
 }
 
-#define AllocateInstance(AssetManager, Index) (asset_instance*) AllocateValue_(&AssetManager->AssetArena, sizeof(asset_instance), AssetManager->Instances.Values, Index, &AssetManager->Instances.Count, &AssetManager->Instances.MaxCount);
+
 #define AllocateMesh(AssetManager, Index) (mesh_data*) AllocateValue_(&AssetManager->AssetArena, sizeof(mesh_data), AssetManager->Meshes.Values, Index, &AssetManager->Meshes.Count, &AssetManager->Meshes.MaxCount);
 #define AllocateBitmap(AssetManager, Index) (bitmap*) AllocateValue_(&AssetManager->AssetArena, sizeof(bitmap), AssetManager->Bitmaps.Values, Index, &AssetManager->Bitmaps.Count, &AssetManager->Bitmaps.MaxCount);
 #define AllocateObject(AssetManager, Index) (mesh_indeces*) AllocateValue_(&AssetManager->AssetArena, sizeof(mesh_indeces), AssetManager->Objects.Values, Index, &AssetManager->Objects.Count, &AssetManager->Objects.MaxCount);
@@ -141,49 +141,7 @@ PushMaterialData(game_asset_manager* AssetManager, c8* Key, material SrcMaterial
   material* DstMaterial = AllocateMaterial(AssetManager, Index);
   *DstMaterial = SrcMaterial;
 }
-
-// Game Layer API
-instance_handle GetAssetHandle(game_asset_manager* AssetManager)
-{
-  instance_handle Result = {};
-  Assert(AssetManager->TemporaryInstancesBase == 0);
-  Result.Value = AssetManager->Instances.Count;
-  AllocateInstance(AssetManager, Result.Value);
-  return Result;
-}
-
-void ResetAssetManagerTemporaryInstances(game_asset_manager* AssetManager)
-{
-  AssetManager->TemporaryInstancesCount = 0;
-}
-
-instance_handle GetTemporaryAssetHandle(game_asset_manager* AssetManager)
-{
-  if(AssetManager->TemporaryInstancesBase == 0)
-  {
-    AssetManager->TemporaryInstancesBase = AssetManager->Instances.Count;
-    AssetManager->TemporaryInstancesCount = 0;
-  }
-
-  u32 Base = AssetManager->TemporaryInstancesBase;
-  u32 Count = AssetManager->TemporaryInstancesCount++;
-  u32 AssetInstanceIndex = Base + Count;
   
-  asset_vector* Instances = &AssetManager->Instances;
-  Assert(AssetInstanceIndex < Instances->MaxCount);
-  asset_instance* Instance = (asset_instance*) Instances->Values[AssetInstanceIndex];
-  if(!Instance)
-  {
-    Instances->Values[AssetInstanceIndex] = PushStruct(&AssetManager->AssetArena, asset_instance);
-  }else{
-    *Instance = {};
-  }
-
-  instance_handle Result = {};
-  Result.Value = AssetInstanceIndex;
-  return Result;
-}
-
 void GetHandle(game_asset_manager* AssetManager, char* Key, bitmap_handle* Handle)
 {
   Assert(Key && Handle);
@@ -267,35 +225,11 @@ GetAsset(game_asset_manager* AssetManager, bitmap_handle Handle, bitmap_keeper**
   return Result;
 }
 
-internal inline asset_instance*
-GetAssetInstance(game_asset_manager* AssetManager, instance_handle Handle)
-{
-  Assert(Handle.Value < AssetManager->Instances.Count + AssetManager->TemporaryInstancesCount);
-  asset_instance** Instances = (asset_instance**) AssetManager->Instances.Values;
-  asset_instance* Result = Instances[Handle.Value];
-  Assert(Result);
-  return Result;
-}
 
-inline mesh_indeces*
-GetObject(game_asset_manager* AssetManager, instance_handle Handle, buffer_keeper** Keeper)
+collider_mesh GetColliderMesh( game_asset_manager* AssetManager, object_handle Handle)
 {
-  asset_instance* Instance = GetAssetInstance(AssetManager, Handle);
-  mesh_indeces* Result = GetAsset(AssetManager, Instance->ObjectHandle, Keeper);
-  return Result;
-};
-inline mesh_data*
-GetMesh(game_asset_manager* AssetManager, instance_handle Handle)//, buffer_keeper** Keeper)
-{
-  mesh_indeces* Object = GetObject(AssetManager, Handle );
-  mesh_data* Result = GetAsset(AssetManager, Object->MeshHandle);//, Keeper);
-  return Result;
-}
-
-collider_mesh GetColliderMesh( game_asset_manager* AssetManager, instance_handle Handle)
-{
-  mesh_indeces* Object = GetObject(AssetManager, Handle);
-  mesh_data* Data = GetMesh(AssetManager, Handle);
+  mesh_indeces* Object = GetAsset(AssetManager, Handle);
+  mesh_data* Data = GetAsset(AssetManager, Object->MeshHandle);
   collider_mesh Result = {};
   Result.nv = Data->nv;
   Result.v = Data->v;
@@ -304,48 +238,10 @@ collider_mesh GetColliderMesh( game_asset_manager* AssetManager, instance_handle
   return Result;
 }
 
-aabb3f GetMeshAABB(game_asset_manager* AssetManager, instance_handle Handle)
+aabb3f GetMeshAABB(game_asset_manager* AssetManager, object_handle Handle)
 {
-  mesh_indeces* Object = GetObject(AssetManager, Handle);
+  mesh_indeces* Object = GetAsset(AssetManager, Handle);
   return Object->AABB;
-}
-
-bitmap* GetBitmap(game_asset_manager* AssetManager, instance_handle Handle, bitmap_keeper** Keeper)
-{
-  asset_instance* Instance = GetAssetInstance(AssetManager, Handle);
-  bitmap* Result = GetAsset(AssetManager, Instance->BitmapHandle, Keeper);
-  return Result;
-}
-
-material* GetMaterial(game_asset_manager* AssetManager, instance_handle Handle )
-{
-  asset_instance* Instance = GetAssetInstance(AssetManager, Handle);
-  material* Result = GetAsset(AssetManager, Instance->MaterialHandle );
-  return Result;
-};
-
-void SetAsset(game_asset_manager* AssetManager, asset_type AssetType, char* Name, instance_handle Handle)
-{
-  asset_instance* Instance = GetAssetInstance(AssetManager, Handle);
-  switch(AssetType)
-  {
-    case asset_type::OBJECT:
-    {
-      GetHandle(AssetManager, Name, &Instance->ObjectHandle);
-      Assert(IsKeySet(&AssetManager->Objects, Instance->ObjectHandle.Value));
-    }break;
-    case asset_type::BITMAP:
-    {
-      GetHandle(AssetManager, Name, &Instance->BitmapHandle);
-      Assert(IsKeySet(&AssetManager->Bitmaps, Instance->BitmapHandle.Value));
-    }break;
-    case asset_type::MATERIAL:
-    {
-      GetHandle(AssetManager, Name, &Instance->MaterialHandle);
-      Assert(IsKeySet(&AssetManager->Materials, Instance->MaterialHandle.Value));
-    }break;
-
-  }
 }
 
 inline object_handle

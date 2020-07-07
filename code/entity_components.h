@@ -31,6 +31,8 @@ struct component_head
   u32 Type;
 };
 
+
+// Todo, Can we use a location component instead of DeltaRot, DeltaPos etc?
 struct component_camera
 {
   r32 AngleOfView;
@@ -72,7 +74,7 @@ struct component_spatial
 // TODO: Optimize by doing explicit element multiplication
 m4 GetModelMatrix( const component_spatial* c )
 {
-  //TIMED_FUNCTION();
+  TIMED_FUNCTION();
   const m4 Result = M4Identity();
   const m4 Scale = GetScaleMatrix(V4(c->Scale,1));
   const m4 Rotation = GetRotationMatrix(c->Rotation);
@@ -84,7 +86,7 @@ struct component_collider
 {
   // Always in Model Space
   aabb3f AABB;
-  instance_handle AssetHandle;
+  object_handle Object;
 };
 
 struct component_dynamics
@@ -97,7 +99,9 @@ struct component_dynamics
 
 struct component_render
 {
-  instance_handle AssetHandle;
+  object_handle Object;
+  material_handle Material;
+  bitmap_handle Bitmap;
 };
 
 // TODO: Move to AssetManager.

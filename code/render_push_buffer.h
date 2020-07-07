@@ -63,7 +63,9 @@ struct entry_type_light
 
 struct entry_type_render_asset
 {
-  instance_handle AssetHandle;
+  object_handle Object;
+  bitmap_handle Bitmap;
+  material_handle Material;
 
   m4 M;
   m4 NM;

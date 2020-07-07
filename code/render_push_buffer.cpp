@@ -222,11 +222,9 @@ PushLine(render_group* RenderGroup, v3 Start, v3 End, v3 CameraPosition, r32 Lin
   push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_CULL_BACK | RENDER_STATE_FILL );
   entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
 
-  instance_handle TempHandle = GetTemporaryAssetHandle(GlobalGameState->AssetManager);
-  SetAsset(GlobalGameState->AssetManager, asset_type::OBJECT, "quad", TempHandle);
-  SetAsset(GlobalGameState->AssetManager, asset_type::MATERIAL, MaterialName, TempHandle);
-  SetAsset(GlobalGameState->AssetManager, asset_type::BITMAP, "null", TempHandle);
-  Body->AssetHandle = TempHandle;
+  GetHandle(GlobalGameState->AssetManager, "quad", &Body->Object);
+  GetHandle(GlobalGameState->AssetManager, MaterialName, &Body->Material);
+  GetHandle(GlobalGameState->AssetManager, "null", &Body->Bitmap);
   Body->M = TransMat*RotMat*ScaleMat;
   Body->NM = Transpose(RigidInverse(Body->M));
   Body->TM = M4Identity();
@@ -307,7 +305,9 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
 
       push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_CULL_BACK | RENDER_STATE_FILL);
       entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-      Body->AssetHandle = Render->AssetHandle;
+      Body->Object = Render->Object;
+      Body->Bitmap = Render->Bitmap;
+      Body->Material = Render->Material;
       Body->M  = GetModelMatrix(Spatial);
       Body->NM = Transpose(RigidInverse(Body->M));
       Body->TM = M4Identity();

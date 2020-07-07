@@ -195,19 +195,16 @@ struct open_gl
 
   u32 BufferSize;
 
-  // Non-Instanced Geoms
-  // Single VAO InstancedVertexArray (For textured vertices)
-  // Single IndexArray (Each object has an offset into this array)
-  // Good for rendering Small (<1000) number of Large geometries with similar transforms.
-  // (Transforms are sent with uniforms)
-  
+  // Keeps Geometry (vertex, normal, uv)  
   glHandle ElementVAO;
   u32 ElementVBOOffset;
   glHandle ElementVBO;
-
+  
+  // Keeps Idexes to the ElementVAO
   u32 ElementEBOOffset;
   glHandle ElementEBO;
 
+  // Keeps Instance data, whatever we like that's per instance.
   glHandle InstanceVBO;
   glHandle QuadVAO;
   u32 QuadBaseOffset;

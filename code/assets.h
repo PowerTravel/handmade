@@ -8,11 +8,6 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "externals/stb_truetype.h"
 
-struct instance_handle
-{
-  u32 Value;
-};
-
 struct object_handle
 {
   u32 Value;
@@ -31,16 +26,6 @@ struct material_handle
 struct bitmap_handle
 {
   u32 Value;
-};
-
-// TODO: Get rid of asset_instance/
-// Let whatever thing that wants a reference
-// to an asset keep track of it themselves
-struct asset_instance
-{
-  object_handle ObjectHandle;
-  material_handle MaterialHandle;
-  bitmap_handle BitmapHandle;
 };
 
 struct bitmap_keeper
@@ -173,24 +158,16 @@ struct game_asset_manager
 {
   memory_arena AssetArena;
 
-  asset_vector Instances;
-  u32 TemporaryInstancesBase;
-  u32 TemporaryInstancesCount;
-
   asset_vector   Meshes;
   asset_hash_map Bitmaps;
   asset_hash_map Objects;
   asset_hash_map Materials;
 
   buffer_keeper* ObjectKeeper;
-  //buffer_keeper* MeshKeeper;
   bitmap_keeper* BitmapKeeper;
 
   u32 ObjectPendingLoadCount;
   object_handle ObjectPendingLoad[64];
-
-//  u32 MeshPendingLoadCount;
-//  mesh_handle MeshPendingLoad[64];
 
   u32 BitmapPendingLoadCount;
   bitmap_handle BitmapPendingLoad[64];
@@ -200,13 +177,8 @@ struct game_asset_manager
   object_handle* EnumeratedMeshes;
 };
 
-// Game Layer API
-instance_handle GetAssetHandle(game_asset_manager* AssetManager);
-void SetAsset(game_asset_manager* AssetManager, asset_type AssetType, char* Name, instance_handle Handle);
-instance_handle GetTemporaryAssetHandle(game_asset_manager* AssetManager);
-
-collider_mesh GetColliderMesh( game_asset_manager* AssetManager, instance_handle Handle);
-aabb3f GetMeshAABB(game_asset_manager* AssetManager, instance_handle Handle);
+collider_mesh GetColliderMesh( game_asset_manager* AssetManager, object_handle Handle);
+aabb3f GetMeshAABB( game_asset_manager* AssetManager, object_handle Handle);
 
 void ResetAssetManagerTemporaryInstances(game_asset_manager* AssetManager);
 
@@ -216,11 +188,6 @@ inline object_handle GetEnumeratedObjectHandle(game_asset_manager* AssetManager,
 void GetHandle(game_asset_manager* AssetManager, char* Key, bitmap_handle* Handle);
 void GetHandle(game_asset_manager* AssetManager, char* Key, object_handle* Handle);
 void GetHandle(game_asset_manager* AssetManager, char* Key, material_handle* Handle);
-
-mesh_indeces* GetObject(game_asset_manager* AssetManager, instance_handle Handle, buffer_keeper** Keeper = NULL );
-mesh_data* GetMesh(game_asset_manager* AssetManager, instance_handle Handle);//, buffer_keeper** Keeper = NULL);
-bitmap* GetBitmap(game_asset_manager* AssetManager, instance_handle Handle, bitmap_keeper** Keeper = NULL );
-material* GetMaterial(game_asset_manager* AssetManager, instance_handle Handle);
 
 inline mesh_indeces* GetAsset(game_asset_manager* AssetManager, object_handle Handle, buffer_keeper** Keeper = NULL);
 inline mesh_data* GetAsset(game_asset_manager* AssetManager, mesh_handle Index);//, buffer_keeper** Keeper = NULL);
