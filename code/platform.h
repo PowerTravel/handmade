@@ -318,8 +318,6 @@ EndTicketMutex(ticket_mutex* Mutex)
 
 struct game_render_commands
 {
-  s32 ResolutionWidthPixels;
-  s32 ResolutionHeightPixels;
   s32 ScreenWidthPixels;
   s32 ScreenHeightPixels;
 

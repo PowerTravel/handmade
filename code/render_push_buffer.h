@@ -87,8 +87,6 @@ struct push_buffer_header
 
 struct render_group
 {
-  r32 ScreenWidth;
-  r32 ScreenHeight;
   b32 Initialized;
 
   m4 ProjectionMatrix;

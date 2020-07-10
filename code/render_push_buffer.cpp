@@ -69,8 +69,9 @@ void DEBUGPushText(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRec
 rect2f DEBUGTextSize(r32 x, r32 y, render_group* RenderGroup, c8* String)
 {
   stb_font_map* FontMap = &GlobalGameState->AssetManager->FontMap;
-
-  const r32 ScreenScaleFactor = 1.f / RenderGroup->ScreenHeight;
+  
+  game_window_size WindowSize = GameGetWindowSize();
+  const r32 ScreenScaleFactor = 1.f / WindowSize.HeightPx;
 
   r32 Width = 0;
   while (*String != '\0')
@@ -128,15 +129,16 @@ GetSTBGlyphRect(r32 xPosPx, r32 yPosPx, stbtt_bakedchar* CH )
 
 void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* String, v4 Color = V4(1,1,1,1))
 {
-  r32 PixelPosX = CanPosX*RenderGroup->ScreenHeight;
-  r32 PixelPosY = CanPosY*RenderGroup->ScreenHeight;
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 PixelPosX = CanPosX*WindowSize.HeightPx;
+  r32 PixelPosY = CanPosY*WindowSize.HeightPx;
   game_asset_manager* AssetManager =  GlobalGameState->AssetManager;
   stb_font_map* FontMap = &AssetManager->FontMap;
 
   bitmap* BitMap = GetAsset(AssetManager, FontMap->BitmapHandle);
   stbtt_aligned_quad Quad  = {};
 
-  const r32 ScreenScaleFactor = 1.f / RenderGroup->ScreenHeight;
+  const r32 ScreenScaleFactor = 1.f / WindowSize.HeightPx;
 
   const r32 Ks = 1.f / BitMap->Width;
   const r32 Kt = 1.f / BitMap->Height;
@@ -162,10 +164,11 @@ void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* Str
 void DEBUGAddTextSTB(c8* String, r32 LineNumber)
 {
   TIMED_FUNCTION();
+  game_window_size WindowSize = GameGetWindowSize();
   render_group* RenderGroup = GlobalDebugRenderGroup;
   stb_font_map* FontMap = &GlobalGameState->AssetManager->FontMap;
   r32 CanPosX = 1/100.f;
-  r32 CanPosY = 1 - ((LineNumber+1) * FontMap->Ascent - LineNumber*FontMap->Descent)/RenderGroup->ScreenHeight;
+  r32 CanPosY = 1 - ((LineNumber+1) * FontMap->Ascent - LineNumber*FontMap->Descent)/WindowSize.HeightPx;
   DEBUGTextOutAt(CanPosX, CanPosY, RenderGroup, String);
 }
 
@@ -186,8 +189,7 @@ render_group* InitiateRenderGroup(r32 ScreenWidth, r32 ScreenHeight)
 {
   render_group* Result = BootstrapPushStruct(render_group, Arena);
   Result->PushBufferMemory = BeginTemporaryMemory(&Result->Arena);
-  Result->ScreenWidth = ScreenWidth;
-  Result->ScreenHeight = ScreenHeight;
+
   ResetRenderGroup(Result);
 
   Result->Initialized = true;

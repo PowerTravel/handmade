@@ -22,15 +22,11 @@ global_variable win32_state GlobalWin32State = {};
 global_variable b32 GlobalRunning;
 global_variable b32 GlobalPause;
 //global_variable win32_offscreen_buffer GlobalBackBuffer;
+global_variable game_render_commands* GlobalRenderCommands = {};
 global_variable s64 GlobalPerfCounterFrequency;
 global_variable b32 DEBUGGlobalShowCursor;
 global_variable WINDOWPLACEMENT GlobalWindowPosition = {sizeof(GlobalWindowPosition)};
 global_variable game_input GlobalInput[2] = {};
-
-// Note(Jakob): Caseys native screen resolution is 960 by 540 times two
-// Note(Jakob): My native screen resolution is 840 by 525 times two
-#define MONITOR_HEIGHT 525
-#define MONITOR_WIDTH  840
 
 // Note:  We don't want to rely on the libraries needed to run the functions
 //      XInputGetState and XInputSetState defined in <xinput.h> as they have
@@ -483,12 +479,12 @@ Win32InitDSound( HWND aWindow, win32_sound_output* aSoundOutput)
 }
 
 internal win32_window_dimension
-Win32GetWindowDimension( HWND aWindow )
+Win32GetWindowDimension( HWND Window )
 {
   win32_window_dimension Result;
 
   RECT ClientRect;
-  GetClientRect(aWindow, &ClientRect);
+  GetClientRect(Window, &ClientRect);
   Result.Width  = ClientRect.right - ClientRect.left;
   Result.Height = ClientRect.bottom - ClientRect.top;
 
@@ -497,13 +493,13 @@ Win32GetWindowDimension( HWND aWindow )
 
 
 internal LRESULT CALLBACK
-MainWindowCallback( HWND aWindow,
-          UINT aMessage,
-          WPARAM aWParam,
-          LPARAM aLParam)
+MainWindowCallback( HWND Window,
+          UINT Message,
+          WPARAM WParam,
+          LPARAM LParam)
 {
   LRESULT Result = 0;
-  switch(aMessage)
+  switch(Message)
   {
     // User x-out
     case WM_CLOSE:
@@ -516,7 +512,7 @@ MainWindowCallback( HWND aWindow,
     {
       if(DEBUGGlobalShowCursor)
       {
-        Result = DefWindowProc(aWindow, aMessage, aWParam, aLParam);
+        Result = DefWindowProc(Window, Message, WParam, LParam);
       }else{
         SetCursor(0);
       }
@@ -528,11 +524,11 @@ MainWindowCallback( HWND aWindow,
     case WM_ACTIVATEAPP:
     {
 #if 0
-      if( aWParam == TRUE)
+      if( WParam == TRUE)
       {
-        SetLayeredWindowwgl_create_context_attrib_arbutes(aWindow, RGB(0,0,0), 255, LWA_ALPHA);
+        SetLayeredWindowwgl_create_context_attrib_arbutes(Window, RGB(0,0,0), 255, LWA_ALPHA);
       }else{
-        SetLayeredWindowAttributes(aWindow, RGB(0,0,0), 64, LWA_ALPHA);
+        SetLayeredWindowAttributes(Window, RGB(0,0,0), 64, LWA_ALPHA);
       }
 #endif
     }break;
@@ -556,13 +552,11 @@ MainWindowCallback( HWND aWindow,
     {
 
       PAINTSTRUCT Paint;
-      HDC DeviceContext = BeginPaint(aWindow, &Paint);
-      #if 0
-      // TODO: Resize Render Push Buffer Here?
-      win32_window_dimension Dimension = Win32GetWindowDimension(aWindow);
-      Win32DisplayBufferInWindow(DeviceContext, Dimension.Width, Dimension.Height);
-      #endif
-      EndPaint(aWindow, &Paint);
+      HDC DeviceContext = BeginPaint(Window, &Paint);
+      win32_window_dimension Dimension = Win32GetWindowDimension(Window);
+      GlobalRenderCommands->ScreenWidthPixels = Dimension.Width;
+      GlobalRenderCommands->ScreenHeightPixels = Dimension.Height;
+      EndPaint(Window, &Paint);
     }break;
 
     default:
@@ -570,7 +564,7 @@ MainWindowCallback( HWND aWindow,
       //OutputDebugStringA("default\n");
 
       // Windows default window message handling.
-      Result = DefWindowProc(aWindow, aMessage, aWParam, aLParam);
+      Result = DefWindowProc(Window, Message, WParam, LParam);
     }break;
   }
 
@@ -884,25 +878,25 @@ Win32ProcessXinputStickValue( r32* aX,
 // Note(Jakob): Courtesy of Raymond Chen,
 //        See: https://blogs.msdn.microsoft.com/oldnewthing/20100412-00/?p=14353
 internal void
-Win32ToggleFullscreen(HWND aWindow)
+Win32ToggleFullscreen(HWND Window)
 {
-  DWORD Style = GetWindowLong(aWindow, GWL_STYLE);
+  DWORD Style = GetWindowLong(Window, GWL_STYLE);
     if (Style & WS_OVERLAPPEDWINDOW) {
       MONITORINFO MonitorInfo = { sizeof(MonitorInfo) };
-      if(GetWindowPlacement(aWindow, &GlobalWindowPosition) &&
-         GetMonitorInfo(MonitorFromWindow(aWindow,MONITOR_DEFAULTTOPRIMARY), &MonitorInfo))
+      if(GetWindowPlacement(Window, &GlobalWindowPosition) &&
+         GetMonitorInfo(MonitorFromWindow(Window,MONITOR_DEFAULTTOPRIMARY), &MonitorInfo))
       {
-        SetWindowLong(aWindow, GWL_STYLE, Style & ~WS_OVERLAPPEDWINDOW);
-          SetWindowPos(aWindow, HWND_TOP,
+        SetWindowLong(Window, GWL_STYLE, Style & ~WS_OVERLAPPEDWINDOW);
+          SetWindowPos(Window, HWND_TOP,
                    MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
                    MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
                    MonitorInfo.rcMonitor.bottom - MonitorInfo .rcMonitor.top,
                    SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
       }
     }else{
-      SetWindowLong(aWindow, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
-      SetWindowPlacement(aWindow, &GlobalWindowPosition);
-      SetWindowPos(aWindow, NULL, 0, 0, 0, 0,
+      SetWindowLong(Window, GWL_STYLE, Style | WS_OVERLAPPEDWINDOW);
+      SetWindowPlacement(Window, &GlobalWindowPosition);
+      SetWindowPos(Window, NULL, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
                  SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
   }
@@ -1687,10 +1681,10 @@ PLATFORM_WORK_QUEUE_CALLBACK(testFun)
 };
 
 s32 CALLBACK
-WinMain(  HINSTANCE aInstance,
-      HINSTANCE aPrevInstance,
-      LPSTR aCommandLine,
-      s32 aShowCode )
+WinMain(  HINSTANCE Instance,
+          HINSTANCE PrevInstance,
+          LPSTR CommandLine,
+          s32 ShowCode )
 {
   win32_thread_info Threads[3] = {};
   u32 ThreadCount = 3;
@@ -1751,7 +1745,7 @@ WinMain(  HINSTANCE aInstance,
   WNDCLASSA WindowClass = {};
   WindowClass.style = CS_HREDRAW|CS_VREDRAW;//|CS_OWNDC;
   WindowClass.lpfnWndProc = MainWindowCallback;
-  WindowClass.hInstance = aPrevInstance;
+  WindowClass.hInstance = PrevInstance;
   WindowClass.hCursor = LoadCursor(0, IDC_ARROW);
 //  WindowClass.hIcon;  // window icon (for later)
   WindowClass.lpszClassName = "HandmadeWindowClass";  // Name for the window class
@@ -1763,23 +1757,22 @@ WinMain(  HINSTANCE aInstance,
         WindowClass.lpszClassName,
         "HandMade",
         WS_OVERLAPPEDWINDOW|WS_VISIBLE,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
+        CW_USEDEFAULT, // X  CW_USEDEFAULT means the system decides for us.
+        CW_USEDEFAULT, // Y
+        CW_USEDEFAULT, // W
+        CW_USEDEFAULT, // H
         0,
         0,
-        aInstance,
+        Instance,
         NULL);
 
 
     if (WindowHandle != NULL)
     {
       game_render_commands RenderCommands = {};
+      GlobalRenderCommands = &RenderCommands;
       HDC DeviceContext = GetDC(WindowHandle);
       win32_window_dimension Dimension = Win32GetWindowDimension( WindowHandle );
-      RenderCommands.ResolutionWidthPixels  = Dimension.Width; //GlobalBackBuffer.Width;
-      RenderCommands.ResolutionHeightPixels = Dimension.Height; //GlobalBackBuffer.Height;
       RenderCommands.ScreenWidthPixels = Dimension.Width;
       RenderCommands.ScreenHeightPixels = Dimension.Height;
       ReleaseDC( WindowHandle, DeviceContext);
@@ -1789,6 +1782,8 @@ WinMain(  HINSTANCE aInstance,
       s32 MonitorRefreshHz = 60;
       HDC DC = GetDC(WindowHandle);
       s32 Win32RefreshRate = GetDeviceCaps(DC,VREFRESH);
+      s32 Win32MonitorWidthPx = GetDeviceCaps(DC,HORZRES);
+      s32 Win32MonitorHeightPx = GetDeviceCaps(DC,VERTRES);
       ReleaseDC(WindowHandle, DC);
       if (Win32RefreshRate > 1)
       {

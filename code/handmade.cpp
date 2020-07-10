@@ -1,4 +1,4 @@
-/*
+/* 
   TODO:
   BUGS:
     - Make things work with arbitrary screensize (we have desired aspect ratio hardcoded evertwhere, (Add as global variable?))
@@ -52,8 +52,6 @@
 game_memory* DebugGlobalMemory = 0;
 #endif
 
-game_state* GlobalGameState = 0;
-platform_api Platform;
 
 #include "math/aabb.cpp"
 #include "handmade_tile.cpp"
@@ -154,7 +152,8 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   u32 ControllableCamera = NewEntity( EM );
   NewComponents( EM, ControllableCamera, COMPONENT_FLAG_CONTROLLER | COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_CAMERA);
   component_camera* Camera = GetCameraComponent(ControllableCamera);
-  r32 AspectRatio = GameState->ScreenWidthPixels / GameState->ScreenHeightPixels;
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 AspectRatio = WindowSize.WidthPx / WindowSize.HeightPx;
   r32 FieldOfView =  90;
   SetCameraComponent(Camera, FieldOfView, AspectRatio );
   LookAt(Camera, 1*V3(0,3,-8), V3(0,3,0));
@@ -367,21 +366,22 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
 {
   if (!Memory->GameState)
   {
+
     GlobalGameState = BootstrapPushStruct(game_state, PersistentArena);
     GlobalGameState->TransientArena = PushStruct(GlobalGameState->PersistentArena, memory_arena);
     GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
+
+    GlobalGameState->RenderCommands = RenderCommands;
 
     GlobalGameState->AssetManager = CreateAssetManager();
     GlobalGameState->EntityManager = CreateEntityManager();
 
     GlobalGameState->World = CreateWorld(2048);
 
-    GlobalGameState->ScreenWidthPixels  = (r32)RenderCommands->ResolutionWidthPixels;
-    GlobalGameState->ScreenHeightPixels = (r32)RenderCommands->ResolutionHeightPixels;
-
     CreateCollisionTestScene(GlobalGameState, Input);
 
     Memory->GameState = GlobalGameState;
+
     RenderCommands->AssetManager = GlobalGameState->AssetManager;
 
     for (s32 ControllerIndex = 0;
@@ -430,11 +430,11 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
   EndTemporaryMemory(GlobalGameState->TransientTempMem);
   GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
 
-  RenderCommands->MainRenderGroup->ScreenWidth  = (r32)RenderCommands->ScreenWidthPixels;
-  RenderCommands->MainRenderGroup->ScreenHeight = (r32)RenderCommands->ScreenHeightPixels;
-
-  RenderCommands->DebugRenderGroup->ScreenWidth  = (r32) RenderCommands->ScreenWidthPixels;
-  RenderCommands->DebugRenderGroup->ScreenHeight = (r32) RenderCommands->ScreenHeightPixels;
+//  RenderCommands->MainRenderGroup->ScreenWidth  = (r32)RenderCommands->ScreenWidthPixels;
+//  RenderCommands->MainRenderGroup->ScreenHeight = (r32)RenderCommands->ScreenHeightPixels;
+//
+//  RenderCommands->DebugRenderGroup->ScreenWidth  = (r32) RenderCommands->ScreenWidthPixels;
+//  RenderCommands->DebugRenderGroup->ScreenHeight = (r32) RenderCommands->ScreenHeightPixels;
 };
 
 /*

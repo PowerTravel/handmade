@@ -634,8 +634,9 @@ void DrawMenu(radial_menu* ActiveMenu, u32 ActiveMenuItemIndex, r32 MouseAngle, 
 
 void DebugMainWindow(game_input* GameInput)
 {
-  r32 Width  = GlobalDebugRenderGroup->ScreenWidth;
-  r32 Height = GlobalDebugRenderGroup->ScreenHeight;
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 Width  = WindowSize.WidthPx;
+  r32 Height = WindowSize.HeightPx;
 
   r32 AspectRatio = Width/Height;
   r32 ScreenWidth = AspectRatio;
@@ -766,7 +767,8 @@ void PushDebugOverlay(game_input* GameInput)
 
   ResetRenderGroup(GlobalDebugRenderGroup);
 
-  r32 AspectRatio = GlobalDebugRenderGroup->ScreenWidth/GlobalDebugRenderGroup->ScreenHeight;
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 AspectRatio = WindowSize.WidthPx/WindowSize.HeightPx;
   m4 ScreenToCubeScale =  M4( 2/AspectRatio, 0, 0, 0,
                                            0, 2, 0, 0,
                                            0, 0, 0, 0,
