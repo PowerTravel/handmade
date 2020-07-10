@@ -21,7 +21,7 @@ platform_api Platform;
 global_variable win32_state GlobalWin32State = {};
 global_variable b32 GlobalRunning;
 global_variable b32 GlobalPause;
-global_variable win32_offscreen_buffer GlobalBackBuffer;
+//global_variable win32_offscreen_buffer GlobalBackBuffer;
 global_variable s64 GlobalPerfCounterFrequency;
 global_variable b32 DEBUGGlobalShowCursor;
 global_variable WINDOWPLACEMENT GlobalWindowPosition = {sizeof(GlobalWindowPosition)};
@@ -495,38 +495,6 @@ Win32GetWindowDimension( HWND aWindow )
   return Result;
 }
 
-
-internal void
-Win32ResizeDIBSection( win32_offscreen_buffer* aBuffer, s32 aWidth, s32 aHeight )
-{
-  if(aBuffer->Memory)
-  {
-    VirtualFree(aBuffer->Memory, NULL, MEM_RELEASE);
-  }
-
-  aBuffer->Width  = aWidth;
-  aBuffer->Height = aHeight;
-
-  aBuffer->BytesPerPixel = 4;
-  // Note: If biHeight is set to negative it is the cue to the
-  // compiler that we are to draw in a top down coordinate system
-  // where our screen origin is in the top left corner.
-  aBuffer->Info.bmiHeader.biSize = sizeof(aBuffer->Info.bmiHeader);
-  aBuffer->Info.bmiHeader.biWidth = aBuffer->Width;
-  aBuffer->Info.bmiHeader.biHeight = aBuffer->Height;
-  aBuffer->Info.bmiHeader.biPlanes = 1;
-  aBuffer->Info.bmiHeader.biBitCount = 32;
-  aBuffer->Info.bmiHeader.biCompression = BI_RGB;
-
-
-
-  s32 BitmapMemorySize = (aBuffer->Width*aBuffer->Height)*aBuffer->BytesPerPixel;
-  aBuffer->Memory = VirtualAlloc(NULL, BitmapMemorySize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-  aBuffer->Pitch = aBuffer->Width * aBuffer->BytesPerPixel;
-
-  // TODO: Probably clear this to black
-
-}
 
 internal LRESULT CALLBACK
 MainWindowCallback( HWND aWindow,
@@ -1779,9 +1747,6 @@ WinMain(  HINSTANCE aInstance,
 #if HANDMADE_INTERNAL
   DEBUGGlobalShowCursor = true;
 #endif
-  
-
-  Win32ResizeDIBSection(&GlobalBackBuffer, MONITOR_WIDTH, MONITOR_HEIGHT);
   
   WNDCLASSA WindowClass = {};
   WindowClass.style = CS_HREDRAW|CS_VREDRAW;//|CS_OWNDC;
