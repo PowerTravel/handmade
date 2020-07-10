@@ -96,6 +96,7 @@ menu_item MenuItem(c8* Name, b32 Active = false)
   menu_item Result = {};
   Assert(str::StringLength( Name ) < ArrayCount( Result.Header ) );
   str::CopyStringsUnchecked( Name, Result.Header );
+  Result.Active = Active;
   return Result;
 }
 

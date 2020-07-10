@@ -43,7 +43,7 @@ TogglePause(debug_state* DebugState, menu_item* Item)
 
 void CreateMainMenuFunctions(debug_state* DebugState)
 {
-  radial_menu* MainMenu = &DebugState->RadialMenues[0];
+  radial_menu* MainMenu = &DebugState->RadialMenues[1];
   Assert(MainMenu->MenuRegionCount == 3);
 
   MainMenu->MenuItems[0].Activate = [](debug_state* DebugState, menu_item* Item)
@@ -58,7 +58,7 @@ void CreateMainMenuFunctions(debug_state* DebugState)
 
 void CreateOptionsMenuFunctions(debug_state* DebugState)
 {
-  radial_menu* OptionsMenu = &DebugState->RadialMenues[1];
+  radial_menu* OptionsMenu = &DebugState->RadialMenues[0];
   Assert(OptionsMenu->MenuRegionCount == 5);
 
   OptionsMenu->MenuItems[0].Activate =
@@ -135,14 +135,16 @@ DEBUGGetState()
     DebugState->RadialMenues = DEBUGPushArray(DebugState, DebugState->RadialMenuEntries, radial_menu);
     DebugState->ActiveMenu = 0;
 
-    radial_menu* MainMenu = &DebugState->RadialMenues[0];
+    radial_menu* MainMenu = &DebugState->RadialMenues[1];
     MainMenu->MenuRegionCount = 3;
     MainMenu->MenuItems = DEBUGPushArray(DebugState, MainMenu->MenuRegionCount, menu_item);
     MainMenu->Regions = DEBUGPushArray(DebugState, MainMenu->MenuRegionCount, radial_menu_region);
-    MainMenu->MenuItems[0] = MenuItem("Pause Collation");
-    MainMenu->MenuItems[1] = MenuItem("Show Collation");
+    MainMenu->MenuItems[0] = MenuItem("Show Collation");
+    MainMenu->MenuItems[1] = MenuItem("Pause Collation");
     MainMenu->MenuItems[2] = MenuItem("Options");
-    radial_menu* OptionsMenu = &DebugState->RadialMenues[1];
+
+    // TodoL Make a Normal window
+    radial_menu* OptionsMenu = &DebugState->RadialMenues[0];
     OptionsMenu->MenuRegionCount = 5;
     OptionsMenu->MenuItems = DEBUGPushArray(DebugState, OptionsMenu->MenuRegionCount, menu_item);
     OptionsMenu->Regions = DEBUGPushArray(DebugState, MainMenu->MenuRegionCount, radial_menu_region);
@@ -659,7 +661,7 @@ void DebugMainWindow(game_input* GameInput)
     r32 RadiusBegin = 0.5f*Radius;
 
     r32 AngleCenter = Tau32/4.f;
-    r32 AngleHalfSlice  = Tau32/6.f;
+    r32 AngleHalfSlice  = Pi32/(r32)DebugState->ActiveMenu->MenuRegionCount;
     for (u32 RegionIndex = 0; RegionIndex < DebugState->ActiveMenu->MenuRegionCount; ++RegionIndex)
     {
       DebugState->ActiveMenu->Regions[RegionIndex] = 
@@ -687,7 +689,7 @@ void DebugMainWindow(game_input* GameInput)
     {
       radial_menu_region* Region = &ActiveMenu->Regions[RegionIndex];
       menu_item* MenuItem = &ActiveMenu->MenuItems[RegionIndex];
-#if 0
+#if 1
       DEBUGDrawRadialRegion(
         DebugState->ActiveMenu->MenuX, DebugState->ActiveMenu->MenuY,
         GameInput->MouseX, GameInput->MouseY,
