@@ -528,80 +528,6 @@ Win32ResizeDIBSection( win32_offscreen_buffer* aBuffer, s32 aWidth, s32 aHeight 
 
 }
 
-u32 GlobalOpenVAO = 0;
-
-internal void
-Win32DisplayBufferInWindow( game_render_commands* Commands, HDC aDeviceContext )
-{
-  TIMED_FUNCTION();
-  b32 InHardware = true;
-  b32 InModernOpenGL = true;
-  b32 DisplayViaHardware = true;
-
-  if(InHardware)
-  {
-    OpenGLRenderGroupToOutput( Commands );
-
-    SwapBuffers(aDeviceContext);
-
-
-    // TODO (Jakob): Re-implement this again when you have a working softwarerenderer again
-    //               USE SIMD THIS TIME
-    // DisplayBitmapViaOpenGL( u32 Width, u32 Height, void* Memory );
-    // SwapBuffers(aDeviceContext);
-  }else{
-    bitmap TargetBitMap = {};
-    TargetBitMap.Width  = GlobalBackBuffer.Width;
-    TargetBitMap.Height = GlobalBackBuffer.Height;
-    TargetBitMap.Pixels = GlobalBackBuffer.Memory;
-
-    if(DisplayViaHardware)
-    {
-
-      //DisplayBitmapViaOpenGL( GlobalBackBuffer.Width, GlobalBackBuffer.Height, GlobalBackBuffer.Memory );
-
-      //SwapBuffers(aDeviceContext);
-    }else{
-      s32 WindowWidth = Commands->ScreenWidthPixels;
-      s32 WindowHeight = Commands->ScreenHeightPixels;
-      if( (WindowWidth  >= GlobalBackBuffer.Width*2 ) &&
-          (WindowHeight >= GlobalBackBuffer.Height*2) )
-      {
-        // Note: No Stretching for prorotyping purposes.
-        StretchDIBits(  aDeviceContext,
-                0,0, WindowWidth,WindowHeight,
-                0,0, GlobalBackBuffer.Width, GlobalBackBuffer.Height,
-                GlobalBackBuffer.Memory,
-                &GlobalBackBuffer.Info,
-                  DIB_RGB_COLORS, SRCCOPY);
-      }else{
-        s32 OffsetX = 10;
-        s32 OffsetY = 10;
-        PatBlt(aDeviceContext, GlobalBackBuffer.Width+OffsetX,  0, WindowWidth, WindowHeight, BLACKNESS);
-        PatBlt(aDeviceContext, 0, GlobalBackBuffer.Height+OffsetY, WindowWidth, WindowHeight, BLACKNESS);
-        PatBlt(aDeviceContext, 0, 0, OffsetX, WindowHeight, BLACKNESS);
-        PatBlt(aDeviceContext, 0, 0, WindowWidth, OffsetY,  BLACKNESS);
-        /*
-        StretchDIBits(  aDeviceContext,
-                0,0, WindowWidth, WindowHeight,
-                0,0, GlobalBackBuffer->Width, GlobalBackBuffer->Height,
-                GlobalBackBuffer->Memory,
-                &GlobalBackBuffer->Info,
-                  DIB_RGB_COLORS, SRCCOPY);
-        */
-        // Note: No Stretching for prorotyping purposes.
-        StretchDIBits(  aDeviceContext,
-                OffsetX,OffsetY, GlobalBackBuffer.Width, GlobalBackBuffer.Height,
-                0,0, GlobalBackBuffer.Width, GlobalBackBuffer.Height,
-                GlobalBackBuffer.Memory,
-                &GlobalBackBuffer.Info,
-                  DIB_RGB_COLORS, SRCCOPY);
-      }
-    }
-  }
-}
-
-
 internal LRESULT CALLBACK
 MainWindowCallback( HWND aWindow,
           UINT aMessage,
@@ -1886,9 +1812,9 @@ WinMain(  HINSTANCE aInstance,
     {
       game_render_commands RenderCommands = {};
       HDC DeviceContext = GetDC(WindowHandle);
-      win32_window_dimension Dimension = Win32GetWindowDimension(  WindowHandle );
-      RenderCommands.ResolutionWidthPixels  = GlobalBackBuffer.Width;
-      RenderCommands.ResolutionHeightPixels = GlobalBackBuffer.Height;
+      win32_window_dimension Dimension = Win32GetWindowDimension( WindowHandle );
+      RenderCommands.ResolutionWidthPixels  = Dimension.Width; //GlobalBackBuffer.Width;
+      RenderCommands.ResolutionHeightPixels = Dimension.Height; //GlobalBackBuffer.Height;
       RenderCommands.ScreenWidthPixels = Dimension.Width;
       RenderCommands.ScreenHeightPixels = Dimension.Height;
       ReleaseDC( WindowHandle, DeviceContext);
@@ -2260,6 +2186,16 @@ WinMain(  HINSTANCE aInstance,
             //
             //
 
+            BEGIN_BLOCK(ProcessRenderQueue);
+
+            OpenGLRenderGroupToOutput( &RenderCommands );
+
+            END_BLOCK(ProcessRenderQueue);
+
+            //
+            //
+            //
+
             BEGIN_BLOCK(FrameWait);
 
             LARGE_INTEGER WorkCounter = Win32GetWallClock();
@@ -2307,14 +2243,13 @@ WinMain(  HINSTANCE aInstance,
             //
             //
 
-            BEGIN_BLOCK(ProcessRenderQueue);
-
+            BEGIN_BLOCK(SwapBuffers);
             // Update Window
             DeviceContext = GetDC(WindowHandle);
-            Win32DisplayBufferInWindow(&RenderCommands, DeviceContext);
-            ReleaseDC( WindowHandle, DeviceContext);
+            SwapBuffers(DeviceContext);
+            ReleaseDC(WindowHandle, DeviceContext);
+            END_BLOCK(SwapBuffers);
 
-            END_BLOCK(ProcessRenderQueue);
 
             FlipWallClock = Win32GetWallClock();
 
