@@ -171,6 +171,9 @@ struct radial_menu
   radial_menu_region* Regions;
   menu_item* MenuItems;
 
+  r32 MouseRadius;
+  r32 MouseAngle;
+
   r32 MenuX;
   r32 MenuY;
 };

@@ -43,24 +43,29 @@ TogglePause(debug_state* DebugState, menu_item* Item)
 
 void CreateMainMenuFunctions(debug_state* DebugState)
 {
-  radial_menu* MainMenu = &DebugState->RadialMenues[1];
+  radial_menu* MainMenu = &DebugState->RadialMenues[0];
   Assert(MainMenu->MenuRegionCount == 3);
 
+  // "Show Collation"
   MainMenu->MenuItems[0].Activate = [](debug_state* DebugState, menu_item* Item)
   {
     DebugState->ChartVisible = !DebugState->ChartVisible;
     Item->Active = (b32) DebugState->ChartVisible;
   };
+
+  // "Pause Collation"
   MainMenu->MenuItems[1].Activate = TogglePause;
 
+  // "Options"
   MainMenu->MenuItems[2].Activate = [](debug_state* DebugState, menu_item* Item){};
 }
 
 void CreateOptionsMenuFunctions(debug_state* DebugState)
 {
-  radial_menu* OptionsMenu = &DebugState->RadialMenues[0];
-  Assert(OptionsMenu->MenuRegionCount == 5);
+  radial_menu* OptionsMenu = &DebugState->RadialMenues[1];
+  Assert(OptionsMenu->MenuRegionCount == 4);
 
+  // "Multi Threaded"
   OptionsMenu->MenuItems[0].Activate =
   [](debug_state* DebugState, menu_item* Item)
   { 
@@ -68,6 +73,7 @@ void CreateOptionsMenuFunctions(debug_state* DebugState)
     Item->Active = (b32) DebugState->ConfigMultiThreaded;
     DebugRewriteConfigFile();
   };
+  // "Collision Points"
   OptionsMenu->MenuItems[1].Activate =
   [](debug_state* DebugState, menu_item* Item)
   { 
@@ -75,6 +81,7 @@ void CreateOptionsMenuFunctions(debug_state* DebugState)
     Item->Active = DebugState->ConfigCollisionPoints;
     DebugRewriteConfigFile();
   };
+  // "Colliders"
   OptionsMenu->MenuItems[2].Activate = 
   [](debug_state* DebugState, menu_item* Item)
   {
@@ -82,6 +89,7 @@ void CreateOptionsMenuFunctions(debug_state* DebugState)
     Item->Active = DebugState->ConfigCollider;
     DebugRewriteConfigFile();
   };
+  // "AABBTree"
   OptionsMenu->MenuItems[3].Activate = 
   [](debug_state* DebugState, menu_item* Item)
   {
@@ -89,9 +97,6 @@ void CreateOptionsMenuFunctions(debug_state* DebugState)
     Item->Active = DebugState->ConfigAABBTree;
     DebugRewriteConfigFile();
   };
-
-  OptionsMenu->MenuItems[4].Activate = 
-  [](debug_state* DebugState, menu_item* Item){};
 }
 
 void InitializeMenuFunctionPointers(debug_state* DebugState)
@@ -135,24 +140,30 @@ DEBUGGetState()
     DebugState->RadialMenues = DEBUGPushArray(DebugState, DebugState->RadialMenuEntries, radial_menu);
     DebugState->ActiveMenu = 0;
 
-    radial_menu* MainMenu = &DebugState->RadialMenues[1];
-    MainMenu->MenuRegionCount = 3;
-    MainMenu->MenuItems = DEBUGPushArray(DebugState, MainMenu->MenuRegionCount, menu_item);
-    MainMenu->Regions = DEBUGPushArray(DebugState, MainMenu->MenuRegionCount, radial_menu_region);
-    MainMenu->MenuItems[0] = MenuItem("Show Collation");
-    MainMenu->MenuItems[1] = MenuItem("Pause Collation");
-    MainMenu->MenuItems[2] = MenuItem("Options");
+    menu_item MainMenuItems[] = 
+    {
+      MenuItem("Show Collation"),
+      MenuItem("Pause Collation"),
+      MenuItem("Options")
+    };
 
-    // TodoL Make a Normal window
-    radial_menu* OptionsMenu = &DebugState->RadialMenues[0];
-    OptionsMenu->MenuRegionCount = 5;
-    OptionsMenu->MenuItems = DEBUGPushArray(DebugState, OptionsMenu->MenuRegionCount, menu_item);
+    radial_menu* MainMenu = &DebugState->RadialMenues[0];
+    MainMenu->MenuRegionCount = ArrayCount(MainMenuItems);
+    MainMenu->MenuItems = (menu_item*) DEBUGPushCopy(DebugState, sizeof(MainMenuItems), MainMenuItems);
+    MainMenu->Regions = DEBUGPushArray(DebugState, MainMenu->MenuRegionCount, radial_menu_region);
+
+    menu_item OptionMenuItems[] = 
+    {
+      MenuItem("Multi Threaded", DebugState->ConfigMultiThreaded),
+      MenuItem("Collision Points", DebugState->ConfigCollisionPoints),
+      MenuItem("Colliders", DebugState->ConfigCollider),
+      MenuItem("AABBTree", DebugState->ConfigAABBTree),
+    };
+
+    radial_menu* OptionsMenu = &DebugState->RadialMenues[1];
+    OptionsMenu->MenuRegionCount = ArrayCount(OptionMenuItems);
+    OptionsMenu->MenuItems = (menu_item*) DEBUGPushCopy(DebugState, sizeof(OptionMenuItems), OptionMenuItems);
     OptionsMenu->Regions = DEBUGPushArray(DebugState, MainMenu->MenuRegionCount, radial_menu_region);
-    OptionsMenu->MenuItems[0] = MenuItem("Multi Threaded", DebugState->ConfigMultiThreaded);
-    OptionsMenu->MenuItems[1] = MenuItem("Collision Points", DebugState->ConfigCollisionPoints);
-    OptionsMenu->MenuItems[2] = MenuItem("Colliders", DebugState->ConfigCollider);
-    OptionsMenu->MenuItems[3] = MenuItem("AABBTree", DebugState->ConfigAABBTree);
-    OptionsMenu->MenuItems[4] = MenuItem("GoBack");
 
     RestartCollation();
   }
@@ -523,7 +534,75 @@ u32 IsMouseInRegion( const radial_menu_region* Region, r32 MouseAngle, r32 Mouse
 }
 
 
-void DrawMenu(radial_menu* ActiveMenu, u32 ActiveMenuItemIndex, r32 MouseAngle, r32 MouseRadius )
+void SetMenuInput(game_input* GameInput, debug_state* DebugState, radial_menu* RadialMenu)
+{
+  b32 RightButtonReleased = GameInput->MouseButton[PlatformMouseButton_Right].Released;
+  v2 MouseButtonPos = V2(GameInput->MouseX, GameInput->MouseY);
+
+  v2  MousePosMenuSpace = MouseButtonPos - V2(RadialMenu->MenuX, RadialMenu->MenuY);
+  RadialMenu->MouseRadius = Norm(MousePosMenuSpace);
+  RadialMenu->MouseAngle  = ATan2(MousePosMenuSpace.Y, MousePosMenuSpace.X);
+  if( RadialMenu->MouseAngle < 0 ) RadialMenu->MouseAngle+=Tau32;
+
+  // Update Menu Input State (Take the input)
+  for(u32 RegionIndex = 0; RegionIndex < RadialMenu->MenuRegionCount; ++RegionIndex)
+  {
+    radial_menu_region* Region = &RadialMenu->Regions[RegionIndex];
+    menu_item* MenuItem = &RadialMenu->MenuItems[RegionIndex];
+#if 0
+    DEBUGDrawRadialRegion(
+      DebugState->RadialMenu->MenuX, DebugState->RadialMenu->MenuY,
+      GameInput->MouseX, GameInput->MouseY,
+      Region->AngleStart, Region->AngleEnd, Region->RadiusStart, Region->Radius );
+#endif
+
+    b32 MouseInRegion = IsMouseInRegion( Region, RadialMenu->MouseAngle, RadialMenu->MouseRadius );
+
+    Update( &MenuItem->MouseOverState, MouseInRegion );
+    Update( &MenuItem->MenuActivationState, MouseInRegion && RightButtonReleased );
+
+#if 0
+    if(MenuItem->MouseOverState.Edge)
+    {
+      if(MenuItem->MouseOverState.Active){
+        Platform.DEBUGPrint("Mouse Entered: %d %d\n", RegionIndex, MouseInRegion );
+      }else{
+        Platform.DEBUGPrint("Mouse Left: %d %d\n", RegionIndex, MouseInRegion );
+      }
+    }
+
+    if(MenuItem->MenuActivationState.Edge)
+    {
+      if(MenuItem->MenuActivationState.Active){
+        Platform.DEBUGPrint("Menu Active: %d\n", RegionIndex );
+      }else{
+        Platform.DEBUGPrint("Menu Inactive: %d\n", RegionIndex );
+      }
+    }  
+#endif
+  }
+}
+
+void ActOnInput(debug_state* DebugState, radial_menu* RadialMenu )
+{
+  // Update Menu Internal State (Act on the input)
+  for (u32 MenuItemIndex = 0; MenuItemIndex < RadialMenu->MenuRegionCount; ++MenuItemIndex)
+  {
+    menu_item* MenuItem = &RadialMenu->MenuItems[MenuItemIndex];
+
+    if(MenuItem->MouseOverState.Active)
+    {
+      if((MenuItem->MenuActivationState.Active) && 
+         (MenuItem->MenuActivationState.Edge))
+      {
+        // Todo: Make callbacks use DebugGetState() ?
+        MenuItem->Activate(DebugState, MenuItem);
+      }  
+    }
+  }
+}
+
+void DrawMenu( radial_menu* ActiveMenu )
 {
 
   v4 IdleColor              = V4(0  ,0  ,0.4,1.f);
@@ -628,11 +707,50 @@ void DrawMenu(radial_menu* ActiveMenu, u32 ActiveMenuItemIndex, r32 MouseAngle, 
     DEBUGTextOutAt(TextPosX+Offset.X, TextPosY+Offset.Y, GlobalDebugRenderGroup, MenuItem->Header, V4(1,1,1,1));
   }
 
-  v2 MouseLine  = V2(ActiveMenu->MenuX + MouseRadius * Cos(MouseAngle),
-                     ActiveMenu->MenuY + MouseRadius * Sin(MouseAngle));
+  v2 MouseLine  = V2(ActiveMenu->MenuX + ActiveMenu->MouseRadius * Cos(ActiveMenu->MouseAngle),
+                     ActiveMenu->MenuY + ActiveMenu->MouseRadius * Sin(ActiveMenu->MouseAngle));
   DEBUGDrawDottedLine(V2(ActiveMenu->MenuX, ActiveMenu->MenuY) , MouseLine,  V4(0.7,0,0,1));
 }
 
+
+internal void
+BeginRadialMenu(radial_menu* RadialMenu, v2 MouseButtonPos)
+{
+  r32 Radius = 1/8.f;
+  r32 RadiusBegin = 0.5f*Radius;
+
+  r32 AngleCenter = Tau32/4.f;
+  r32 AngleHalfSlice  = Pi32/(r32)RadialMenu->MenuRegionCount;
+  for (u32 RegionIndex = 0; RegionIndex < RadialMenu->MenuRegionCount; ++RegionIndex)
+  {
+    RadialMenu->Regions[RegionIndex] = 
+      RadialMenuRegion(AngleCenter - AngleHalfSlice,
+                       AngleCenter + AngleHalfSlice,
+                       RadiusBegin, Radius);
+      AngleCenter+=2*AngleHalfSlice;
+  }
+  
+  RadialMenu->MenuX = MouseButtonPos.X;
+  RadialMenu->MenuY = MouseButtonPos.Y;
+}
+
+internal void
+EndRadialMenu(radial_menu* RadialMenu)
+{
+  // Reset all-non persistant event states
+  for(u32 MenuItemIndex = 0; MenuItemIndex < RadialMenu->MenuRegionCount; ++MenuItemIndex)
+  {
+    menu_item* MenuItem = &RadialMenu->MenuItems[MenuItemIndex];
+    MenuItem->MouseOverState = {};
+    MenuItem->MenuActivationState  = {};
+  }
+
+  RadialMenu->MouseRadius = 0;
+  RadialMenu->MouseAngle  = 0;
+  RadialMenu->MenuX = 0;
+  RadialMenu->MenuY = 0;
+  
+}
 
 void DebugMainWindow(game_input* GameInput)
 {
@@ -644,9 +762,8 @@ void DebugMainWindow(game_input* GameInput)
   r32 ScreenWidth = AspectRatio;
   r32 ScreenHeight = 1;
 
-  b32 RightButtonReleased = GameInput->MouseButton[PlatformMouseButton_Right].Released;
   b32 RightButtonPushed = GameInput->MouseButton[PlatformMouseButton_Right].Pushed;
-  b32 RightButtonDown = GameInput->MouseButton[PlatformMouseButton_Right].EndedDown;
+  b32 RightButtonReleased = GameInput->MouseButton[PlatformMouseButton_Right].Released;
 
   debug_state* DebugState = DEBUGGetState();
 
@@ -656,99 +773,22 @@ void DebugMainWindow(game_input* GameInput)
   {
     Assert(DebugState->ActiveMenu == 0);
     DebugState->ActiveMenu = &DebugState->RadialMenues[0];
-
-    r32 Radius = 1/8.f;
-    r32 RadiusBegin = 0.5f*Radius;
-
-    r32 AngleCenter = Tau32/4.f;
-    r32 AngleHalfSlice  = Pi32/(r32)DebugState->ActiveMenu->MenuRegionCount;
-    for (u32 RegionIndex = 0; RegionIndex < DebugState->ActiveMenu->MenuRegionCount; ++RegionIndex)
-    {
-      DebugState->ActiveMenu->Regions[RegionIndex] = 
-        RadialMenuRegion(AngleCenter - AngleHalfSlice,
-                         AngleCenter + AngleHalfSlice,
-                         RadiusBegin, Radius);
-        AngleCenter+=2*AngleHalfSlice;
-    }
-    
-    DebugState->ActiveMenu->MenuX = MouseButtonPos.X;
-    DebugState->ActiveMenu->MenuY = MouseButtonPos.Y;
+    BeginRadialMenu(DebugState->ActiveMenu, MouseButtonPos);
   }
 
-  radial_menu* ActiveMenu = DebugState->ActiveMenu;
-  if(ActiveMenu)
+  radial_menu* RadialMenu = DebugState->ActiveMenu;
+  if(RadialMenu)
   {
-    u32 ActiveMenuItemIndex = ActiveMenu->MenuRegionCount;
-    v2  MousePosMenuSpace = MouseButtonPos - V2(ActiveMenu->MenuX, ActiveMenu->MenuY);
-    r32 MouseRadius = Norm(MousePosMenuSpace);
-    r32 MouseAngle = ATan2(MousePosMenuSpace.Y, MousePosMenuSpace.X);
-    if( MouseAngle < 0 ) MouseAngle+=Tau32;
+    SetMenuInput(GameInput, DebugState, RadialMenu);
 
-    // Update Menu Input State (Take the input)
-    for(u32 RegionIndex = 0; RegionIndex < ActiveMenu->MenuRegionCount; ++RegionIndex)
-    {
-      radial_menu_region* Region = &ActiveMenu->Regions[RegionIndex];
-      menu_item* MenuItem = &ActiveMenu->MenuItems[RegionIndex];
-#if 1
-      DEBUGDrawRadialRegion(
-        DebugState->ActiveMenu->MenuX, DebugState->ActiveMenu->MenuY,
-        GameInput->MouseX, GameInput->MouseY,
-        Region->AngleStart, Region->AngleEnd, Region->RadiusStart, Region->Radius );
-#endif
-
-      b32 MouseInRegion = IsMouseInRegion( Region, MouseAngle, MouseRadius );
-
-      Update( &MenuItem->MouseOverState, MouseInRegion );
-      Update( &MenuItem->MenuActivationState, MouseInRegion && RightButtonReleased );
-
-#if 0
-      if(MenuItem->MouseOverState.Edge)
-      {
-        if(MenuItem->MouseOverState.Active){
-          Platform.DEBUGPrint("Mouse Entered: %d %d\n", RegionIndex, MouseInRegion );
-        }else{
-          Platform.DEBUGPrint("Mouse Left: %d %d\n", RegionIndex, MouseInRegion );
-        }
-      }
-
-      if(MenuItem->MenuActivationState.Edge)
-      {
-        if(MenuItem->MenuActivationState.Active){
-          Platform.DEBUGPrint("Menu Active: %d\n", RegionIndex );
-        }else{
-          Platform.DEBUGPrint("Menu Inactive: %d\n", RegionIndex );
-        }
-      }  
-#endif
-    }
-
-    // Update Menu Internal State (Act on the input)
-    for (u32 MenuItemIndex = 0; MenuItemIndex < ActiveMenu->MenuRegionCount; ++MenuItemIndex)
-    {
-      menu_item* MenuItem = &ActiveMenu->MenuItems[MenuItemIndex];
-
-      if(MenuItem->MouseOverState.Active)
-      {
-        if((MenuItem->MenuActivationState.Active) && 
-           (MenuItem->MenuActivationState.Edge))
-        {
-          MenuItem->Activate(DebugState, MenuItem);
-        }  
-      }
-    }
+    ActOnInput(DebugState, RadialMenu );
 
     // Draw Menu State
-    DrawMenu(ActiveMenu, ActiveMenuItemIndex, MouseAngle, MouseRadius);
+    DrawMenu(RadialMenu);
 
     if(RightButtonReleased)
     {
-      // Reset all event states
-      for(u32 MenuItemIndex = 0; MenuItemIndex < ActiveMenu->MenuRegionCount; ++MenuItemIndex)
-      {
-        menu_item* MenuItem = &ActiveMenu->MenuItems[MenuItemIndex];
-        MenuItem->MouseOverState = {};
-        MenuItem->MenuActivationState  = {};
-      }
+      EndRadialMenu(RadialMenu);      
       DebugState->ActiveMenu = 0;
     }
   }
