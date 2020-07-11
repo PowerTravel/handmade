@@ -49,16 +49,18 @@ void DEBUGPushLine(render_group* RenderGroup, rect2f QuadRect, v2 p0, v2 p1, r32
   Body->QuadRect = QuadRect;
 }
 #endif
-void DEBUGPushQuad(render_group* RenderGroup, rect2f QuadRect, v4 Color)
-{
+void DEBUGPushQuad(rect2f QuadRect, v4 Color)
+{ 
+  render_group* RenderGroup = GlobalDebugRenderGroup;
   push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::OVERLAY_QUAD, RENDER_STATE_FILL);
   entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);
   Body->Colour = Color;
   Body->QuadRect = QuadRect;
 }
 
-void DEBUGPushText(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRect, v4 Color)
+void DEBUGPushText(rect2f QuadRect, rect2f TextureRect, v4 Color)
 {
+  render_group* RenderGroup = GlobalDebugRenderGroup;
   push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::TEXT, RENDER_STATE_FILL);
   entry_type_text* Body = PushStruct(&RenderGroup->Arena, entry_type_text);
   Body->QuadRect = QuadRect;
@@ -66,7 +68,7 @@ void DEBUGPushText(render_group* RenderGroup, rect2f QuadRect, rect2f TextureRec
   Body->Colour = Color;
 }
 
-rect2f DEBUGTextSize(r32 x, r32 y, render_group* RenderGroup, c8* String)
+rect2f DEBUGTextSize(r32 x, r32 y, c8* String)
 {
   stb_font_map* FontMap = &GlobalGameState->AssetManager->FontMap;
   
@@ -127,7 +129,7 @@ GetSTBGlyphRect(r32 xPosPx, r32 yPosPx, stbtt_bakedchar* CH )
   return Result;
 }
 
-void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* String, v4 Color = V4(1,1,1,1))
+void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, c8* String, v4 Color = V4(1,1,1,1))
 {
   game_window_size WindowSize = GameGetWindowSize();
   r32 PixelPosX = CanPosX*WindowSize.HeightPx;
@@ -154,7 +156,7 @@ void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, render_group* RenderGroup, c8* Str
       GlyphOffset.Y *= ScreenScaleFactor;
       GlyphOffset.W *= ScreenScaleFactor;
       GlyphOffset.H *= ScreenScaleFactor;
-      DEBUGPushText(RenderGroup, GlyphOffset, TextureRect,Color);
+      DEBUGPushText(GlyphOffset, TextureRect,Color);
     }
     PixelPosX += CH->xadvance;
     ++String;
@@ -165,11 +167,10 @@ void DEBUGAddTextSTB(c8* String, r32 LineNumber)
 {
   TIMED_FUNCTION();
   game_window_size WindowSize = GameGetWindowSize();
-  render_group* RenderGroup = GlobalDebugRenderGroup;
   stb_font_map* FontMap = &GlobalGameState->AssetManager->FontMap;
   r32 CanPosX = 1/100.f;
   r32 CanPosY = 1 - ((LineNumber+1) * FontMap->Ascent - LineNumber*FontMap->Descent)/WindowSize.HeightPx;
-  DEBUGTextOutAt(CanPosX, CanPosY, RenderGroup, String);
+  DEBUGTextOutAt(CanPosX, CanPosY,String);
 }
 
 void ResetRenderGroup(render_group* RenderGroup)

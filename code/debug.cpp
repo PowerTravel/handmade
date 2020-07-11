@@ -138,7 +138,7 @@ DEBUGGetState()
     // Allocate Menu Space
     DebugState->RadialMenuEntries =  2;
     DebugState->RadialMenues = DEBUGPushArray(DebugState, DebugState->RadialMenuEntries, radial_menu);
-    DebugState->ActiveMenu = 0;
+    DebugState->ActiveMenu = {};
 
     menu_item MainMenuItems[] = 
     {
@@ -475,7 +475,7 @@ void DEBUGDrawDottedLine(v2 Start, v2 End, v4 Color = V4(1,1,1,1), r32 NrDots = 
   for (r32 i = 0; i < NrDots; ++i)
   {
     v2 Pos = Start + (End-Start) * (i/NrDots);
-    DEBUGPushQuad(GlobalDebugRenderGroup, Rect2f(Pos.X,Pos.Y, 0.01, 0.01), Color);      
+    DEBUGPushQuad(Rect2f(Pos.X,Pos.Y, 0.01, 0.01), Color);      
   }
 }
 
@@ -487,7 +487,7 @@ void DEBUGDrawDottedCircularSection(v2 Origin, r32 AngleStart, r32 AngleEnd, r32
     r32 Angle = AngleStart + i * AngleInterval / NrDots;
     v2 Pos = V2(Origin.X + Radius * Cos(Angle),
                 Origin.Y + Radius * Sin(Angle));
-    DEBUGPushQuad(GlobalDebugRenderGroup, Rect2f(Pos.X,Pos.Y, 0.01, 0.01), Color);      
+    DEBUGPushQuad(Rect2f(Pos.X,Pos.Y, 0.01, 0.01), Color);      
   }
 }
 
@@ -534,6 +534,45 @@ u32 IsMouseInRegion( const radial_menu_region* Region, r32 MouseAngle, r32 Mouse
 }
 
 
+
+internal void
+BeginRadialMenu(radial_menu* RadialMenu, v2 MouseButtonPos)
+{
+  r32 Radius = 1/8.f;
+  r32 RadiusBegin = 0.5f*Radius;
+
+  r32 AngleCenter = Tau32/4.f;
+  r32 AngleHalfSlice  = Pi32/(r32)RadialMenu->MenuRegionCount;
+  for (u32 RegionIndex = 0; RegionIndex < RadialMenu->MenuRegionCount; ++RegionIndex)
+  {
+    RadialMenu->Regions[RegionIndex] = 
+      RadialMenuRegion(AngleCenter - AngleHalfSlice,
+                       AngleCenter + AngleHalfSlice,
+                       RadiusBegin, Radius);
+      AngleCenter+=2*AngleHalfSlice;
+  }
+  
+  RadialMenu->MenuX = MouseButtonPos.X;
+  RadialMenu->MenuY = MouseButtonPos.Y;
+}
+
+internal void
+EndRadialMenu(radial_menu* RadialMenu)
+{
+  // Reset all-non persistant event states
+  for(u32 MenuItemIndex = 0; MenuItemIndex < RadialMenu->MenuRegionCount; ++MenuItemIndex)
+  {
+    menu_item* MenuItem = &RadialMenu->MenuItems[MenuItemIndex];
+    MenuItem->MouseOverState = {};
+    MenuItem->MenuActivationState  = {};
+  }
+
+  RadialMenu->MouseRadius = 0;
+  RadialMenu->MouseAngle  = 0;
+  RadialMenu->MenuX = 0;
+  RadialMenu->MenuY = 0;
+  
+}
 void SetMenuInput(game_input* GameInput, debug_state* DebugState, radial_menu* RadialMenu)
 {
   b32 RightButtonReleased = GameInput->MouseButton[PlatformMouseButton_Right].Released;
@@ -586,6 +625,7 @@ void SetMenuInput(game_input* GameInput, debug_state* DebugState, radial_menu* R
 void ActOnInput(debug_state* DebugState, radial_menu* RadialMenu )
 {
   // Update Menu Internal State (Act on the input)
+  b32 MenuActivated = false;
   for (u32 MenuItemIndex = 0; MenuItemIndex < RadialMenu->MenuRegionCount; ++MenuItemIndex)
   {
     menu_item* MenuItem = &RadialMenu->MenuItems[MenuItemIndex];
@@ -602,7 +642,7 @@ void ActOnInput(debug_state* DebugState, radial_menu* RadialMenu )
   }
 }
 
-void DrawMenu( radial_menu* ActiveMenu )
+void DrawMenu( radial_menu* RadialMenu )
 {
 
   v4 IdleColor              = V4(0  ,0  ,0.4,1.f);
@@ -610,23 +650,23 @@ void DrawMenu( radial_menu* ActiveMenu )
   v4 ActiveColor            = V4(0  ,0.4,  0,1.f);
   v4 ActiveHighlightedColor = V4(0.2,0.5,0.2,1.f);
 
-  if(!ActiveMenu)
+  if(!RadialMenu)
   {
     return;
   }
 
 
-  for(u32 ItemIndex = 0; ItemIndex < ActiveMenu->MenuRegionCount; ++ItemIndex)
+  for(u32 ItemIndex = 0; ItemIndex < RadialMenu->MenuRegionCount; ++ItemIndex)
   {
-    radial_menu_region* Region = &ActiveMenu->Regions[ItemIndex];
-    menu_item* MenuItem = &ActiveMenu->MenuItems[ItemIndex];
+    radial_menu_region* Region = &RadialMenu->Regions[ItemIndex];
+    menu_item* MenuItem = &RadialMenu->MenuItems[ItemIndex];
     
 
     r32 AngleCenter = RecanonicalizeAngle(Region->AngleStart + 0.5f * GetDeltaAngle(Region->AngleStart, Region->AngleEnd));
 
-    v2 ItemLine   = V2(ActiveMenu->MenuX + Region->Radius * Cos(AngleCenter),
-                     ActiveMenu->MenuY + Region->Radius * Sin(AngleCenter));
-    DEBUGDrawDottedLine(V2(ActiveMenu->MenuX, ActiveMenu->MenuY) , ItemLine,  V4(0,0.7,0,1));
+    v2 ItemLine   = V2(RadialMenu->MenuX + Region->Radius * Cos(AngleCenter),
+                     RadialMenu->MenuY + Region->Radius * Sin(AngleCenter));
+    DEBUGDrawDottedLine(V2(RadialMenu->MenuX, RadialMenu->MenuY) , ItemLine,  V4(0,0.7,0,1));
 
 
     v4 Color = IdleColor;
@@ -650,10 +690,10 @@ void DrawMenu( radial_menu* ActiveMenu )
 
     r32 ItemAngle = AngleCenter;
 
-    r32 TextPosX = ActiveMenu->MenuX + Region->Radius*Cos(AngleCenter);
-    r32 TextPosY = ActiveMenu->MenuY + Region->Radius*Sin(AngleCenter);
+    r32 TextPosX = RadialMenu->MenuX + Region->Radius*Cos(AngleCenter);
+    r32 TextPosY = RadialMenu->MenuY + Region->Radius*Sin(AngleCenter);
 
-    rect2f TextBox = DEBUGTextSize(TextPosX, TextPosY, GlobalDebugRenderGroup, MenuItem->Header);
+    rect2f TextBox = DEBUGTextSize(TextPosX, TextPosY, MenuItem->Header);
 
     r32 Anglef0 = Tau32/8.f;
     r32 Anglef1 = 3*Tau32/8.f;
@@ -702,55 +742,16 @@ void DrawMenu( radial_menu* ActiveMenu )
     rect2f QuadRect = Rect2f(TextBox.X + Offset.X + 0.5f*TextBox.W, 
                              TextBox.Y + Offset.Y + 0.5f*TextBox.H,
                              TextBox.W,TextBox.H);
-    DEBUGPushQuad(GlobalDebugRenderGroup, QuadRect, Color);
+    DEBUGPushQuad(QuadRect, Color);
 
-    DEBUGTextOutAt(TextPosX+Offset.X, TextPosY+Offset.Y, GlobalDebugRenderGroup, MenuItem->Header, V4(1,1,1,1));
+    DEBUGTextOutAt(TextPosX+Offset.X, TextPosY+Offset.Y, MenuItem->Header, V4(1,1,1,1));
   }
 
-  v2 MouseLine  = V2(ActiveMenu->MenuX + ActiveMenu->MouseRadius * Cos(ActiveMenu->MouseAngle),
-                     ActiveMenu->MenuY + ActiveMenu->MouseRadius * Sin(ActiveMenu->MouseAngle));
-  DEBUGDrawDottedLine(V2(ActiveMenu->MenuX, ActiveMenu->MenuY) , MouseLine,  V4(0.7,0,0,1));
+  v2 MouseLine  = V2(RadialMenu->MenuX + RadialMenu->MouseRadius * Cos(RadialMenu->MouseAngle),
+                     RadialMenu->MenuY + RadialMenu->MouseRadius * Sin(RadialMenu->MouseAngle));
+  DEBUGDrawDottedLine(V2(RadialMenu->MenuX, RadialMenu->MenuY) , MouseLine,  V4(0.7,0,0,1));
 }
 
-
-internal void
-BeginRadialMenu(radial_menu* RadialMenu, v2 MouseButtonPos)
-{
-  r32 Radius = 1/8.f;
-  r32 RadiusBegin = 0.5f*Radius;
-
-  r32 AngleCenter = Tau32/4.f;
-  r32 AngleHalfSlice  = Pi32/(r32)RadialMenu->MenuRegionCount;
-  for (u32 RegionIndex = 0; RegionIndex < RadialMenu->MenuRegionCount; ++RegionIndex)
-  {
-    RadialMenu->Regions[RegionIndex] = 
-      RadialMenuRegion(AngleCenter - AngleHalfSlice,
-                       AngleCenter + AngleHalfSlice,
-                       RadiusBegin, Radius);
-      AngleCenter+=2*AngleHalfSlice;
-  }
-  
-  RadialMenu->MenuX = MouseButtonPos.X;
-  RadialMenu->MenuY = MouseButtonPos.Y;
-}
-
-internal void
-EndRadialMenu(radial_menu* RadialMenu)
-{
-  // Reset all-non persistant event states
-  for(u32 MenuItemIndex = 0; MenuItemIndex < RadialMenu->MenuRegionCount; ++MenuItemIndex)
-  {
-    menu_item* MenuItem = &RadialMenu->MenuItems[MenuItemIndex];
-    MenuItem->MouseOverState = {};
-    MenuItem->MenuActivationState  = {};
-  }
-
-  RadialMenu->MouseRadius = 0;
-  RadialMenu->MouseAngle  = 0;
-  RadialMenu->MenuX = 0;
-  RadialMenu->MenuY = 0;
-  
-}
 
 void DebugMainWindow(game_input* GameInput)
 {
@@ -769,29 +770,57 @@ void DebugMainWindow(game_input* GameInput)
 
   v2 MouseButtonPos = V2(GameInput->MouseX, GameInput->MouseY);
 
-  if(RightButtonPushed)
+  if(RightButtonPushed )
   {
-    Assert(DebugState->ActiveMenu == 0);
-    DebugState->ActiveMenu = &DebugState->RadialMenues[0];
-    BeginRadialMenu(DebugState->ActiveMenu, MouseButtonPos);
+    DebugState->ActiveMenu.Type = menu_type::Radial;
+    DebugState->ActiveMenu.RadialMenu = &DebugState->RadialMenues[0];
+    BeginRadialMenu(DebugState->ActiveMenu.RadialMenu, MouseButtonPos);
   }
 
-  radial_menu* RadialMenu = DebugState->ActiveMenu;
-  if(RadialMenu)
+  switch(DebugState->ActiveMenu.Type)
   {
-    SetMenuInput(GameInput, DebugState, RadialMenu);
-
-    ActOnInput(DebugState, RadialMenu );
-
-    // Draw Menu State
-    DrawMenu(RadialMenu);
-
-    if(RightButtonReleased)
+    case menu_type::Radial:
     {
-      EndRadialMenu(RadialMenu);      
-      DebugState->ActiveMenu = 0;
-    }
+      Assert(DebugState->ActiveMenu.RadialMenu);
+      radial_menu* RadialMenu = DebugState->ActiveMenu.RadialMenu;
+
+      SetMenuInput(GameInput, DebugState, RadialMenu);
+
+      ActOnInput(DebugState, RadialMenu );
+
+    }break;   
+    case menu_type::Box:
+    {
+
+    }break;   
+    
   }
+
+  switch(DebugState->ActiveMenu.Type)
+  {
+    case menu_type::Radial:
+    {
+      Assert(DebugState->ActiveMenu.RadialMenu);
+      radial_menu* RadialMenu = DebugState->ActiveMenu.RadialMenu;
+
+      DrawMenu(RadialMenu);
+
+    }break;   
+    case menu_type::Box:
+    {
+      DEBUGPushQuad(Rect2f(0.1,0.1,0.3,0.3), V4(0.3,0.3,0.3,0.5));
+    }break;   
+  }
+
+
+  if(RightButtonReleased &&
+    (DebugState->ActiveMenu.Type == menu_type::Radial))
+  {
+    Assert(DebugState->ActiveMenu.RadialMenu);
+    EndRadialMenu(DebugState->ActiveMenu.RadialMenu);      
+    DebugState->ActiveMenu = {};
+  }
+
 }
 
 inline internal debug_frame*
@@ -883,7 +912,7 @@ void PushDebugOverlay(game_input* GameInput)
       rect2f Rect2 = Rect;
       Rect2.X += Rect2.W/2.f;
       Rect2.Y += Rect2.H/2.f;
-      DEBUGPushQuad(GlobalDebugRenderGroup, Rect2, Color);
+      DEBUGPushQuad(Rect2, Color);
 
       if((GameInput->MouseX >= Rect.X) && (GameInput->MouseX <= Rect.X+Rect.W) &&
          (GameInput->MouseY >= Rect.Y) && (GameInput->MouseY <= Rect.Y+Rect.H))
@@ -891,7 +920,7 @@ void PushDebugOverlay(game_input* GameInput)
         c8 StringBuffer[256] = {};
         Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
         "%s : %2.2f MCy", Region->Record->BlockName, (Region->MaxT-Region->MinT)/1000000.f);
-        DEBUGTextOutAt(GameInput->MouseX, GameInput->MouseY+0.02f, GlobalDebugRenderGroup, StringBuffer);
+        DEBUGTextOutAt(GameInput->MouseX, GameInput->MouseY+0.02f, StringBuffer);
         if(GameInput->MouseButton[PlatformMouseButton_Left].Pushed)
         {
           HotRecord = Region->Record;

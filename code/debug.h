@@ -164,6 +164,13 @@ radial_menu_region RadialMenuRegion(r32 AngleStart, r32 AngleEnd, r32 RadiusStar
   return Result;
 }
 
+enum class menu_type
+{
+  None,
+  Radial,
+  Box
+};
+
 struct radial_menu
 {
   u32 MenuRegionCount;
@@ -178,6 +185,20 @@ struct radial_menu
   r32 MenuY;
 };
 
+struct box_menu
+{
+
+};
+
+struct active_menu
+{
+  menu_type Type;
+  union
+  {
+    radial_menu* RadialMenu;
+    box_menu* BoxMenu; 
+  };
+};
 
 struct debug_state
 {
@@ -216,7 +237,8 @@ struct debug_state
 
   u32 RadialMenuEntries;
   radial_menu* RadialMenues;
-  radial_menu* ActiveMenu;
+
+  active_menu ActiveMenu;
 
   b32 ConfigMultiThreaded;
   b32 ConfigCollisionPoints;

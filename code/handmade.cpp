@@ -6,7 +6,6 @@
       Pressing L activates game-looping. When the loop reloads win32-memory-allocation fails. No idea why, It seems
       to have been like this for a long long time. Before debug-system.
     - Collision detection breaks when we have several boxes
-    - Sending out %s or %f to Platform.DEBUGPrint crashes the program.
   Rendering:
     - Nice Lines (https://blog.mapbox.com/drawing-antialiased-lines-with-opengl-8766f34192dc)
     - Proper Diffuse Textures, BumpMapping
