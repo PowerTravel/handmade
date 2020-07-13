@@ -5,7 +5,10 @@
 #include "memory.h"
 #include <stdio.h>
 #include "string.h"
+
 #pragma intrinsic(__rdtsc)
+
+struct debug_state;
 
 struct debug_statistics
 {
@@ -108,6 +111,7 @@ struct radial_menu_region
   r32 Radius;
 };
 
+
 #define AssertCanonical(Angle) Assert(( (Angle) >= 0 ) && ( (Angle) < Tau32))
 
 // Angle -> [0,Tau]
@@ -187,7 +191,12 @@ struct radial_menu
 
 struct box_menu
 {
-
+  u32 MenuItemCount;
+  menu_item* MenuItems;
+  r32 x;
+  r32 y;
+  r32 w;
+  r32 h;
 };
 
 struct active_menu
@@ -224,11 +233,6 @@ struct debug_state
   debug_record* ScopeToRecord;
 
   r32 ChartVisible;
-  r32 ChartLeft;
-  r32 ChartBot;
-  r32 ChartWidth;
-  r32 ChartHeight;
-
   b32 MainMenu;
 
   midx MemorySize;
@@ -238,7 +242,11 @@ struct debug_state
   u32 RadialMenuEntries;
   radial_menu* RadialMenues;
 
+  u32 BoxMenuEntries;
+  box_menu* BoxMenues;
+
   active_menu ActiveMenu;
+  struct main_window* MainWindow;
 
   b32 ConfigMultiThreaded;
   b32 ConfigCollisionPoints;
@@ -250,3 +258,82 @@ struct debug_state
 
 void PushDebugOverlay(game_input* GameInput);
 global_variable render_group* GlobalDebugRenderGroup;
+
+
+struct region_node
+{
+  rect2f Region;
+  u32 BranchCount;
+  region_node* Branches;
+  v4 Color;
+};
+
+enum class window_regions
+{
+  LeftBody,
+  RightBody,
+  LeftBorder,
+  MiddleBorder,
+  RightBorder,
+  BotBorder,
+  Header,
+  TopBorder,
+  BotLeftCorner,
+  BotRightCorner,
+  TopLeftCorner,
+  TopRightCorner,
+};
+
+enum class split_direction
+{
+  None,
+  Horizontal,
+  Vertical
+};
+
+struct main_window
+{
+  //region_node Root;
+  rect2f Region;
+
+  r32 X,Y,W;
+
+  r32 MinWidth;
+  r32 MinHeight;
+
+  r32 BorderSize;
+  r32 HeaderSize;
+  c8 Header[64];
+  v4 Color;
+
+  b32 VerticalSplit;
+  r32 MiddleBorderPos; // [0,1]
+  r32 DraggingStart;
+
+  b32 WindowDrag;
+  b32 LeftBorderDrag;
+  b32 RightBorderDrag;
+  b32 BotBorderDrag;
+  b32 TopBorderDrag;
+  b32 MiddleBorderDrag;
+
+  rect2f WindowDraggingStart;
+
+  v2 MousePos;
+
+  binary_signal_state MouseLeftButton;
+  v2 MouseLeftButtonPush;
+  v2 MouseLeftButtonRelese;
+};
+
+
+
+
+void Draw(region_node* Root);
+region_node* GetMouseOverRegion(region_node* Root, v2 MousePosition);
+
+main_window* GetMenu(debug_state* DebugState);
+void SetMenuInput(game_input* GameInput, debug_state* DebugState, main_window*  MenuRoot);
+void ActOnInput(debug_state* DebugState, main_window*  MenuRoot);
+void Draw(main_window* MenuRoot);
+rect2f GetRegion(window_regions Type, main_window* MainWindow);

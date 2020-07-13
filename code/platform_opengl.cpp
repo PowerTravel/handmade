@@ -167,7 +167,8 @@ void main()
   mat3 quadTransform;
   quadTransform[0] = vec3(rect.z, 0, 0); // z=Width
   quadTransform[1] = vec3(0, rect.w, 0); // w=Height
-  quadTransform[2] = vec3(rect.xy, 1);   // x,y = x,y
+  quadTransform[2] = vec3(rect.x + 0.5*rect.z,
+                          rect.y + 0.5*rect.w, 1);   // x,y = x,y
 
   gl_Position = vec4((projection*quadTransform*vec3(v.xy,1)).xy,0,1);
   vertexColor = color;

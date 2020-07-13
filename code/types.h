@@ -1,5 +1,4 @@
-#ifndef TYPES_H
-#define TYPES_H
+#pragma once
 
 #include <stdint.h>
 #include <float.h>
@@ -61,21 +60,17 @@ typedef double r64;
 #define Pi32  3.14159265359f
 #define Tau32 6.28318530718f
 
-
-union rect2f
+struct rect2f
 {
-	struct{
-		r32 X,Y,W,H;
-	};
-	struct{
-		r32 X0,Y0,X1,Y1;
-	};
+	r32 X,Y,W,H;
 };
 
-rect2f Rect2f( r32 a, r32 b, r32 c, r32 d )
+rect2f Rect2f( r32 X, r32 Y, r32 W, r32 H )
 {
-	rect2f Result = {a,b,c,d};
+	rect2f Result = {};
+  Result.X = X;
+  Result.Y = Y;
+  Result.W = W;
+  Result.H = H;
 	return Result;
 };
-
-#endif
