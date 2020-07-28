@@ -347,7 +347,7 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
       m4 M = GetModelMatrix(Spatial);
       aabb3f AABB = Collider->AABB;
       r32 LineThickness = 0.03;
-      
+
       PushBoxFrame(RenderGroup, M, AABB, CameraPosition, LineThickness, "jade");
     }
   }

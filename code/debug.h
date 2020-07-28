@@ -270,14 +270,23 @@ struct region_node
 
 enum class window_regions
 {
+  WholeBody,
   LeftBody,
   RightBody,
+  BotBody,
+  TopBody,
+  BotLeftBody,
+  BotRightBody,
+  TopLeftBody,
+  TopRightBody,
+  HorizontalBorder,
+  VerticalBorder,
   LeftBorder,
-  MiddleBorder,
   RightBorder,
   BotBorder,
-  Header,
   TopBorder,
+  Header,
+  MiddleCorner,
   BotLeftCorner,
   BotRightCorner,
   TopLeftCorner,
@@ -307,17 +316,22 @@ struct main_window
   v4 Color;
 
   b32 VerticalSplit;
-  r32 MiddleBorderPos; // [0,1]
-  r32 DraggingStart;
+  b32 HorizontalSplit;
+  r32 VerticalBorderFraction;   // [0,1]
+  r32 HorizontalBorderFraction; // [0,1]
+
 
   b32 WindowDrag;
   b32 LeftBorderDrag;
   b32 RightBorderDrag;
   b32 BotBorderDrag;
   b32 TopBorderDrag;
-  b32 MiddleBorderDrag;
+  b32 VerticalBorderDrag;
+  b32 HorizontalBorderDrag;
 
   rect2f WindowDraggingStart;
+  r32 VerticalBorderDraggingStart;
+  r32 HorizontalBorderDraggingStart;
 
   v2 MousePos;
 

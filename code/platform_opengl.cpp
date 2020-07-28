@@ -263,6 +263,7 @@ void main()
   //fragColor = Kd*(AmbientProduct + Ks*SpecularProduct);
   fragColor = Kd*(Sample + Ks*SpecularProduct);
   fragColor.w = Sample.w;
+  //fragColor = Sample;
 }
 )FOO";
 

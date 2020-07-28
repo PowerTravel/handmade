@@ -167,7 +167,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   component_spatial* LightSpatial = GetSpatialComponent(LightEntity);
   component_render* LightRender = GetRenderComponent(LightEntity);
 
-  Light->Color = 2.7*V4(1,1,1,1);
+  Light->Color = 12.7*V4(1,1,1,1);
 
   LightSpatial->Position = V3(1,1,1);
   LightSpatial->Scale    = V3( 0.3, 0.3, 0.3);
@@ -310,7 +310,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   component_spatial* SpriteSpatial = GetSpatialComponent(SpriteAnimationEntity);
   SpriteSpatial->Position = V3( -0,  8, 8);
   SpriteSpatial->Rotation = RotateQuaternion( Pi32, V3(0,1,0) );
-  SpriteSpatial->Scale    = V3( 18, 18, 0);
+  SpriteSpatial->Scale    = V3( 18, 18, 1);
 
   component_sprite_animation* SpriteAnimation = GetSpriteAnimationComponent(SpriteAnimationEntity);
 

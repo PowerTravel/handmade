@@ -77,7 +77,7 @@ void CreateOptionsMenuFunctions(debug_state* DebugState)
   // "Multi Threaded"
   OptionsMenu->MenuItems[0].Activate =
   [](debug_state* DebugState, menu_item* Item)
-  { 
+  {
     DebugState->ConfigMultiThreaded = !DebugState->ConfigMultiThreaded;
     Item->Active = (b32) DebugState->ConfigMultiThreaded;
     DebugRewriteConfigFile();
@@ -85,13 +85,13 @@ void CreateOptionsMenuFunctions(debug_state* DebugState)
   // "Collision Points"
   OptionsMenu->MenuItems[1].Activate =
   [](debug_state* DebugState, menu_item* Item)
-  { 
+  {
     DebugState->ConfigCollisionPoints = !DebugState->ConfigCollisionPoints;
     Item->Active = DebugState->ConfigCollisionPoints;
     DebugRewriteConfigFile();
   };
   // "Colliders"
-  OptionsMenu->MenuItems[2].Activate = 
+  OptionsMenu->MenuItems[2].Activate =
   [](debug_state* DebugState, menu_item* Item)
   {
     DebugState->ConfigCollider = !DebugState->ConfigCollider;
@@ -99,7 +99,7 @@ void CreateOptionsMenuFunctions(debug_state* DebugState)
     DebugRewriteConfigFile();
   };
   // "AABBTree"
-  OptionsMenu->MenuItems[3].Activate = 
+  OptionsMenu->MenuItems[3].Activate =
   [](debug_state* DebugState, menu_item* Item)
   {
     DebugState->ConfigAABBTree = !DebugState->ConfigAABBTree;
@@ -125,7 +125,7 @@ DEBUGGetState()
   }
 
   if(!DebugState->Initialized)
-  { 
+  {
     // Permanent Memory
     DebugState->MemorySize = (midx) Megabytes(1);
     DebugState->MemoryBase = PushArray(&DebugState->Arena, DebugState->MemorySize, u8);
@@ -150,7 +150,7 @@ DEBUGGetState()
     DebugState->RadialMenuEntries =  1;
     DebugState->RadialMenues = DEBUGPushArray(DebugState, DebugState->RadialMenuEntries, radial_menu);
 
-    menu_item MainMenuItems[] = 
+    menu_item MainMenuItems[] =
     {
       MenuItem("Show Collation"),
       MenuItem("Pause Collation"),
@@ -165,7 +165,7 @@ DEBUGGetState()
 
     DebugState->BoxMenuEntries =  1;
     DebugState->BoxMenues = DEBUGPushArray(DebugState, DebugState->RadialMenuEntries, box_menu);
-    menu_item OptionMenuItems[] = 
+    menu_item OptionMenuItems[] =
     {
       MenuItem("Multi Threaded", DebugState->ConfigMultiThreaded),
       MenuItem("Collision Points", DebugState->ConfigCollisionPoints),
@@ -489,7 +489,7 @@ void DEBUGDrawDottedLine(v2 Start, v2 End, v4 Color = V4(1,1,1,1), r32 NrDots = 
   for (r32 i = 0; i < NrDots; ++i)
   {
     v2 Pos = Start + (End-Start) * (i/NrDots);
-    DEBUGPushQuad(Rect2f(Pos.X-0.005f,Pos.Y-0.005f, 0.01, 0.01), Color);      
+    DEBUGPushQuad(Rect2f(Pos.X-0.005f,Pos.Y-0.005f, 0.01, 0.01), Color);
   }
 }
 
@@ -501,7 +501,7 @@ void DEBUGDrawDottedCircularSection(v2 Origin, r32 AngleStart, r32 AngleEnd, r32
     r32 Angle = AngleStart + i * AngleInterval / NrDots;
     v2 Pos = V2(Origin.X + Radius * Cos(Angle),
                 Origin.Y + Radius * Sin(Angle));
-    DEBUGPushQuad(Rect2f(Pos.X-0.005f,Pos.Y-0.005f, 0.01, 0.01), Color);      
+    DEBUGPushQuad(Rect2f(Pos.X-0.005f,Pos.Y-0.005f, 0.01, 0.01), Color);
   }
 }
 
@@ -514,7 +514,7 @@ void DEBUGDrawRadialRegion( r32 OriginX, r32 OriginY, r32 MouseX, r32 MouseY, r3
   v4 Color = V4(1,0,0,1);
 
   if(RadiusEnd < RadiusStart) RadiusEnd+=(Tau32-RadiusStart);
-  
+
   v2 Origin = V2(OriginX, OriginY);
   v2 Mouse = V2(MouseX, MouseY) - Origin;
   r32 MouseAngle = ATan2(Mouse.Y, Mouse.X);
@@ -527,7 +527,7 @@ void DEBUGDrawRadialRegion( r32 OriginX, r32 OriginY, r32 MouseX, r32 MouseY, r3
                      Origin.Y +  RadiusEnd * Sin(AngleStart+0.1f));
   v2 StopLine   = V2(Origin.X +  RadiusEnd * Cos(AngleEnd-0.1f),
                      Origin.Y +  RadiusEnd * Sin(AngleEnd-0.1f));
-  
+
   DEBUGDrawDottedLine(Origin, StartLine,  V4(0,1,0,1));
   DEBUGDrawDottedLine(Origin, StopLine,   V4(1,0,0,1));
   DEBUGDrawDottedLine(Origin, MouseLine,  V4(0,0,1,1));
@@ -559,13 +559,13 @@ BeginRadialMenu(radial_menu* RadialMenu, v2 MouseButtonPos)
   r32 AngleHalfSlice  = Pi32/(r32)RadialMenu->MenuRegionCount;
   for (u32 RegionIndex = 0; RegionIndex < RadialMenu->MenuRegionCount; ++RegionIndex)
   {
-    RadialMenu->Regions[RegionIndex] = 
+    RadialMenu->Regions[RegionIndex] =
       RadialMenuRegion(AngleCenter - AngleHalfSlice,
                        AngleCenter + AngleHalfSlice,
                        RadiusBegin, Radius);
       AngleCenter+=2*AngleHalfSlice;
   }
-  
+
   RadialMenu->MenuX = MouseButtonPos.X;
   RadialMenu->MenuY = MouseButtonPos.Y;
 }
@@ -585,7 +585,7 @@ EndRadialMenu(radial_menu* RadialMenu)
   RadialMenu->MouseAngle  = 0;
   RadialMenu->MenuX = 0;
   RadialMenu->MenuY = 0;
-  
+
 }
 void SetMenuInput(game_input* GameInput, debug_state* DebugState, radial_menu* RadialMenu)
 {
@@ -631,7 +631,7 @@ void SetMenuInput(game_input* GameInput, debug_state* DebugState, radial_menu* R
       }else{
         Platform.DEBUGPrint("Menu Inactive: %d\n", RegionIndex );
       }
-    }  
+    }
 #endif
   }
 }
@@ -646,12 +646,12 @@ void ActOnInput(debug_state* DebugState, radial_menu* RadialMenu )
 
     if(MenuItem->MouseOverState.Active)
     {
-      if((MenuItem->MenuActivationState.Active) && 
+      if((MenuItem->MenuActivationState.Active) &&
          (MenuItem->MenuActivationState.Edge))
       {
         // Todo: Make callbacks use DebugGetState() ?
         MenuItem->Activate(DebugState, MenuItem);
-      }  
+      }
     }
   }
 }
@@ -674,7 +674,7 @@ void DrawMenu( radial_menu* RadialMenu )
   {
     radial_menu_region* Region = &RadialMenu->Regions[ItemIndex];
     menu_item* MenuItem = &RadialMenu->MenuItems[ItemIndex];
-    
+
 
     r32 AngleCenter = RecanonicalizeAngle(Region->AngleStart + 0.5f * GetDeltaAngle(Region->AngleStart, Region->AngleEnd));
 
@@ -713,7 +713,7 @@ void DrawMenu( radial_menu* RadialMenu )
     r32 Anglef1 = 3*Tau32/8.f;
     r32 Anglef2 = 5*Tau32/8.f;
     r32 Anglef3 = 7*Tau32/8.f;
-    
+
     v2 BottomLeft    = V2(0,0);
     v2 BottomRight   = -1.0f * V2(TextBox.W, 0);
     v2 TopRight      = -1.0f * V2(TextBox.W, TextBox.H);
@@ -753,7 +753,7 @@ void DrawMenu( radial_menu* RadialMenu )
 
     v2 Offset = Start + AngleParameter * (End - Start);
 
-    rect2f QuadRect = Rect2f(TextBox.X + Offset.X, 
+    rect2f QuadRect = Rect2f(TextBox.X + Offset.X,
                              TextBox.Y + Offset.Y,
                              TextBox.W,TextBox.H);
     DEBUGPushQuad(QuadRect, Color);
@@ -802,12 +802,12 @@ void DebugMainWindow(game_input* GameInput)
 
       ActOnInput(DebugState, RadialMenu );
 
-    }break;   
+    }break;
     case menu_type::Box:
     {
 
-    }break;   
-    
+    }break;
+
   }
 
   switch(DebugState->ActiveMenu.Type)
@@ -819,11 +819,11 @@ void DebugMainWindow(game_input* GameInput)
 
       DrawMenu(RadialMenu);
 
-    }break;   
+    }break;
     case menu_type::Box:
     {
       DEBUGPushQuad(Rect2f(0.1,0.1,0.3,0.3), V4(0.3,0.3,0.3,0.5));
-    }break;   
+    }break;
   }
 
 
@@ -831,10 +831,9 @@ void DebugMainWindow(game_input* GameInput)
     (DebugState->ActiveMenu.Type == menu_type::Radial))
   {
     Assert(DebugState->ActiveMenu.RadialMenu);
-    EndRadialMenu(DebugState->ActiveMenu.RadialMenu);      
+    EndRadialMenu(DebugState->ActiveMenu.RadialMenu);
     DebugState->ActiveMenu = {};
   }
-
 
   SetMenuInput(GameInput, DebugState, DebugState->MainWindow);
 
@@ -1117,17 +1116,17 @@ region_node* GetMouseOverRegion(region_node* Root, v2 MousePosition)
 void SetMenuInput(game_input* GameInput, debug_state* DebugState, main_window* MainWindow)
 {
   v2 MousePos = V2(GameInput->MouseX, GameInput->MouseY);
-  
+
   Update(&MainWindow->MouseLeftButton, GameInput->MouseButton[PlatformMouseButton_Left].EndedDown);
   if( MainWindow->MouseLeftButton.Edge )
   {
     if(MainWindow->MouseLeftButton.Active )
     {
       Platform.DEBUGPrint("Mous Down\n");
-      MainWindow->MouseLeftButtonPush = MousePos;  
+      MainWindow->MouseLeftButtonPush = MousePos;
     }else{
       Platform.DEBUGPrint("Mous Up\n");
-      MainWindow->MouseLeftButtonRelese = MousePos;  
+      MainWindow->MouseLeftButtonRelese = MousePos;
     }
   }
   MainWindow->MousePos = MousePos;
@@ -1135,7 +1134,7 @@ void SetMenuInput(game_input* GameInput, debug_state* DebugState, main_window* M
 }
 
 void MoveRegion(rect2f* SubRegion, rect2f* SubRegionStart, rect2f* Surroundings, v2 Delta)
-{ 
+{
   Assert((Surroundings->Y + Surroundings->H)<=1);
 
   r32 NewPosX = SubRegionStart->X + Delta.X;
@@ -1146,7 +1145,7 @@ void MoveRegion(rect2f* SubRegion, rect2f* SubRegionStart, rect2f* Surroundings,
   }
   if( (NewPosX + SubRegion->W) > (Surroundings->X + Surroundings->W))
   {
-    NewPosX = (Surroundings->X + Surroundings->W) - SubRegion->W; 
+    NewPosX = (Surroundings->X + Surroundings->W) - SubRegion->W;
   }
   if(NewPosY < Surroundings->Y)
   {
@@ -1154,14 +1153,12 @@ void MoveRegion(rect2f* SubRegion, rect2f* SubRegionStart, rect2f* Surroundings,
   }
   if(NewPosY + SubRegion->H > (Surroundings->Y + Surroundings->H))
   {
-    NewPosY = (Surroundings->Y + Surroundings->H) - SubRegion->H; 
+    NewPosY = (Surroundings->Y + Surroundings->H) - SubRegion->H;
   }
 
   SubRegion->X = NewPosX;
   SubRegion->Y = NewPosY;
 }
-
-
 
 void DragBorderRight(rect2f* SubRegion, rect2f* SubRegionStart, r32 DeltaX, r32 XMax, r32 MinWidth)
 {
@@ -1224,118 +1221,178 @@ void DragBorderBot(rect2f* SubRegion, rect2f* SubRegionStart, r32 DeltaY, r32 YM
 }
 
 
-rect2f GetRegion(window_regions Type, rect2f Region, r32 BorderSize, r32 HeaderSize, r32 MiddleBorderFraction)
-{ 
+rect2f GetRegion(window_regions Type, rect2f Region, r32 BorderSize, r32 HeaderSize, r32 VerticalBorderPos, r32 HorizontalBorderPos)
+{
   rect2f Result = {};
-  r32 MiddleBorderPos = MiddleBorderFraction * Region.W;
-
+  r32 XStart = 0;
+  r32 YStart = 0;
+  r32 Width  = 0;
+  r32 Height = 0;
   switch(Type)
   {
+    case window_regions::WholeBody:
+    {
+      XStart = Region.X;                                // Left
+      YStart = Region.Y;                                // Bot
+      Width  = Region.W;                                // Whole
+      Height = Region.H;                                // Bot
+    }break;
+    case window_regions::BotBody:
+    {
+      XStart = Region.X;                                // Left
+      YStart = Region.Y;                                // Bot
+      Width  = Region.W;                                // Whole
+      Height = HorizontalBorderPos - 0.5f * BorderSize; // Bot
+    }break;
+    case window_regions::TopBody:
+    {
+      XStart = Region.X;                                              // Left
+      YStart = Region.Y + HorizontalBorderPos + 0.5f * BorderSize;    // Top
+      Width  = Region.W;                                              // Whole
+      Height = Region.H - (HorizontalBorderPos + 0.5f * BorderSize);  // Top
+    }break;
     case window_regions::LeftBody:
     {
-      Result = 
-      Rect2f(Region.X + BorderSize, 
-             Region.Y + BorderSize,
-             MiddleBorderPos-0.5f*BorderSize,
-             Region.H - (2*BorderSize + HeaderSize));
+      XStart = Region.X;                                              // Left
+      YStart = Region.Y;                                              // Bot
+      Width  = VerticalBorderPos - 0.5f * BorderSize;                 // Left
+      Height = Region.H;                                              // Whole
     }break;
     case window_regions::RightBody:
     {
-
-      Result = 
-      Rect2f(Region.X + MiddleBorderPos+0.5f*BorderSize, 
-             Region.Y + BorderSize,
-             Region.W - (MiddleBorderPos+1.5f*BorderSize),
-             Region.H - (2*BorderSize + HeaderSize));
+      XStart = Region.X + VerticalBorderPos + 0.5f * BorderSize;      // Right
+      YStart = Region.Y;                                              // Bot
+      Width  = Region.W - (VerticalBorderPos + 0.5f * BorderSize);    // Right
+      Height = Region.H;                                              // Whole
     }break;
+
+
+    case window_regions::BotLeftBody:
+    {
+      XStart = Region.X;                                              // Left
+      YStart = Region.Y;                                              // Bot
+      Width  = VerticalBorderPos   - 0.5f * BorderSize;               // Left
+      Height = HorizontalBorderPos - 0.5f * BorderSize;               // Bot
+    }break;
+    case window_regions::BotRightBody:
+    {
+      XStart = Region.X + VerticalBorderPos + 0.5f * BorderSize;      // Right
+      YStart = Region.Y;                                              // Bot
+      Width  = Region.W - (VerticalBorderPos + 0.5f * BorderSize);    // Right
+      Height = HorizontalBorderPos - 0.5f * BorderSize;               // Bot
+    }break;
+    case window_regions::TopLeftBody:
+    {
+      XStart = Region.X;                                              // Left
+      YStart = Region.Y + HorizontalBorderPos + 0.5f * BorderSize;    // Top
+      Width  = VerticalBorderPos - 0.5f * BorderSize;                 // Left
+      Height = Region.H - (HorizontalBorderPos + 0.5f * BorderSize);  // Top
+    }break;
+    case window_regions::TopRightBody:
+    {
+      XStart = Region.X + VerticalBorderPos    + 0.5f * BorderSize;   // Right
+      YStart = Region.Y + HorizontalBorderPos  + 0.5f * BorderSize;   // Top
+      Width  = Region.W - (VerticalBorderPos   + 0.5f * BorderSize);  // Right
+      Height = Region.H - (HorizontalBorderPos + 0.5f * BorderSize);  // Top
+    }break;
+
+    case window_regions::VerticalBorder:
+    {
+      XStart = Region.X + VerticalBorderPos    - 0.5f * BorderSize;
+      YStart = Region.Y;
+      Width  = BorderSize;
+      Height = Region.H;
+    }break;
+    case window_regions::HorizontalBorder:
+    {
+      XStart = Region.X;
+      YStart = Region.Y + HorizontalBorderPos - 0.5f * BorderSize;
+      Width  = Region.W;
+      Height = BorderSize;
+    }break;
+
     case window_regions::LeftBorder:
     {
-      Result = 
-      Rect2f(Region.X,
-             Region.Y,
-             BorderSize,
-             Region.H);
-    }break;
-    case window_regions::MiddleBorder:
-    {
-      Result = 
-      Rect2f(Region.X + MiddleBorderPos - 0.5f*BorderSize,
-             Region.Y + BorderSize,
-             BorderSize,
-             Region.H - 2*BorderSize - HeaderSize);
+      XStart = Region.X - BorderSize;
+      YStart = Region.Y - BorderSize;
+      Width  = BorderSize;
+      Height = Region.H + 2*BorderSize + HeaderSize;
     }break;
     case window_regions::RightBorder:
     {
-      Result = 
-      Rect2f(Region.X + Region.W - BorderSize,
-             Region.Y,
-             BorderSize,
-             Region.H);
+      XStart = Region.X + Region.W;
+      YStart = Region.Y - BorderSize;
+      Width  = BorderSize;
+      Height = Region.H + 2*BorderSize + HeaderSize;
     }break;
     case window_regions::BotBorder:
     {
-      Result = 
-      Rect2f(Region.X,
-             Region.Y,
-             Region.W,
-             BorderSize);
-    }break;
-    case window_regions::Header:
-    {
-      Result = 
-      Rect2f(Region.X,
-             Region.Y + Region.H - HeaderSize - BorderSize,
-             Region.W,
-             HeaderSize);
+      XStart = Region.X - BorderSize;
+      YStart = Region.Y - BorderSize;
+      Width  = Region.W + 2*BorderSize;
+      Height = BorderSize;
     }break;
     case window_regions::TopBorder:
     {
-      Result = 
-      Rect2f(Region.X,
-             Region.Y + Region.H - BorderSize,
-             Region.W,
-             BorderSize);
+      XStart = Region.X - BorderSize;
+      YStart = Region.Y + Region.H + HeaderSize;
+      Width  = Region.W + 2*BorderSize;
+      Height = BorderSize;
+    }break;
+
+    case window_regions::Header:
+    {
+      XStart = Region.X;
+      YStart = Region.Y + Region.H;
+      Width  = Region.W;
+      Height = HeaderSize;
+    }break;
+
+    case window_regions::MiddleCorner:
+    {
+      XStart = Region.X + VerticalBorderPos   - 0.5f * BorderSize;
+      YStart = Region.Y + HorizontalBorderPos - 0.5f * BorderSize;
+      Width  = BorderSize;
+      Height = BorderSize;
     }break;
     case window_regions::BotLeftCorner:
     {
-
-      Result = 
-      Rect2f(Region.X,
-             Region.Y,
-             BorderSize,
-             BorderSize);
-
+      XStart = Region.X - BorderSize;
+      YStart = Region.Y - BorderSize;
+      Width  = BorderSize;
+      Height = BorderSize;
     }break;
     case window_regions::BotRightCorner:
     {
-      Result = 
-      Rect2f(Region.X + Region.W - BorderSize,
-             Region.Y,
-             BorderSize,
-             BorderSize);
+      XStart = Region.X + Region.W;
+      YStart = Region.Y - BorderSize;
+      Width  = BorderSize;
+      Height = BorderSize;
     }break;
     case window_regions::TopLeftCorner:
     {
-      Result = 
-      Rect2f(Region.X,
-             Region.Y + Region.H - BorderSize,
-             BorderSize,
-             BorderSize);
+      XStart = Region.X - BorderSize;
+      YStart = Region.Y + Region.H + HeaderSize;
+      Width  = BorderSize;
+      Height = BorderSize;
     }break;
     case window_regions::TopRightCorner:
     {
-      Result = 
-      Rect2f(Region.X + Region.W - BorderSize,    
-             Region.Y + Region.H - BorderSize,
-             BorderSize,
-             BorderSize);
+      XStart = Region.X + Region.W;
+      YStart = Region.Y + Region.H + HeaderSize;
+      Width  = BorderSize;
+      Height = BorderSize;
     }break;
   }
+
+  Result = Rect2f(XStart, YStart, Width, Height);
   return Result;
 }
 inline rect2f GetRegion(window_regions Type, main_window* MainWindow)
 {
-  return GetRegion(Type, MainWindow->Region, MainWindow->BorderSize, MainWindow->HeaderSize, MainWindow->MiddleBorderPos);
+  return GetRegion(Type, MainWindow->Region, MainWindow->BorderSize, MainWindow->HeaderSize,
+                                             MainWindow->VerticalBorderFraction * MainWindow->Region.W,
+                                             MainWindow->HorizontalBorderFraction * MainWindow->Region.H);
 }
 
 void ActOnInput(debug_state* DebugState, main_window* MainWindow)
@@ -1343,53 +1400,58 @@ void ActOnInput(debug_state* DebugState, main_window* MainWindow)
   rect2f Region = MainWindow->Region;
   r32 BorderSize = MainWindow->BorderSize;
   r32 HeaderSize = MainWindow->HeaderSize;
-  r32 MiddleBorderPos = MainWindow->MiddleBorderPos;
   rect2f SubRegion = {};
-  
-  v2 MousePos = MainWindow->MousePos;
 
+  v2 MousePos = MainWindow->MousePos;
 
   if(MainWindow->MouseLeftButton.Active)
   {
     // Mouse Clicked Event
     if(MainWindow->MouseLeftButton.Edge)
     {
-      SubRegion = GetRegion(window_regions::Header, Region, BorderSize, HeaderSize, MiddleBorderPos);
+      SubRegion = GetRegion(window_regions::Header, MainWindow);
       if(Intersects(SubRegion, MousePos))
       {
         MainWindow->WindowDrag = true;
         Platform.DEBUGPrint("Header Selected\n");
         MainWindow->WindowDraggingStart = Region;
       }
-      SubRegion = GetRegion(window_regions::LeftBorder, Region, BorderSize, HeaderSize, MiddleBorderPos);
+      SubRegion = GetRegion(window_regions::LeftBorder, MainWindow);
       if(Intersects(SubRegion, MousePos))
       {
         MainWindow->LeftBorderDrag = true;
         Platform.DEBUGPrint("Left Border Selected\n");
         MainWindow->WindowDraggingStart = Region;
       }
-      SubRegion = GetRegion(window_regions::MiddleBorder, Region, BorderSize, HeaderSize, MiddleBorderPos);
+      SubRegion = GetRegion(window_regions::VerticalBorder, MainWindow);
       if(Intersects(SubRegion, MousePos))
       {
-        MainWindow->MiddleBorderDrag = true;
-        Platform.DEBUGPrint("Middle Border Selected\n");
-        MainWindow->DraggingStart = MainWindow->MiddleBorderPos;
+        MainWindow->VerticalBorderDrag = true;
+        Platform.DEBUGPrint("Vertical Border Selected\n");
+        MainWindow->VerticalBorderDraggingStart = MainWindow->VerticalBorderFraction;
       }
-      SubRegion = GetRegion(window_regions::RightBorder, Region, BorderSize, HeaderSize, MiddleBorderPos);
+      SubRegion = GetRegion(window_regions::HorizontalBorder, MainWindow);
+      if(Intersects(SubRegion, MousePos))
+      {
+        MainWindow->HorizontalBorderDrag = true;
+        Platform.DEBUGPrint("Horizontal Border Selected\n");
+        MainWindow->HorizontalBorderDraggingStart = MainWindow->HorizontalBorderFraction;
+      }
+      SubRegion = GetRegion(window_regions::RightBorder, MainWindow);
       if(Intersects(SubRegion, MousePos))
       {
         MainWindow->RightBorderDrag = true;
         Platform.DEBUGPrint("Right Border Selected\n");
         MainWindow->WindowDraggingStart = Region;
       }
-      SubRegion = GetRegion(window_regions::BotBorder, Region, BorderSize, HeaderSize, MiddleBorderPos);
+      SubRegion = GetRegion(window_regions::BotBorder, MainWindow);
       if(Intersects(SubRegion, MousePos))
       {
         MainWindow->BotBorderDrag = true;
         Platform.DEBUGPrint("Bot Border Selected\n");
         MainWindow->WindowDraggingStart = Region;
       }
-      SubRegion = GetRegion(window_regions::TopBorder, Region, BorderSize, HeaderSize, MiddleBorderPos);
+      SubRegion = GetRegion(window_regions::TopBorder, MainWindow);
       if(Intersects(SubRegion, MousePos))
       {
         MainWindow->TopBorderDrag = true;
@@ -1417,11 +1479,17 @@ void ActOnInput(debug_state* DebugState, main_window* MainWindow)
       }
       MainWindow->LeftBorderDrag = false;
 
-      if(MainWindow->MiddleBorderDrag)
+      if(MainWindow->VerticalBorderDrag)
       {
-        Platform.DEBUGPrint("Middle Border Released\n");
+        Platform.DEBUGPrint("Vertical Border Released\n");
       }
-      MainWindow->MiddleBorderDrag = false;
+      MainWindow->VerticalBorderDrag = false;
+
+      if(MainWindow->HorizontalBorderDrag)
+      {
+        Platform.DEBUGPrint("Horizontal Border Released\n");
+      }
+      MainWindow->HorizontalBorderDrag = false;
 
       if(MainWindow->RightBorderDrag)
       {
@@ -1446,11 +1514,11 @@ void ActOnInput(debug_state* DebugState, main_window* MainWindow)
 
     }
   }
-  
+
   game_window_size WindowSize = GameGetWindowSize();
   r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
-  r32 MinWidth = MainWindow->MinWidth;
-  r32 MinHeight = MainWindow->MinHeight;
+  r32 MinWidth  = MainWindow->VerticalSplit   ?  2 * MainWindow->MinWidth  : MainWindow->MinWidth;
+  r32 MinHeight = MainWindow->HorizontalSplit ?  2 * MainWindow->MinHeight : MainWindow->MinHeight;
   v2 Delta = MainWindow->MousePos - MainWindow->MouseLeftButtonPush;
   rect2f Surroundings = Rect2f(0,0,Width,1);
 
@@ -1459,19 +1527,14 @@ void ActOnInput(debug_state* DebugState, main_window* MainWindow)
     MoveRegion(&MainWindow->Region, &MainWindow->WindowDraggingStart, &Surroundings, Delta);
   }
 
-  if(MainWindow->LeftBorderDrag)
-  {
-    DragBorderLeft(&MainWindow->Region, &MainWindow->WindowDraggingStart, Delta.X, Surroundings.X, 2*MinWidth);
-  }
-
-  if(MainWindow->MiddleBorderDrag)
-  {
-    MainWindow->MiddleBorderPos = MainWindow->DraggingStart  + Delta.X/Region.W;
-  }
-
   if(MainWindow->RightBorderDrag)
   {
-    DragBorderRight(&MainWindow->Region, &MainWindow->WindowDraggingStart, Delta.X, Surroundings.X+Surroundings.W, 2*MinWidth);
+    DragBorderRight(&MainWindow->Region, &MainWindow->WindowDraggingStart, Delta.X, Surroundings.X+Surroundings.W, MinWidth);
+  }
+
+  if(MainWindow->LeftBorderDrag)
+  {
+    DragBorderLeft(&MainWindow->Region, &MainWindow->WindowDraggingStart, Delta.X, Surroundings.X, MinWidth);
   }
 
   if(MainWindow->BotBorderDrag)
@@ -1484,45 +1547,93 @@ void ActOnInput(debug_state* DebugState, main_window* MainWindow)
     DragBorderTop(&MainWindow->Region, &MainWindow->WindowDraggingStart, Delta.Y, Surroundings.Y+Surroundings.H, MinHeight);
   }
 
-  if(MainWindow->MiddleBorderPos <= MinWidth/Region.W)
+  if(MainWindow->VerticalSplit)
   {
-    MainWindow->MiddleBorderPos = MinWidth/Region.W;
+    if(MainWindow->VerticalBorderDrag)
+    {
+      MainWindow->VerticalBorderFraction = MainWindow->VerticalBorderDraggingStart + Delta.X/Region.W;
+    }
+    if(MainWindow->VerticalBorderFraction <= 0.5f*MinWidth/Region.W)
+    {
+      MainWindow->VerticalBorderFraction = 0.5f*MinWidth/Region.W;
+    }
+    if(MainWindow->VerticalBorderFraction > (Region.W - 0.5f*MinWidth)/Region.W)
+    {
+      MainWindow->VerticalBorderFraction = (Region.W - 0.5f*MinWidth)/Region.W;
+    }
   }
-  if(MainWindow->MiddleBorderPos > (Region.W - MinWidth)/Region.W)
+
+  if(MainWindow->HorizontalSplit)
   {
-    MainWindow->MiddleBorderPos = (Region.W - MinWidth)/Region.W;
+    if(MainWindow->HorizontalBorderDrag)
+    {
+      MainWindow->HorizontalBorderFraction = MainWindow->HorizontalBorderDraggingStart + Delta.Y/Region.H;
+    }
+    if(MainWindow->HorizontalBorderFraction <= (0.5f*MinHeight)/Region.H)
+    {
+      MainWindow->HorizontalBorderFraction = (0.5f*MinHeight)/Region.H;
+    }
+    if(MainWindow->HorizontalBorderFraction > (Region.H - 0.5f*MinHeight)/Region.H)
+    {
+      MainWindow->HorizontalBorderFraction = (Region.H - 0.5f*MinHeight)/Region.H;
+    }
   }
+
 }
 void Draw(main_window* MainWindow)
 {
   rect2f Region = MainWindow->Region;
   r32 BorderSize = MainWindow->BorderSize;
   r32 HeaderSize = MainWindow->HeaderSize;
-  r32 MiddleBorderPos = MainWindow->MiddleBorderPos;
-  DEBUGPushQuad(MainWindow->Region, MainWindow->Color);
-  DEBUGPushQuad(GetRegion(window_regions::Header,         Region, BorderSize, HeaderSize, MiddleBorderPos), V4(1,0,0,1));
-  DEBUGPushQuad(GetRegion(window_regions::LeftBody,       Region, BorderSize, HeaderSize, MiddleBorderPos), V4(0.2,0.2,0.2,1));
-  DEBUGPushQuad(GetRegion(window_regions::RightBody,      Region, BorderSize, HeaderSize, MiddleBorderPos), V4(0.2,0.2,0.2,1));
-  DEBUGPushQuad(GetRegion(window_regions::LeftBorder,     Region, BorderSize, HeaderSize, MiddleBorderPos), V4(0,0,1,1));
-  DEBUGPushQuad(GetRegion(window_regions::MiddleBorder,   Region, BorderSize, HeaderSize, MiddleBorderPos), V4(0,0,1,1));
-  DEBUGPushQuad(GetRegion(window_regions::RightBorder,    Region, BorderSize, HeaderSize, MiddleBorderPos), V4(0,0,1,1));
-  DEBUGPushQuad(GetRegion(window_regions::TopBorder,      Region, BorderSize, HeaderSize, MiddleBorderPos), V4(0,0,1,1));
-  DEBUGPushQuad(GetRegion(window_regions::BotBorder,      Region, BorderSize, HeaderSize, MiddleBorderPos), V4(0,0,1,1));
-  DEBUGPushQuad(GetRegion(window_regions::BotLeftCorner,  Region, BorderSize, HeaderSize, MiddleBorderPos), V4(1,0,1,1));
-  DEBUGPushQuad(GetRegion(window_regions::BotRightCorner, Region, BorderSize, HeaderSize, MiddleBorderPos), V4(1,0,1,1));
-  DEBUGPushQuad(GetRegion(window_regions::TopLeftCorner,  Region, BorderSize, HeaderSize, MiddleBorderPos), V4(1,0,1,1));
-  DEBUGPushQuad(GetRegion(window_regions::TopRightCorner, Region, BorderSize, HeaderSize, MiddleBorderPos), V4(1,0,1,1));
+
+  v4 CornerColor = V4(1,0,1,1);
+  v4 BorderColor = V4(0,0,1,1);
+  v4 BodyColor   = V4(0.2,0.2,0.2,1);
+  v4 HeaderColor = V4(1,0,0,1);
+
+  if(MainWindow->VerticalSplit && !MainWindow->HorizontalSplit)
+  {
+    DEBUGPushQuad(GetRegion(window_regions::LeftBody,       MainWindow), BodyColor);
+    DEBUGPushQuad(GetRegion(window_regions::RightBody,      MainWindow), BodyColor);
+    DEBUGPushQuad(GetRegion(window_regions::VerticalBorder, MainWindow), BorderColor);
+  }else if(!MainWindow->VerticalSplit && MainWindow->HorizontalSplit)
+  {
+    DEBUGPushQuad(GetRegion(window_regions::BotBody,          MainWindow), BodyColor);
+    DEBUGPushQuad(GetRegion(window_regions::TopBody,          MainWindow), BodyColor);
+    DEBUGPushQuad(GetRegion(window_regions::HorizontalBorder, MainWindow), BorderColor);
+  }else if(MainWindow->HorizontalSplit && MainWindow->VerticalSplit){
+    DEBUGPushQuad(GetRegion(window_regions::BotBody,          MainWindow), BodyColor);
+    DEBUGPushQuad(GetRegion(window_regions::TopBody,          MainWindow), BodyColor);
+    DEBUGPushQuad(GetRegion(window_regions::HorizontalBorder, MainWindow), BorderColor);
+    DEBUGPushQuad(GetRegion(window_regions::VerticalBorder,   MainWindow), BorderColor);
+    DEBUGPushQuad(GetRegion(window_regions::MiddleCorner,     MainWindow), CornerColor);
+  }else{
+    DEBUGPushQuad(GetRegion(window_regions::WholeBody,        MainWindow), BodyColor);
+  }
+
+  DEBUGPushQuad(GetRegion(window_regions::LeftBorder,     MainWindow), BorderColor);
+  DEBUGPushQuad(GetRegion(window_regions::RightBorder,    MainWindow), BorderColor);
+  DEBUGPushQuad(GetRegion(window_regions::TopBorder,      MainWindow), BorderColor);
+  DEBUGPushQuad(GetRegion(window_regions::BotBorder,      MainWindow), BorderColor);
+  DEBUGPushQuad(GetRegion(window_regions::BotLeftCorner,  MainWindow), CornerColor);
+  DEBUGPushQuad(GetRegion(window_regions::BotRightCorner, MainWindow), CornerColor);
+  DEBUGPushQuad(GetRegion(window_regions::TopLeftCorner,  MainWindow), CornerColor);
+  DEBUGPushQuad(GetRegion(window_regions::TopRightCorner, MainWindow), CornerColor);
+  DEBUGPushQuad(GetRegion(window_regions::Header,         MainWindow), HeaderColor);
 }
 
 main_window* GetMenu(debug_state* DebugState)
 {
   main_window* MainWindow = DEBUGPushStruct(DebugState, main_window);
-  MainWindow->Region = Rect2f(0.5,0.5,0.5,0.5);
-  MainWindow->BorderSize = 0.02;
-  MainWindow->HeaderSize = 0.05;
+  MainWindow->Region = Rect2f(0.2,0.2,0.5,0.5);
+  MainWindow->BorderSize = 0.007;
+  MainWindow->HeaderSize = 0.02;
   MainWindow->MinWidth  = 4*MainWindow->BorderSize;
-  MainWindow->MinHeight = 4*MainWindow->BorderSize + MainWindow->HeaderSize;
-  MainWindow->MiddleBorderPos = 0.5f;
+  MainWindow->MinHeight = 4*MainWindow->BorderSize;
+  MainWindow->VerticalBorderFraction = 0.5f; // [0,1]
+  MainWindow->HorizontalBorderFraction = 0.5f;
+  MainWindow->VerticalSplit = false;
+  MainWindow->HorizontalSplit = false;
   //MainWindow->MidBorder = 0.5;
   Platform.DEBUGFormatString(MainWindow->Header, 64,53,"%s","MainWindow");
   MainWindow->Color = V4(0,0,0,1);

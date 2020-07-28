@@ -19,7 +19,7 @@ internal void LoadPredefinedMaterials(game_asset_manager* AssetManager)
   //}
   //PushBitmapData(AssetManager, "null2", 256, 256, 32, (void*)WhiteTexture, false);
 
-  PushMaterialData(AssetManager, "white",           CreateMaterial(V4(0.1,      0.1,      0.1,      1), V4( 0.1,      0.1,        0.1,        1), V4( 0.1,        0.1,        0.1,        1), 1.0,        false));
+  PushMaterialData(AssetManager, "white",           CreateMaterial(V4(1.0,      1.0,      1.0,      1), V4( 1.0,      1.0,        1.0,        1), V4( 1.0,        1.0,        1.0,        1), 1.0,        false));
   PushMaterialData(AssetManager, "red",             CreateMaterial(V4(1.0,      0.0,      0.0,      1), V4( 1.0,      0.0,        0.0,        1), V4( 1.0,        0.0,        0.0,        1), 1.0,        false));
   PushMaterialData(AssetManager, "green",           CreateMaterial(V4(0.0,      1.0,      0.0,      1), V4( 0.0,      1.0,        0.0,        1), V4( 0.0,        1.0,        0.0,        1), 1.0,        false));
   PushMaterialData(AssetManager, "blue",            CreateMaterial(V4(0.0,      0.0,      1.0,      1), V4( 0.0,      0.0,        1.0,        1), V4( 0.0,        0.0,        1.0,        1), 1.0,        false));
