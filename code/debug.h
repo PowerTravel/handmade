@@ -205,7 +205,7 @@ struct active_menu
   union
   {
     radial_menu* RadialMenu;
-    box_menu* BoxMenu; 
+    box_menu* BoxMenu;
   };
 };
 
@@ -275,10 +275,6 @@ enum class window_regions
   RightBody,
   BotBody,
   TopBody,
-  BotLeftBody,
-  BotRightBody,
-  TopLeftBody,
-  TopRightBody,
   HorizontalBorder,
   VerticalBorder,
   LeftBorder,
@@ -286,11 +282,11 @@ enum class window_regions
   BotBorder,
   TopBorder,
   Header,
-  MiddleCorner,
   BotLeftCorner,
   BotRightCorner,
   TopLeftCorner,
   TopRightCorner,
+  WindowRegionCount
 };
 
 enum class split_direction
@@ -302,10 +298,7 @@ enum class split_direction
 
 struct main_window
 {
-  //region_node Root;
   rect2f Region;
-
-  r32 X,Y,W;
 
   r32 MinWidth;
   r32 MinHeight;
@@ -316,28 +309,24 @@ struct main_window
   v4 Color;
 
   b32 VerticalSplit;
-  b32 HorizontalSplit;
-  r32 VerticalBorderFraction;   // [0,1]
-  r32 HorizontalBorderFraction; // [0,1]
-
+  r32 SplitBorderFraction;   // [0,1]
 
   b32 WindowDrag;
   b32 LeftBorderDrag;
   b32 RightBorderDrag;
   b32 BotBorderDrag;
   b32 TopBorderDrag;
-  b32 VerticalBorderDrag;
-  b32 HorizontalBorderDrag;
+  b32 SplitBorderDrag;
 
   rect2f WindowDraggingStart;
-  r32 VerticalBorderDraggingStart;
-  r32 HorizontalBorderDraggingStart;
+  r32 SplitBorderDraggingStart;
 
   v2 MousePos;
-
   binary_signal_state MouseLeftButton;
   v2 MouseLeftButtonPush;
   v2 MouseLeftButtonRelese;
+
+  main_window* SubWindows[2];
 };
 
 
@@ -346,8 +335,10 @@ struct main_window
 void Draw(region_node* Root);
 region_node* GetMouseOverRegion(region_node* Root, v2 MousePosition);
 
-main_window* GetMenu(debug_state* DebugState);
+main_window* GetMenu(debug_state* DebugState, c8* WindowTitle, rect2f Region = Rect2f(0,0,1,1));
 void SetMenuInput(game_input* GameInput, debug_state* DebugState, main_window*  MenuRoot);
 void ActOnInput(debug_state* DebugState, main_window*  MenuRoot);
 void Draw(main_window* MenuRoot);
 rect2f GetRegion(window_regions Type, main_window* MainWindow);
+
+void AddSubWindow(main_window* MainWindow, main_window** SubWindow, window_regions Region);
