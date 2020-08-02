@@ -209,6 +209,7 @@ struct active_menu
   };
 };
 
+
 struct debug_state
 {
   b32 Initialized;
@@ -246,7 +247,7 @@ struct debug_state
   box_menu* BoxMenues;
 
   active_menu ActiveMenu;
-  struct main_window* MainWindow;
+  struct menu_interface* MenuInterface;
 
   b32 ConfigMultiThreaded;
   b32 ConfigCollisionPoints;
@@ -254,22 +255,29 @@ struct debug_state
   b32 ConfigAABBTree;
 
   b32 UpdateConfig;
+
+  //v2 MousePos;
+  //binary_signal_state MouseLeftButton;
+  //v2 MouseLeftButtonPush;
+  //v2 MouseLeftButtonRelese;
 };
 
 void PushDebugOverlay(game_input* GameInput);
 global_variable render_group* GlobalDebugRenderGroup;
 
-
-struct region_node
+enum class container_type
 {
-  rect2f Region;
-  u32 BranchCount;
-  region_node* Branches;
-  v4 Color;
+  Root,
+  Empty,
+  VerticalSplit,
+  HorizontalSplit,
+  TabbedHeader,
+  MenuHeader
 };
 
 enum class window_regions
 {
+  None,
   WholeBody,
   LeftBody,
   RightBody,
@@ -282,6 +290,10 @@ enum class window_regions
   BotBorder,
   TopBorder,
   Header,
+  LeftHeader,
+  RightHeader,
+  BotHeader,
+  TopHeader,
   BotLeftCorner,
   BotRightCorner,
   TopLeftCorner,
@@ -289,56 +301,186 @@ enum class window_regions
   WindowRegionCount
 };
 
-enum class split_direction
+const char* ToString(window_regions Region)
 {
-  None,
-  Horizontal,
-  Vertical
+  switch(Region)
+  {
+    case window_regions::None: return "None";
+    case window_regions::WholeBody: return "WholeBody";
+    case window_regions::LeftBody: return "LeftBody";
+    case window_regions::RightBody: return "RightBody";
+    case window_regions::BotBody: return "BotBody";
+    case window_regions::TopBody: return "TopBody";
+    case window_regions::HorizontalBorder: return "HorizontalBorder";
+    case window_regions::VerticalBorder: return "VerticalBorder";
+    case window_regions::LeftBorder: return "LeftBorder";
+    case window_regions::RightBorder: return "RightBorder";
+    case window_regions::BotBorder: return "BotBorder";
+    case window_regions::TopBorder: return "TopBorder";
+    case window_regions::Header: return "Header";
+    case window_regions::BotLeftCorner: return "BotLeftCorner";
+    case window_regions::BotRightCorner: return "BotRightCorner";
+    case window_regions::TopLeftCorner: return "TopLeftCorner";
+    case window_regions::TopRightCorner: return "TopRightCorner";
+    case window_regions::WindowRegionCount: return "WindowRegionCount";
+  }
+  return "";
 };
 
-struct main_window
+struct container_node
 {
+  container_type Type;
+  u32 Index;
   rect2f Region;
 
-  r32 MinWidth;
-  r32 MinHeight;
-
-  r32 BorderSize;
-  r32 HeaderSize;
   c8 Header[64];
-  v4 Color;
 
-  b32 VerticalSplit;
-  r32 SplitBorderFraction;   // [0,1]
+  u32 MaxChildCount;
+  u32 ChildCount;
+  container_node* Children;
+
+  struct menu_functions* Functions;
+  union
+  {
+    void* Container;
+    struct tabbed_header_window* TabbedHeader;
+    struct menu_header_window* MenuHeader;
+    struct split_window* SplitWindow;
+    struct empty_window* EmptyWindow;
+    struct root_window* RootWindow;
+  };
+};
+
+
+struct node_region_pair
+{
+  container_node* Node;
+  window_regions Region;
+};
+
+
+#define MENU_MOUSE_DOWN(name) void name( container_node* Node, window_regions HotRegion, void* Params)
+typedef MENU_MOUSE_DOWN( menu_mouse_down );
+
+#define MENU_MOUSE_UP(name) void name( container_node* Node, window_regions HotRegion, void* Params)
+typedef MENU_MOUSE_UP( menu_mouse_up );
+
+
+#define MENU_MOUSE_ENTER(name) void name( container_node* Node, window_regions HotRegion, void* Params)
+typedef MENU_MOUSE_ENTER( menu_mouse_enter );
+
+#define MENU_MOUSE_EXIT(name) void name( container_node* Node, window_regions HotRegion, void* Params)
+typedef MENU_MOUSE_EXIT( menu_mouse_exit );
+
+#define MENU_HANDLE_INPUT(name) void name( menu_interface* Interface, container_node* Node,  void* Params)
+typedef MENU_HANDLE_INPUT( menu_handle_input );
+
+#define MENU_UPDATE_REGIONS(name) void name( container_node* Node)
+typedef MENU_UPDATE_REGIONS( menu_update_regions );
+
+#define MENU_GET_REGION_RECT(name) rect2f name( window_regions Type, container_node* Node )
+typedef MENU_GET_REGION_RECT( menu_get_region_rect );
+
+// Note: Return value here is node_region_pair where the
+// node_region_pair::Node contains the next node to visit if we hit a body region (whole body / left / right etc)
+// node_region_pair::Region contains the region name. window_regions::None means we are outside of the whole window)
+#define MENU_GET_MOUSE_OVER_REGION(name) node_region_pair name( container_node* Node, v2 MousePos)
+typedef MENU_GET_MOUSE_OVER_REGION( menu_get_mouse_over_region );
+
+
+#define MENU_DRAW(name) void name( container_node* Node)
+typedef MENU_DRAW( menu_draw );
+
+
+struct menu_functions
+{
+  menu_mouse_down* MouseDown;
+  menu_mouse_up* MouseUp;
+  menu_mouse_enter* MouseEnter;
+  menu_mouse_exit* MouseExit;
+
+  menu_handle_input* HandleInput;
+  menu_update_regions* UpdateRegions;
+  menu_get_region_rect* GetRegionRect;
+  menu_get_mouse_over_region* GetMouseOverRegion;
+  menu_draw*  Draw;
+};
+
+
+
+menu_functions GetEmptyFunctions();
+menu_functions GetRootMenuFunctions();
+menu_functions MenuHeaderMenuFunctions();
+menu_functions TabbedHeaderMenuFunctions();
+menu_functions VerticalSplitMenuFunctions();
+menu_functions HorizontalMenuFunctions();
+
+struct tabbed_header_window
+{
+  r32 HeaderSize;
+  container_node* Main;
+};
+
+struct menu_header_window
+{
+  r32 HeaderSize;
+  container_node* Main;
+  container_node* RootWindow;
+  v2 DraggingStart;
+  b32 WindowDrag;
+};
+
+struct split_window
+{
+  r32 BorderSize;
+  r32 MinSize;
+  r32 SplitFraction;
+  container_node* Container[2];
+
+  b32 BorderDrag;
+  r32 DraggingStart;
+
+  b32 WindowDrag[2];
+};
+
+struct empty_window
+{
+  int a = 0;
+};
+
+struct root_window
+{
+  r32 BorderSize;
+  r32 MinSize;
+  container_node* Main;
 
   b32 WindowDrag;
   b32 LeftBorderDrag;
   b32 RightBorderDrag;
   b32 BotBorderDrag;
   b32 TopBorderDrag;
-  b32 SplitBorderDrag;
 
   rect2f WindowDraggingStart;
-  r32 SplitBorderDraggingStart;
+};
+
+
+struct menu_interface
+{
+  container_node* RootWindow;
+  window_regions HotRegion;
+  container_node* HotWindow;
 
   v2 MousePos;
   binary_signal_state MouseLeftButton;
   v2 MouseLeftButtonPush;
   v2 MouseLeftButtonRelese;
-
-  main_window* SubWindows[2];
 };
 
 
+void SetMouseInput(game_input* GameInput, menu_interface* Interface);
 
+rect2f GetRegion(window_regions Type, container_node* Node);
 
-void Draw(region_node* Root);
-region_node* GetMouseOverRegion(region_node* Root, v2 MousePosition);
+void ActOnInput(menu_interface* Interface);
 
-main_window* GetMenu(debug_state* DebugState, c8* WindowTitle, rect2f Region = Rect2f(0,0,1,1));
-void SetMenuInput(game_input* GameInput, debug_state* DebugState, main_window*  MenuRoot);
-void ActOnInput(debug_state* DebugState, main_window*  MenuRoot);
-void Draw(main_window* MenuRoot);
-rect2f GetRegion(window_regions Type, main_window* MainWindow);
-
-void AddSubWindow(main_window* MainWindow, main_window** SubWindow, window_regions Region);
+window_regions CheckRegions(rect2f Region, u32 RegionCount, window_regions* RegionArray, r32 BorderSize, r32 HeaderSize, r32 BorderFrac);

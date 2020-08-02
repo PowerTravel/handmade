@@ -114,6 +114,50 @@ void InitializeMenuFunctionPointers(debug_state* DebugState)
   CreateOptionsMenuFunctions(DebugState);
 }
 
+container_node* NewContainer(debug_state* DebugState, c8* Name, container_type Type, void* Container)
+{
+  local_persist u32 IndexCounter = 0;
+
+  container_node* Node = DEBUGPushStruct(DebugState, container_node);
+  Platform.DEBUGFormatString(Node->Header, 64,53,"%s", Name);
+  Node->Type = Type;
+  Node->Index = IndexCounter++;
+  Node->Container = Container;
+
+  Node->Functions = DEBUGPushStruct(DebugState, menu_functions);
+  switch(Type)
+  {
+    case container_type::Root:
+    {
+      *Node->Functions = GetRootMenuFunctions();
+    }break;
+    case container_type::Empty:
+    {
+      *Node->Functions = GetEmptyFunctions();
+    }break;
+    case container_type::VerticalSplit:
+    {
+      *Node->Functions = VerticalSplitMenuFunctions();
+    }break;
+    case container_type::HorizontalSplit:
+    {
+      *Node->Functions = HorizontalMenuFunctions();
+    }break;
+    case container_type::TabbedHeader:
+    {
+      *Node->Functions = TabbedHeaderMenuFunctions();
+    }break;
+    case container_type::MenuHeader:
+    {
+      *Node->Functions = MenuHeaderMenuFunctions();
+    }break;
+
+    default: {Assert(0);}break;
+
+  }
+  return Node;
+}
+
 internal debug_state*
 DEBUGGetState()
 {
@@ -177,12 +221,58 @@ DEBUGGetState()
     OptionsMenu->MenuItemCount = ArrayCount(OptionMenuItems);
     OptionsMenu->MenuItems = (menu_item*) DEBUGPushCopy(DebugState, sizeof(OptionMenuItems), OptionMenuItems);
 
-    DebugState->MainWindow = GetMenu(DebugState, "MainWindow", Rect2f(0.2,0.2,0.5,0.5));
-    DebugState->MainWindow->VerticalSplit = false;
-    main_window* SubWindow = GetMenu(DebugState, "Widget1");
-    main_window* SubWindow1 = GetMenu(DebugState, "Widget2");
-    DebugState->MainWindow->SubWindows[0] = SubWindow;
-    DebugState->MainWindow->SubWindows[1] = SubWindow1;
+
+    u32 IndexCounter = 0;
+
+    // Window 0
+    container_node* EmptyContainer0 = NewContainer(DebugState, "Empty0", container_type::Empty, (void*) DEBUGPushStruct(DebugState, empty_window) );
+
+    tabbed_header_window* Header0 = DEBUGPushStruct(DebugState, tabbed_header_window);
+    Header0->HeaderSize = 0.02;
+    Header0->Main = EmptyContainer0;
+
+    container_node* Header0Container = NewContainer(DebugState, "Header0Container", container_type::TabbedHeader, (void*) Header0 );
+
+    // Window 1
+
+    container_node* EmptyContainer1 = NewContainer(DebugState, "Empty1", container_type::Empty, (void*) DEBUGPushStruct(DebugState, empty_window) );
+
+    tabbed_header_window* Header1 = DEBUGPushStruct(DebugState, tabbed_header_window);
+    Header1->HeaderSize = 0.02;
+    Header1->Main = EmptyContainer1;
+
+    container_node* Header1Container = NewContainer(DebugState, "Header1Container", container_type::TabbedHeader, (void*) Header1 );
+
+    split_window* Split = DEBUGPushStruct(DebugState, split_window);
+    Split->BorderSize = 0.007f;
+    Split->MinSize = 0.02f;
+    Split->SplitFraction = 0.5f;
+    Split->Container[0] = Header0Container;
+    Split->Container[1] = Header1Container;
+
+    container_node* SplitContainer = NewContainer(DebugState, "SplitContainer", container_type::HorizontalSplit, (void*) Split );
+
+    menu_header_window* RootHeader = DEBUGPushStruct(DebugState, menu_header_window);
+    RootHeader->HeaderSize = 0.02;
+    RootHeader->Main = SplitContainer;
+
+    container_node* RootHeaderContainer = NewContainer(DebugState, "RootHeaderContainer", container_type::MenuHeader, (void*) RootHeader );
+
+    root_window* Root = DEBUGPushStruct(DebugState, root_window);
+    Root = DEBUGPushStruct(DebugState, root_window);
+    Root->BorderSize = 0.007;
+    Root->MinSize = 0.2f;
+    Root->Main = RootHeaderContainer;
+
+    container_node* RootContainer = NewContainer(DebugState, "Root", container_type::Root, (void*) Root );
+    RootContainer->Region = Rect2f(0.2,0.2,0.5,0.5);
+
+    RootHeader->RootWindow = RootContainer;
+
+    menu_interface* Interaface = DEBUGPushStruct(DebugState, menu_interface);
+    Interaface->RootWindow = RootContainer;
+    DebugState->MenuInterface = Interaface;
+
 
     RestartCollation();
   }
@@ -772,6 +862,7 @@ void DrawMenu( radial_menu* RadialMenu )
 }
 
 
+
 void DebugMainWindow(game_input* GameInput)
 {
   game_window_size WindowSize = GameGetWindowSize();
@@ -840,11 +931,15 @@ void DebugMainWindow(game_input* GameInput)
     DebugState->ActiveMenu = {};
   }
 
-  SetMenuInput(GameInput, DebugState, DebugState->MainWindow);
 
-  ActOnInput(DebugState, DebugState->MainWindow);
+  menu_interface* Interface = DebugState->MenuInterface;
+  SetMouseInput(GameInput, Interface);
 
-  Draw(DebugState->MainWindow);
+  Assert(Interface->RootWindow->Type == container_type::Root);
+  ActOnInput(Interface);
+
+  Interface->RootWindow->Functions->UpdateRegions(Interface->RootWindow);
+  Interface->RootWindow->Functions->Draw(Interface->RootWindow);
 
 }
 
@@ -900,7 +995,7 @@ void PushDebugOverlay(game_input* GameInput)
 
   if(!DebugState->ChartVisible) return;
 
-  rect2f Chart = GetRegion(window_regions::RightBody, DebugState->MainWindow);
+  rect2f Chart = DebugState->MenuInterface->RootWindow->Functions->GetRegionRect(window_regions::WholeBody, DebugState->MenuInterface->RootWindow);
 
   u32 MaxFramesToDisplay = DebugState->FrameCount < 10 ? DebugState->FrameCount : 10;
   r32 BarWidth = Chart.H/MaxFramesToDisplay;
@@ -1042,35 +1137,6 @@ void DrawFunctionCount(){
 
 
 
-rect2f ToGlobalSpace(rect2f Subregion, rect2f GlobalRegion)
-{
-  rect2f Result = {};
-  Result.X = GlobalRegion.X + Subregion.X*GlobalRegion.H;
-  Result.Y = GlobalRegion.Y + Subregion.Y*GlobalRegion.H;
-  Result.W = Subregion.W*GlobalRegion.H;
-  Result.H = Subregion.H*GlobalRegion.H;
-  return Result;
-}
-
-void Draw(region_node* Root)
-{
-  game_window_size WindowSize = GameGetWindowSize();
-  r32 AspectRatio = WindowSize.WidthPx / WindowSize.HeightPx;
-  rect2f GlobalSpaceRect = ToGlobalSpace(Root->Region, Rect2f(0,0,AspectRatio,1));
-  DEBUGPushQuad(GlobalSpaceRect, Root->Color);
-  for (u32 BranchIndex = 0; BranchIndex < Root->BranchCount; ++BranchIndex)
-  {
-    region_node* Branch = &Root->Branches[BranchIndex];
-    rect2f Region = ToGlobalSpace(Branch->Region, GlobalSpaceRect);
-    DEBUGPushQuad(Region, Branch->Color);
-    for (u32 BranchIndex2 = 0; BranchIndex2 < Branch->BranchCount; ++BranchIndex2)
-    {
-      region_node* Branch2 = &Branch->Branches[BranchIndex2];
-      rect2f Region2 = ToGlobalSpace(Branch2->Region, Region);
-      DEBUGPushQuad(Region2, Branch2->Color);
-    }
-  }
-}
 
 inline internal b32
 Intersects(const rect2f & Rect, v2 P)
@@ -1080,587 +1146,98 @@ Intersects(const rect2f & Rect, v2 P)
   return Result;
 }
 
-
-region_node* GetMouseOverRegion(region_node* Root, v2 MousePosition)
-{
-  region_node* Result = 0;
-  game_window_size WindowSize = GameGetWindowSize();
-  r32 AspectRatio = WindowSize.WidthPx / WindowSize.HeightPx;
-  rect2f GlobalSpaceRect = ToGlobalSpace(Root->Region, Rect2f(0,0,AspectRatio,1));
-
-  v4 Red = V4(1,0,0,1);
-  v4 Green = V4(0,1,0,1);
-
-  if(Intersects(GlobalSpaceRect, MousePosition))
-  {
-    Result = Root;
-  }
-  for (u32 BranchIndex = 0; BranchIndex < Root->BranchCount; ++BranchIndex)
-  {
-    region_node* Branch = &Root->Branches[BranchIndex];
-    rect2f Region = ToGlobalSpace(Branch->Region, GlobalSpaceRect);
-    if(Intersects(Region, MousePosition))
-    {
-      Result = Branch;
-    }
-    for (u32 BranchIndex2 = 0; BranchIndex2 < Branch->BranchCount; ++BranchIndex2)
-    {
-      region_node* Branch2 = &Branch->Branches[BranchIndex2];
-      rect2f Region2 = ToGlobalSpace(Branch2->Region, Region);
-      DEBUGPushQuad(Region2, Branch2->Color);
-      if(Intersects(Region2, MousePosition))
-      {
-        Result = Branch2;
-      }
-    }
-  }
-  return Result;
-}
-
-
-void SetMenuInput(game_input* GameInput, debug_state* DebugState, main_window* MainWindow)
+void SetMouseInput(game_input* GameInput, menu_interface* Interface)
 {
   v2 MousePos = V2(GameInput->MouseX, GameInput->MouseY);
 
-  Update(&MainWindow->MouseLeftButton, GameInput->MouseButton[PlatformMouseButton_Left].EndedDown);
-  if( MainWindow->MouseLeftButton.Edge )
+  Update(&Interface->MouseLeftButton, GameInput->MouseButton[PlatformMouseButton_Left].EndedDown);
+  if( Interface->MouseLeftButton.Edge )
   {
-    if(MainWindow->MouseLeftButton.Active )
+    if(Interface->MouseLeftButton.Active )
     {
       Platform.DEBUGPrint("Mous Down\n");
-      MainWindow->MouseLeftButtonPush = MousePos;
+      Interface->MouseLeftButtonPush = MousePos;
     }else{
       Platform.DEBUGPrint("Mous Up\n");
-      MainWindow->MouseLeftButtonRelese = MousePos;
+      Interface->MouseLeftButtonRelese = MousePos;
     }
   }
-  MainWindow->MousePos = MousePos;
-
+  Interface->MousePos = MousePos;
 }
 
-void MoveRegion(rect2f* SubRegion, rect2f* SubRegionStart, rect2f* Surroundings, v2 Delta)
+node_region_pair GetRegion(container_node* Node, v2 MousePos)
 {
-  Assert((Surroundings->Y + Surroundings->H)<=1);
-
-  r32 NewPosX = SubRegionStart->X + Delta.X;
-  r32 NewPosY = SubRegionStart->Y + Delta.Y;
-  if(NewPosX < Surroundings->X)
+  node_region_pair Result = {};
+  while(true)
   {
-    NewPosX = Surroundings->X;
+    node_region_pair NodeRegion = Node->Functions->GetMouseOverRegion(Node, MousePos);
+    if(NodeRegion.Region == window_regions::None)
+    {
+      Assert(!NodeRegion.Node);
+      Result.Node = 0;
+      Result.Region = window_regions::None;
+      break;
+    }else if(NodeRegion.Node)
+    {
+      // Note: NodeRegion.Node is the "next node" to check given that we hit a body region.
+      Node = NodeRegion.Node;
+    }else{
+      // Note: If Result.Region is not "Empty" and NodeRegion.Node is 0, it means we hit the bottom inside an active region
+      //       such as a border.
+      Result.Node = Node;
+      Result.Region = NodeRegion.Region;
+      break;
+    }
   }
-  if( (NewPosX + SubRegion->W) > (Surroundings->X + Surroundings->W))
-  {
-    NewPosX = (Surroundings->X + Surroundings->W) - SubRegion->W;
-  }
-  if(NewPosY < Surroundings->Y)
-  {
-    NewPosY = Surroundings->Y;
-  }
-  if(NewPosY + SubRegion->H > (Surroundings->Y + Surroundings->H))
-  {
-    NewPosY = (Surroundings->Y + Surroundings->H) - SubRegion->H;
-  }
-
-  SubRegion->X = NewPosX;
-  SubRegion->Y = NewPosY;
-}
-
-void DragBorderRight(rect2f* SubRegion, rect2f* SubRegionStart, r32 DeltaX, r32 XMax, r32 MinWidth)
-{
-  r32 NewWidth = SubRegionStart->W + DeltaX;
-  if(SubRegionStart->X + NewWidth > XMax )
-  {
-    NewWidth = XMax - SubRegionStart->X;
-  }else if(NewWidth < MinWidth)
-  {
-    NewWidth = MinWidth;
-  }
-  SubRegion->W = NewWidth;
-}
-
-void DragBorderTop(rect2f* SubRegion, rect2f* SubRegionStart, r32 DeltaY, r32 YMax, r32 MinHeight)
-{
-  r32 NewHeight = SubRegionStart->H + DeltaY;
-  if((SubRegionStart->Y + NewHeight) > YMax)
-  {
-    NewHeight = YMax - SubRegionStart->Y;
-  }else if(NewHeight < MinHeight)
-  {
-    NewHeight = MinHeight;
-  }
-  SubRegion->H = NewHeight;
-}
-
-void DragBorderLeft(rect2f* SubRegion, rect2f* SubRegionStart, r32 DeltaX, r32 XMin, r32 MinWidth)
-{
-  r32 NewXPos   = SubRegionStart->X + DeltaX;
-  r32 NewWidth  = SubRegionStart->W - DeltaX;
-  if(NewXPos < XMin)
-  {
-    NewXPos = XMin;
-    NewWidth = (SubRegionStart->X - XMin) + SubRegionStart->W;
-  }else if(NewWidth < MinWidth)
-  {
-    NewXPos  = SubRegionStart->X + SubRegionStart->W - MinWidth;
-    NewWidth = MinWidth;
-  }
-  SubRegion->X = NewXPos;
-  SubRegion->W = NewWidth;
-}
-
-void DragBorderBot(rect2f* SubRegion, rect2f* SubRegionStart, r32 DeltaY, r32 YMin, r32 MinHeight)
-{
-  r32 NewYPos   = SubRegionStart->Y + DeltaY;
-  r32 NewHeight = SubRegionStart->H - DeltaY;
-  if(NewYPos < YMin)
-  {
-    NewYPos = YMin;
-    NewHeight = (SubRegionStart->Y - YMin) + SubRegionStart->H;
-  }else if(NewHeight < MinHeight)
-  {
-    NewYPos = SubRegionStart->Y + SubRegionStart->H - MinHeight;
-    NewHeight = MinHeight;
-  }
-  SubRegion->Y = NewYPos;
-  SubRegion->H = NewHeight;
-}
-
-
-rect2f GetRegion(window_regions Type, rect2f Region, r32 BorderSize, r32 HeaderSize, r32 SplitBorderPos)
-{
-  rect2f Result = {};
-  r32 XStart = 0;
-  r32 YStart = 0;
-  r32 Width  = 0;
-  r32 Height = 0;
-  switch(Type)
-  {
-    case window_regions::WholeBody:
-    {
-      XStart = Region.X;                                // Left
-      YStart = Region.Y;                                // Bot
-      Width  = Region.W;                                // Whole
-      Height = Region.H;                                // Bot
-    }break;
-    case window_regions::BotBody:
-    {
-      XStart = Region.X;                                // Left
-      YStart = Region.Y;                                // Bot
-      Width  = Region.W;                                // Whole
-      Height = SplitBorderPos - 0.5f * BorderSize; // Bot
-    }break;
-    case window_regions::TopBody:
-    {
-      XStart = Region.X;                                              // Left
-      YStart = Region.Y + SplitBorderPos + 0.5f * BorderSize;    // Top
-      Width  = Region.W;                                              // Whole
-      Height = Region.H - (SplitBorderPos + 0.5f * BorderSize);  // Top
-    }break;
-    case window_regions::LeftBody:
-    {
-      XStart = Region.X;                                              // Left
-      YStart = Region.Y;                                              // Bot
-      Width  = SplitBorderPos - 0.5f * BorderSize;                 // Left
-      Height = Region.H;                                              // Whole
-    }break;
-    case window_regions::RightBody:
-    {
-      XStart = Region.X + SplitBorderPos + 0.5f * BorderSize;      // Right
-      YStart = Region.Y;                                              // Bot
-      Width  = Region.W - (SplitBorderPos + 0.5f * BorderSize);    // Right
-      Height = Region.H;                                              // Whole
-    }break;
-
-    case window_regions::VerticalBorder:
-    {
-      XStart = Region.X + SplitBorderPos    - 0.5f * BorderSize;
-      YStart = Region.Y;
-      Width  = BorderSize;
-      Height = Region.H;
-    }break;
-    case window_regions::HorizontalBorder:
-    {
-      XStart = Region.X;
-      YStart = Region.Y + SplitBorderPos - 0.5f * BorderSize;
-      Width  = Region.W;
-      Height = BorderSize;
-    }break;
-
-    case window_regions::LeftBorder:
-    {
-      XStart = Region.X - BorderSize;
-      YStart = Region.Y - BorderSize;
-      Width  = BorderSize;
-      Height = Region.H + 2*BorderSize + HeaderSize;
-    }break;
-    case window_regions::RightBorder:
-    {
-      XStart = Region.X + Region.W;
-      YStart = Region.Y - BorderSize;
-      Width  = BorderSize;
-      Height = Region.H + 2*BorderSize + HeaderSize;
-    }break;
-    case window_regions::BotBorder:
-    {
-      XStart = Region.X - BorderSize;
-      YStart = Region.Y - BorderSize;
-      Width  = Region.W + 2*BorderSize;
-      Height = BorderSize;
-    }break;
-    case window_regions::TopBorder:
-    {
-      XStart = Region.X - BorderSize;
-      YStart = Region.Y + Region.H + HeaderSize;
-      Width  = Region.W + 2*BorderSize;
-      Height = BorderSize;
-    }break;
-
-    case window_regions::Header:
-    {
-      XStart = Region.X;
-      YStart = Region.Y + Region.H;
-      Width  = Region.W;
-      Height = HeaderSize;
-    }break;
-
-    case window_regions::BotLeftCorner:
-    {
-      XStart = Region.X - BorderSize;
-      YStart = Region.Y - BorderSize;
-      Width  = BorderSize;
-      Height = BorderSize;
-    }break;
-    case window_regions::BotRightCorner:
-    {
-      XStart = Region.X + Region.W;
-      YStart = Region.Y - BorderSize;
-      Width  = BorderSize;
-      Height = BorderSize;
-    }break;
-    case window_regions::TopLeftCorner:
-    {
-      XStart = Region.X - BorderSize;
-      YStart = Region.Y + Region.H + HeaderSize;
-      Width  = BorderSize;
-      Height = BorderSize;
-    }break;
-    case window_regions::TopRightCorner:
-    {
-      XStart = Region.X + Region.W;
-      YStart = Region.Y + Region.H + HeaderSize;
-      Width  = BorderSize;
-      Height = BorderSize;
-    }break;
-  }
-
-  Result = Rect2f(XStart, YStart, Width, Height);
   return Result;
 }
-inline rect2f GetRegion(window_regions Type, main_window* MainWindow)
+
+void ActOnInput(menu_interface* Interface)
 {
-  r32 SplitBorderPos =  MainWindow->VerticalSplit ? MainWindow->SplitBorderFraction * MainWindow->Region.W :  MainWindow->SplitBorderFraction * MainWindow->Region.H;
-  return GetRegion(Type, MainWindow->Region, MainWindow->BorderSize, MainWindow->HeaderSize, SplitBorderPos);
-}
+  v2 MousePos = Interface->MousePos;
+  node_region_pair NodeRegion = GetRegion(Interface->RootWindow, MousePos);
 
-void ActOnInput(debug_state* DebugState, main_window* MainWindow)
-{
-  rect2f Region = MainWindow->Region;
-  r32 BorderSize = MainWindow->BorderSize;
-  r32 HeaderSize = MainWindow->HeaderSize;
-  rect2f SubRegion = {};
-
-  v2 MousePos = MainWindow->MousePos;
-
-  if(MainWindow->MouseLeftButton.Active)
+  if(Interface->MouseLeftButton.Active)
   {
     // Mouse Clicked Event
-    if(MainWindow->MouseLeftButton.Edge)
+    if(Interface->MouseLeftButton.Edge)
     {
-      SubRegion = GetRegion(window_regions::Header, MainWindow);
-      if(Intersects(SubRegion, MousePos))
-      {
-        MainWindow->WindowDrag = true;
-        Platform.DEBUGPrint("Header Selected\n");
-        MainWindow->WindowDraggingStart = Region;
-      }
-      SubRegion = GetRegion(window_regions::LeftBorder, MainWindow);
-      if(Intersects(SubRegion, MousePos))
-      {
-        MainWindow->LeftBorderDrag = true;
-        Platform.DEBUGPrint("Left Border Selected\n");
-        MainWindow->WindowDraggingStart = Region;
-      }
+      Interface->HotWindow = NodeRegion.Node;
+      Interface->HotRegion = NodeRegion.Region;
 
-      SubRegion = MainWindow->VerticalSplit ? GetRegion(window_regions::VerticalBorder, MainWindow) :
-                                              GetRegion(window_regions::HorizontalBorder, MainWindow);
-      if(Intersects(SubRegion, MousePos))
+      if(Interface->HotWindow)
       {
-        MainWindow->SplitBorderDrag = true;
-        Platform.DEBUGPrint("%s", MainWindow->VerticalSplit ? "Vertical Border Selected\n" : "Horizontal Border Selected\n");
-        MainWindow->SplitBorderDraggingStart = MainWindow->SplitBorderFraction;
+        Platform.DEBUGPrint("%s %s Pushed\n", Interface->HotWindow->Header, ToString(NodeRegion.Region) );
+        Interface->HotWindow->Functions->MouseDown(Interface->HotWindow, Interface->HotRegion, 0);
+      }else{
+        Platform.DEBUGPrint("%s %s Pushed\n", "(null)", ToString(NodeRegion.Region) );
       }
-      SubRegion = GetRegion(window_regions::RightBorder, MainWindow);
-      if(Intersects(SubRegion, MousePos))
-      {
-        MainWindow->RightBorderDrag = true;
-        Platform.DEBUGPrint("Right Border Selected\n");
-        MainWindow->WindowDraggingStart = Region;
-      }
-      SubRegion = GetRegion(window_regions::BotBorder, MainWindow);
-      if(Intersects(SubRegion, MousePos))
-      {
-        MainWindow->BotBorderDrag = true;
-        Platform.DEBUGPrint("Bot Border Selected\n");
-        MainWindow->WindowDraggingStart = Region;
-      }
-      SubRegion = GetRegion(window_regions::TopBorder, MainWindow);
-      if(Intersects(SubRegion, MousePos))
-      {
-        MainWindow->TopBorderDrag = true;
-        Platform.DEBUGPrint("Top Border Selected\n");
-        MainWindow->WindowDraggingStart = Region;
-      }
-
     // Mouse Down Movement State
     }else{
 
     }
-  }else{
-    // Mouse Released Event
-    if(MainWindow->MouseLeftButton.Edge)
+    if(Interface->HotWindow)
     {
-      if(MainWindow->WindowDrag)
-      {
-        Platform.DEBUGPrint("Header Released\n");
-      }
-      MainWindow->WindowDrag = false;
+      Interface->HotWindow->Functions->HandleInput(Interface, Interface->HotWindow, 0);
+    }
+  }else{
 
-      if(MainWindow->LeftBorderDrag)
-      {
-        Platform.DEBUGPrint("Left Border Released\n");
-      }
-      MainWindow->LeftBorderDrag = false;
+    if(Interface->HotWindow)
+    {
+      Interface->HotWindow->Functions->MouseUp(Interface->HotWindow, Interface->HotRegion,0);
+      Platform.DEBUGPrint("%s Released\n", Interface->HotWindow->Header);
+    }
 
-      if(MainWindow->SplitBorderDrag)
-      {
-        Platform.DEBUGPrint("%s", MainWindow->VerticalSplit ? "Vertical Border Released\n" : "Horizontal Border Released\n");
-      }
-      MainWindow->SplitBorderDrag = false;
-
-      if(MainWindow->RightBorderDrag)
-      {
-        Platform.DEBUGPrint("Right Border Released\n");
-      }
-      MainWindow->RightBorderDrag = false;
-
-      if(MainWindow->BotBorderDrag)
-      {
-        Platform.DEBUGPrint("Bot Border Released\n");
-      }
-      MainWindow->BotBorderDrag = false;
-
-      if(MainWindow->TopBorderDrag)
-      {
-        Platform.DEBUGPrint("Top Border Released\n");
-      }
-      MainWindow->TopBorderDrag = false;
-
+    // Mouse Released Event
+    if(Interface->MouseLeftButton.Edge)
+    {
+      Interface->HotWindow = 0;
+      Interface->HotRegion = window_regions::None;
       // Mouse Exploration State
     }else{
 
     }
   }
-
-  game_window_size WindowSize = GameGetWindowSize();
-  r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
-  r32 MinWidth  = MainWindow->VerticalSplit ? 2 * MainWindow->MinWidth : MainWindow->MinWidth;
-  r32 MinHeight = MainWindow->VerticalSplit ? MainWindow->MinHeight : 2 * MainWindow->MinHeight;
-  v2 Delta = MainWindow->MousePos - MainWindow->MouseLeftButtonPush;
-  rect2f Surroundings = Rect2f(0,0,Width,1);
-
-  if(MainWindow->WindowDrag)
-  {
-    MoveRegion(&MainWindow->Region, &MainWindow->WindowDraggingStart, &Surroundings, Delta);
-  }
-
-  if(MainWindow->RightBorderDrag)
-  {
-    DragBorderRight(&MainWindow->Region, &MainWindow->WindowDraggingStart, Delta.X, Surroundings.X+Surroundings.W, MinWidth);
-  }
-
-  if(MainWindow->LeftBorderDrag)
-  {
-    DragBorderLeft(&MainWindow->Region, &MainWindow->WindowDraggingStart, Delta.X, Surroundings.X, MinWidth);
-  }
-
-  if(MainWindow->BotBorderDrag)
-  {
-    DragBorderBot(&MainWindow->Region, &MainWindow->WindowDraggingStart, Delta.Y, Surroundings.Y, MinHeight);
-  }
-
-  if(MainWindow->TopBorderDrag)
-  {
-    DragBorderTop(&MainWindow->Region, &MainWindow->WindowDraggingStart, Delta.Y, Surroundings.Y+Surroundings.H, MinHeight);
-  }
-
-  if(MainWindow->VerticalSplit)
-  {
-    if(MainWindow->SplitBorderDrag)
-    {
-      MainWindow->SplitBorderFraction = MainWindow->SplitBorderDraggingStart + Delta.X/Region.W;
-    }
-    if(MainWindow->SplitBorderFraction <= 0.5f*MinWidth/Region.W)
-    {
-      MainWindow->SplitBorderFraction = 0.5f*MinWidth/Region.W;
-    }
-    if(MainWindow->SplitBorderFraction > (Region.W - 0.5f*MinWidth)/Region.W)
-    {
-      MainWindow->SplitBorderFraction = (Region.W - 0.5f*MinWidth)/Region.W;
-    }
-  }else{
-    if(MainWindow->SplitBorderDrag)
-    {
-      MainWindow->SplitBorderFraction = MainWindow->SplitBorderDraggingStart + Delta.Y/Region.H;
-    }
-    if(MainWindow->SplitBorderFraction <= (0.5f*MinHeight)/Region.H)
-    {
-      MainWindow->SplitBorderFraction = (0.5f*MinHeight)/Region.H;
-    }
-    if(MainWindow->SplitBorderFraction > (Region.H - 0.5f*MinHeight)/Region.H)
-    {
-      MainWindow->SplitBorderFraction = (Region.H - 0.5f*MinHeight)/Region.H;
-    }
-  }
-
 }
 
-void DrawWindow(main_window* MainWindow)
-{
-  rect2f Region  = MainWindow->Region;
-  r32 BorderSize = MainWindow->BorderSize;
-  r32 HeaderSize = MainWindow->HeaderSize;
-
-  v4 CornerColor = V4(1,0,1,1);
-  v4 BorderColor = V4(0,0,1,1);
-  v4 BodyColor   = V4(0.2,0.1,0.1,1);
-  v4 HeaderColor = V4(1,0,0,1);
-
-  if(MainWindow->SubWindows[0] && MainWindow->SubWindows[1])
-  {
-    if(MainWindow->VerticalSplit)
-    {
-      DEBUGPushQuad(GetRegion(window_regions::VerticalBorder, MainWindow), BorderColor);
-    }else{
-      DEBUGPushQuad(GetRegion(window_regions::HorizontalBorder, MainWindow), BorderColor);
-    }
-  }
-
-  DEBUGPushQuad(GetRegion(window_regions::LeftBorder,     MainWindow), BorderColor);
-  DEBUGPushQuad(GetRegion(window_regions::RightBorder,    MainWindow), BorderColor);
-  DEBUGPushQuad(GetRegion(window_regions::TopBorder,      MainWindow), BorderColor);
-  DEBUGPushQuad(GetRegion(window_regions::BotBorder,      MainWindow), BorderColor);
-  DEBUGPushQuad(GetRegion(window_regions::BotLeftCorner,  MainWindow), CornerColor);
-  DEBUGPushQuad(GetRegion(window_regions::BotRightCorner, MainWindow), CornerColor);
-  DEBUGPushQuad(GetRegion(window_regions::TopLeftCorner,  MainWindow), CornerColor);
-  DEBUGPushQuad(GetRegion(window_regions::TopRightCorner, MainWindow), CornerColor);
-  DEBUGPushQuad(GetRegion(window_regions::Header,         MainWindow), HeaderColor);
-
-}
-
-void PushBodyRegionQuad(rect2f Region, r32 HeaderSize, v4 BodyColor, v4 HeaderColor)
-{
-  DEBUGPushQuad(Region, BodyColor);
-  rect2f Header = Region;
-  Header.Y  += Header.H;
-  Header.H  = HeaderSize;
-  DEBUGPushQuad(Header, HeaderColor);
-}
-
-void DrawWidget(main_window* Widget)
-{
-  v4 CornerColor = V4(1,0,1,1);
-  v4 BorderColor = V4(0,0,1,1);
-  v4 BodyColor   = V4(0.2,0.2,0.2,1);
-  v4 HeaderColor = V4(0.4,0.4,0.4,1);
-
-  if(Widget->SubWindows[0] && Widget->SubWindows[1])
-  {
-    if(Widget->VerticalSplit)
-    {
-      PushBodyRegionQuad(GetRegion(window_regions::LeftBody, Widget), Widget->HeaderSize, BodyColor, HeaderColor);
-      PushBodyRegionQuad(GetRegion(window_regions::RightBody, Widget), Widget->HeaderSize, BodyColor, HeaderColor);
-      DEBUGPushQuad(GetRegion(window_regions::VerticalBorder, Widget), BorderColor);
-    }else{
-      PushBodyRegionQuad(GetRegion(window_regions::BotBody, Widget), Widget->HeaderSize, BodyColor, HeaderColor);
-      PushBodyRegionQuad(GetRegion(window_regions::TopBody, Widget), Widget->HeaderSize, BodyColor, HeaderColor);
-      DEBUGPushQuad(GetRegion(window_regions::HorizontalBorder, Widget), BorderColor);
-    }
-  }else{
-    PushBodyRegionQuad(GetRegion(window_regions::WholeBody, Widget), Widget->HeaderSize, BodyColor, HeaderColor);
-  }
-
-}
-
-void Draw(main_window* MainWindow)
-{
-  DrawWindow(MainWindow);
-
-  game_window_size WindowSize = GameGetWindowSize();
-  r32 AspectRatio = WindowSize.WidthPx / WindowSize.HeightPx;
-  rect2f GlobalSpaceRect = ToGlobalSpace(MainWindow->Region, Rect2f(0,0,AspectRatio,1));
-
-  rect2f SubRegion;
-  if(MainWindow->SubWindows[0] && MainWindow->SubWindows[1])
-  {
-    if(MainWindow->VerticalSplit)
-    {
-      main_window* LeftChild = MainWindow->SubWindows[0];
-      SubRegion = GetRegion(window_regions::LeftBody, MainWindow);
-      SubRegion.H-=LeftChild->HeaderSize;
-      LeftChild->Region = SubRegion;
-      DrawWidget(LeftChild);
-
-      main_window* RightChild = MainWindow->SubWindows[1];
-      SubRegion = GetRegion(window_regions::RightBody, MainWindow);
-      SubRegion.H-=RightChild->HeaderSize;
-      RightChild->Region = SubRegion;
-      DrawWidget(RightChild);
-    }else{
-      main_window* BotChild = MainWindow->SubWindows[0];
-      SubRegion = GetRegion(window_regions::BotBody, MainWindow);
-      SubRegion.H-=BotChild->HeaderSize;
-      BotChild->Region = SubRegion;
-      DrawWidget(BotChild);
-
-      main_window* TopChild = MainWindow->SubWindows[1];
-      SubRegion = GetRegion(window_regions::TopBody, MainWindow);
-      SubRegion.H-=TopChild->HeaderSize;
-      TopChild->Region = SubRegion;
-      DrawWidget(TopChild);
-    }
-  }else{
-    Assert(MainWindow->SubWindows[0] && !MainWindow->SubWindows[1]);
-    main_window* Child = MainWindow->SubWindows[0];
-    SubRegion = GetRegion(window_regions::WholeBody, MainWindow);
-    SubRegion.H-=Child->HeaderSize;
-    Child->Region = SubRegion;
-    DrawWidget(Child);
-  }
-
-}
-
-main_window* GetMenu(debug_state* DebugState, c8* WindowTitle, rect2f Region)
-{
-  main_window* MainWindow = DEBUGPushStruct(DebugState, main_window);
-  MainWindow->Region = Region;
-  MainWindow->BorderSize = 0.007;
-  MainWindow->HeaderSize = 0.02;
-  MainWindow->MinWidth  = 4*MainWindow->BorderSize;
-  MainWindow->MinHeight = 4*MainWindow->BorderSize;
-  MainWindow->SplitBorderFraction = 0.5f; // [0,1]
-  MainWindow->VerticalSplit = false;
-  Platform.DEBUGFormatString(MainWindow->Header, 64,53,"%s", WindowTitle);
-  MainWindow->Color = V4(0,0,0,1);
-
-  return MainWindow;
-}
+#include "menu_functions.h"

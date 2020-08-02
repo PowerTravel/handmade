@@ -1,4 +1,4 @@
- 
+
 #include "render_push_buffer.h"
 #include "math/affine_transformations.h"
 #include "bitmap.h"

@@ -561,7 +561,7 @@ struct platform_api
       debug_platform_get_process_state*      DEBUGGetProcessState;
       debug_platform_format_string*          DEBUGFormatString;
       debug_platform_print*                  DEBUGPrint;
-      
+
 //     }
 
 //    debug_platform_get_memory_stats *DEBUGGetMemoryStats;
