@@ -255,15 +255,11 @@ struct debug_state
   b32 ConfigAABBTree;
 
   b32 UpdateConfig;
-
-  //v2 MousePos;
-  //binary_signal_state MouseLeftButton;
-  //v2 MouseLeftButtonPush;
-  //v2 MouseLeftButtonRelese;
 };
 
 void PushDebugOverlay(game_input* GameInput);
 global_variable render_group* GlobalDebugRenderGroup;
+
 
 enum class container_type
 {
@@ -327,17 +323,22 @@ const char* ToString(window_regions Region)
   return "";
 };
 
+struct tree_node
+{
+  tree_node* Parent;
+  tree_node* FirstChild;
+  tree_node* NextSibling;
+};
+
 struct container_node
 {
+  tree_node TreeNode; // "tree_node* Node" Must be on top so we can cast tree_node* to a container_node*
   container_type Type;
+  window_regions RegionType;
   u32 Index;
   rect2f Region;
 
   c8 Header[64];
-
-  u32 MaxChildCount;
-  u32 ChildCount;
-  container_node* Children;
 
   struct menu_functions* Functions;
   union
@@ -350,6 +351,8 @@ struct container_node
     struct root_window* RootWindow;
   };
 };
+
+void PushWindow( window_regions Type, container_node* Node );
 
 
 struct node_region_pair
@@ -364,7 +367,6 @@ typedef MENU_MOUSE_DOWN( menu_mouse_down );
 
 #define MENU_MOUSE_UP(name) void name( container_node* Node, window_regions HotRegion, void* Params)
 typedef MENU_MOUSE_UP( menu_mouse_up );
-
 
 #define MENU_MOUSE_ENTER(name) void name( container_node* Node, window_regions HotRegion, void* Params)
 typedef MENU_MOUSE_ENTER( menu_mouse_enter );
@@ -381,12 +383,13 @@ typedef MENU_UPDATE_REGIONS( menu_update_regions );
 #define MENU_GET_REGION_RECT(name) rect2f name( window_regions Type, container_node* Node )
 typedef MENU_GET_REGION_RECT( menu_get_region_rect );
 
+#define MENU_GET_SUB_MENU_REGION_RECT(name) rect2f name( u32 SubMenuIndex, container_node* Node )
+typedef MENU_GET_SUB_MENU_REGION_RECT( menu_get_sub_menu_region_rect );
 // Note: Return value here is node_region_pair where the
 // node_region_pair::Node contains the next node to visit if we hit a body region (whole body / left / right etc)
 // node_region_pair::Region contains the region name. window_regions::None means we are outside of the whole window)
-#define MENU_GET_MOUSE_OVER_REGION(name) node_region_pair name( container_node* Node, v2 MousePos)
+#define MENU_GET_MOUSE_OVER_REGION(name) window_regions name( container_node* Node, v2 MousePos)
 typedef MENU_GET_MOUSE_OVER_REGION( menu_get_mouse_over_region );
-
 
 #define MENU_DRAW(name) void name( container_node* Node)
 typedef MENU_DRAW( menu_draw );
@@ -402,11 +405,10 @@ struct menu_functions
   menu_handle_input* HandleInput;
   menu_update_regions* UpdateRegions;
   menu_get_region_rect* GetRegionRect;
+  menu_get_sub_menu_region_rect* GetSubMenuRegionRect;
   menu_get_mouse_over_region* GetMouseOverRegion;
   menu_draw*  Draw;
 };
-
-
 
 menu_functions GetEmptyFunctions();
 menu_functions GetRootMenuFunctions();
@@ -418,13 +420,11 @@ menu_functions HorizontalMenuFunctions();
 struct tabbed_header_window
 {
   r32 HeaderSize;
-  container_node* Main;
 };
 
 struct menu_header_window
 {
   r32 HeaderSize;
-  container_node* Main;
   container_node* RootWindow;
   v2 DraggingStart;
   b32 WindowDrag;
@@ -435,7 +435,6 @@ struct split_window
   r32 BorderSize;
   r32 MinSize;
   r32 SplitFraction;
-  container_node* Container[2];
 
   b32 BorderDrag;
   r32 DraggingStart;
@@ -452,9 +451,7 @@ struct root_window
 {
   r32 BorderSize;
   r32 MinSize;
-  container_node* Main;
 
-  b32 WindowDrag;
   b32 LeftBorderDrag;
   b32 RightBorderDrag;
   b32 BotBorderDrag;
@@ -479,8 +476,8 @@ struct menu_interface
 
 void SetMouseInput(game_input* GameInput, menu_interface* Interface);
 
-rect2f GetRegion(window_regions Type, container_node* Node);
-
-void ActOnInput(menu_interface* Interface);
+void InitializeMenuFunctionPointers(menu_interface* Interface, memory_arena* Arena, u32 NodeCount);
+void UpdateRegions(container_node* Root, rect2f RootRegion);
+void ActOnInput(debug_state* DebugState, menu_interface* Interface);
 
 window_regions CheckRegions(rect2f Region, u32 RegionCount, window_regions* RegionArray, r32 BorderSize, r32 HeaderSize, r32 BorderFrac);

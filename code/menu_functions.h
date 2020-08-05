@@ -50,6 +50,12 @@ MENU_UPDATE_REGIONS( UpdateRegions )
 MENU_GET_REGION_RECT( GetRegionRect )
 {
 }
+
+MENU_GET_SUB_MENU_REGION_RECT( GetSubMenuRegionRect )
+{
+  
+}
+
 MENU_GET_MOUSE_OVER_REGION( GetMouseOverRegion )
 {
 
@@ -68,6 +74,7 @@ menu_functions GetFunctions()
   Result.HandleInput = HandleInput;
   Result.UpdateRegions = UpdateRegions;
   Result.GetRegionRect = GetRegionRect;
+  Result.GetSubMenuRegionRect = GetSubMenuRegionRect;
   Result.GetMouseOverRegion = GetMouseOverRegion;
   Result.Draw = Draw;
   return Result;
@@ -105,13 +112,18 @@ MENU_GET_REGION_RECT( EmptyGetRegionRect )
   Assert(Type == window_regions::WholeBody);
   return Node->Region;
 }
+MENU_GET_SUB_MENU_REGION_RECT( EmptyGetSubMenuRegionRect )
+{
+  rect2f Result = Node->Functions->GetRegionRect(window_regions::WholeBody, Node);
+  return Result;
+}
 MENU_GET_MOUSE_OVER_REGION( EmptyGetMouseOverRegion )
 {
   if(Intersects(Node->Region, MousePos))
   {
-    return {0,window_regions::WholeBody};
+    return window_regions::WholeBody;
   }
-  return {0,window_regions::None};
+  return window_regions::None;
 }
 MENU_DRAW( EmptyDraw )
 {
@@ -128,6 +140,7 @@ menu_functions GetEmptyFunctions()
   Result.HandleInput = EmptyHandleInput;
   Result.UpdateRegions = EmptyUpdateRegions;
   Result.GetRegionRect = EmptyGetRegionRect;
+  Result.GetSubMenuRegionRect = EmptyGetSubMenuRegionRect;
   Result.GetMouseOverRegion = EmptyGetMouseOverRegion;
   Result.Draw = EmptyDraw;
   return Result;
@@ -189,7 +202,6 @@ MENU_MOUSE_DOWN( RootWindowMouseDown )
 MENU_MOUSE_UP( RootWindowMouseUp )
 {
   root_window* Window = Node->RootWindow;
-  Window->WindowDrag      = false;
   Window->LeftBorderDrag  = false;
   Window->RightBorderDrag = false;
   Window->BotBorderDrag   = false;
@@ -276,11 +288,10 @@ MENU_HANDLE_INPUT( RootWindowHandleInput )
   }
 }
 
+
 MENU_UPDATE_REGIONS( RootWindowUpdateRegions )
 {
   root_window* Window = Node->RootWindow;
-  Window->Main->Region = Node->Functions->GetRegionRect(window_regions::WholeBody, Node);
-  Window->Main->Functions->UpdateRegions(Window->Main);
 }
 
 MENU_GET_REGION_RECT( RootWindowGetRegionRect )
@@ -388,20 +399,7 @@ MENU_GET_MOUSE_OVER_REGION( RootWindowGetMouseOverRegion )
 
   root_window* Window = Node->RootWindow;
 
-  node_region_pair Result = {};
-  Result.Region = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
-
-  if(Result.Region == window_regions::None)
-  {
-    Assert(!Result.Node);
-    Result.Node = 0;
-    Result.Region = window_regions::None;
-  }else if(Result.Region == window_regions::WholeBody)
-  {
-    Result.Node = Window->Main;
-  }else{
-    Result.Node = 0;
-  }
+  window_regions Result = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
 
   return Result;
 }
@@ -420,7 +418,6 @@ MENU_DRAW( RootWindowDraw )
   DEBUGPushQuad(Node->Functions->GetRegionRect(window_regions::BotRightCorner, Node), CornerColor);
   DEBUGPushQuad(Node->Functions->GetRegionRect(window_regions::TopLeftCorner,  Node), CornerColor);
   DEBUGPushQuad(Node->Functions->GetRegionRect(window_regions::TopRightCorner, Node), CornerColor);
-  Window->Main->Functions->Draw( Window->Main );
 }
 
 menu_functions GetRootMenuFunctions()
@@ -431,8 +428,10 @@ menu_functions GetRootMenuFunctions()
   Result.MouseEnter = RootWindowMouseEnter;
   Result.MouseExit = RootWindowMouseExit;
   Result.HandleInput = RootWindowHandleInput;
+
   Result.UpdateRegions = RootWindowUpdateRegions;
   Result.GetRegionRect = RootWindowGetRegionRect;
+  Result.GetSubMenuRegionRect = EmptyGetSubMenuRegionRect;
   Result.GetMouseOverRegion = RootWindowGetMouseOverRegion;
   Result.Draw = RootWindowDraw;
   return Result;
@@ -511,8 +510,6 @@ MENU_HANDLE_INPUT( MenuHeaderHandleInput )
 MENU_UPDATE_REGIONS( MenuHeaderUpdateRegions )
 {
   menu_header_window* Window = Node->MenuHeader;
-  Window->Main->Region = Node->Functions->GetRegionRect(window_regions::WholeBody, Node);
-  Window->Main->Functions->UpdateRegions(Window->Main);
 }
 
 MENU_GET_REGION_RECT( MenuHeaderGetRegionRect )
@@ -562,20 +559,8 @@ MENU_GET_MOUSE_OVER_REGION( MenuHeaderGetMouseOverRegion )
 
   menu_header_window* Window = Node->MenuHeader;
 
-  node_region_pair Result = {};
-  Result.Region = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
+  window_regions Result = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
 
-  if(Result.Region == window_regions::None)
-  {
-    Assert(!Result.Node);
-    Result.Node = 0;
-    Result.Region = window_regions::None;
-  }else if(Result.Region == window_regions::WholeBody)
-  {
-    Result.Node = Window->Main;
-  }else{
-    Result.Node = 0;
-  }
   return Result;
 }
 
@@ -585,7 +570,7 @@ MENU_DRAW( MenuHeaderDraw )
   menu_header_window* Window = Node->MenuHeader;
   v4 HeaderColor = V4(0.8,0.2,0.2,1);
   DEBUGPushQuad(Node->Functions->GetRegionRect(window_regions::Header, Node), HeaderColor);
-  Window->Main->Functions->Draw( Window->Main );
+
 }
 
 menu_functions MenuHeaderMenuFunctions()
@@ -598,6 +583,7 @@ menu_functions MenuHeaderMenuFunctions()
   Result.HandleInput = MenuHeaderHandleInput;
   Result.UpdateRegions = MenuHeaderUpdateRegions;
   Result.GetRegionRect = MenuHeaderGetRegionRect;
+  Result.GetSubMenuRegionRect = EmptyGetSubMenuRegionRect;
   Result.GetMouseOverRegion = MenuHeaderGetMouseOverRegion;
   Result.Draw = MenuHeaderDraw;
   return Result;
@@ -633,8 +619,6 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
 MENU_UPDATE_REGIONS( TabbedHeaderUpdateRegions )
 {
   menu_header_window* Window = Node->MenuHeader;
-  Window->Main->Region = Node->Functions->GetRegionRect(window_regions::WholeBody, Node);
-  Window->Main->Functions->UpdateRegions(Window->Main);
 }
 
 MENU_GET_REGION_RECT( TabbedHeaderGetRegionRect )
@@ -684,20 +668,8 @@ MENU_GET_MOUSE_OVER_REGION( TabbedHeaderGetMouseOverRegion )
 
   tabbed_header_window* Window = Node->TabbedHeader;
 
-  node_region_pair Result = {};
-  Result.Region = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
+  window_regions Result = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
 
-  if(Result.Region == window_regions::None)
-  {
-    Assert(!Result.Node);
-    Result.Node = 0;
-    Result.Region = window_regions::None;
-  }else if(Result.Region == window_regions::WholeBody)
-  {
-    Result.Node = Window->Main;
-  }else{
-    Result.Node = 0;
-  }
   return Result;
 }
 
@@ -706,7 +678,6 @@ MENU_DRAW( TabbedHeaderDraw )
   tabbed_header_window* Window = Node->TabbedHeader;
   v4 HeaderColor = V4(0.3,0.5,0.3,1);
   DEBUGPushQuad(Node->Functions->GetRegionRect(window_regions::Header, Node), HeaderColor);
-  Window->Main->Functions->Draw(Window->Main);
 }
 
 
@@ -720,6 +691,7 @@ menu_functions TabbedHeaderMenuFunctions()
   Result.HandleInput = TabbedHeaderHandleInput;
   Result.UpdateRegions = TabbedHeaderUpdateRegions;
   Result.GetRegionRect = TabbedHeaderGetRegionRect;
+  Result.GetSubMenuRegionRect = EmptyGetSubMenuRegionRect;
   Result.GetMouseOverRegion = TabbedHeaderGetMouseOverRegion;
   Result.Draw = TabbedHeaderDraw;
   return Result;
@@ -814,10 +786,10 @@ MENU_UPDATE_REGIONS( VerticalSplitUpdateRegions )
     Window->SplitFraction = 1-MinFrac;
   }
 
-  Window->Container[0]->Region = Node->Functions->GetRegionRect(window_regions::LeftBody, Node);
-  Window->Container[1]->Region = Node->Functions->GetRegionRect(window_regions::RightBody, Node);
-  Window->Container[0]->Functions->UpdateRegions(Window->Container[0]);
-  Window->Container[1]->Functions->UpdateRegions(Window->Container[1]);
+//  Window->Container[0]->Region = Node->Functions->GetRegionRect(window_regions::LeftBody, Node);
+//  Window->Container[1]->Region = Node->Functions->GetRegionRect(window_regions::RightBody, Node);
+//  Window->Container[0]->Functions->UpdateRegions(Window->Container[0]);
+//  Window->Container[1]->Functions->UpdateRegions(Window->Container[1]);
 }
 
 MENU_GET_REGION_RECT( VerticalSplitGetRegionRect )
@@ -868,6 +840,18 @@ MENU_GET_REGION_RECT( VerticalSplitGetRegionRect )
   return Result;
 }
 
+MENU_GET_SUB_MENU_REGION_RECT( VerticalSplitGetSubMenuRegionRect )
+{
+  window_regions Result = (SubMenuIndex == 1) ? window_regions::WholeBody : window_regions::None;
+  switch(SubMenuIndex)
+  {
+    case 0: return VerticalSplitGetRegionRect(window_regions::LeftBody, Node);
+    case 1: return VerticalSplitGetRegionRect(window_regions::RightBody, Node);
+    default: Assert(0);
+  }
+  return {};
+}
+
 MENU_GET_MOUSE_OVER_REGION( VerticalSplitGetMouseOverRegion )
 {
   window_regions RegionArray[] =
@@ -879,23 +863,8 @@ MENU_GET_MOUSE_OVER_REGION( VerticalSplitGetMouseOverRegion )
 
   split_window* Window = Node->SplitWindow;
 
-  node_region_pair Result = {};
-  Result.Region = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
+  window_regions Result = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
 
-  if(Result.Region == window_regions::None)
-  {
-    Assert(!Result.Node);
-    Result.Node = 0;
-    Result.Region = window_regions::None;
-  }else if(Result.Region == window_regions::LeftBody)
-  {
-    Result.Node = Window->Container[0];
-  }else if(Result.Region == window_regions::RightBody)
-  {
-    Result.Node = Window->Container[1];
-  }else{
-    Result.Node = 0;
-  }
   return Result;
 }
 
@@ -909,8 +878,6 @@ MENU_DRAW( VerticalSplitDraw )
   DEBUGPushQuad(Node->Functions->GetRegionRect(window_regions::RightBody, Node), BodyColor);
   DEBUGPushQuad(Node->Functions->GetRegionRect(window_regions::VerticalBorder, Node), BorderColor);
 
-  Window->Container[0]->Functions->Draw( Window->Container[0] );
-  Window->Container[1]->Functions->Draw( Window->Container[1] );
 }
 
 menu_functions VerticalSplitMenuFunctions()
@@ -923,6 +890,7 @@ menu_functions VerticalSplitMenuFunctions()
   Result.HandleInput = VerticalSplitHandleInput;
   Result.UpdateRegions = VerticalSplitUpdateRegions;
   Result.GetRegionRect = VerticalSplitGetRegionRect;
+  Result.GetSubMenuRegionRect = VerticalSplitGetSubMenuRegionRect;
   Result.GetMouseOverRegion = VerticalSplitGetMouseOverRegion;
   Result.Draw = VerticalSplitDraw;
   return Result;
@@ -1013,10 +981,10 @@ MENU_UPDATE_REGIONS( HorizontalUpdateRegions )
   {
     Window->SplitFraction = 1-MinFrac;
   }
-  Window->Container[0]->Region = Node->Functions->GetRegionRect(window_regions::BotBody, Node);
-  Window->Container[1]->Region = Node->Functions->GetRegionRect(window_regions::TopBody, Node);
-  Window->Container[0]->Functions->UpdateRegions(Window->Container[0]);
-  Window->Container[1]->Functions->UpdateRegions(Window->Container[1]);
+//  Window->Container[0]->Region = Node->Functions->GetRegionRect(window_regions::BotBody, Node);
+//  Window->Container[1]->Region = Node->Functions->GetRegionRect(window_regions::TopBody, Node);
+//  Window->Container[0]->Functions->UpdateRegions(Window->Container[0]);
+//  Window->Container[1]->Functions->UpdateRegions(Window->Container[1]);
 }
 
 MENU_GET_REGION_RECT( HorizontalGetRegionRect )
@@ -1078,26 +1046,22 @@ MENU_GET_MOUSE_OVER_REGION( HorizontalGetMouseOverRegion )
 
   split_window* Window = Node->SplitWindow;
 
-  node_region_pair Result = {};
-  Result.Region = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
+  window_regions Result = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
 
-  if(Result.Region == window_regions::None)
-  {
-    Assert(!Result.Node);
-    Result.Node = 0;
-    Result.Region = window_regions::None;
-  }else if(Result.Region == window_regions::BotBody)
-  {
-    Result.Node = Window->Container[0];
-  }else if(Result.Region == window_regions::TopBody)
-  {
-    Result.Node = Window->Container[1];
-  }else{
-    Result.Node = 0;
-  }
   return Result;
 }
 
+MENU_GET_SUB_MENU_REGION_RECT( HorizontalSplitGetSubMenuRegionRect )
+{
+  window_regions Result = (SubMenuIndex == 1)? window_regions::WholeBody : window_regions::None;
+  switch(SubMenuIndex)
+  {
+    case 0: return HorizontalGetRegionRect(window_regions::BotBody, Node);
+    case 1: return HorizontalGetRegionRect(window_regions::TopBody, Node);
+    default: Assert(0);
+  }
+  return {};
+}
 MENU_DRAW( HorizontalDraw )
 {
   split_window* Window = Node->SplitWindow;
@@ -1107,8 +1071,7 @@ MENU_DRAW( HorizontalDraw )
   DEBUGPushQuad(Node->Functions->GetRegionRect(window_regions::BotBody, Node), BodyColor);
   DEBUGPushQuad(Node->Functions->GetRegionRect(window_regions::TopBody, Node), BodyColor);
   DEBUGPushQuad(Node->Functions->GetRegionRect(window_regions::HorizontalBorder, Node), BorderColor);
-  Window->Container[0]->Functions->Draw( Window->Container[0] );
-  Window->Container[1]->Functions->Draw( Window->Container[1] );
+
 }
 
 
@@ -1122,6 +1085,7 @@ menu_functions HorizontalMenuFunctions()
   Result.HandleInput = HorizontalHandleInput;
   Result.UpdateRegions = HorizontalUpdateRegions;
   Result.GetRegionRect = HorizontalGetRegionRect;
+  Result.GetSubMenuRegionRect = HorizontalSplitGetSubMenuRegionRect;
   Result.GetMouseOverRegion = HorizontalGetMouseOverRegion;
   Result.Draw = HorizontalDraw;
   return Result;

@@ -96,7 +96,7 @@ namespace utils
 
     return(DestInit);
   }
-  
+
   // djb2 from http://www.cse.yorku.ca/~oz/hash.html
   inline u32 djb2_hash(const char* str)
   {
@@ -108,5 +108,5 @@ namespace utils
 
     return hash;
   }
- 
+
 }
