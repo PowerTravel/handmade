@@ -263,6 +263,7 @@ global_variable render_group* GlobalDebugRenderGroup;
 
 enum class container_type
 {
+  None,
   Root,
   Empty,
   VerticalSplit,
@@ -330,27 +331,7 @@ struct tree_node
   tree_node* NextSibling;
 };
 
-struct container_node
-{
-  tree_node TreeNode; // "tree_node* Node" Must be on top so we can cast tree_node* to a container_node*
-  container_type Type;
-  window_regions RegionType;
-  u32 Index;
-  rect2f Region;
-
-  c8 Header[64];
-
-  struct menu_functions* Functions;
-  union
-  {
-    void* Container;
-    struct tabbed_header_window* TabbedHeader;
-    struct menu_header_window* MenuHeader;
-    struct split_window* SplitWindow;
-    struct empty_window* EmptyWindow;
-    struct root_window* RootWindow;
-  };
-};
+struct container_node;
 
 void PushWindow( window_regions Type, container_node* Node );
 
@@ -377,17 +358,9 @@ typedef MENU_MOUSE_EXIT( menu_mouse_exit );
 #define MENU_HANDLE_INPUT(name) void name( menu_interface* Interface, container_node* Node,  void* Params)
 typedef MENU_HANDLE_INPUT( menu_handle_input );
 
-#define MENU_UPDATE_REGIONS(name) void name( container_node* Node)
-typedef MENU_UPDATE_REGIONS( menu_update_regions );
-
 #define MENU_GET_REGION_RECT(name) rect2f name( window_regions Type, container_node* Node )
 typedef MENU_GET_REGION_RECT( menu_get_region_rect );
 
-#define MENU_GET_SUB_MENU_REGION_RECT(name) rect2f name( u32 SubMenuIndex, container_node* Node )
-typedef MENU_GET_SUB_MENU_REGION_RECT( menu_get_sub_menu_region_rect );
-// Note: Return value here is node_region_pair where the
-// node_region_pair::Node contains the next node to visit if we hit a body region (whole body / left / right etc)
-// node_region_pair::Region contains the region name. window_regions::None means we are outside of the whole window)
 #define MENU_GET_MOUSE_OVER_REGION(name) window_regions name( container_node* Node, v2 MousePos)
 typedef MENU_GET_MOUSE_OVER_REGION( menu_get_mouse_over_region );
 
@@ -403,11 +376,31 @@ struct menu_functions
   menu_mouse_exit* MouseExit;
 
   menu_handle_input* HandleInput;
-  menu_update_regions* UpdateRegions;
   menu_get_region_rect* GetRegionRect;
-  menu_get_sub_menu_region_rect* GetSubMenuRegionRect;
   menu_get_mouse_over_region* GetMouseOverRegion;
   menu_draw*  Draw;
+};
+
+struct container_node
+{
+  tree_node TreeNode; // "tree_node* Node" Must be on top so we can cast tree_node* to a container_node*
+  container_type Type;
+  window_regions RegionType;
+  u32 Index;
+  rect2f Region;
+
+  c8 Header[64];
+
+  menu_functions Functions;
+  union
+  {
+    void* Container;
+    struct tabbed_header_window* TabbedHeader;
+    struct menu_header_window* MenuHeader;
+    struct split_window* SplitWindow;
+    struct empty_window* EmptyWindow;
+    struct root_window* RootWindow;
+  };
 };
 
 menu_functions GetEmptyFunctions();
@@ -460,12 +453,37 @@ struct root_window
   rect2f WindowDraggingStart;
 };
 
+struct menu_tree
+{
+  u32 NodeCount;
+  u32 Depth;
+  container_node* Root;
+};
 
 struct menu_interface
 {
-  container_node* RootWindow;
+  u32 RootContainerCount;
+  menu_tree RootContainers[16];
+
+  menu_tree HotWindow;
+
   window_regions HotRegion;
-  container_node* HotWindow;
+  container_node* HotSubWindow;
+
+
+  b32 ContainerOccupancy[16];
+  b32 TabbedHeaderOccupancy[8];
+  b32 MenuHeaderOccupancy[8];
+  b32 SplitOccupancy[8];
+  b32 EmptyOccupancy[8];
+  b32 RootOccupancy[8];
+
+  container_node ContainerNodes[16];
+  tabbed_header_window TabbedHeaderWindows[8];
+  menu_header_window MenuHeaderWindows[8];
+  split_window SplitWindows[8];
+  empty_window EmptyWindows[8];
+  root_window RootWindows[8];
 
   v2 MousePos;
   binary_signal_state MouseLeftButton;
@@ -476,8 +494,8 @@ struct menu_interface
 
 void SetMouseInput(game_input* GameInput, menu_interface* Interface);
 
-void InitializeMenuFunctionPointers(menu_interface* Interface, memory_arena* Arena, u32 NodeCount);
+void InitializeMenuFunctionPointers(container_node* Root, memory_arena* Arena, u32 NodeCount);
 void UpdateRegions(container_node* Root, rect2f RootRegion);
-void ActOnInput(debug_state* DebugState, menu_interface* Interface);
+void ActOnInput(memory_arena* Arena, menu_interface* Interface, container_node* RootWindow);
 
 window_regions CheckRegions(rect2f Region, u32 RegionCount, window_regions* RegionArray, r32 BorderSize, r32 HeaderSize, r32 BorderFrac);
