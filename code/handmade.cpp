@@ -365,7 +365,6 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
 {
   if (!Memory->GameState)
   {
-
     GlobalGameState = BootstrapPushStruct(game_state, PersistentArena);
     GlobalGameState->TransientArena = PushStruct(GlobalGameState->PersistentArena, memory_arena);
     GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);

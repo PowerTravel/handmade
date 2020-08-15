@@ -552,30 +552,108 @@ menu_functions MenuHeaderMenuFunctions()
 }
 
 
-
-
-
 MENU_MOUSE_DOWN( TabbedHeaderMouseDown )
 {
-
+  Platform.DEBUGPrint("Tabbed Header Mouse Down\n");
+  Node->TabbedHeader->WindowDrag = true;
+  Node->TabbedHeader->DraggingStart = Interface->MousePos;
 }
 MENU_MOUSE_UP( TabbedHeaderMouseUp )
 {
+  Platform.DEBUGPrint("Tabbed Header Mouse Up\n");
 
+  if(Node->TabbedHeader->WindowDrag)
+  {
+    b32 SplitOccured = false;
+    v2 Delta = Interface->MousePos - Node->TabbedHeader->DraggingStart;
+    if(NormSq(Delta) > 0.01)
+    {
+      if(Node->TreeNode.Parent)
+      {
+        container_node* ParentContainer = (container_node*) Node->TreeNode.Parent;
+        if(ParentContainer->Type == container_type::VerticalSplit)
+        {
+          container_node* OppositeNode = 0;
+          if(Node->RegionType == window_regions::LeftBody)
+          {
+            OppositeNode = (container_node*) Node->TreeNode.NextSibling;
+            Assert(OppositeNode->RegionType == window_regions::RightBody);
+          }else{
+            Assert(Node->RegionType == window_regions::RightBody);
+            OppositeNode = (container_node*) ParentContainer->TreeNode.FirstChild;
+            Assert(OppositeNode->RegionType == window_regions::LeftBody);
+          }
+
+          OppositeNode->RegionType = window_regions::WholeBody;
+          container_node* GrandParentContainer = (container_node*) ParentContainer->TreeNode.Parent;
+          DisconnectNode(&ParentContainer->TreeNode);
+          ConnectNode(&GrandParentContainer->TreeNode, &OppositeNode->TreeNode);
+          DisconnectNode(&Node->TreeNode);
+          Node->RegionType = window_regions::WholeBody;
+          SplitOccured = true;
+        }
+      }
+
+      if(SplitOccured)
+      {
+        menu_tree* Root = &Interface->RootContainers[Interface->RootContainerCount++];
+        Root->Root = NewContainer(Interface, "Root", container_type::Root, window_regions::WholeBody);
+
+        container_node* RootContainer = Root->Root;
+        RootContainer->RootWindow->BorderSize = 0.007;
+        RootContainer->RootWindow->MinSize = 0.2f;
+        RootContainer->Region = Rect2f(Node->Region.X + Delta.X, Node->Region.Y + Delta.Y, Node->Region.W, Node->Region.H);
+
+        container_node* RootHeader = NewContainer(Interface, "Headerkek", container_type::MenuHeader, window_regions::WholeBody);
+        RootHeader->MenuHeader->HeaderSize = 0.02;
+        RootHeader->MenuHeader->RootWindow = RootContainer;
+
+
+        ConnectNode(0, &Root->Root->TreeNode);
+        ConnectNode(&RootContainer->TreeNode, &RootHeader->TreeNode);
+        ConnectNode(&RootHeader->TreeNode, &Node->TreeNode);
+
+        Root->Depth = 3;
+        Root->NodeCount = 3;
+      }
+
+      //UpdateRegions( &DebugState->Arena, Root->NodeCount, Root->Root);
+    }
+  }
+  Node->TabbedHeader->WindowDrag = false;
+  //Node->Region.X = Node->TabbedHeader->DraggingStart.X;
+  //Node->Region.Y = Node->TabbedHeader->DraggingStart.Y;
 }
 
 MENU_MOUSE_ENTER( TabbedHeaderMouseEnter )
 {
-
+  Platform.DEBUGPrint("Tabbed Header Mouse Enter\n");
 }
 MENU_MOUSE_EXIT( TabbedHeaderMouseExit )
 {
-
+  Platform.DEBUGPrint("Tabbed Header Mouse Exit\n");
 }
 
 MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
 {
+  Node->TabbedHeader->MousePos = Interface->MousePos;
 
+  if(Node->TabbedHeader->WindowDrag)
+  {
+    debug_state* DebugState = DEBUGGetState();
+    for (u32 WindowIndex = 0;
+         WindowIndex < Interface->RootContainerCount;
+         ++WindowIndex)
+    {
+      menu_tree Menu = Interface->RootContainers[WindowIndex];
+      node_region_pair NodeRegion = GetRegion(&DebugState->Arena, Menu.NodeCount, Menu.Root, Interface->MousePos);
+      if(NodeRegion.Region != window_regions::None)
+      {
+        Platform.DEBUGPrint("%s\n", ToString(NodeRegion.Region));
+        break;
+      }
+    }
+  }
 }
 
 MENU_GET_REGION_RECT( TabbedHeaderGetRegionRect )
@@ -634,7 +712,18 @@ MENU_DRAW( TabbedHeaderDraw )
 {
   tabbed_header_window* Window = Node->TabbedHeader;
   v4 HeaderColor = V4(0.3,0.5,0.3,1);
+
   DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::Header, Node), HeaderColor);
+
+  if(Node->TabbedHeader->WindowDrag)
+  {
+    rect2f Region = Node->Region;
+    v2 Start = Node->TabbedHeader->DraggingStart;
+    v2 Current = Node->TabbedHeader->MousePos;
+    Region.X += Current.X-Start.X;
+    Region.Y += Current.Y-Start.Y;
+    DEBUGPushQuad(Region, V4(0.3,0.5,0.3,0.3));
+  }
 }
 
 
@@ -674,7 +763,12 @@ MENU_MOUSE_DOWN( VerticalSplitMouseDown )
 
     default:
     {
-      Assert(0);
+      if(HotRegion  == window_regions::LeftBody || HotRegion  == window_regions::RightBody)
+      {
+        // TODO: Remove this case when we have fixed it such that split window will only exist if both left and right exists
+      }else{
+        Assert(0);  
+      }
     }break;
   }
 }
@@ -688,11 +782,11 @@ MENU_MOUSE_UP( SplitMouseUp )
 
 MENU_MOUSE_ENTER( VerticalSplitMouseEnter )
 {
-
+  Platform.DEBUGPrint("Vertical Split Mouse Enter\n");
 }
 MENU_MOUSE_EXIT( VerticalSplitMouseExit )
 {
-
+  Platform.DEBUGPrint("Vertical Split Mouse Exit\n");
 }
 
 MENU_HANDLE_INPUT( VerticalSplitHandleInput )

@@ -82,7 +82,7 @@ struct radial_menu;
 struct menu_item
 {
   c8 Header[64];
-  
+
   // Input State
   b32 MouseReleased;
   binary_signal_state MouseOverState;
@@ -90,11 +90,11 @@ struct menu_item
 
   // Internal State
   b32 Active;
-  
+
   void (*Activate)(debug_state* DebugState, menu_item* Item);
 };
 
-menu_item MenuItem(c8* Name, b32 Active = false) 
+menu_item MenuItem(c8* Name, b32 Active = false)
 {
   menu_item Result = {};
   Assert(str::StringLength( Name ) < ArrayCount( Result.Header ) );
@@ -343,16 +343,16 @@ struct node_region_pair
 };
 
 
-#define MENU_MOUSE_DOWN(name) void name( container_node* Node, window_regions HotRegion, void* Params)
+#define MENU_MOUSE_DOWN(name) void name( menu_interface* Interface, container_node* Node, window_regions HotRegion, void* Params)
 typedef MENU_MOUSE_DOWN( menu_mouse_down );
 
-#define MENU_MOUSE_UP(name) void name( container_node* Node, window_regions HotRegion, void* Params)
+#define MENU_MOUSE_UP(name) void name( menu_interface* Interface, container_node* Node, window_regions HotRegion, void* Params)
 typedef MENU_MOUSE_UP( menu_mouse_up );
 
-#define MENU_MOUSE_ENTER(name) void name( container_node* Node, window_regions HotRegion, void* Params)
+#define MENU_MOUSE_ENTER(name) void name( menu_interface* Interface, container_node* Node, window_regions HotRegion, void* Params)
 typedef MENU_MOUSE_ENTER( menu_mouse_enter );
 
-#define MENU_MOUSE_EXIT(name) void name( container_node* Node, window_regions HotRegion, void* Params)
+#define MENU_MOUSE_EXIT(name) void name( menu_interface* Interface, container_node* Node, window_regions HotRegion, void* Params)
 typedef MENU_MOUSE_EXIT( menu_mouse_exit );
 
 #define MENU_HANDLE_INPUT(name) void name( menu_interface* Interface, container_node* Node,  void* Params)
@@ -381,6 +381,26 @@ struct menu_functions
   menu_draw*  Draw;
 };
 
+
+/* Note: Should we make the interactive windows of container_node into a flat list
+ * Change to this? :
+ * Main Container =
+ * {
+ *   Header(Leaf),
+ *   Some set of Widget(s)),
+ *   Footer (Leaf)
+ * }
+ *          ------------
+ *          |  Header  |
+ *          ------------
+ *          |          |
+ *          | Some     |
+ *          | Widget   |
+ *          |          |
+ *          ------------
+ *          |  Footer  |
+ *          ------------
+ */
 struct container_node
 {
   tree_node TreeNode; // "tree_node* Node" Must be on top so we can cast tree_node* to a container_node*
@@ -413,6 +433,9 @@ menu_functions HorizontalMenuFunctions();
 struct tabbed_header_window
 {
   r32 HeaderSize;
+  v2 DraggingStart;
+  v2 MousePos;
+  b32 WindowDrag;
 };
 
 struct menu_header_window
@@ -463,7 +486,7 @@ struct menu_tree
 struct menu_interface
 {
   u32 RootContainerCount;
-  menu_tree RootContainers[16];
+  menu_tree RootContainers[32];
 
   menu_tree HotWindow;
 
@@ -471,14 +494,14 @@ struct menu_interface
   container_node* HotSubWindow;
 
 
-  b32 ContainerOccupancy[16];
+  b32 ContainerOccupancy[32];
   b32 TabbedHeaderOccupancy[8];
   b32 MenuHeaderOccupancy[8];
   b32 SplitOccupancy[8];
   b32 EmptyOccupancy[8];
   b32 RootOccupancy[8];
 
-  container_node ContainerNodes[16];
+  container_node ContainerNodes[32];
   tabbed_header_window TabbedHeaderWindows[8];
   menu_header_window MenuHeaderWindows[8];
   split_window SplitWindows[8];
@@ -492,10 +515,13 @@ struct menu_interface
 };
 
 
+void DisconnectNode(tree_node* Node);
+void ConnectNode(tree_node* Parent, tree_node* NewNode);
+
 void SetMouseInput(game_input* GameInput, menu_interface* Interface);
 
 void InitializeMenuFunctionPointers(container_node* Root, memory_arena* Arena, u32 NodeCount);
 void UpdateRegions(container_node* Root, rect2f RootRegion);
-void ActOnInput(memory_arena* Arena, menu_interface* Interface, container_node* RootWindow);
+void ActOnInput(memory_arena* Arena, menu_interface* Interface);
 
 window_regions CheckRegions(rect2f Region, u32 RegionCount, window_regions* RegionArray, r32 BorderSize, r32 HeaderSize, r32 BorderFrac);

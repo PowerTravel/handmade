@@ -365,6 +365,33 @@ node_region_pair GetRegion(memory_arena* Arena, u32 NodeCount, container_node* C
   return Result;
 }
 
+void DisconnectNode(tree_node* Node)
+{
+  tree_node* Parent = Node->Parent;
+  if(Parent)
+  {
+    Assert(Parent->FirstChild);
+    if(Parent->FirstChild == Node)
+    {
+      Parent->FirstChild = Node->NextSibling; 
+    }else{
+      tree_node* Child = Parent->FirstChild;
+      while(Child->NextSibling)
+      {
+        if(Child->NextSibling == Node)
+        {
+          Child->NextSibling = Node->NextSibling;
+          break;
+        }
+      }  
+    }
+  } 
+
+  Node->NextSibling = 0;
+  Node->Parent = 0;
+}
+
+
 void ConnectNode(tree_node* Parent, tree_node* NewNode)
 {
   NewNode->Parent = Parent;
@@ -448,8 +475,7 @@ DEBUGGetState()
     menu_interface* Interface = DebugState->MenuInterface;
 
     {
-      Interface->RootContainerCount++;
-      menu_tree* Root = &Interface->RootContainers[0];
+      menu_tree* Root = &Interface->RootContainers[Interface->RootContainerCount++];
       Root->Root = NewContainer(Interface, "Root", container_type::Root, window_regions::WholeBody);
 
       container_node* RootContainer = Root->Root;
@@ -493,8 +519,7 @@ DEBUGGetState()
 
 
     {
-      Interface->RootContainerCount++;
-      menu_tree* Root = &Interface->RootContainers[1];
+      menu_tree* Root = &Interface->RootContainers[Interface->RootContainerCount++];
       Root->Root = NewContainer(Interface, "Root", container_type::Root, window_regions::WholeBody);
 
       container_node* RootContainer = Root->Root;
@@ -1247,7 +1272,7 @@ void DebugMainWindow(game_input* GameInput)
 
   if(Interface->HotWindow.Root)
   {
-    ActOnInput(&DebugState->Arena, Interface, Interface->HotWindow.Root);
+    ActOnInput(&DebugState->Arena, Interface);
   }
 
   for (s32 WindowIndex = Interface->RootContainerCount-1;
@@ -1470,11 +1495,14 @@ void SetMouseInput(game_input* GameInput, menu_interface* Interface)
   Interface->MousePos = MousePos;
 }
 
-void ActOnInput(memory_arena* Arena, menu_interface* Interface, container_node* HotWindow)
+void ActOnInput(memory_arena* Arena, menu_interface* Interface)
 {
   v2 MousePos = Interface->MousePos;
 
-  node_region_pair NodeRegion = GetRegion(Arena, 7, HotWindow, MousePos);
+  container_node* HotWindow = Interface->HotWindow.Root;
+  u32 NodeCount = Interface->HotWindow.NodeCount;
+
+  node_region_pair NodeRegion = GetRegion(Arena, NodeCount, HotWindow, MousePos);
 
   if(Interface->MouseLeftButton.Active)
   {
@@ -1483,8 +1511,8 @@ void ActOnInput(memory_arena* Arena, menu_interface* Interface, container_node* 
     {
       Interface->HotRegion = NodeRegion.Region;
       Interface->HotSubWindow = NodeRegion.Node;
-      Platform.DEBUGPrint("%s %s Pushed\n", HotWindow->Header, ToString(NodeRegion.Region) );
-      Interface->HotSubWindow->Functions.MouseDown(Interface->HotSubWindow, Interface->HotRegion, 0);
+      Platform.DEBUGPrint("%s %s Pushed\n", Interface->HotSubWindow->Header, ToString(Interface->HotRegion) );
+      Interface->HotSubWindow->Functions.MouseDown(Interface, Interface->HotSubWindow, Interface->HotRegion, 0);
     // Mouse Down Movement State
     }else{
 
@@ -1495,10 +1523,9 @@ void ActOnInput(memory_arena* Arena, menu_interface* Interface, container_node* 
 
     if(Interface->HotSubWindow)
     {
-      Interface->HotSubWindow->Functions.MouseUp(Interface->HotSubWindow, Interface->HotRegion, 0);
-      Platform.DEBUGPrint("%s Released\n", HotWindow->Header);  
+      Interface->HotSubWindow->Functions.MouseUp(Interface, Interface->HotSubWindow, Interface->HotRegion, 0);
+      Platform.DEBUGPrint("%s Released\n", Interface->HotSubWindow->Header);  
     }
-    
 
     // Mouse Released Event
     if(Interface->MouseLeftButton.Edge)
