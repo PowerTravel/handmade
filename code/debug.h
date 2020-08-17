@@ -441,6 +441,9 @@ struct tabbed_header_window
   b32 WindowDrag;
 
   container_node* NodeToMerge;
+
+  rect2f MergeZone[5];
+  u32 HotMergeZone;
 };
 
 struct menu_header_window
