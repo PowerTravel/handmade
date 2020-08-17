@@ -168,32 +168,32 @@ void AllocateWindowMenu(menu_interface* Interface, container_node* Node)
   {
     case container_type::Root:
     {
-      u32 WindowIndex =  GetFirstFreeIndex(32, Interface->RootOccupancy);
+      u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->RootOccupancy), Interface->RootOccupancy);
       Node->RootWindow = &Interface->RootWindows[WindowIndex];
     }break;
     case container_type::Empty:
     {
-      u32 WindowIndex =  GetFirstFreeIndex(32, Interface->EmptyOccupancy);
+      u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->EmptyOccupancy), Interface->EmptyOccupancy);
       Node->EmptyWindow = &Interface->EmptyWindows[WindowIndex];
     }break;
     case container_type::VerticalSplit:
     {
-      u32 WindowIndex =  GetFirstFreeIndex(32, Interface->SplitOccupancy);
+      u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->SplitOccupancy), Interface->SplitOccupancy);
       Node->SplitWindow = &Interface->SplitWindows[WindowIndex];
     }break;
     case container_type::HorizontalSplit:
     {
-      u32 WindowIndex =  GetFirstFreeIndex(32, Interface->SplitOccupancy);
+      u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->SplitOccupancy), Interface->SplitOccupancy);
       Node->SplitWindow = &Interface->SplitWindows[WindowIndex];
     }break;
     case container_type::TabbedHeader:
     {
-      u32 WindowIndex =  GetFirstFreeIndex(32, Interface->TabbedHeaderOccupancy);
+      u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->TabbedHeaderOccupancy), Interface->TabbedHeaderOccupancy);
       Node->TabbedHeader = &Interface->TabbedHeaderWindows[WindowIndex];
     }break;
     case container_type::MenuHeader:
     {
-      u32 WindowIndex =  GetFirstFreeIndex(32, Interface->MenuHeaderOccupancy);
+      u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->MenuHeaderOccupancy), Interface->MenuHeaderOccupancy);
       Node->MenuHeader = &Interface->MenuHeaderWindows[WindowIndex];
     }break;
   }
@@ -203,7 +203,7 @@ container_node* NewContainer(menu_interface* Interface, c8* Name, container_type
 {
   local_persist u32 IndexCounter = 0;
 
-  u32 NodeIndex = GetFirstFreeIndex(64, Interface->ContainerOccupancy);
+  u32 NodeIndex = GetFirstFreeIndex(ArrayCount(Interface->ContainerOccupancy), Interface->ContainerOccupancy);
   container_node* Node = &Interface->ContainerNodes[NodeIndex];
   Node->Type = Type;
   Node->RegionType = RegionType;
@@ -282,7 +282,7 @@ void UpdateRegions( memory_arena* Arena, u32 NodeCount, container_node* Containe
 }
 
 // Preorder breadth first.
-void DrawMenu( memory_arena* Arena, u32 NodeCount, container_node* Container )
+void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, container_node* Container )
 {
   u32 StackElementSize = sizeof(container_node*);
   u32 StackByteSize = NodeCount * StackElementSize;
@@ -299,7 +299,7 @@ void DrawMenu( memory_arena* Arena, u32 NodeCount, container_node* Container )
     container_node* ParentContainer = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
 
-    ParentContainer->Functions.Draw(ParentContainer);
+    ParentContainer->Functions.Draw(Interface, ParentContainer);
     // Update the region of all children and push them to the stack
     tree_node* Parent = (tree_node*)ParentContainer;
     tree_node* Child = Parent->FirstChild;
@@ -363,6 +363,38 @@ node_region_pair GetRegion(memory_arena* Arena, u32 NodeCount, container_node* C
   }
 
   return Result;
+}
+
+
+menu_tree* GetNewMenuTree(menu_interface* Interface)
+{
+  menu_tree* Result = &Interface->RootContainers[Interface->RootContainerCount++];
+  return Result;
+}
+
+void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree)
+{
+  u32 WindowIndex = 0;
+  b32 MenuClicked = false;
+  while(WindowIndex < Interface->RootContainerCount)
+  {
+    menu_tree* MenuTree = &Interface->RootContainers[WindowIndex];
+    if( MenuTree->Root == MenuToFree->Root )
+    {
+      break;
+    }
+    ++WindowIndex;
+  }
+
+  Assert(WindowIndex != Interface->RootContainerCount);
+
+  while(WindowIndex < Interface->RootContainerCount-1)
+  {
+    Interface->RootContainers[WindowIndex] = Interface->RootContainers[WindowIndex+1];
+    WindowIndex++;
+  }
+  Interface->RootContainers[Interface->RootContainerCount-1] = {};
+  Interface->RootContainerCount--;
 }
 
 void DisconnectNode(tree_node* Node)
@@ -475,7 +507,7 @@ DEBUGGetState()
     menu_interface* Interface = DebugState->MenuInterface;
 
     {
-      menu_tree* Root = &Interface->RootContainers[Interface->RootContainerCount++];
+      menu_tree* Root = GetNewMenuTree(Interface);
       Root->Root = NewContainer(Interface, "Root", container_type::Root, window_regions::WholeBody);
 
       container_node* RootContainer = Root->Root;
@@ -495,10 +527,12 @@ DEBUGGetState()
       container_node* TabbedHeader0 = NewContainer(Interface, "Tab0", container_type::TabbedHeader, window_regions::LeftBody);
       TabbedHeader0->TabbedHeader->HeaderSize = 0.02;
       container_node*  EmptyContainer0 = NewContainer(Interface, "Empty0", container_type::Empty, window_regions::WholeBody);
+      EmptyContainer0->EmptyWindow->Color = V4(0,0,0.4,1);
 
       container_node* TabbedHeader1 = NewContainer(Interface,  "Tab1", container_type::TabbedHeader, window_regions::RightBody);
       TabbedHeader1->TabbedHeader->HeaderSize = 0.02;
       container_node*  EmptyContainer1 = NewContainer(Interface, "Empty1", container_type::Empty, window_regions::WholeBody);
+      EmptyContainer1->EmptyWindow->Color = V4(0,0.4,0.4,1);
 
       ConnectNode(0, &Root->Root->TreeNode); // 0
 
@@ -519,13 +553,13 @@ DEBUGGetState()
 
 
     {
-      menu_tree* Root = &Interface->RootContainers[Interface->RootContainerCount++];
+      menu_tree* Root = GetNewMenuTree(Interface);
       Root->Root = NewContainer(Interface, "Root", container_type::Root, window_regions::WholeBody);
 
       container_node* RootContainer = Root->Root;
       RootContainer->RootWindow->BorderSize = 0.007;
       RootContainer->RootWindow->MinSize = 0.2f;
-      RootContainer->Region = Rect2f(0.5,0.2,0.5,0.5);
+      RootContainer->Region = Rect2f(1,0.2,0.5,0.5);
 
       container_node* RootHeader = NewContainer(Interface, "Header", container_type::MenuHeader, window_regions::WholeBody);
       RootHeader->MenuHeader->HeaderSize = 0.02;
@@ -539,10 +573,12 @@ DEBUGGetState()
       container_node* TabbedHeader0 = NewContainer(Interface, "Tab0", container_type::TabbedHeader, window_regions::LeftBody);
       TabbedHeader0->TabbedHeader->HeaderSize = 0.02;
       container_node*  EmptyContainer0 = NewContainer(Interface, "Empty0", container_type::Empty, window_regions::WholeBody);
+      EmptyContainer0->EmptyWindow->Color = V4(0,0.4,0,1);
 
       container_node* TabbedHeader1 = NewContainer(Interface,  "Tab1", container_type::TabbedHeader, window_regions::RightBody);
       TabbedHeader1->TabbedHeader->HeaderSize = 0.02;
       container_node*  EmptyContainer1 = NewContainer(Interface, "Empty1", container_type::Empty, window_regions::WholeBody);
+      EmptyContainer1->EmptyWindow->Color = V4(0.4,0,0,1);
 
       ConnectNode(0, &Root->Root->TreeNode); // 0
 
@@ -1151,6 +1187,17 @@ Intersects(const rect2f & Rect, v2 P)
   return Result;
 }
 
+void MoveMenuToTop(menu_interface* Interface, u32 WindowIndex)
+{
+  Assert(WindowIndex < Interface->RootContainerCount)
+  menu_tree Menu = Interface->RootContainers[WindowIndex];
+  while(WindowIndex > 0)
+  {
+    Interface->RootContainers[WindowIndex] = Interface->RootContainers[WindowIndex-1];
+    WindowIndex--;
+  }
+  Interface->RootContainers[0] = Menu;
+}
 
 void DebugMainWindow(game_input* GameInput)
 {
@@ -1230,7 +1277,6 @@ void DebugMainWindow(game_input* GameInput)
   // [w2]            |            | [w1] |
   // [w3] <- Clicked |            | [w2] |
   // [w4]            |            | [w4] |
-  // TODO: Make list instead, jakob, what are you doing?
 
   // Find the clicked window and set HotWindow
   if(Interface->MouseLeftButton.Active &&
@@ -1260,18 +1306,13 @@ void DebugMainWindow(game_input* GameInput)
     {
       Interface->HotWindow = {};
     }else{
-      menu_tree NewTopWindow = Interface->RootContainers[HotWindowIndex];
-      while(HotWindowIndex > 0)
-      {
-        Interface->RootContainers[HotWindowIndex] = Interface->RootContainers[HotWindowIndex-1];
-        HotWindowIndex--;
-      }
-      Interface->RootContainers[0] = NewTopWindow;
+      MoveMenuToTop(Interface, HotWindowIndex);
     }
   }
 
   if(Interface->HotWindow.Root)
   {
+    // Acts on hot window
     ActOnInput(&DebugState->Arena, Interface);
   }
 
@@ -1281,7 +1322,7 @@ void DebugMainWindow(game_input* GameInput)
   {
     menu_tree MenuTree = Interface->RootContainers[WindowIndex];
     UpdateRegions( &DebugState->Arena, MenuTree.NodeCount, MenuTree.Root);
-    DrawMenu( &DebugState->Arena, MenuTree.NodeCount, MenuTree.Root);
+    DrawMenu( &DebugState->Arena, Interface, MenuTree.NodeCount, MenuTree.Root);  
   }
 }
 

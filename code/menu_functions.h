@@ -104,7 +104,7 @@ MENU_GET_MOUSE_OVER_REGION( EmptyGetMouseOverRegion )
 }
 MENU_DRAW( EmptyDraw )
 {
-  DEBUGPushQuad(Node->Region, V4(0,0,0,1));
+  DEBUGPushQuad(Node->Region, Node->EmptyWindow->Color);
 }
 
 menu_functions GetEmptyFunctions()
@@ -555,74 +555,55 @@ menu_functions MenuHeaderMenuFunctions()
 MENU_MOUSE_DOWN( TabbedHeaderMouseDown )
 {
   Platform.DEBUGPrint("Tabbed Header Mouse Down\n");
-  Node->TabbedHeader->WindowDrag = true;
-  Node->TabbedHeader->DraggingStart = Interface->MousePos;
+  tabbed_header_window* TabbedHeader = Node->TabbedHeader;
+  TabbedHeader->WindowDrag = true;
+  TabbedHeader->DraggingStart = V2(Node->Region.X,Node->Region.Y);
+  if(TabbedHeader->RootWindow)
+  {
+    TabbedHeader->RootDraggingStart = V2(TabbedHeader->RootWindow->Region.X,TabbedHeader->RootWindow->Region.Y);
+  }
 }
+
 MENU_MOUSE_UP( TabbedHeaderMouseUp )
 {
-  Platform.DEBUGPrint("Tabbed Header Mouse Up\n");
-
-  if(Node->TabbedHeader->WindowDrag)
-  {
-    b32 SplitOccured = false;
-    v2 Delta = Interface->MousePos - Node->TabbedHeader->DraggingStart;
-    if(NormSq(Delta) > 0.01)
-    {
-      if(Node->TreeNode.Parent)
-      {
-        container_node* ParentContainer = (container_node*) Node->TreeNode.Parent;
-        if(ParentContainer->Type == container_type::VerticalSplit)
-        {
-          container_node* OppositeNode = 0;
-          if(Node->RegionType == window_regions::LeftBody)
-          {
-            OppositeNode = (container_node*) Node->TreeNode.NextSibling;
-            Assert(OppositeNode->RegionType == window_regions::RightBody);
-          }else{
-            Assert(Node->RegionType == window_regions::RightBody);
-            OppositeNode = (container_node*) ParentContainer->TreeNode.FirstChild;
-            Assert(OppositeNode->RegionType == window_regions::LeftBody);
-          }
-
-          OppositeNode->RegionType = window_regions::WholeBody;
-          container_node* GrandParentContainer = (container_node*) ParentContainer->TreeNode.Parent;
-          DisconnectNode(&ParentContainer->TreeNode);
-          ConnectNode(&GrandParentContainer->TreeNode, &OppositeNode->TreeNode);
-          DisconnectNode(&Node->TreeNode);
-          Node->RegionType = window_regions::WholeBody;
-          SplitOccured = true;
-        }
-      }
-
-      if(SplitOccured)
-      {
-        menu_tree* Root = &Interface->RootContainers[Interface->RootContainerCount++];
-        Root->Root = NewContainer(Interface, "Root", container_type::Root, window_regions::WholeBody);
-
-        container_node* RootContainer = Root->Root;
-        RootContainer->RootWindow->BorderSize = 0.007;
-        RootContainer->RootWindow->MinSize = 0.2f;
-        RootContainer->Region = Rect2f(Node->Region.X + Delta.X, Node->Region.Y + Delta.Y, Node->Region.W, Node->Region.H);
-
-        container_node* RootHeader = NewContainer(Interface, "Headerkek", container_type::MenuHeader, window_regions::WholeBody);
-        RootHeader->MenuHeader->HeaderSize = 0.02;
-        RootHeader->MenuHeader->RootWindow = RootContainer;
-
-
-        ConnectNode(0, &Root->Root->TreeNode);
-        ConnectNode(&RootContainer->TreeNode, &RootHeader->TreeNode);
-        ConnectNode(&RootHeader->TreeNode, &Node->TreeNode);
-
-        Root->Depth = 3;
-        Root->NodeCount = 3;
-      }
-
-      //UpdateRegions( &DebugState->Arena, Root->NodeCount, Root->Root);
-    }
-  }
   Node->TabbedHeader->WindowDrag = false;
-  //Node->Region.X = Node->TabbedHeader->DraggingStart.X;
-  //Node->Region.Y = Node->TabbedHeader->DraggingStart.Y;
+
+  if(Node->TabbedHeader->NodeToMerge)
+  {
+    container_node* LeftNode = Node->TabbedHeader->NodeToMerge;
+    window_regions ParentRegion = LeftNode->RegionType;
+    LeftNode->RegionType = window_regions::LeftBody;
+    LeftNode->TabbedHeader->RootWindow = 0;
+
+    Assert(LeftNode);
+    Assert(LeftNode->Type == container_type::TabbedHeader);
+
+    FreeMenuTree(Interface, &Interface->HotWindow);
+
+    container_node* SplitContainer = NewContainer(Interface,  "Split", container_type::VerticalSplit, ParentRegion);
+    SplitContainer->SplitWindow->BorderSize = 0.007f;
+    SplitContainer->SplitWindow->MinSize = 0.02f;
+    SplitContainer->SplitWindow->SplitFraction = 0.5f;
+
+    container_node* RightNode = Node;
+    RightNode->RegionType = window_regions::RightBody;
+    RightNode->TabbedHeader->RootWindow = 0;
+
+    container_node* CommonParent = (container_node*) LeftNode->TreeNode.Parent;
+
+    DisconnectNode(&RightNode->TreeNode);
+    DisconnectNode(&LeftNode->TreeNode);
+
+    ConnectNode(&CommonParent->TreeNode, &SplitContainer->TreeNode);
+    ConnectNode(&SplitContainer->TreeNode, &LeftNode->TreeNode);
+    ConnectNode(&SplitContainer->TreeNode, &RightNode->TreeNode);
+
+//    // Todo: Calculate these numbers;
+//    Root->Depth = 10;
+//    Root->NodeCount = 10;
+
+    Node->TabbedHeader->NodeToMerge = 0;
+  }
 }
 
 MENU_MOUSE_ENTER( TabbedHeaderMouseEnter )
@@ -636,22 +617,119 @@ MENU_MOUSE_EXIT( TabbedHeaderMouseExit )
 
 MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
 {
-  Node->TabbedHeader->MousePos = Interface->MousePos;
+  tabbed_header_window* TabbedHeader = Node->TabbedHeader;
 
-  if(Node->TabbedHeader->WindowDrag)
+  if(TabbedHeader->WindowDrag)
   {
+    v2 Delta = Interface->MousePos - Interface->MouseLeftButtonPush;
+
+    // Move Root Window If there is one
+    // (Root window is only set IF the tabbed window doesn't share the Root Window with any other)
+    if(TabbedHeader->RootWindow)
+    {
+      v2 NewPos = TabbedHeader->RootDraggingStart + Delta;
+      TabbedHeader->RootWindow->Region.X = NewPos.X;
+      TabbedHeader->RootWindow->Region.Y = NewPos.Y;
+    }
+
+
     debug_state* DebugState = DEBUGGetState();
-    for (u32 WindowIndex = 0;
+    container_node* NodeToMergeWith = 0;
+    for (u32 WindowIndex = 1;
          WindowIndex < Interface->RootContainerCount;
          ++WindowIndex)
     {
       menu_tree Menu = Interface->RootContainers[WindowIndex];
       node_region_pair NodeRegion = GetRegion(&DebugState->Arena, Menu.NodeCount, Menu.Root, Interface->MousePos);
-      if(NodeRegion.Region != window_regions::None)
+      if(NodeRegion.Region == window_regions::WholeBody ||
+         NodeRegion.Region == window_regions::LeftBody  ||
+         NodeRegion.Region == window_regions::RightBody )
       {
-        Platform.DEBUGPrint("%s\n", ToString(NodeRegion.Region));
-        break;
+        while(NodeRegion.Node && NodeRegion.Node->Type != container_type::TabbedHeader)
+        {
+          NodeRegion.Node = (container_node*) NodeRegion.Node->TreeNode.Parent;
+        }
+        
+        if(NodeRegion.Node)
+        {
+          NodeToMergeWith = NodeRegion.Node;
+          break;
+        }
+      } 
+    }
+
+    TabbedHeader->NodeToMerge = NodeToMergeWith;
+    
+    b32 SplitOccured = false;
+    if(NormSq(Delta) > 0.01)
+    {
+      if(Node->TreeNode.Parent)
+      {
+        container_node* ParentContainer = (container_node*) Node->TreeNode.Parent;
+        if(ParentContainer->Type == container_type::VerticalSplit)
+        {
+          container_node* OppositeNode = 0;
+          if(Node->RegionType == window_regions::LeftBody)
+          {
+            OppositeNode = (container_node*) Node->TreeNode.NextSibling;
+          }else{
+            OppositeNode = (container_node*) ParentContainer->TreeNode.FirstChild;
+          }
+
+          if(OppositeNode->Type == container_type::TabbedHeader)
+          {
+            OppositeNode->TabbedHeader->RootWindow = Interface->HotWindow.Root;
+          }
+
+          OppositeNode->RegionType = ParentContainer->RegionType;
+          container_node* GrandParentContainer = (container_node*) ParentContainer->TreeNode.Parent;
+          DisconnectNode(&ParentContainer->TreeNode);
+          ConnectNode(&GrandParentContainer->TreeNode, &OppositeNode->TreeNode);
+          DisconnectNode(&Node->TreeNode);
+
+          SplitOccured = true;
+        }
       }
+
+      if(SplitOccured)
+      {
+        rect2f Region = Node->Region;
+
+        menu_tree* Root = GetNewMenuTree(Interface);
+        Root->Root = NewContainer(Interface, "Root", container_type::Root, window_regions::WholeBody);
+
+        r32 BorderSize = 0.007;
+        r32 HeaderSize = 0.02;
+
+        container_node* RootContainer = Root->Root;
+        
+        RootContainer->RootWindow->BorderSize = BorderSize;
+        RootContainer->RootWindow->MinSize = 0.2f;
+        RootContainer->Region = Rect2f(Region.X, Region.Y + BorderSize + HeaderSize, Region.W, Region.H);
+
+        TabbedHeader->RootDraggingStart = V2(RootContainer->Region.X,RootContainer->Region.Y);
+
+        container_node* RootHeader = NewContainer(Interface, "Headerkek", container_type::MenuHeader, window_regions::WholeBody);
+        RootHeader->MenuHeader->HeaderSize = HeaderSize;
+        RootHeader->MenuHeader->RootWindow = RootContainer;
+
+        ConnectNode(0, &Root->Root->TreeNode);
+        ConnectNode(&RootContainer->TreeNode, &RootHeader->TreeNode);
+        ConnectNode(&RootHeader->TreeNode, &Node->TreeNode);
+
+        Node->RegionType = window_regions::WholeBody;
+        TabbedHeader->RootWindow = Root->Root;
+
+        // Note> Just random numbers that will give a large enought stack to traverse atm
+        Root->Depth = 6;
+        Root->NodeCount = 6;
+
+        menu_tree TopMenu = *Root;
+        MoveMenuToTop(Interface, Interface->RootContainerCount-1);
+        Interface->HotWindow = TopMenu;
+      }
+
+      //UpdateRegions( &DebugState->Arena, Root->NodeCount, Root->Root);
     }
   }
 }
@@ -715,13 +793,12 @@ MENU_DRAW( TabbedHeaderDraw )
 
   DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::Header, Node), HeaderColor);
 
-  if(Node->TabbedHeader->WindowDrag)
+  if(Node->TabbedHeader->WindowDrag && !Node->TabbedHeader->RootWindow )
   {
     rect2f Region = Node->Region;
-    v2 Start = Node->TabbedHeader->DraggingStart;
-    v2 Current = Node->TabbedHeader->MousePos;
-    Region.X += Current.X-Start.X;
-    Region.Y += Current.Y-Start.Y;
+    v2 Delta = Interface->MousePos-Interface->MouseLeftButtonPush;
+    Region.X += Delta.X;
+    Region.Y += Delta.Y;
     DEBUGPushQuad(Region, V4(0.3,0.5,0.3,0.3));
   }
 }

@@ -364,7 +364,7 @@ typedef MENU_GET_REGION_RECT( menu_get_region_rect );
 #define MENU_GET_MOUSE_OVER_REGION(name) window_regions name( container_node* Node, v2 MousePos)
 typedef MENU_GET_MOUSE_OVER_REGION( menu_get_mouse_over_region );
 
-#define MENU_DRAW(name) void name( container_node* Node)
+#define MENU_DRAW(name) void name( menu_interface* Interface, container_node* Node)
 typedef MENU_DRAW( menu_draw );
 
 
@@ -433,9 +433,14 @@ menu_functions HorizontalMenuFunctions();
 struct tabbed_header_window
 {
   r32 HeaderSize;
+  container_node* RootWindow;
   v2 DraggingStart;
-  v2 MousePos;
+
+  v2 RootDraggingStart;
+
   b32 WindowDrag;
+
+  container_node* NodeToMerge;
 };
 
 struct menu_header_window
@@ -460,7 +465,7 @@ struct split_window
 
 struct empty_window
 {
-  int a = 0;
+  v4 Color;
 };
 
 struct root_window
@@ -515,6 +520,8 @@ struct menu_interface
 };
 
 
+container_node* NewContainer(menu_interface* Interface, c8* Name, container_type Type, window_regions RegionType);
+menu_tree* GetNewMenuTree(menu_interface* Interface);
 void DisconnectNode(tree_node* Node);
 void ConnectNode(tree_node* Parent, tree_node* NewNode);
 
