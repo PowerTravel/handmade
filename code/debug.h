@@ -397,7 +397,6 @@ struct menu_functions
 struct container_node
 {
   container_type Type;
-  window_regions RegionType;
   u32 Index;
   rect2f Region;
 

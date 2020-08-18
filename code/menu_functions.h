@@ -570,57 +570,61 @@ MENU_MOUSE_UP( TabbedHeaderMouseUp )
 
   tabbed_header_window* TabbedHeader = Node->TabbedHeader;
   container_node* OppositeNode = Node->TabbedHeader->NodeToMerge;
+  container_node* SplitContainer = 0;
   if(OppositeNode)
-  {
-
-    // 0 Left Quarter
-    // 1 Middle Point
-    // 2 Right Quarter
-    // 3 Bot Quarter
-    // 4 Top Quarter
-
-    window_regions ParentRegion = OppositeNode->RegionType;
-
-    container_node* SplitContainer = 0;
-    if( TabbedHeader->HotMergeZone == 0 )
+  { 
+    if( TabbedHeader->HotMergeZone == 0  || TabbedHeader->HotMergeZone == 2 )
     {
-      SplitContainer = NewContainer(Interface,  "Split", container_type::VerticalSplit, ParentRegion);
+      // Vertical
+      SplitContainer = NewContainer(Interface,  "Split", container_type::VerticalSplit, window_regions::None);
       SplitContainer->SplitWindow->BorderSize = 0.007f;
       SplitContainer->SplitWindow->MinSize = 0.02f;
-      SplitContainer->SplitWindow->SplitFraction = 0.5f;
-
-      OppositeNode->RegionType = window_regions::RightBody;
-      Node->RegionType = window_regions::LeftBody;
+      SplitContainer->SplitWindow->SplitFraction = 0.5f; 
     }else if( TabbedHeader->HotMergeZone == 1 ){
-      
-    }else if( TabbedHeader->HotMergeZone == 2 ){
-      SplitContainer = NewContainer(Interface,  "Split", container_type::VerticalSplit, ParentRegion);
+      // Middle
+    }else if( TabbedHeader->HotMergeZone == 3  || TabbedHeader->HotMergeZone == 4){
+      // Horizontal
+      SplitContainer = NewContainer(Interface,  "Split", container_type::HorizontalSplit, window_regions::None);
       SplitContainer->SplitWindow->BorderSize = 0.007f;
       SplitContainer->SplitWindow->MinSize = 0.02f;
       SplitContainer->SplitWindow->SplitFraction = 0.5f;
-
-      OppositeNode->RegionType = window_regions::LeftBody;
-      Node->RegionType = window_regions::RightBody;
-    }else if( TabbedHeader->HotMergeZone == 3 ){
-      SplitContainer = NewContainer(Interface,  "Split", container_type::HorizontalSplit, ParentRegion);
-      SplitContainer->SplitWindow->BorderSize = 0.007f;
-      SplitContainer->SplitWindow->MinSize = 0.02f;
-      SplitContainer->SplitWindow->SplitFraction = 0.5f;
-
-      Node->RegionType = window_regions::BotBody;
-      OppositeNode->RegionType = window_regions::TopBody;
-    }else if( TabbedHeader->HotMergeZone == 4 ){
-      SplitContainer = NewContainer(Interface,  "Split", container_type::HorizontalSplit, ParentRegion);
-      SplitContainer->SplitWindow->BorderSize = 0.007f;
-      SplitContainer->SplitWindow->MinSize = 0.02f;
-      SplitContainer->SplitWindow->SplitFraction = 0.5f;
-
-      Node->RegionType = window_regions::TopBody;
-      OppositeNode->RegionType = window_regions::BotBody;
     }
 
     if(SplitContainer)
     {
+      container_node* CommonParent = OppositeNode->Parent;
+      if(CommonParent->Type ==  container_type::VerticalSplit ||
+         CommonParent->Type ==  container_type::HorizontalSplit)
+      {
+        if(CommonParent->FirstChild == OppositeNode)
+        {
+          container_node* Sibling = OppositeNode->NextSibling;
+          DisconnectNode(Sibling);
+          DisconnectNode(OppositeNode);
+
+          ConnectNode(CommonParent, SplitContainer);
+          ConnectNode(CommonParent, Sibling);
+        }else{
+          DisconnectNode(OppositeNode);
+          ConnectNode(CommonParent, SplitContainer);  
+        }
+      }else{
+        DisconnectNode(OppositeNode);
+        ConnectNode(CommonParent, SplitContainer);
+      }
+
+      DisconnectNode(Node);
+      if( TabbedHeader->HotMergeZone == 0  || TabbedHeader->HotMergeZone == 3 )
+      {
+        // Left || Bot
+        ConnectNode(SplitContainer, Node);
+        ConnectNode(SplitContainer, OppositeNode);
+      }else if(TabbedHeader->HotMergeZone == 2  ||  TabbedHeader->HotMergeZone == 4){  
+        // Right || Top
+        ConnectNode(SplitContainer, OppositeNode);
+        ConnectNode(SplitContainer, Node);
+      }
+
       if(OppositeNode->Type == container_type::TabbedHeader)
       {
         OppositeNode->TabbedHeader->RootWindow = 0;
@@ -629,16 +633,7 @@ MENU_MOUSE_UP( TabbedHeaderMouseUp )
 
       Assert(OppositeNode->Type == container_type::TabbedHeader);
   
-      FreeMenuTree(Interface, &Interface->HotWindow);    
-  
-      container_node* CommonParent = OppositeNode->Parent;
-  
-      DisconnectNode(Node);
-      DisconnectNode(OppositeNode);
-  
-      ConnectNode(CommonParent, SplitContainer);
-      ConnectNode(SplitContainer, OppositeNode);
-      ConnectNode(SplitContainer, Node);
+      FreeMenuTree(Interface, &Interface->HotWindow);
   
       TabbedHeader->NodeToMerge = 0;
     }
@@ -743,23 +738,17 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
 
       container_node* ParentContainer = Node->Parent;
       container_node* OppositeNode = 0;
-      if(ParentContainer->Type == container_type::VerticalSplit)
+      if(ParentContainer->Type == container_type::VerticalSplit || 
+         ParentContainer->Type == container_type::HorizontalSplit)
       {
-        if(Node->RegionType == window_regions::LeftBody)
+        if(Node == ParentContainer->FirstChild)
         {
           OppositeNode = Node->NextSibling;
         }else{
           OppositeNode = ParentContainer->FirstChild;
-        }
-      }else if(ParentContainer->Type == container_type::HorizontalSplit){
-        if(Node->RegionType == window_regions::TopBody)
-        {
-          OppositeNode = Node->NextSibling;
-        }else{
-          OppositeNode = ParentContainer->FirstChild;
+          Assert(Node == OppositeNode->NextSibling);
         }
       }
-
       if(OppositeNode)
       {
         if(OppositeNode->Type == container_type::TabbedHeader)
@@ -767,12 +756,34 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
           OppositeNode->TabbedHeader->RootWindow = Interface->HotWindow.Root;
         }
 
-        OppositeNode->RegionType = ParentContainer->RegionType;
         container_node* GrandParentContainer = ParentContainer->Parent;
+
+#if 0
         DisconnectNode(ParentContainer);
         ConnectNode(GrandParentContainer, OppositeNode);
         DisconnectNode(Node);
+#else
+        if(GrandParentContainer->Type ==  container_type::VerticalSplit ||
+           GrandParentContainer->Type ==  container_type::HorizontalSplit)
+        {
+          if(GrandParentContainer->FirstChild == ParentContainer)
+          {
+            container_node* Sibling = ParentContainer->NextSibling;
+            DisconnectNode(Sibling);
+            DisconnectNode(ParentContainer);
 
+            ConnectNode(GrandParentContainer, OppositeNode);
+            ConnectNode(GrandParentContainer, Sibling);
+          }else{
+            DisconnectNode(ParentContainer);
+            ConnectNode(GrandParentContainer, OppositeNode);  
+          }
+        }else{
+          DisconnectNode(ParentContainer);
+          ConnectNode(GrandParentContainer, OppositeNode);
+        }
+        DisconnectNode(Node);
+#endif
         menu_tree* Root = GetNewMenuTree(Interface);
         Root->Root = NewContainer(Interface, "Root", container_type::Root, window_regions::WholeBody);
 
@@ -795,7 +806,7 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
         ConnectNode(RootContainer, RootHeader);
         ConnectNode(RootHeader, Node);
 
-        Node->RegionType = window_regions::WholeBody;
+        //Node->RegionType = window_regions::WholeBody;
         TabbedHeader->RootWindow = Root->Root;
 
         // Note> Just random numbers that will give a large enought stack to traverse atm

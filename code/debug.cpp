@@ -206,7 +206,7 @@ container_node* NewContainer(menu_interface* Interface, c8* Name, container_type
   u32 NodeIndex = GetFirstFreeIndex(ArrayCount(Interface->ContainerOccupancy), Interface->ContainerOccupancy);
   container_node* Node = &Interface->ContainerNodes[NodeIndex];
   Node->Type = Type;
-  Node->RegionType = RegionType;
+//  Node->RegionType = RegionType;
   Platform.DEBUGFormatString(Node->Header,  sizeof(Node->Header), sizeof(Node->Header)-1, Name);
   Node->Index = IndexCounter++;
 
@@ -235,7 +235,6 @@ void InitializeMenuFunctionPointers(container_node* RootWindow, memory_arena* Ar
     ContainerStack[StackCount] = 0;
 
     Parent->Functions = GetMenuFunction(Parent->Type);
-    // Update the region of all children and push them to the stack
 
     container_node* Child = Parent->FirstChild;
     while(Child)
@@ -268,12 +267,25 @@ void UpdateRegions( memory_arena* Arena, u32 NodeCount, container_node* Containe
 
     // Update the region of all children and push them to the stack
     container_node* Child = Parent->FirstChild;
+    u32 ChildIndex = 0;
+    window_regions RegionType = window_regions::WholeBody;
     while(Child)
     {
-      Child->Region = Parent->Functions.GetRegionRect(Child->RegionType, Parent);
+      if(Parent->Type == container_type::HorizontalSplit)
+      {
+        RegionType = ChildIndex == 0 ? window_regions::BotBody : window_regions::TopBody;
+      }else if(Parent->Type == container_type::VerticalSplit)
+      {
+        RegionType = ChildIndex == 0 ? window_regions::LeftBody : window_regions::RightBody;
+      }else{
+        Assert(ChildIndex == 0);
+      }
+
+      Child->Region = Parent->Functions.GetRegionRect(RegionType, Parent);
       ContainerStack[StackCount++] = Child;
 
       Child = Child->NextSibling;
+      ChildIndex++;
     }
   }
 }
@@ -335,11 +347,13 @@ node_region_pair GetRegion(memory_arena* Arena, u32 NodeCount, container_node* C
       return Result;
     }
 
+    rect2f RegionRect = Parent->Functions.GetRegionRect(Region, Parent);
+
     // Check if mouse is inside the child region and push those to the stack.
     container_node* Child = Parent->FirstChild;
     while(Child)
     {
-      if(Child->RegionType == Region)
+      if(Intersects(Child->Region, MousePos))
       {
         ContainerStack[StackCount++] = Child;
       }
@@ -1171,13 +1185,7 @@ void DrawMenu( radial_menu* RadialMenu )
 }
 
 
-inline internal b32
-Intersects(const rect2f & Rect, v2 P)
-{
-  b32 Result = (P.X>=Rect.X && (P.X<=Rect.X+Rect.W)) &&
-               (P.Y>=Rect.Y && (P.Y<=Rect.Y+Rect.H));
-  return Result;
-}
+
 
 void MoveMenuToTop(menu_interface* Interface, u32 WindowIndex)
 {

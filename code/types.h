@@ -60,6 +60,8 @@ typedef double r64;
 #define Pi32  3.14159265359f
 #define Tau32 6.28318530718f
 
+#include "math/vector_math.h"
+
 struct rect2f
 {
 	r32 X,Y,W,H;
@@ -74,3 +76,21 @@ rect2f Rect2f( r32 X, r32 Y, r32 W, r32 H )
   Result.H = H;
 	return Result;
 };
+
+inline b32
+Intersects(const rect2f & Rect, v2 P)
+{
+  b32 Result = (P.X>=Rect.X && (P.X<=Rect.X+Rect.W)) &&
+               (P.Y>=Rect.Y && (P.Y<=Rect.Y+Rect.H));
+  return Result;
+}
+
+inline b32
+Intersects(const rect2f& A, const rect2f& B)
+{
+  b32 Result = ( (A.X+A.W) <  B.X)       ||
+               (  A.X      > (B.X+B.W))  ||
+               ( (A.Y+A.H) <  B.Y)       ||
+               (  A.Y      > (B.Y+B.H));
+  return Result;
+}
