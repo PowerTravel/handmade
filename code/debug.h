@@ -324,13 +324,6 @@ const char* ToString(window_regions Region)
   return "";
 };
 
-struct tree_node
-{
-  tree_node* Parent;
-  tree_node* FirstChild;
-  tree_node* NextSibling;
-};
-
 struct container_node;
 
 void PushWindow( window_regions Type, container_node* Node );
@@ -403,7 +396,6 @@ struct menu_functions
  */
 struct container_node
 {
-  tree_node TreeNode; // "tree_node* Node" Must be on top so we can cast tree_node* to a container_node*
   container_type Type;
   window_regions RegionType;
   u32 Index;
@@ -421,6 +413,11 @@ struct container_node
     struct empty_window* EmptyWindow;
     struct root_window* RootWindow;
   };
+
+  // Tree Connections
+  container_node* Parent;
+  container_node* FirstChild;
+  container_node* NextSibling;
 };
 
 menu_functions GetEmptyFunctions();
@@ -525,8 +522,8 @@ struct menu_interface
 
 container_node* NewContainer(menu_interface* Interface, c8* Name, container_type Type, window_regions RegionType);
 menu_tree* GetNewMenuTree(menu_interface* Interface);
-void DisconnectNode(tree_node* Node);
-void ConnectNode(tree_node* Parent, tree_node* NewNode);
+void DisconnectNode(container_node* Node);
+void ConnectNode(container_node* Parent, container_node* NewNode);
 
 void SetMouseInput(game_input* GameInput, menu_interface* Interface);
 

@@ -631,14 +631,14 @@ MENU_MOUSE_UP( TabbedHeaderMouseUp )
   
       FreeMenuTree(Interface, &Interface->HotWindow);    
   
-      container_node* CommonParent = (container_node*) OppositeNode->TreeNode.Parent;
+      container_node* CommonParent = OppositeNode->Parent;
   
-      DisconnectNode(&Node->TreeNode);
-      DisconnectNode(&OppositeNode->TreeNode);
+      DisconnectNode(Node);
+      DisconnectNode(OppositeNode);
   
-      ConnectNode(&CommonParent->TreeNode, &SplitContainer->TreeNode);
-      ConnectNode(&SplitContainer->TreeNode, &OppositeNode->TreeNode);
-      ConnectNode(&SplitContainer->TreeNode, &Node->TreeNode);
+      ConnectNode(CommonParent, SplitContainer);
+      ConnectNode(SplitContainer, OppositeNode);
+      ConnectNode(SplitContainer, Node);
   
       TabbedHeader->NodeToMerge = 0;
     }
@@ -686,7 +686,7 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
       {
         while(NodeRegion.Node && NodeRegion.Node->Type != container_type::TabbedHeader)
         {
-          NodeRegion.Node = (container_node*) NodeRegion.Node->TreeNode.Parent;
+          NodeRegion.Node = NodeRegion.Node->Parent;
         }
         
         if(NodeRegion.Node)
@@ -708,10 +708,10 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
       r32 S = Minimum(W,H)/4;
 
       v2 MP = V2(Rect.X+W/2,Rect.Y+H/2); // Middle Point
-      v2 LQ = V2(MP.X-S, MP.Y); // Left Quarter
-      v2 RQ = V2(MP.X+S, MP.Y); // Right Quarter
-      v2 BQ = V2(MP.X,   MP.Y-S); // Bot Quarter
-      v2 TQ = V2(MP.X,   MP.Y+S); // Top Quarter
+      v2 LQ = V2(MP.X-S, MP.Y);          // Left Quarter
+      v2 RQ = V2(MP.X+S, MP.Y);          // Right Quarter
+      v2 BQ = V2(MP.X,   MP.Y-S);        // Bot Quarter
+      v2 TQ = V2(MP.X,   MP.Y+S);        // Top Quarter
 
       TabbedHeader->MergeZone[0] = Rect2f(LQ.X-S/2.f, LQ.Y-S/2.f,S/1.1f,S/1.1f); // Left Quarter
       TabbedHeader->MergeZone[1] = Rect2f(MP.X-S/2.f, MP.Y-S/2.f,S/1.1f,S/1.1f); // Middle Point
@@ -739,58 +739,39 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
     b32 SplitOccured = false;
     if(NormSq(Delta) > 0.01)
     {
-      if(Node->TreeNode.Parent)
+      Assert(Node->Parent)
+
+      container_node* ParentContainer = Node->Parent;
+      container_node* OppositeNode = 0;
+      if(ParentContainer->Type == container_type::VerticalSplit)
       {
-        container_node* ParentContainer = (container_node*) Node->TreeNode.Parent;
-        if(ParentContainer->Type == container_type::VerticalSplit)
+        if(Node->RegionType == window_regions::LeftBody)
         {
-          container_node* OppositeNode = 0;
-          if(Node->RegionType == window_regions::LeftBody)
-          {
-            OppositeNode = (container_node*) Node->TreeNode.NextSibling;
-          }else{
-            OppositeNode = (container_node*) ParentContainer->TreeNode.FirstChild;
-          }
-
-          if(OppositeNode->Type == container_type::TabbedHeader)
-          {
-            OppositeNode->TabbedHeader->RootWindow = Interface->HotWindow.Root;
-          }
-
-          OppositeNode->RegionType = ParentContainer->RegionType;
-          container_node* GrandParentContainer = (container_node*) ParentContainer->TreeNode.Parent;
-          DisconnectNode(&ParentContainer->TreeNode);
-          ConnectNode(&GrandParentContainer->TreeNode, &OppositeNode->TreeNode);
-          DisconnectNode(&Node->TreeNode);
-
-          SplitOccured = true;
-        }else if(ParentContainer->Type == container_type::HorizontalSplit){
-          container_node* OppositeNode = 0;
-          if(Node->RegionType == window_regions::TopBody)
-          {
-            OppositeNode = (container_node*) Node->TreeNode.NextSibling;
-          }else{
-            OppositeNode = (container_node*) ParentContainer->TreeNode.FirstChild;
-          }
-
-          if(OppositeNode->Type == container_type::TabbedHeader)
-          {
-            OppositeNode->TabbedHeader->RootWindow = Interface->HotWindow.Root;
-          }
-
-          OppositeNode->RegionType = ParentContainer->RegionType;
-          container_node* GrandParentContainer = (container_node*) ParentContainer->TreeNode.Parent;
-          DisconnectNode(&ParentContainer->TreeNode);
-          ConnectNode(&GrandParentContainer->TreeNode, &OppositeNode->TreeNode);
-          DisconnectNode(&Node->TreeNode);
-
-          SplitOccured = true;
+          OppositeNode = Node->NextSibling;
+        }else{
+          OppositeNode = ParentContainer->FirstChild;
+        }
+      }else if(ParentContainer->Type == container_type::HorizontalSplit){
+        if(Node->RegionType == window_regions::TopBody)
+        {
+          OppositeNode = Node->NextSibling;
+        }else{
+          OppositeNode = ParentContainer->FirstChild;
         }
       }
 
-      if(SplitOccured)
+      if(OppositeNode)
       {
-        rect2f Region = Node->Region;
+        if(OppositeNode->Type == container_type::TabbedHeader)
+        {
+          OppositeNode->TabbedHeader->RootWindow = Interface->HotWindow.Root;
+        }
+
+        OppositeNode->RegionType = ParentContainer->RegionType;
+        container_node* GrandParentContainer = ParentContainer->Parent;
+        DisconnectNode(ParentContainer);
+        ConnectNode(GrandParentContainer, OppositeNode);
+        DisconnectNode(Node);
 
         menu_tree* Root = GetNewMenuTree(Interface);
         Root->Root = NewContainer(Interface, "Root", container_type::Root, window_regions::WholeBody);
@@ -802,7 +783,7 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
         
         RootContainer->RootWindow->BorderSize = BorderSize;
         RootContainer->RootWindow->MinSize = 0.2f;
-        RootContainer->Region = Rect2f(Region.X, Region.Y + BorderSize + HeaderSize, Region.W, Region.H);
+        RootContainer->Region = Rect2f(Node->Region.X, Node->Region.Y + BorderSize + HeaderSize, Node->Region.W, Node->Region.H);
 
         TabbedHeader->RootDraggingStart = V2(RootContainer->Region.X,RootContainer->Region.Y);
 
@@ -810,9 +791,9 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
         RootHeader->MenuHeader->HeaderSize = HeaderSize;
         RootHeader->MenuHeader->RootWindow = RootContainer;
 
-        ConnectNode(0, &Root->Root->TreeNode);
-        ConnectNode(&RootContainer->TreeNode, &RootHeader->TreeNode);
-        ConnectNode(&RootHeader->TreeNode, &Node->TreeNode);
+        ConnectNode(0, Root->Root);
+        ConnectNode(RootContainer, RootHeader);
+        ConnectNode(RootHeader, Node);
 
         Node->RegionType = window_regions::WholeBody;
         TabbedHeader->RootWindow = Root->Root;

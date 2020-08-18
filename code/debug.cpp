@@ -231,17 +231,16 @@ void InitializeMenuFunctionPointers(container_node* RootWindow, memory_arena* Ar
   while(StackCount>0)
   {
     // Pop new parent from Stack
-    container_node* ParentContainer = ContainerStack[--StackCount];
+    container_node* Parent = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
 
-    ParentContainer->Functions = GetMenuFunction(ParentContainer->Type);
+    Parent->Functions = GetMenuFunction(Parent->Type);
     // Update the region of all children and push them to the stack
-    tree_node* Parent = (tree_node*)ParentContainer;
-    tree_node* Child = Parent->FirstChild;
+
+    container_node* Child = Parent->FirstChild;
     while(Child)
     {
-      container_node* ChildContainer = (container_node*) Child;
-      ContainerStack[StackCount++] = ChildContainer;
+      ContainerStack[StackCount++] = Child;
 
       Child = Child->NextSibling;
     }
@@ -264,17 +263,15 @@ void UpdateRegions( memory_arena* Arena, u32 NodeCount, container_node* Containe
   while(StackCount>0)
   {
     // Pop new parent from Stack
-    container_node* ParentContainer = ContainerStack[--StackCount];
+    container_node* Parent = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
 
     // Update the region of all children and push them to the stack
-    tree_node* Parent = (tree_node*)ParentContainer;
-    tree_node* Child = Parent->FirstChild;
+    container_node* Child = Parent->FirstChild;
     while(Child)
     {
-      container_node* ChildContainer = (container_node*) Child;
-      ChildContainer->Region = ParentContainer->Functions.GetRegionRect(ChildContainer->RegionType, ParentContainer);
-      ContainerStack[StackCount++] = ChildContainer;
+      Child->Region = Parent->Functions.GetRegionRect(Child->RegionType, Parent);
+      ContainerStack[StackCount++] = Child;
 
       Child = Child->NextSibling;
     }
@@ -296,18 +293,15 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
   while(StackCount>0)
   {
     // Pop new parent from Stack
-    container_node* ParentContainer = ContainerStack[--StackCount];
+    container_node* Parent = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
 
-    ParentContainer->Functions.Draw(Interface, ParentContainer);
+    Parent->Functions.Draw(Interface, Parent);
     // Update the region of all children and push them to the stack
-    tree_node* Parent = (tree_node*)ParentContainer;
-    tree_node* Child = Parent->FirstChild;
+    container_node* Child = Parent->FirstChild;
     while(Child)
     {
-      container_node* ChildContainer = (container_node*) Child;
-      ContainerStack[StackCount++] = ChildContainer;
-
+      ContainerStack[StackCount++] = Child;
       Child = Child->NextSibling;
     }
   }
@@ -329,10 +323,10 @@ node_region_pair GetRegion(memory_arena* Arena, u32 NodeCount, container_node* C
   while(StackCount>0)
   {
     // Pop new parent from Stack
-    container_node* ParentContainer = ContainerStack[--StackCount];
+    container_node* Parent = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
 
-    window_regions Region = ParentContainer->Functions.GetMouseOverRegion(ParentContainer, MousePos);
+    window_regions Region = Parent->Functions.GetMouseOverRegion(Parent, MousePos);
 
     if(Region == window_regions::None)
     {
@@ -342,21 +336,19 @@ node_region_pair GetRegion(memory_arena* Arena, u32 NodeCount, container_node* C
     }
 
     // Check if mouse is inside the child region and push those to the stack.
-    tree_node* Parent = (tree_node*)ParentContainer;
-    tree_node* Child = Parent->FirstChild;
+    container_node* Child = Parent->FirstChild;
     while(Child)
     {
-      container_node* ChildContainer = (container_node*) Child;
-      if(ChildContainer->RegionType == Region)
+      if(Child->RegionType == Region)
       {
-        ContainerStack[StackCount++] = ChildContainer;
+        ContainerStack[StackCount++] = Child;
       }
       Child = Child->NextSibling;
     }
 
     if(StackCount == 0)
     {
-      Result.Node = ParentContainer;
+      Result.Node = Parent;
       Result.Region = Region;
       return Result;
     }
@@ -397,9 +389,9 @@ void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree)
   Interface->RootContainerCount--;
 }
 
-void DisconnectNode(tree_node* Node)
+void DisconnectNode(container_node* Node)
 {
-  tree_node* Parent = Node->Parent;
+  container_node* Parent = Node->Parent;
   if(Parent)
   {
     Assert(Parent->FirstChild);
@@ -407,7 +399,7 @@ void DisconnectNode(tree_node* Node)
     {
       Parent->FirstChild = Node->NextSibling; 
     }else{
-      tree_node* Child = Parent->FirstChild;
+      container_node* Child = Parent->FirstChild;
       while(Child->NextSibling)
       {
         if(Child->NextSibling == Node)
@@ -424,13 +416,13 @@ void DisconnectNode(tree_node* Node)
 }
 
 
-void ConnectNode(tree_node* Parent, tree_node* NewNode)
+void ConnectNode(container_node* Parent, container_node* NewNode)
 {
   NewNode->Parent = Parent;
 
   if( Parent )
   {
-    tree_node** Child = &Parent->FirstChild;
+    container_node** Child = &Parent->FirstChild;
     while(*Child)
     {
       Child = &((*Child)->NextSibling);
@@ -534,16 +526,16 @@ DEBUGGetState()
       container_node*  EmptyContainer1 = NewContainer(Interface, "Empty1", container_type::Empty, window_regions::WholeBody);
       EmptyContainer1->EmptyWindow->Color = V4(0,0.4,0.4,1);
 
-      ConnectNode(0, &Root->Root->TreeNode); // 0
+      ConnectNode(0, Root->Root); // 0
 
-      ConnectNode(&RootContainer->TreeNode, &RootHeader->TreeNode); // 1
-      ConnectNode(&RootHeader->TreeNode,    &SplitContainer->TreeNode); // 2
+      ConnectNode(RootContainer, RootHeader); // 1
+      ConnectNode(RootHeader,    SplitContainer); // 2
 
-      ConnectNode(&SplitContainer->TreeNode, &TabbedHeader0->TreeNode); // 3
-      ConnectNode(&TabbedHeader0->TreeNode,  &EmptyContainer0->TreeNode); // 4
+      ConnectNode(SplitContainer, TabbedHeader0); // 3
+      ConnectNode(TabbedHeader0,  EmptyContainer0); // 4
 
-      ConnectNode(&SplitContainer->TreeNode, &TabbedHeader1->TreeNode); // 3
-      ConnectNode(&TabbedHeader1->TreeNode,  &EmptyContainer1->TreeNode); // 4
+      ConnectNode(SplitContainer, TabbedHeader1); // 3
+      ConnectNode(TabbedHeader1,  EmptyContainer1); // 4
 
       Root->Depth = 4;
       Root->NodeCount = 7;
@@ -580,16 +572,16 @@ DEBUGGetState()
       container_node*  EmptyContainer1 = NewContainer(Interface, "Empty1", container_type::Empty, window_regions::WholeBody);
       EmptyContainer1->EmptyWindow->Color = V4(0.4,0,0,1);
 
-      ConnectNode(0, &Root->Root->TreeNode); // 0
+      ConnectNode(0, Root->Root); // 0
 
-      ConnectNode(&RootContainer->TreeNode, &RootHeader->TreeNode); // 1
-      ConnectNode(&RootHeader->TreeNode,    &SplitContainer->TreeNode); // 2
+      ConnectNode(RootContainer, RootHeader); // 1
+      ConnectNode(RootHeader,    SplitContainer); // 2
 
-      ConnectNode(&SplitContainer->TreeNode, &TabbedHeader0->TreeNode); // 3
-      ConnectNode(&TabbedHeader0->TreeNode,  &EmptyContainer0->TreeNode); // 4
+      ConnectNode(SplitContainer, TabbedHeader0); // 3
+      ConnectNode(TabbedHeader0,  EmptyContainer0); // 4
 
-      ConnectNode(&SplitContainer->TreeNode, &TabbedHeader1->TreeNode); // 3
-      ConnectNode(&TabbedHeader1->TreeNode,  &EmptyContainer1->TreeNode); // 4
+      ConnectNode(SplitContainer, TabbedHeader1); // 3
+      ConnectNode(TabbedHeader1,  EmptyContainer1); // 4
 
       Root->Depth = 4;
       Root->NodeCount = 7;
