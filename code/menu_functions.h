@@ -566,32 +566,27 @@ MENU_MOUSE_DOWN( TabbedHeaderMouseDown )
 
 MENU_MOUSE_UP( TabbedHeaderMouseUp )
 {
-  Node->TabbedHeader->WindowDrag = false;
-
   tabbed_header_window* TabbedHeader = Node->TabbedHeader;
-  container_node* OppositeNode = Node->TabbedHeader->NodeToMerge;
-  container_node* SplitContainer = 0;
-  if(OppositeNode)
-  { 
-    if( TabbedHeader->HotMergeZone == 0  || TabbedHeader->HotMergeZone == 2 )
+  TabbedHeader->WindowDrag = false;
+
+  if(Node->TabbedHeader->NodeToMerge)
+  {
+    Assert(Node->TabbedHeader->NodeToMerge->Type == container_type::TabbedHeader);
+    u32 ZoneIndex = TabbedHeader->HotMergeZone;
+    if( ZoneIndex == 1 )
     {
-      // Vertical
-      SplitContainer = NewContainer(Interface,  "Split", container_type::VerticalSplit, window_regions::None);
+      // Middle
+      Platform.DEBUGPrint("TABBED MERGE\n");
+    }else if( ZoneIndex == 0  || ZoneIndex == 2 ||  // Vertical
+              ZoneIndex == 3  || ZoneIndex == 4)    // Horizontal
+    {
+      container_node* OppositeNode = Node->TabbedHeader->NodeToMerge;
+      container_type Type = (ZoneIndex == 0  || ZoneIndex == 2) ? container_type::VerticalSplit : container_type::HorizontalSplit;
+      container_node* SplitContainer = NewContainer(Interface, Type);
       SplitContainer->SplitWindow->BorderSize = 0.007f;
       SplitContainer->SplitWindow->MinSize = 0.02f;
       SplitContainer->SplitWindow->SplitFraction = 0.5f; 
-    }else if( TabbedHeader->HotMergeZone == 1 ){
-      // Middle
-    }else if( TabbedHeader->HotMergeZone == 3  || TabbedHeader->HotMergeZone == 4){
-      // Horizontal
-      SplitContainer = NewContainer(Interface,  "Split", container_type::HorizontalSplit, window_regions::None);
-      SplitContainer->SplitWindow->BorderSize = 0.007f;
-      SplitContainer->SplitWindow->MinSize = 0.02f;
-      SplitContainer->SplitWindow->SplitFraction = 0.5f;
-    }
 
-    if(SplitContainer)
-    {
       container_node* CommonParent = OppositeNode->Parent;
       if(CommonParent->Type ==  container_type::VerticalSplit ||
          CommonParent->Type ==  container_type::HorizontalSplit)
@@ -614,12 +609,12 @@ MENU_MOUSE_UP( TabbedHeaderMouseUp )
       }
 
       DisconnectNode(Node);
-      if( TabbedHeader->HotMergeZone == 0  || TabbedHeader->HotMergeZone == 3 )
+      if( ZoneIndex == 0  || ZoneIndex == 3 )
       {
         // Left || Bot
         ConnectNode(SplitContainer, Node);
         ConnectNode(SplitContainer, OppositeNode);
-      }else if(TabbedHeader->HotMergeZone == 2  ||  TabbedHeader->HotMergeZone == 4){  
+      }else if(ZoneIndex == 2  ||  ZoneIndex == 4){  
         // Right || Top
         ConnectNode(SplitContainer, OppositeNode);
         ConnectNode(SplitContainer, Node);
@@ -669,6 +664,7 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
 
     debug_state* DebugState = DEBUGGetState();
     container_node* NodeToMergeWith = 0;
+    tabbed_header_window* TabbedHeaderToMergeWith = 0;
     for (u32 WindowIndex = 1;
          WindowIndex < Interface->RootContainerCount;
          ++WindowIndex)
@@ -686,6 +682,7 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
         
         if(NodeRegion.Node)
         {
+          TabbedHeaderToMergeWith = NodeRegion.Node->TabbedHeader;
           NodeToMergeWith = NodeRegion.Node;
           break;
         }
@@ -730,7 +727,6 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
       }
     }
 
-
     b32 SplitOccured = false;
     if(NormSq(Delta) > 0.01)
     {
@@ -758,11 +754,6 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
 
         container_node* GrandParentContainer = ParentContainer->Parent;
 
-#if 0
-        DisconnectNode(ParentContainer);
-        ConnectNode(GrandParentContainer, OppositeNode);
-        DisconnectNode(Node);
-#else
         if(GrandParentContainer->Type ==  container_type::VerticalSplit ||
            GrandParentContainer->Type ==  container_type::HorizontalSplit)
         {
@@ -783,9 +774,10 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
           ConnectNode(GrandParentContainer, OppositeNode);
         }
         DisconnectNode(Node);
-#endif
+        DeleteContainer(Interface, ParentContainer);
+
         menu_tree* Root = GetNewMenuTree(Interface);
-        Root->Root = NewContainer(Interface, "Root", container_type::Root, window_regions::WholeBody);
+        Root->Root = NewContainer(Interface, container_type::Root);
 
         r32 BorderSize = 0.007;
         r32 HeaderSize = 0.02;
@@ -798,7 +790,7 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
 
         TabbedHeader->RootDraggingStart = V2(RootContainer->Region.X,RootContainer->Region.Y);
 
-        container_node* RootHeader = NewContainer(Interface, "Headerkek", container_type::MenuHeader, window_regions::WholeBody);
+        container_node* RootHeader = NewContainer(Interface, container_type::MenuHeader);
         RootHeader->MenuHeader->HeaderSize = HeaderSize;
         RootHeader->MenuHeader->RootWindow = RootContainer;
 

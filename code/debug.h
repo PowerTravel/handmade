@@ -394,18 +394,24 @@ struct menu_functions
  *          |  Footer  |
  *          ------------
  */
+
 struct container_node
 {
   container_type Type;
-  u32 Index;
+
+  container_node* Parent;
+  container_node* FirstChild;
+  container_node* NextSibling;
+  
   rect2f Region;
 
-  c8 Header[64];
+  u32 ContainerIndex;
+  u32 WindowIndex;
 
   menu_functions Functions;
   union
   {
-    void* Container;
+    void* WindowPointer;
     struct tabbed_header_window* TabbedHeader;
     struct menu_header_window* MenuHeader;
     struct split_window* SplitWindow;
@@ -413,11 +419,9 @@ struct container_node
     struct root_window* RootWindow;
   };
 
-  // Tree Connections
-  container_node* Parent;
-  container_node* FirstChild;
-  container_node* NextSibling;
 };
+
+#define GetContainingNode( WindowPtr )  (container_node*) ( ((u8*)(WindowPtr)) - OffsetOf(container_node, WindowPointer))
 
 menu_functions GetEmptyFunctions();
 menu_functions GetRootMenuFunctions();
@@ -426,18 +430,20 @@ menu_functions TabbedHeaderMenuFunctions();
 menu_functions VerticalSplitMenuFunctions();
 menu_functions HorizontalMenuFunctions();
 
+
+
 struct tabbed_header_window
 {
   r32 HeaderSize;
+
+  // Window Dragging
   container_node* RootWindow;
-  v2 DraggingStart;
-
   v2 RootDraggingStart;
-
+  v2 DraggingStart;
   b32 WindowDrag;
 
+  // Window Merging
   container_node* NodeToMerge;
-
   rect2f MergeZone[5];
   u32 HotMergeZone;
 };
@@ -519,10 +525,13 @@ struct menu_interface
 };
 
 
-container_node* NewContainer(menu_interface* Interface, c8* Name, container_type Type, window_regions RegionType);
+container_node* NewContainer(menu_interface* Interface, container_type Type);
+void DeleteContainer(menu_interface* Interface, container_node* Node);
 menu_tree* GetNewMenuTree(menu_interface* Interface);
+void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree);
 void DisconnectNode(container_node* Node);
 void ConnectNode(container_node* Parent, container_node* NewNode);
+
 
 void SetMouseInput(game_input* GameInput, menu_interface* Interface);
 

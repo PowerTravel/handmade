@@ -163,57 +163,102 @@ u32 GetFirstFreeIndex(u32 MaxCount, b32* List)
 
 void AllocateWindowMenu(menu_interface* Interface, container_node* Node)
 {
-
   switch(Node->Type)
   {
     case container_type::Root:
     {
       u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->RootOccupancy), Interface->RootOccupancy);
       Node->RootWindow = &Interface->RootWindows[WindowIndex];
+      Node->WindowIndex = WindowIndex;
     }break;
     case container_type::Empty:
     {
       u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->EmptyOccupancy), Interface->EmptyOccupancy);
       Node->EmptyWindow = &Interface->EmptyWindows[WindowIndex];
+      Node->WindowIndex = WindowIndex;
     }break;
     case container_type::VerticalSplit:
     {
       u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->SplitOccupancy), Interface->SplitOccupancy);
       Node->SplitWindow = &Interface->SplitWindows[WindowIndex];
+      Node->WindowIndex = WindowIndex;
     }break;
     case container_type::HorizontalSplit:
     {
       u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->SplitOccupancy), Interface->SplitOccupancy);
       Node->SplitWindow = &Interface->SplitWindows[WindowIndex];
+      Node->WindowIndex = WindowIndex;
     }break;
     case container_type::TabbedHeader:
     {
       u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->TabbedHeaderOccupancy), Interface->TabbedHeaderOccupancy);
       Node->TabbedHeader = &Interface->TabbedHeaderWindows[WindowIndex];
+      Node->WindowIndex = WindowIndex;
     }break;
     case container_type::MenuHeader:
     {
       u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->MenuHeaderOccupancy), Interface->MenuHeaderOccupancy);
       Node->MenuHeader = &Interface->MenuHeaderWindows[WindowIndex];
+      Node->WindowIndex = WindowIndex;
     }break;
   }
 }
 
-container_node* NewContainer(menu_interface* Interface, c8* Name, container_type Type, window_regions RegionType)
+void DeallocateWindowMenu(menu_interface* Interface, container_node* Node)
 {
-  local_persist u32 IndexCounter = 0;
+  switch(Node->Type)
+  {
+    case container_type::Root:
+    {
+      Interface->RootWindows[Node->WindowIndex] = {};
+      Interface->RootOccupancy[Node->WindowIndex] = {};
+    }break;
+    case container_type::Empty:
+    {
+      Interface->EmptyWindows[Node->WindowIndex] = {};
+      Interface->EmptyOccupancy[Node->WindowIndex] = {};
+    }break;
+    case container_type::VerticalSplit:
+    {
+      Interface->SplitWindows[Node->WindowIndex] = {};
+      Interface->SplitOccupancy[Node->WindowIndex] = {};
+    }break;
+    case container_type::HorizontalSplit:
+    {
+      Interface->SplitWindows[Node->WindowIndex] = {};
+      Interface->SplitOccupancy[Node->WindowIndex] = {};
+    }break;
+    case container_type::TabbedHeader:
+    {
+      Interface->TabbedHeaderWindows[Node->WindowIndex] = {};
+      Interface->TabbedHeaderOccupancy[Node->WindowIndex] = {};
+    }break;
+    case container_type::MenuHeader:
+    {
+      Interface->MenuHeaderWindows[Node->WindowIndex] = {};
+      Interface->MenuHeaderOccupancy[Node->WindowIndex] = {};
+    }break;
+  }
+}
 
-  u32 NodeIndex = GetFirstFreeIndex(ArrayCount(Interface->ContainerOccupancy), Interface->ContainerOccupancy);
-  container_node* Node = &Interface->ContainerNodes[NodeIndex];
+container_node* NewContainer(menu_interface* Interface, container_type Type)
+{
+  u32 ContainerIndex = GetFirstFreeIndex(ArrayCount(Interface->ContainerOccupancy), Interface->ContainerOccupancy);
+  container_node* Node = &Interface->ContainerNodes[ContainerIndex];
   Node->Type = Type;
-//  Node->RegionType = RegionType;
-  Platform.DEBUGFormatString(Node->Header,  sizeof(Node->Header), sizeof(Node->Header)-1, Name);
-  Node->Index = IndexCounter++;
+  Node->ContainerIndex = ContainerIndex;
 
   Node->Functions = GetMenuFunction(Node->Type);
   AllocateWindowMenu(Interface, Node);
 
   return Node;
+}
+void DeleteContainer( menu_interface* Interface, container_node* Node)
+{
+  DeallocateWindowMenu(Interface, Node);
+  Interface->ContainerOccupancy[Node->ContainerIndex] = false;
+  Interface->ContainerNodes[Node->ContainerIndex] = {};
+
 }
 
 // Preorder breadth first.
@@ -380,12 +425,14 @@ menu_tree* GetNewMenuTree(menu_interface* Interface)
 
 void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree)
 {
+  container_node* Root = MenuToFree->Root;
+
+  // Remove the menu from RootContainers
   u32 WindowIndex = 0;
-  b32 MenuClicked = false;
   while(WindowIndex < Interface->RootContainerCount)
   {
     menu_tree* MenuTree = &Interface->RootContainers[WindowIndex];
-    if( MenuTree->Root == MenuToFree->Root )
+    if( MenuTree->Root == Root )
     {
       break;
     }
@@ -399,13 +446,41 @@ void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree)
     Interface->RootContainers[WindowIndex] = Interface->RootContainers[WindowIndex+1];
     WindowIndex++;
   }
+
+  Interface->HotWindow = Interface->RootContainers[0];
   Interface->RootContainers[Interface->RootContainerCount-1] = {};
   Interface->RootContainerCount--;
+
+
+  // Free the nodes;
+  // 1: Go to the bottom
+  // 2: Step up Once
+  // 3: Delete FirstChild 
+  // 4: Set NextSibling as FirstChild
+  // 5: Repeat from 1
+  container_node* Node = Root->FirstChild;
+  while(Node)
+  {
+    while(Node->FirstChild)
+    {
+      Node = Node->FirstChild;
+    }
+
+    Node = Node->Parent;
+    if(Node)
+    {
+      container_node* NodeToDelete = Node->FirstChild;
+      Node->FirstChild = NodeToDelete->NextSibling;
+      DeleteContainer(Interface, NodeToDelete);
+    }
+  }
+  DeleteContainer(Interface, Root);
 }
 
 void DisconnectNode(container_node* Node)
 {
   container_node* Parent = Node->Parent;
+
   if(Parent)
   {
     Assert(Parent->FirstChild);
@@ -428,6 +503,7 @@ void DisconnectNode(container_node* Node)
   Node->NextSibling = 0;
   Node->Parent = 0;
 }
+
 
 
 void ConnectNode(container_node* Parent, container_node* NewNode)
@@ -514,30 +590,30 @@ DEBUGGetState()
 
     {
       menu_tree* Root = GetNewMenuTree(Interface);
-      Root->Root = NewContainer(Interface, "Root", container_type::Root, window_regions::WholeBody);
+      Root->Root = NewContainer(Interface, container_type::Root);
 
       container_node* RootContainer = Root->Root;
       RootContainer->RootWindow->BorderSize = 0.007;
       RootContainer->RootWindow->MinSize = 0.2f;
       RootContainer->Region = Rect2f(0.2,0.2,0.5,0.5);
 
-      container_node* RootHeader = NewContainer(Interface, "Header", container_type::MenuHeader, window_regions::WholeBody);
+      container_node* RootHeader = NewContainer(Interface, container_type::MenuHeader);
       RootHeader->MenuHeader->HeaderSize = 0.02;
       RootHeader->MenuHeader->RootWindow = RootContainer;
 
-      container_node* SplitContainer = NewContainer(Interface,  "Split", container_type::VerticalSplit, window_regions::WholeBody);
+      container_node* SplitContainer = NewContainer(Interface, container_type::VerticalSplit);
       SplitContainer->SplitWindow->BorderSize = 0.007f;
       SplitContainer->SplitWindow->MinSize = 0.02f;
       SplitContainer->SplitWindow->SplitFraction = 0.5f;
 
-      container_node* TabbedHeader0 = NewContainer(Interface, "Tab0", container_type::TabbedHeader, window_regions::LeftBody);
+      container_node* TabbedHeader0 = NewContainer(Interface, container_type::TabbedHeader);
       TabbedHeader0->TabbedHeader->HeaderSize = 0.02;
-      container_node*  EmptyContainer0 = NewContainer(Interface, "Empty0", container_type::Empty, window_regions::WholeBody);
+      container_node*  EmptyContainer0 = NewContainer(Interface, container_type::Empty);
       EmptyContainer0->EmptyWindow->Color = V4(0,0,0.4,1);
 
-      container_node* TabbedHeader1 = NewContainer(Interface,  "Tab1", container_type::TabbedHeader, window_regions::RightBody);
+      container_node* TabbedHeader1 = NewContainer(Interface, container_type::TabbedHeader);
       TabbedHeader1->TabbedHeader->HeaderSize = 0.02;
-      container_node*  EmptyContainer1 = NewContainer(Interface, "Empty1", container_type::Empty, window_regions::WholeBody);
+      container_node*  EmptyContainer1 = NewContainer(Interface, container_type::Empty);
       EmptyContainer1->EmptyWindow->Color = V4(0,0.4,0.4,1);
 
       ConnectNode(0, Root->Root); // 0
@@ -560,30 +636,30 @@ DEBUGGetState()
 
     {
       menu_tree* Root = GetNewMenuTree(Interface);
-      Root->Root = NewContainer(Interface, "Root", container_type::Root, window_regions::WholeBody);
+      Root->Root = NewContainer(Interface, container_type::Root);
 
       container_node* RootContainer = Root->Root;
       RootContainer->RootWindow->BorderSize = 0.007;
       RootContainer->RootWindow->MinSize = 0.2f;
       RootContainer->Region = Rect2f(1,0.2,0.5,0.5);
 
-      container_node* RootHeader = NewContainer(Interface, "Header", container_type::MenuHeader, window_regions::WholeBody);
+      container_node* RootHeader = NewContainer(Interface, container_type::MenuHeader);
       RootHeader->MenuHeader->HeaderSize = 0.02;
       RootHeader->MenuHeader->RootWindow = RootContainer;
 
-      container_node* SplitContainer = NewContainer(Interface,  "Split", container_type::VerticalSplit, window_regions::WholeBody);
+      container_node* SplitContainer = NewContainer(Interface, container_type::VerticalSplit);
       SplitContainer->SplitWindow->BorderSize = 0.007f;
       SplitContainer->SplitWindow->MinSize = 0.02f;
       SplitContainer->SplitWindow->SplitFraction = 0.5f;
 
-      container_node* TabbedHeader0 = NewContainer(Interface, "Tab0", container_type::TabbedHeader, window_regions::LeftBody);
+      container_node* TabbedHeader0 = NewContainer(Interface, container_type::TabbedHeader);
       TabbedHeader0->TabbedHeader->HeaderSize = 0.02;
-      container_node*  EmptyContainer0 = NewContainer(Interface, "Empty0", container_type::Empty, window_regions::WholeBody);
+      container_node*  EmptyContainer0 = NewContainer(Interface, container_type::Empty);
       EmptyContainer0->EmptyWindow->Color = V4(0,0.4,0,1);
 
-      container_node* TabbedHeader1 = NewContainer(Interface,  "Tab1", container_type::TabbedHeader, window_regions::RightBody);
+      container_node* TabbedHeader1 = NewContainer(Interface, container_type::TabbedHeader);
       TabbedHeader1->TabbedHeader->HeaderSize = 0.02;
-      container_node*  EmptyContainer1 = NewContainer(Interface, "Empty1", container_type::Empty, window_regions::WholeBody);
+      container_node*  EmptyContainer1 = NewContainer(Interface, container_type::Empty);
       EmptyContainer1->EmptyWindow->Color = V4(0.4,0,0,1);
 
       ConnectNode(0, Root->Root); // 0
@@ -1552,7 +1628,6 @@ void ActOnInput(memory_arena* Arena, menu_interface* Interface)
     {
       Interface->HotRegion = NodeRegion.Region;
       Interface->HotSubWindow = NodeRegion.Node;
-      Platform.DEBUGPrint("%s %s Pushed\n", Interface->HotSubWindow->Header, ToString(Interface->HotRegion) );
       Interface->HotSubWindow->Functions.MouseDown(Interface, Interface->HotSubWindow, Interface->HotRegion, 0);
     // Mouse Down Movement State
     }else{
@@ -1565,7 +1640,6 @@ void ActOnInput(memory_arena* Arena, menu_interface* Interface)
     if(Interface->HotSubWindow)
     {
       Interface->HotSubWindow->Functions.MouseUp(Interface, Interface->HotSubWindow, Interface->HotRegion, 0);
-      Platform.DEBUGPrint("%s Released\n", Interface->HotSubWindow->Header);  
     }
 
     // Mouse Released Event
