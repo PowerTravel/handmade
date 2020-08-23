@@ -104,7 +104,7 @@ MENU_GET_MOUSE_OVER_REGION( EmptyGetMouseOverRegion )
 }
 MENU_DRAW( EmptyDraw )
 {
-  DEBUGPushQuad(Node->Region, Node->EmptyWindow->Color);
+  DEBUGPushQuad(Node->Region, GetContainerPayload(empty_window, Node)->Color);
 }
 
 menu_functions GetEmptyFunctions()
@@ -124,7 +124,7 @@ menu_functions GetEmptyFunctions()
 
 MENU_MOUSE_DOWN( RootWindowMouseDown )
 {
-  root_window* Window = Node->RootWindow;
+  root_window* Window = GetContainerPayload(root_window, Node);
 
   Window->WindowDraggingStart = Node->Region;
   switch(HotRegion)
@@ -176,7 +176,7 @@ MENU_MOUSE_DOWN( RootWindowMouseDown )
 
 MENU_MOUSE_UP( RootWindowMouseUp )
 {
-  root_window* Window = Node->RootWindow;
+  root_window* Window = GetContainerPayload(root_window, Node);
   Window->LeftBorderDrag  = false;
   Window->RightBorderDrag = false;
   Window->BotBorderDrag   = false;
@@ -192,7 +192,7 @@ MENU_MOUSE_EXIT( RootWindowMouseExit )
 
 MENU_HANDLE_INPUT( RootWindowHandleInput )
 {
-  root_window* Window = Node->RootWindow;
+  root_window* Window = GetContainerPayload(root_window, Node);
 
   r32 MinWidth  = Window->MinSize + 2*Window->BorderSize;
   r32 MinHeight = Window->MinSize + 2*Window->BorderSize;
@@ -273,7 +273,8 @@ MENU_GET_REGION_RECT( RootWindowGetRegionRect )
   r32 Height = 0;
 
   rect2f Region = Node->Region;
-  r32 BorderSize = Node->RootWindow->BorderSize;
+  root_window* Window = GetContainerPayload(root_window, Node);
+  r32 BorderSize = Window->BorderSize;
 
   switch(Type)
   {
@@ -367,7 +368,7 @@ MENU_GET_MOUSE_OVER_REGION( RootWindowGetMouseOverRegion )
     window_regions::TopRightCorner
   };
 
-  root_window* Window = Node->RootWindow;
+  root_window* Window = GetContainerPayload(root_window, Node);
 
   window_regions Result = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
 
@@ -376,7 +377,7 @@ MENU_GET_MOUSE_OVER_REGION( RootWindowGetMouseOverRegion )
 
 MENU_DRAW( RootWindowDraw )
 {
-  root_window* Window = Node->RootWindow;
+  root_window* Window = GetContainerPayload(root_window, Node);
   v4 CornerColor = V4(1,0,1,1);
   v4 BorderColor = V4(0,0,1,1);
   v4 HeaderColor = V4(1,0,0,1);
@@ -406,11 +407,9 @@ menu_functions GetRootMenuFunctions()
 }
 
 
-
-
 MENU_MOUSE_DOWN( MenuHeaderMouseDown )
 {
-  menu_header_window* Window = Node->MenuHeader;
+  menu_header_window* Window = GetContainerPayload(menu_header_window, Node);
   rect2f RootContainer = Window->RootWindow->Region;
   Window->DraggingStart = V2(RootContainer.X,RootContainer.Y);
   switch(HotRegion)
@@ -425,9 +424,81 @@ MENU_MOUSE_DOWN( MenuHeaderMouseDown )
     }break;
   }
 }
+
 MENU_MOUSE_UP( MenuHeaderMouseUp )
 {
-  Node->MenuHeader->WindowDrag = false;
+  menu_header_window* Window = GetContainerPayload(menu_header_window, Node);
+  Window->WindowDrag = false;
+  if(Window->NodeToMerge)
+  {
+    Assert(Window->NodeToMerge->Type == container_type::TabbedHeader);
+    u32 ZoneIndex = Window->HotMergeZone;
+    if( ZoneIndex == 1 && Node->FirstChild->Type == container_type::TabbedHeader)
+    {
+      // Middle
+      tabbed_header_window* SrcTabbedHeader = GetContainerPayload(tabbed_header_window, Node->FirstChild);
+      tabbed_header_window* DstTabbedHeader = GetContainerPayload(tabbed_header_window, Window->NodeToMerge);
+      DstTabbedHeader->SelectedTabOrdinal = SrcTabbedHeader->SelectedTabOrdinal + DstTabbedHeader->TabCount;
+      for(u32 TabIndex = 0; TabIndex < SrcTabbedHeader->TabCount; TabIndex++)
+      {
+        
+        DstTabbedHeader->Tabs[DstTabbedHeader->TabCount++] = SrcTabbedHeader->Tabs[TabIndex];
+        Assert( DstTabbedHeader->TabCount < ArrayCount(DstTabbedHeader->Tabs))
+      }
+
+      DisconnectNode(Node->FirstChild);
+      FreeMenuTree(Interface, &Interface->HotWindow);
+
+    }else if( ZoneIndex == 0  || ZoneIndex == 2 ||  // Vertical
+              ZoneIndex == 3  || ZoneIndex == 4)    // Horizontal
+    {
+      container_node* OppositeNode = Window->NodeToMerge;
+      container_type Type = (ZoneIndex == 0  || ZoneIndex == 2) ? container_type::VerticalSplit : container_type::HorizontalSplit;
+      container_node* SplitContainer = NewContainer(Interface, Type);
+      split_window* SplitWindow = GetContainerPayload(split_window, SplitContainer);
+      SplitWindow->BorderSize = 0.007f;
+      SplitWindow->MinSize = 0.02f;
+      SplitWindow->SplitFraction = 0.5f; 
+
+      container_node* CommonParent = OppositeNode->Parent;
+      if(CommonParent->Type ==  container_type::VerticalSplit ||
+         CommonParent->Type ==  container_type::HorizontalSplit)
+      {
+        if(CommonParent->FirstChild == OppositeNode)
+        {
+          container_node* Sibling = OppositeNode->NextSibling;
+          DisconnectNode(Sibling);
+          DisconnectNode(OppositeNode);
+
+          ConnectNode(CommonParent, SplitContainer);
+          ConnectNode(CommonParent, Sibling);
+        }else{
+          DisconnectNode(OppositeNode);
+          ConnectNode(CommonParent, SplitContainer);  
+        }
+      }else{
+        DisconnectNode(OppositeNode);
+        ConnectNode(CommonParent, SplitContainer);
+      }
+
+      container_node* NodeToConnect = Node->FirstChild;
+      DisconnectNode(NodeToConnect);
+      if( ZoneIndex == 0  || ZoneIndex == 3 )
+      {
+        // Left || Bot
+        ConnectNode(SplitContainer, NodeToConnect);
+        ConnectNode(SplitContainer, OppositeNode);
+      }else if(ZoneIndex == 2  ||  ZoneIndex == 4){  
+        // Right || Top
+        ConnectNode(SplitContainer, OppositeNode);
+        ConnectNode(SplitContainer, NodeToConnect);
+      }
+
+      Assert(OppositeNode->Type == container_type::TabbedHeader);
+  
+      FreeMenuTree(Interface, &Interface->HotWindow);
+    }
+  }
 }
 
 MENU_MOUSE_ENTER( MenuHeaderMouseEnter )
@@ -441,9 +512,75 @@ MENU_MOUSE_EXIT( MenuHeaderMouseExit )
 
 MENU_HANDLE_INPUT( MenuHeaderHandleInput )
 {
-  menu_header_window* Window = Node->MenuHeader;
+  menu_header_window* Window = GetContainerPayload(menu_header_window, Node);
+
   if(Window->WindowDrag)
   {
+    container_node* NodeToMerge = 0;
+    debug_state* DebugState = DEBUGGetState();
+    Window->NodeToMerge = 0;
+    for (u32 WindowIndex = 1;
+         WindowIndex < Interface->RootContainerCount;
+         ++WindowIndex)
+    {
+      menu_tree Menu = Interface->RootContainers[WindowIndex];
+      node_region_pair NodeRegion = GetRegion(&DebugState->Arena, Menu.NodeCount, Menu.Root, Interface->MousePos);
+      if(NodeRegion.Region == window_regions::WholeBody ||
+         NodeRegion.Region == window_regions::LeftBody  ||
+         NodeRegion.Region == window_regions::RightBody )
+      {
+        while(NodeRegion.Node && NodeRegion.Node->Type != container_type::TabbedHeader)
+        {
+          NodeRegion.Node = NodeRegion.Node->Parent;
+        }
+        
+        if(NodeRegion.Node)
+        {
+          Window->NodeToMerge = NodeRegion.Node;
+          break;
+        }
+      } 
+    }
+
+    if(Window->NodeToMerge)
+    {
+      rect2f Rect = Window->NodeToMerge->Functions.GetRegionRect(window_regions::WholeBody, Window->NodeToMerge);
+
+      r32 W = Rect.W;
+      r32 H = Rect.H;
+      r32 S = Minimum(W,H)/4;
+
+      v2 MP = V2(Rect.X+W/2,Rect.Y+H/2); // Middle Point
+      v2 LQ = V2(MP.X-S, MP.Y);          // Left Quarter
+      v2 RQ = V2(MP.X+S, MP.Y);          // Right Quarter
+      v2 BQ = V2(MP.X,   MP.Y-S);        // Bot Quarter
+      v2 TQ = V2(MP.X,   MP.Y+S);        // Top Quarter
+
+      Window->MergeZone[0] = Rect2f(LQ.X-S/2.f, LQ.Y-S/2.f,S/1.1f,S/1.1f); // Left Quarter
+      Window->MergeZone[1] = Rect2f(MP.X-S/2.f, MP.Y-S/2.f,S/1.1f,S/1.1f); // Middle Point
+      Window->MergeZone[2] = Rect2f(RQ.X-S/2.f, RQ.Y-S/2.f,S/1.1f,S/1.1f); // Right Quarter
+      Window->MergeZone[3] = Rect2f(BQ.X-S/2.f, BQ.Y-S/2.f,S/1.1f,S/1.1f); // Bot Quarter
+      Window->MergeZone[4] = Rect2f(TQ.X-S/2.f, TQ.Y-S/2.f,S/1.1f,S/1.1f); // Top Quarter
+
+      if(Intersects(Window->MergeZone[0], Interface->MousePos))
+      {
+        Window->HotMergeZone = 0;
+      }else if(Intersects(Window->MergeZone[1], Interface->MousePos)){
+        Window->HotMergeZone = 1;
+      }else if(Intersects(Window->MergeZone[2], Interface->MousePos)){
+        Window->HotMergeZone = 2;
+      }else if(Intersects(Window->MergeZone[3], Interface->MousePos)){
+        Window->HotMergeZone = 3;
+      }else if(Intersects(Window->MergeZone[4], Interface->MousePos)){
+        Window->HotMergeZone = 4;
+      }else{
+        Window->HotMergeZone = ArrayCount(Window->MergeZone);
+      }
+
+      Platform.DEBUGPrint("MergeRegion: %d\n", Window->HotMergeZone);
+    }
+
+
     v2 Delta = Interface->MousePos - Interface->MouseLeftButtonPush;
     game_window_size WindowSize = GameGetWindowSize();
     r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
@@ -454,6 +591,7 @@ MENU_HANDLE_INPUT( MenuHeaderHandleInput )
     Assert((Surroundings.Y + Surroundings.H)<=1);
 
     v2 NewPos = Window->DraggingStart + Delta;
+    #if 0
     if(NewPos.X < Surroundings.X)
     {
       NewPos.X = Surroundings.X;
@@ -470,6 +608,7 @@ MENU_HANDLE_INPUT( MenuHeaderHandleInput )
     {
       NewPos.Y = (Surroundings.Y + Surroundings.H) - Region->H;
     }
+    #endif
 
     Region->X = NewPos.X;
     Region->Y = NewPos.Y;
@@ -485,7 +624,8 @@ MENU_GET_REGION_RECT( MenuHeaderGetRegionRect )
   r32 Height = 0;
 
   rect2f Region = Node->Region;
-  r32 HeaderSize = Node->MenuHeader->HeaderSize;
+
+  r32 HeaderSize = GetContainerPayload(menu_header_window,Node)->HeaderSize;
 
   switch(Type)
   {
@@ -521,7 +661,7 @@ MENU_GET_MOUSE_OVER_REGION( MenuHeaderGetMouseOverRegion )
     window_regions::Header
   };
 
-  menu_header_window* Window = Node->MenuHeader;
+  menu_header_window* Window = GetContainerPayload(menu_header_window, Node);
 
   window_regions Result = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
 
@@ -531,10 +671,26 @@ MENU_GET_MOUSE_OVER_REGION( MenuHeaderGetMouseOverRegion )
 
 MENU_DRAW( MenuHeaderDraw )
 {
-  menu_header_window* Window = Node->MenuHeader;
+  menu_header_window* Window = GetContainerPayload(menu_header_window, Node);
   v4 HeaderColor = V4(0.8,0.2,0.2,1);
   DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::Header, Node), HeaderColor);
+  if(Window->NodeToMerge)
+  {
+    rect2f Rect = Window->NodeToMerge->Functions.GetRegionRect(window_regions::WholeBody, Window->NodeToMerge);
 
+    for (u32 Index = 0; Index < ArrayCount(Window->MergeZone); ++Index)
+    {
+      if(!(Index == 1 && Node->FirstChild->Type != container_type::TabbedHeader))
+      {
+        v4 Color = V4(0.3,0.5,0.3,0.5);
+        if(Index == Window->HotMergeZone)
+        {
+          Color = V4(0.3,0.5,0.3,0.7);
+        }
+        DEBUGPushQuad(Window->MergeZone[Index], Color); 
+      }
+    }
+  }
 }
 
 menu_functions MenuHeaderMenuFunctions()
@@ -551,88 +707,42 @@ menu_functions MenuHeaderMenuFunctions()
   return Result;
 }
 
+rect2f GetTabRegion(rect2f HeaderRect, u32 TabIndex, u32 TabCount)
+{
+  r32 TabWidth = HeaderRect.W / (r32) TabCount;
+  rect2f Result = HeaderRect;
+  Result.W = TabWidth;
+  Result.X = HeaderRect.X + TabIndex * TabWidth;
+  return Result;
+}
 
 MENU_MOUSE_DOWN( TabbedHeaderMouseDown )
 {
   Platform.DEBUGPrint("Tabbed Header Mouse Down\n");
-  tabbed_header_window* TabbedHeader = Node->TabbedHeader;
-  TabbedHeader->WindowDrag = true;
-  TabbedHeader->DraggingStart = V2(Node->Region.X,Node->Region.Y);
-  if(TabbedHeader->RootWindow)
+  tabbed_header_window* TabbedHeader = GetContainerPayload(tabbed_header_window,Node);
+
+  v2 MousePos = Interface->MousePos;
+  rect2f HeaderRegion = Node->Functions.GetRegionRect(window_regions::Header, Node);
+  for(u32 TabIndex = 0; TabIndex < TabbedHeader->TabCount; TabIndex++)
   {
-    TabbedHeader->RootDraggingStart = V2(TabbedHeader->RootWindow->Region.X,TabbedHeader->RootWindow->Region.Y);
+    rect2f TabRegion = GetTabRegion(HeaderRegion, TabIndex, TabbedHeader->TabCount);
+    if(Intersects(TabRegion,MousePos))
+    {
+      TabbedHeader->SelectedTabOrdinal = TabIndex+1;
+      DisconnectNode(Node->FirstChild);
+      ConnectNode(Node,TabbedHeader->Tabs[TabIndex]);
+      TabbedHeader->TabDrag = true;
+      TabbedHeader->TabMouseOffset = MousePos - V2(TabRegion.X, TabRegion.Y);
+      break;
+    }
   }
 }
 
 MENU_MOUSE_UP( TabbedHeaderMouseUp )
 {
-  tabbed_header_window* TabbedHeader = Node->TabbedHeader;
-  TabbedHeader->WindowDrag = false;
-
-  if(Node->TabbedHeader->NodeToMerge)
-  {
-    Assert(Node->TabbedHeader->NodeToMerge->Type == container_type::TabbedHeader);
-    u32 ZoneIndex = TabbedHeader->HotMergeZone;
-    if( ZoneIndex == 1 )
-    {
-      // Middle
-      Platform.DEBUGPrint("TABBED MERGE\n");
-    }else if( ZoneIndex == 0  || ZoneIndex == 2 ||  // Vertical
-              ZoneIndex == 3  || ZoneIndex == 4)    // Horizontal
-    {
-      container_node* OppositeNode = Node->TabbedHeader->NodeToMerge;
-      container_type Type = (ZoneIndex == 0  || ZoneIndex == 2) ? container_type::VerticalSplit : container_type::HorizontalSplit;
-      container_node* SplitContainer = NewContainer(Interface, Type);
-      SplitContainer->SplitWindow->BorderSize = 0.007f;
-      SplitContainer->SplitWindow->MinSize = 0.02f;
-      SplitContainer->SplitWindow->SplitFraction = 0.5f; 
-
-      container_node* CommonParent = OppositeNode->Parent;
-      if(CommonParent->Type ==  container_type::VerticalSplit ||
-         CommonParent->Type ==  container_type::HorizontalSplit)
-      {
-        if(CommonParent->FirstChild == OppositeNode)
-        {
-          container_node* Sibling = OppositeNode->NextSibling;
-          DisconnectNode(Sibling);
-          DisconnectNode(OppositeNode);
-
-          ConnectNode(CommonParent, SplitContainer);
-          ConnectNode(CommonParent, Sibling);
-        }else{
-          DisconnectNode(OppositeNode);
-          ConnectNode(CommonParent, SplitContainer);  
-        }
-      }else{
-        DisconnectNode(OppositeNode);
-        ConnectNode(CommonParent, SplitContainer);
-      }
-
-      DisconnectNode(Node);
-      if( ZoneIndex == 0  || ZoneIndex == 3 )
-      {
-        // Left || Bot
-        ConnectNode(SplitContainer, Node);
-        ConnectNode(SplitContainer, OppositeNode);
-      }else if(ZoneIndex == 2  ||  ZoneIndex == 4){  
-        // Right || Top
-        ConnectNode(SplitContainer, OppositeNode);
-        ConnectNode(SplitContainer, Node);
-      }
-
-      if(OppositeNode->Type == container_type::TabbedHeader)
-      {
-        OppositeNode->TabbedHeader->RootWindow = 0;
-      }
-      TabbedHeader->RootWindow = 0;  
-
-      Assert(OppositeNode->Type == container_type::TabbedHeader);
-  
-      FreeMenuTree(Interface, &Interface->HotWindow);
-  
-      TabbedHeader->NodeToMerge = 0;
-    }
-  }
+  tabbed_header_window* TabbedHeader = GetContainerPayload(tabbed_header_window,Node);
+  TabbedHeader->SelectedTabOrdinal = 0;
+  TabbedHeader->TabDrag = false;
 }
 
 MENU_MOUSE_ENTER( TabbedHeaderMouseEnter )
@@ -646,90 +756,54 @@ MENU_MOUSE_EXIT( TabbedHeaderMouseExit )
 
 MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
 {
-  tabbed_header_window* TabbedHeader = Node->TabbedHeader;
+  tabbed_header_window* TabbedHeader = GetContainerPayload(tabbed_header_window,Node);
 
-  if(TabbedHeader->WindowDrag)
+  rect2f HeaderRegion = Node->Functions.GetRegionRect(window_regions::Header, Node);
+
+  if(TabbedHeader->TabDrag)
   {
-    v2 Delta = Interface->MousePos - Interface->MouseLeftButtonPush;
-
-    // Move Root Window If there is one
-    // (Root window is only set IF the tabbed window doesn't share the Root Window with any other)
-    if(TabbedHeader->RootWindow)
+    if(TabbedHeader->SelectedTabOrdinal > 0 )
     {
-      v2 NewPos = TabbedHeader->RootDraggingStart + Delta;
-      TabbedHeader->RootWindow->Region.X = NewPos.X;
-      TabbedHeader->RootWindow->Region.Y = NewPos.Y;
-    }
+      Assert(TabbedHeader->SelectedTabOrdinal <= TabbedHeader->TabCount)
 
-
-    debug_state* DebugState = DEBUGGetState();
-    container_node* NodeToMergeWith = 0;
-    tabbed_header_window* TabbedHeaderToMergeWith = 0;
-    for (u32 WindowIndex = 1;
-         WindowIndex < Interface->RootContainerCount;
-         ++WindowIndex)
-    {
-      menu_tree Menu = Interface->RootContainers[WindowIndex];
-      node_region_pair NodeRegion = GetRegion(&DebugState->Arena, Menu.NodeCount, Menu.Root, Interface->MousePos);
-      if(NodeRegion.Region == window_regions::WholeBody ||
-         NodeRegion.Region == window_regions::LeftBody  ||
-         NodeRegion.Region == window_regions::RightBody )
+      u32 SelectedTabIndex = TabbedHeader->SelectedTabOrdinal-1;
+      rect2f SelectedTabRegion = GetTabRegion(HeaderRegion, SelectedTabIndex,TabbedHeader->TabCount);
+      if( SelectedTabIndex > 0 )
       {
-        while(NodeRegion.Node && NodeRegion.Node->Type != container_type::TabbedHeader)
+        rect2f LeftTabRegion = GetTabRegion(HeaderRegion, SelectedTabIndex-1,TabbedHeader->TabCount);
+        if(Intersects(LeftTabRegion, Interface->MousePos))
         {
-          NodeRegion.Node = NodeRegion.Node->Parent;
+          container_node* Swap = TabbedHeader->Tabs[SelectedTabIndex-1];
+          TabbedHeader->Tabs[SelectedTabIndex-1] = TabbedHeader->Tabs[SelectedTabIndex];
+          TabbedHeader->Tabs[SelectedTabIndex] = Swap;
+          TabbedHeader->SelectedTabOrdinal--;
         }
-        
-        if(NodeRegion.Node)
-        {
-          TabbedHeaderToMergeWith = NodeRegion.Node->TabbedHeader;
-          NodeToMergeWith = NodeRegion.Node;
-          break;
-        }
-      } 
-    }
+      }
 
-    TabbedHeader->NodeToMerge = NodeToMergeWith;
-    TabbedHeader->HotMergeZone = ArrayCount(TabbedHeader->MergeZone);
-    if(TabbedHeader->NodeToMerge)
-    {
-      rect2f Rect = TabbedHeader->NodeToMerge->Functions.GetRegionRect(window_regions::WholeBody, TabbedHeader->NodeToMerge);
-
-      r32 W = Rect.W;
-      r32 H = Rect.H;
-      r32 S = Minimum(W,H)/4;
-
-      v2 MP = V2(Rect.X+W/2,Rect.Y+H/2); // Middle Point
-      v2 LQ = V2(MP.X-S, MP.Y);          // Left Quarter
-      v2 RQ = V2(MP.X+S, MP.Y);          // Right Quarter
-      v2 BQ = V2(MP.X,   MP.Y-S);        // Bot Quarter
-      v2 TQ = V2(MP.X,   MP.Y+S);        // Top Quarter
-
-      TabbedHeader->MergeZone[0] = Rect2f(LQ.X-S/2.f, LQ.Y-S/2.f,S/1.1f,S/1.1f); // Left Quarter
-      TabbedHeader->MergeZone[1] = Rect2f(MP.X-S/2.f, MP.Y-S/2.f,S/1.1f,S/1.1f); // Middle Point
-      TabbedHeader->MergeZone[2] = Rect2f(RQ.X-S/2.f, RQ.Y-S/2.f,S/1.1f,S/1.1f); // Right Quarter
-      TabbedHeader->MergeZone[3] = Rect2f(BQ.X-S/2.f, BQ.Y-S/2.f,S/1.1f,S/1.1f); // Bot Quarter
-      TabbedHeader->MergeZone[4] = Rect2f(TQ.X-S/2.f, TQ.Y-S/2.f,S/1.1f,S/1.1f); // Top Quarter
-
-      if(Intersects(TabbedHeader->MergeZone[0], Interface->MousePos))
+      if(SelectedTabIndex < TabbedHeader->TabCount-1)
       {
-        TabbedHeader->HotMergeZone = 0;
-      }else if(Intersects(TabbedHeader->MergeZone[1], Interface->MousePos)){
-        TabbedHeader->HotMergeZone = 1;
-      }else if(Intersects(TabbedHeader->MergeZone[2], Interface->MousePos)){
-        TabbedHeader->HotMergeZone = 2;
-      }else if(Intersects(TabbedHeader->MergeZone[3], Interface->MousePos)){
-        TabbedHeader->HotMergeZone = 3;
-      }else if(Intersects(TabbedHeader->MergeZone[4], Interface->MousePos)){
-        TabbedHeader->HotMergeZone = 4;
-      }else{
-        TabbedHeader->HotMergeZone = ArrayCount(TabbedHeader->MergeZone);
+        rect2f RightTabRegion = GetTabRegion(HeaderRegion, SelectedTabIndex+1,TabbedHeader->TabCount);
+        if(Intersects(RightTabRegion, Interface->MousePos))
+        {
+          container_node* Swap = TabbedHeader->Tabs[SelectedTabIndex+1];
+          TabbedHeader->Tabs[SelectedTabIndex+1] = TabbedHeader->Tabs[SelectedTabIndex];
+          TabbedHeader->Tabs[SelectedTabIndex] = Swap;
+          TabbedHeader->SelectedTabOrdinal++;
+        }
       }
     }
 
-    b32 SplitOccured = false;
-    if(NormSq(Delta) > 0.01)
+    v2 Delta = Interface->MousePos - Interface->MouseLeftButtonPush;
+
+    debug_state* DebugState = DEBUGGetState();
+
+    rect2f HeaderSplitRegion = HeaderRegion;
+    HeaderSplitRegion.Y -= HeaderSplitRegion.H;
+    HeaderSplitRegion.H += 2*HeaderSplitRegion.H;
+
+    if(!Intersects(HeaderSplitRegion,Interface->MousePos))
     {
+      TabbedHeader->TabDrag = false;
       Assert(Node->Parent)
 
       container_node* ParentContainer = Node->Parent;
@@ -747,11 +821,6 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
       }
       if(OppositeNode)
       {
-        if(OppositeNode->Type == container_type::TabbedHeader)
-        {
-          OppositeNode->TabbedHeader->RootWindow = Interface->HotWindow.Root;
-        }
-
         container_node* GrandParentContainer = ParentContainer->Parent;
 
         if(GrandParentContainer->Type ==  container_type::VerticalSplit ||
@@ -776,6 +845,7 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
         DisconnectNode(Node);
         DeleteContainer(Interface, ParentContainer);
 
+
         menu_tree* Root = GetNewMenuTree(Interface);
         Root->Root = NewContainer(Interface, container_type::Root);
 
@@ -783,25 +853,29 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
         r32 HeaderSize = 0.02;
 
         container_node* RootContainer = Root->Root;
-        
-        RootContainer->RootWindow->BorderSize = BorderSize;
-        RootContainer->RootWindow->MinSize = 0.2f;
-        RootContainer->Region = Rect2f(Node->Region.X, Node->Region.Y + BorderSize + HeaderSize, Node->Region.W, Node->Region.H);
+        RootContainer->Region = Rect2f(Node->Region.X, Node->Region.Y + BorderSize, Node->Region.W, Node->Region.H);
 
-        TabbedHeader->RootDraggingStart = V2(RootContainer->Region.X,RootContainer->Region.Y);
+        root_window* RootWindow = GetContainerPayload(root_window, RootContainer);
+        RootWindow->BorderSize = BorderSize;
+        RootWindow->MinSize = 0.2f;
 
         container_node* RootHeader = NewContainer(Interface, container_type::MenuHeader);
-        RootHeader->MenuHeader->HeaderSize = HeaderSize;
-        RootHeader->MenuHeader->RootWindow = RootContainer;
+        menu_header_window* MenuHeader = GetContainerPayload(menu_header_window, RootHeader);
+        MenuHeader->HeaderSize = HeaderSize;
+        MenuHeader->RootWindow = RootContainer;
+        MenuHeader->WindowDrag = true;
+        MenuHeader->RootWindow = Root->Root;
+        MenuHeader->DraggingStart = V2(RootContainer->Region.X, RootContainer->Region.Y);
+
+        Interface->HotRegion = window_regions::Header;
+        Interface->HotSubWindow = RootHeader;
 
         ConnectNode(0, Root->Root);
         ConnectNode(RootContainer, RootHeader);
         ConnectNode(RootHeader, Node);
 
-        //Node->RegionType = window_regions::WholeBody;
-        TabbedHeader->RootWindow = Root->Root;
-
-        // Note> Just random numbers that will give a large enought stack to traverse atm
+        // TODO: Just random numbers that will give a large enought stack to traverse atm
+        //       Fixit
         Root->Depth = 6;
         Root->NodeCount = 6;
 
@@ -821,7 +895,7 @@ MENU_GET_REGION_RECT( TabbedHeaderGetRegionRect )
   r32 Width  = 0;
   r32 Height = 0;
 
-  r32 HeaderSize = Node->MenuHeader->HeaderSize;
+  r32 HeaderSize = GetContainerPayload(tabbed_header_window, Node)->HeaderSize;
   rect2f Region = Node->Region;
 
   switch(Type)
@@ -858,7 +932,7 @@ MENU_GET_MOUSE_OVER_REGION( TabbedHeaderGetMouseOverRegion )
     window_regions::Header
   };
 
-  tabbed_header_window* Window = Node->TabbedHeader;
+  tabbed_header_window* Window = GetContainerPayload(tabbed_header_window,Node);
 
   window_regions Result = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
 
@@ -867,33 +941,41 @@ MENU_GET_MOUSE_OVER_REGION( TabbedHeaderGetMouseOverRegion )
 
 MENU_DRAW( TabbedHeaderDraw )
 {
-  tabbed_header_window* Window = Node->TabbedHeader;
+  tabbed_header_window* Window = GetContainerPayload(tabbed_header_window, Node);
+
+  r32 Fill = 0.8;
   v4 HeaderColor = V4(0.3,0.5,0.3,1);
 
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::Header, Node), HeaderColor);
+  rect2f HeaderRegion = Node->Functions.GetRegionRect(window_regions::Header, Node);
 
-  if(Window->WindowDrag && !Window->RootWindow )
+  s32 SelectedTabIndex = Window->SelectedTabOrdinal-1;
+  for(u32 TabIndex = 0; TabIndex < Window->TabCount; TabIndex++)
   {
-    rect2f Region = Node->Region;
-    v2 Delta = Interface->MousePos-Interface->MouseLeftButtonPush;
-    Region.X += Delta.X;
-    Region.Y += Delta.Y;
-    DEBUGPushQuad(Region, V4(0.3,0.5,0.3,0.3));
-  }
-
-  if(Window->NodeToMerge)
-  {
-    rect2f Rect = Window->NodeToMerge->Functions.GetRegionRect(window_regions::WholeBody, Window->NodeToMerge);
-
-    for (u32 Index = 0; Index < ArrayCount(Window->MergeZone); ++Index)
+    rect2f TabRegion = GetTabRegion(HeaderRegion, TabIndex,Window->TabCount);
+    if(Window->TabDrag && TabIndex+1 == Window->SelectedTabOrdinal)
     {
-      v4 Color = V4(0.3,0.5,0.3,0.5);
-      if(Index == Window->HotMergeZone)
+      TabRegion.X = Interface->MousePos.X - Window->TabMouseOffset.X; 
+      if(TabRegion.X < HeaderRegion.X)
       {
-        Color = V4(0.3,0.5,0.3,0.7);
+        TabRegion.X = HeaderRegion.X;
       }
-      DEBUGPushQuad(Window->MergeZone[Index], Color); 
+
+      if(TabRegion.X + TabRegion.W  > HeaderRegion.X + HeaderRegion.W)
+      {
+        TabRegion.X = HeaderRegion.X + HeaderRegion.W - TabRegion.W;
+      }
     }
+    
+    container_node* Child = Window->Tabs[TabIndex];
+    while(Child->FirstChild)
+    {
+      Child = Child->FirstChild;
+    }
+
+    Assert(Child->Type == container_type::Empty);
+
+    empty_window* EmptyWindow = GetContainerPayload(empty_window, Child);
+    DEBUGPushQuad(TabRegion, V4(0.8*V3(EmptyWindow->Color),1));
   }
 }
 
@@ -914,7 +996,7 @@ menu_functions TabbedHeaderMenuFunctions()
 
 MENU_MOUSE_DOWN( VerticalSplitMouseDown )
 {
-  split_window* Window = Node->SplitWindow;
+  split_window* Window = GetContainerPayload(split_window, Node);
   Window->DraggingStart = Window->SplitFraction;
   switch(HotRegion)
   {
@@ -940,7 +1022,7 @@ MENU_MOUSE_DOWN( VerticalSplitMouseDown )
 }
 MENU_MOUSE_UP( SplitMouseUp )
 {
-  split_window* Window = Node->SplitWindow;
+  split_window* Window = GetContainerPayload(split_window, Node);
   Window->BorderDrag = false;
   Window->WindowDrag[0] = false;
   Window->WindowDrag[1] = false;
@@ -957,7 +1039,7 @@ MENU_MOUSE_EXIT( VerticalSplitMouseExit )
 
 MENU_HANDLE_INPUT( VerticalSplitHandleInput )
 {
-  split_window* Window = Node->SplitWindow;
+  split_window* Window = GetContainerPayload(split_window, Node);
   game_window_size WindowSize = GameGetWindowSize();
   r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
   rect2f Surroundings = Rect2f(0,0,Width,1);
@@ -989,10 +1071,11 @@ MENU_GET_REGION_RECT( VerticalSplitGetRegionRect )
   r32 Width  = 0;
   r32 Height = 0;
 
+  split_window* Window = GetContainerPayload(split_window, Node);
   rect2f Region = Node->Region;
-  r32 BorderSize = Node->SplitWindow->BorderSize;
+  r32 BorderSize = Window->BorderSize;
 
-  r32 LeftWidth = Node->SplitWindow->SplitFraction * Region.W - 0.5f * BorderSize;
+  r32 LeftWidth = Window->SplitFraction * Region.W - 0.5f * BorderSize;
   r32 RightXStart = Region.X + LeftWidth + BorderSize;
   r32 RightWidth = Region.W - LeftWidth - BorderSize;
 
@@ -1039,7 +1122,7 @@ MENU_GET_MOUSE_OVER_REGION( VerticalSplitGetMouseOverRegion )
     window_regions::VerticalBorder
   };
 
-  split_window* Window = Node->SplitWindow;
+  split_window* Window = GetContainerPayload(split_window, Node);
 
   window_regions Result = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
 
@@ -1048,7 +1131,7 @@ MENU_GET_MOUSE_OVER_REGION( VerticalSplitGetMouseOverRegion )
 
 MENU_DRAW( VerticalSplitDraw )
 {
-  split_window* Window = Node->SplitWindow;
+  split_window* Window = GetContainerPayload(split_window, Node);
   v4 BodyColor   = V4(0.2,0.2,0.2,1);
   v4 BorderColor = V4(0,0,1,1);
   v4 HeaderColor = V4(0.4,0.4,0.4,1);
@@ -1074,7 +1157,7 @@ menu_functions VerticalSplitMenuFunctions()
 
 MENU_MOUSE_DOWN( HorizontalMouseDown )
 {
-  split_window* Window = Node->SplitWindow;
+  split_window* Window = GetContainerPayload(split_window, Node);
   Window->DraggingStart = Window->SplitFraction;
   switch(HotRegion)
   {
@@ -1110,7 +1193,7 @@ MENU_MOUSE_EXIT( HorizontalMouseExit )
 
 MENU_HANDLE_INPUT( HorizontalHandleInput )
 {
-  split_window* Window = Node->SplitWindow;
+  split_window* Window = GetContainerPayload(split_window, Node);
   game_window_size WindowSize = GameGetWindowSize();
   r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
   rect2f Surroundings = Rect2f(0,0,Width,1);
@@ -1142,10 +1225,11 @@ MENU_GET_REGION_RECT( HorizontalGetRegionRect )
   r32 Width  = 0;
   r32 Height = 0;
 
+  split_window* Window = GetContainerPayload(split_window, Node);
   rect2f Region = Node->Region;
-  r32 BorderSize = Node->SplitWindow->BorderSize;
+  r32 BorderSize = Window->BorderSize;
 
-  r32 BotHeight = Node->SplitWindow->SplitFraction * Region.H - 0.5f * BorderSize;
+  r32 BotHeight = Window->SplitFraction * Region.H - 0.5f * BorderSize;
   r32 TopYStart = Region.Y + BotHeight + BorderSize;
   r32 TopHeight = Region.H - BotHeight - BorderSize;
 
@@ -1191,7 +1275,7 @@ MENU_GET_MOUSE_OVER_REGION( HorizontalGetMouseOverRegion )
     window_regions::HorizontalBorder
   };
 
-  split_window* Window = Node->SplitWindow;
+  split_window* Window = GetContainerPayload(split_window, Node);
 
   window_regions Result = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
 
@@ -1200,7 +1284,7 @@ MENU_GET_MOUSE_OVER_REGION( HorizontalGetMouseOverRegion )
 
 MENU_DRAW( HorizontalDraw )
 {
-  split_window* Window = Node->SplitWindow;
+  split_window* Window = GetContainerPayload(split_window, Node);
   v4 BodyColor   = V4(0.2,0.2,0.2,1);
   v4 BorderColor = V4(0,0,1,1);
   v4 HeaderColor = V4(0.4,0.4,0.4,1);

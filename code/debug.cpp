@@ -148,117 +148,146 @@ menu_functions GetMenuFunction(container_type Type)
   return Result;
 }
 
-u32 GetFirstFreeIndex(u32 MaxCount, b32* List)
-{
-  u32 Index = 0;
-  while(List[Index])
-  {
-    ++Index;
-    Assert(Index < MaxCount);
-  }
-  Assert(!List[Index]);
-  List[Index] = true;
-  return Index;
-}
 
-void AllocateWindowMenu(menu_interface* Interface, container_node* Node)
+u32 GetContainerSize(container_type Type)
 {
-  switch(Node->Type)
+  u32 Result = sizeof(container_node);
+  switch(Type)
   {
     case container_type::Root:
     {
-      u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->RootOccupancy), Interface->RootOccupancy);
-      Node->RootWindow = &Interface->RootWindows[WindowIndex];
-      Node->WindowIndex = WindowIndex;
+      Result += sizeof(root_window);
     }break;
     case container_type::Empty:
     {
-      u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->EmptyOccupancy), Interface->EmptyOccupancy);
-      Node->EmptyWindow = &Interface->EmptyWindows[WindowIndex];
-      Node->WindowIndex = WindowIndex;
+      Result += sizeof(empty_window);
     }break;
-    case container_type::VerticalSplit:
-    {
-      u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->SplitOccupancy), Interface->SplitOccupancy);
-      Node->SplitWindow = &Interface->SplitWindows[WindowIndex];
-      Node->WindowIndex = WindowIndex;
-    }break;
+    case container_type::VerticalSplit:  // Fallthrough
     case container_type::HorizontalSplit:
     {
-      u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->SplitOccupancy), Interface->SplitOccupancy);
-      Node->SplitWindow = &Interface->SplitWindows[WindowIndex];
-      Node->WindowIndex = WindowIndex;
+      Result += sizeof(split_window);
     }break;
     case container_type::TabbedHeader:
     {
-      u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->TabbedHeaderOccupancy), Interface->TabbedHeaderOccupancy);
-      Node->TabbedHeader = &Interface->TabbedHeaderWindows[WindowIndex];
-      Node->WindowIndex = WindowIndex;
+      Result += sizeof(tabbed_header_window);
     }break;
     case container_type::MenuHeader:
     {
-      u32 WindowIndex =  GetFirstFreeIndex(ArrayCount(Interface->MenuHeaderOccupancy), Interface->MenuHeaderOccupancy);
-      Node->MenuHeader = &Interface->MenuHeaderWindows[WindowIndex];
-      Node->WindowIndex = WindowIndex;
+      Result += sizeof(menu_header_window); 
     }break;
   }
-}
-
-void DeallocateWindowMenu(menu_interface* Interface, container_node* Node)
-{
-  switch(Node->Type)
-  {
-    case container_type::Root:
-    {
-      Interface->RootWindows[Node->WindowIndex] = {};
-      Interface->RootOccupancy[Node->WindowIndex] = {};
-    }break;
-    case container_type::Empty:
-    {
-      Interface->EmptyWindows[Node->WindowIndex] = {};
-      Interface->EmptyOccupancy[Node->WindowIndex] = {};
-    }break;
-    case container_type::VerticalSplit:
-    {
-      Interface->SplitWindows[Node->WindowIndex] = {};
-      Interface->SplitOccupancy[Node->WindowIndex] = {};
-    }break;
-    case container_type::HorizontalSplit:
-    {
-      Interface->SplitWindows[Node->WindowIndex] = {};
-      Interface->SplitOccupancy[Node->WindowIndex] = {};
-    }break;
-    case container_type::TabbedHeader:
-    {
-      Interface->TabbedHeaderWindows[Node->WindowIndex] = {};
-      Interface->TabbedHeaderOccupancy[Node->WindowIndex] = {};
-    }break;
-    case container_type::MenuHeader:
-    {
-      Interface->MenuHeaderWindows[Node->WindowIndex] = {};
-      Interface->MenuHeaderOccupancy[Node->WindowIndex] = {};
-    }break;
-  }
+  return Result;
 }
 
 container_node* NewContainer(menu_interface* Interface, container_type Type)
 {
-  u32 ContainerIndex = GetFirstFreeIndex(ArrayCount(Interface->ContainerOccupancy), Interface->ContainerOccupancy);
-  container_node* Node = &Interface->ContainerNodes[ContainerIndex];
-  Node->Type = Type;
-  Node->ContainerIndex = ContainerIndex;
+  u32 ContainerSize = GetContainerSize(Type);
+  Interface->ActiveMemory += ContainerSize;
 
-  Node->Functions = GetMenuFunction(Node->Type);
-  AllocateWindowMenu(Interface, Node);
+  container_node* Result = 0;
+  {
+    u32 RegionUsed = (u32)(Interface->Memory - Interface->MemoryBase);
+    u32 TotSize = (u32) Interface->MaxMemSize;
+    r32 Percentage = RegionUsed / (r32) TotSize;
+    u32 ActiveMemory = Interface->ActiveMemory;
+    r32 Fragmentation = ActiveMemory/(r32)RegionUsed;
+    
+    Platform.DEBUGPrint("--==<< Pre Memory >>==--\n");
+    Platform.DEBUGPrint(" - Tot Mem Used   : %2.3f  (%d/%d)\n", Percentage, RegionUsed, TotSize );
+    Platform.DEBUGPrint(" - Fragmentation  : %2.3f  (%d/%d)\n", Fragmentation, ActiveMemory, RegionUsed );
+  }
+  
+  u32 RegionUsed = (u32)(Interface->Memory - Interface->MemoryBase);
+  r32 MemoryFragmentation = Interface->ActiveMemory/(r32)RegionUsed;
+  b32 MemoryTooFragmented = MemoryFragmentation < 0.8;
+  if( MemoryTooFragmented || RegionUsed == Interface->MaxMemSize )
+  {
+    u32 Slot = 0;
+    u32 SlotSpace = 0;
+    u32 SlotSize = 0;
 
-  return Node;
+    container_node* CurrentNode = Interface->Sentinel.Next;
+    container_node* NextNode = CurrentNode->Next;
+    while( CurrentNode->Next != &Interface->Sentinel)
+    {
+      midx Base = (midx) CurrentNode + CurrentNode->ContainerSize;
+      midx NextNodeAddress    = (midx)  CurrentNode->Next;
+      Assert(Base <= NextNodeAddress);
+
+      midx OpenSpace = NextNodeAddress - Base;
+
+      if(OpenSpace >= ContainerSize)
+      {
+        Result = (container_node*) Base;
+        ListInsertAfter(CurrentNode, Result);
+        SlotSpace = (u32) Slot;
+        SlotSize = (u32) OpenSpace;
+        break;
+      }
+
+      Slot++;
+      CurrentNode =  CurrentNode->Next;
+    }
+
+   
+    {
+      u32 SlotCount = 0;
+      container_node* CurrentNode2 = Interface->Sentinel.Next;
+      container_node* NextNode2 = CurrentNode->Next;
+     
+      while( CurrentNode2->Next != &Interface->Sentinel)
+      {
+        SlotCount++;
+        CurrentNode2 = CurrentNode2->Next;
+      }  
+      
+      Platform.DEBUGPrint("--==<< Middle Inset >>==--\n");
+      Platform.DEBUGPrint(" - Slot: [%d,%d]\n", SlotSpace, SlotCount);
+      Platform.DEBUGPrint(" - Size: [%d,%d]\n", ContainerSize, SlotSize);
+      //Platform.DEBUGPrint(" - Mem : [%d,%d]\n\n", );
+    }
+    
+    
+  }
+  
+  if(!Result)
+  {
+    Assert(RegionUsed+ContainerSize < Interface->MaxMemSize);
+    //Platform.DEBUGPrint("--==<< Post Inset >>==--\n");
+    //Platform.DEBUGPrint(" - Memory Left  : %d\n",Interface->MaxMemSize - (u32)RegionUsed + ContainerSize);
+    //Platform.DEBUGPrint(" - ContainerSize: %d\n\n", ContainerSize);
+    Result = (container_node*) Interface->Memory;
+    Interface->Memory += ContainerSize;  
+    container_node* Sentinel = &Interface->Sentinel;
+    ListInsertBefore( Sentinel, Result );
+  }
+  
+  Result->Type = Type;
+  Result->ContainerSize = ContainerSize;
+  Result->Functions = GetMenuFunction(Type);
+  {
+    u32 RegionUsed2 = (u32)(Interface->Memory - Interface->MemoryBase);
+    u32 TotSize = (u32) Interface->MaxMemSize;
+    r32 Percentage = RegionUsed2 / (r32) TotSize;
+    u32 ActiveMemory = Interface->ActiveMemory;
+    r32 Fragmentation = ActiveMemory/(r32)RegionUsed2;
+    
+    Platform.DEBUGPrint("--==<< Post Memory >>==--\n");
+    Platform.DEBUGPrint(" - Tot Mem Used   : %2.3f  (%d/%d)\n", Percentage, RegionUsed, TotSize );
+    Platform.DEBUGPrint(" - Fragmentation  : %2.3f  (%d/%d)\n", Fragmentation, ActiveMemory, RegionUsed );
+  }
+  return Result;
 }
 void DeleteContainer( menu_interface* Interface, container_node* Node)
 {
-  DeallocateWindowMenu(Interface, Node);
-  Interface->ContainerOccupancy[Node->ContainerIndex] = false;
-  Interface->ContainerNodes[Node->ContainerIndex] = {};
-
+  Node->Previous->Next = Node->Next;
+  Node->Next->Previous = Node->Previous;
+  Interface->ActiveMemory -= Node->ContainerSize;
+  
+  // Note: We should in theory not have to zerosize the deleted containers, 
+  //       But if we don't we sometimes crash, so look out for that when refactoring.
+  //       This is probably masking some bug.
+  utils::ZeroSize(Node->ContainerSize, (void*)Node);
 }
 
 // Preorder breadth first.
@@ -521,6 +550,8 @@ void ConnectNode(container_node* Parent, container_node* NewNode)
   }
 }
 
+#define GetContainerPayload( Type, Container )  ((Type*) (((u8*)Container) + sizeof(container_node)))
+
 internal debug_state*
 DEBUGGetState()
 {
@@ -537,6 +568,13 @@ DEBUGGetState()
     DebugState->MemorySize = (midx) Megabytes(1);
     DebugState->MemoryBase = PushArray(&DebugState->Arena, DebugState->MemorySize, u8);
     DebugState->Memory = DebugState->MemoryBase;
+
+    DebugState->MenuInterface = PushStruct(&DebugState->Arena, menu_interface);
+    menu_interface* Interface = DebugState->MenuInterface;
+    Interface->ActiveMemory = 0;
+    Interface->MaxMemSize = Megabytes(1);
+    Interface->MemoryBase = (u8*) PushSize(&DebugState->Arena, Interface->MaxMemSize);
+    Interface->Memory = Interface->MemoryBase;
 
     // Transient Memory Begin
     DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->Arena);
@@ -584,37 +622,47 @@ DEBUGGetState()
     OptionsMenu->MenuItemCount = ArrayCount(OptionMenuItems);
     OptionsMenu->MenuItems = (menu_item*) DEBUGPushCopy(DebugState, sizeof(OptionMenuItems), OptionMenuItems);
 
-
-    DebugState->MenuInterface = DEBUGPushStruct(DebugState, menu_interface);
-    menu_interface* Interface = DebugState->MenuInterface;
+    container_node* Sentinel = &(Interface->Sentinel);
+    ListInitiate(Sentinel);
 
     {
       menu_tree* Root = GetNewMenuTree(Interface);
       Root->Root = NewContainer(Interface, container_type::Root);
 
       container_node* RootContainer = Root->Root;
-      RootContainer->RootWindow->BorderSize = 0.007;
-      RootContainer->RootWindow->MinSize = 0.2f;
       RootContainer->Region = Rect2f(0.2,0.2,0.5,0.5);
+      root_window* RootWindow = GetContainerPayload(root_window,Root->Root);
+      RootWindow->BorderSize = 0.007;
+      RootWindow->MinSize = 0.2f;
+      
 
       container_node* RootHeader = NewContainer(Interface, container_type::MenuHeader);
-      RootHeader->MenuHeader->HeaderSize = 0.02;
-      RootHeader->MenuHeader->RootWindow = RootContainer;
+      menu_header_window* MenuHeader = GetContainerPayload(menu_header_window, RootHeader);
+      MenuHeader->HeaderSize = 0.02;
+      MenuHeader->RootWindow = RootContainer;
+
 
       container_node* SplitContainer = NewContainer(Interface, container_type::VerticalSplit);
-      SplitContainer->SplitWindow->BorderSize = 0.007f;
-      SplitContainer->SplitWindow->MinSize = 0.02f;
-      SplitContainer->SplitWindow->SplitFraction = 0.5f;
+      split_window* SplitWindow =  GetContainerPayload(split_window, SplitContainer);
+      SplitWindow->BorderSize = 0.007f;
+      SplitWindow->MinSize = 0.02f;
+      SplitWindow->SplitFraction = 0.5f;
 
       container_node* TabbedHeader0 = NewContainer(Interface, container_type::TabbedHeader);
-      TabbedHeader0->TabbedHeader->HeaderSize = 0.02;
-      container_node*  EmptyContainer0 = NewContainer(Interface, container_type::Empty);
-      EmptyContainer0->EmptyWindow->Color = V4(0,0,0.4,1);
+      tabbed_header_window* TabbedHeaderWindow0 = GetContainerPayload(tabbed_header_window, TabbedHeader0);
+      TabbedHeaderWindow0->HeaderSize = 0.02;
+
+      container_node* EmptyContainer0 = NewContainer(Interface, container_type::Empty);
+      empty_window* EmptyWindow0 =  GetContainerPayload(empty_window, EmptyContainer0);
+      EmptyWindow0->Color = V4(0,0,0.4,1);
 
       container_node* TabbedHeader1 = NewContainer(Interface, container_type::TabbedHeader);
-      TabbedHeader1->TabbedHeader->HeaderSize = 0.02;
+      tabbed_header_window* TabbedHeaderWindow1 = GetContainerPayload(tabbed_header_window, TabbedHeader1);
+      TabbedHeaderWindow1->HeaderSize = 0.02;
+
       container_node*  EmptyContainer1 = NewContainer(Interface, container_type::Empty);
-      EmptyContainer1->EmptyWindow->Color = V4(0,0.4,0.4,1);
+      empty_window* EmptyWindow1 =  GetContainerPayload(empty_window, EmptyContainer1);
+      EmptyWindow1->Color = V4(0,0.4,0.4,1);
 
       ConnectNode(0, Root->Root); // 0
 
@@ -623,9 +671,11 @@ DEBUGGetState()
 
       ConnectNode(SplitContainer, TabbedHeader0); // 3
       ConnectNode(TabbedHeader0,  EmptyContainer0); // 4
+      TabbedHeaderWindow0->Tabs[TabbedHeaderWindow0->TabCount++] = EmptyContainer0;
 
       ConnectNode(SplitContainer, TabbedHeader1); // 3
       ConnectNode(TabbedHeader1,  EmptyContainer1); // 4
+      TabbedHeaderWindow1->Tabs[TabbedHeaderWindow1->TabCount++] = EmptyContainer1;
 
       Root->Depth = 4;
       Root->NodeCount = 7;
@@ -639,28 +689,39 @@ DEBUGGetState()
       Root->Root = NewContainer(Interface, container_type::Root);
 
       container_node* RootContainer = Root->Root;
-      RootContainer->RootWindow->BorderSize = 0.007;
-      RootContainer->RootWindow->MinSize = 0.2f;
       RootContainer->Region = Rect2f(1,0.2,0.5,0.5);
+      root_window* RootWindow = GetContainerPayload(root_window,Root->Root);
+      RootWindow->BorderSize = 0.007;
+      RootWindow->MinSize = 0.2f;
+      
 
       container_node* RootHeader = NewContainer(Interface, container_type::MenuHeader);
-      RootHeader->MenuHeader->HeaderSize = 0.02;
-      RootHeader->MenuHeader->RootWindow = RootContainer;
+      menu_header_window* MenuHeader = GetContainerPayload(menu_header_window, RootHeader);
+      MenuHeader->HeaderSize = 0.02;
+      MenuHeader->RootWindow = RootContainer;
+
 
       container_node* SplitContainer = NewContainer(Interface, container_type::VerticalSplit);
-      SplitContainer->SplitWindow->BorderSize = 0.007f;
-      SplitContainer->SplitWindow->MinSize = 0.02f;
-      SplitContainer->SplitWindow->SplitFraction = 0.5f;
+      split_window* SplitWindow =  GetContainerPayload(split_window, SplitContainer);
+      SplitWindow->BorderSize = 0.007f;
+      SplitWindow->MinSize = 0.02f;
+      SplitWindow->SplitFraction = 0.5f;
 
       container_node* TabbedHeader0 = NewContainer(Interface, container_type::TabbedHeader);
-      TabbedHeader0->TabbedHeader->HeaderSize = 0.02;
-      container_node*  EmptyContainer0 = NewContainer(Interface, container_type::Empty);
-      EmptyContainer0->EmptyWindow->Color = V4(0,0.4,0,1);
+      tabbed_header_window* TabbedHeaderWindow0 = GetContainerPayload(tabbed_header_window, TabbedHeader0);
+      TabbedHeaderWindow0->HeaderSize = 0.02;
+
+      container_node* EmptyContainer0 = NewContainer(Interface, container_type::Empty);
+      empty_window* EmptyWindow0 =  GetContainerPayload(empty_window, EmptyContainer0);
+      EmptyWindow0->Color = V4(0,0.4,0,1);
 
       container_node* TabbedHeader1 = NewContainer(Interface, container_type::TabbedHeader);
-      TabbedHeader1->TabbedHeader->HeaderSize = 0.02;
+      tabbed_header_window* TabbedHeaderWindow1 = GetContainerPayload(tabbed_header_window, TabbedHeader1);
+      TabbedHeaderWindow1->HeaderSize = 0.02;
+
       container_node*  EmptyContainer1 = NewContainer(Interface, container_type::Empty);
-      EmptyContainer1->EmptyWindow->Color = V4(0.4,0,0,1);
+      empty_window* EmptyWindow1 =  GetContainerPayload(empty_window, EmptyContainer1);
+      EmptyWindow1->Color = V4(0.4,0,0,1);
 
       ConnectNode(0, Root->Root); // 0
 
@@ -669,9 +730,11 @@ DEBUGGetState()
 
       ConnectNode(SplitContainer, TabbedHeader0); // 3
       ConnectNode(TabbedHeader0,  EmptyContainer0); // 4
+      TabbedHeaderWindow0->Tabs[TabbedHeaderWindow0->TabCount++] = EmptyContainer0;
 
       ConnectNode(SplitContainer, TabbedHeader1); // 3
       ConnectNode(TabbedHeader1,  EmptyContainer1); // 4
+      TabbedHeaderWindow1->Tabs[TabbedHeaderWindow1->TabCount++] = EmptyContainer1;
 
       Root->Depth = 4;
       Root->NodeCount = 7;
@@ -1345,6 +1408,7 @@ void DebugMainWindow(game_input* GameInput)
 
 
   menu_interface* Interface = DebugState->MenuInterface;
+
   SetMouseInput(GameInput, Interface);
 
   // Hot Window is at index 0; Here we sort the windows such that the klicked window
@@ -1385,13 +1449,11 @@ void DebugMainWindow(game_input* GameInput)
       MoveMenuToTop(Interface, HotWindowIndex);
     }
   }
-
   if(Interface->HotWindow.Root)
   {
     // Acts on hot window
     ActOnInput(&DebugState->Arena, Interface);
   }
-
   for (s32 WindowIndex = Interface->RootContainerCount-1;
            WindowIndex >= 0;
          --WindowIndex)

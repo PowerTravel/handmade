@@ -20,18 +20,18 @@ struct temporary_memory
 };
 
 inline void
-SetMinimumBlockSize( memory_arena *Arena, memory_index MinimumBlockSize )
+SetMinimumBlockSize( memory_arena *Arena, midx MinimumBlockSize )
 {
   Arena->MinimumBlockSize = MinimumBlockSize;
 }
 
-inline memory_index
-GetAlignmentOffset( memory_arena *Arena, memory_index Alignment )
+inline midx
+GetAlignmentOffset( memory_arena *Arena, midx Alignment )
 {
-  memory_index AlignmentOffset = 0;
+  midx AlignmentOffset = 0;
 
-  memory_index ResultPointer = (memory_index)Arena->CurrentBlock->Base + Arena->CurrentBlock->Used;
-  memory_index AlignmentMask = Alignment - 1;
+  midx ResultPointer = (midx)Arena->CurrentBlock->Base + Arena->CurrentBlock->Used;
+  midx AlignmentMask = Alignment - 1;
   if(ResultPointer & AlignmentMask)
   {
       AlignmentOffset = Alignment - (ResultPointer & AlignmentMask);
@@ -120,23 +120,23 @@ NonRestoredArena( void )
 #define PushSize(Arena, Size, ...)                             PushSize_( Arena, Size,                 ## __VA_ARGS__ )
 #define PushCopy(Arena, Size, Source, ...)  utils::Copy(Size, Source, PushSize_( Arena, Size,          ## __VA_ARGS__ ))
 
-inline memory_index
-GetEffectiveSizeFor( memory_arena *Arena, memory_index SizeInit, arena_push_params Params = DefaultArenaParams() )
+inline midx
+GetEffectiveSizeFor( memory_arena *Arena, midx SizeInit, arena_push_params Params = DefaultArenaParams() )
 {
-  memory_index Size = SizeInit;
+  midx Size = SizeInit;
 
-  memory_index AlignmentOffset = GetAlignmentOffset( Arena, Params.Alignment );
+  midx AlignmentOffset = GetAlignmentOffset( Arena, Params.Alignment );
   Size += AlignmentOffset;
 
   return( Size );
 }
 
 inline void *
-PushSize_( memory_arena *Arena, memory_index SizeInit, arena_push_params Params = DefaultArenaParams() )
+PushSize_( memory_arena *Arena, midx SizeInit, arena_push_params Params = DefaultArenaParams() )
 {
   void *Result = 0;
 
-  memory_index Size = 0;
+  midx Size = 0;
   if( Arena->CurrentBlock )
   {
     Size = GetEffectiveSizeFor( Arena, SizeInit, Params );
@@ -158,7 +158,7 @@ PushSize_( memory_arena *Arena, memory_index SizeInit, arena_push_params Params 
       Arena->MinimumBlockSize = 1024*1024;
     }
 
-    memory_index BlockSize = Maximum( Size, Arena->MinimumBlockSize );
+    midx BlockSize = Maximum( Size, Arena->MinimumBlockSize );
 
     platform_memory_block *NewBlock =
         Platform.AllocateMemory( BlockSize, Arena->AllocationFlags );
@@ -168,7 +168,7 @@ PushSize_( memory_arena *Arena, memory_index SizeInit, arena_push_params Params 
 
   Assert( ( Arena->CurrentBlock->Used + Size ) <= Arena->CurrentBlock->Size );
 
-  memory_index AlignmentOffset = GetAlignmentOffset( Arena, Params.Alignment );
+  midx AlignmentOffset = GetAlignmentOffset( Arena, Params.Alignment );
   Result = Arena->CurrentBlock->Base + Arena->CurrentBlock->Used + AlignmentOffset;
   Arena->CurrentBlock->Used += Size;
 

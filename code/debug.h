@@ -375,50 +375,24 @@ struct menu_functions
 };
 
 
-/* Note: Should we make the interactive windows of container_node into a flat list
- * Change to this? :
- * Main Container =
- * {
- *   Header(Leaf),
- *   Some set of Widget(s)),
- *   Footer (Leaf)
- * }
- *          ------------
- *          |  Header  |
- *          ------------
- *          |          |
- *          | Some     |
- *          | Widget   |
- *          |          |
- *          ------------
- *          |  Footer  |
- *          ------------
- */
-
 struct container_node
 {
   container_type Type;
 
+  // Tree Links (Menu Structure)
   container_node* Parent;
   container_node* FirstChild;
   container_node* NextSibling;
+
+  // List Links (Memory)
+  container_node* Next;
+  container_node* Previous;
   
   rect2f Region;
 
-  u32 ContainerIndex;
-  u32 WindowIndex;
+  u32 ContainerSize;
 
   menu_functions Functions;
-  union
-  {
-    void* WindowPointer;
-    struct tabbed_header_window* TabbedHeader;
-    struct menu_header_window* MenuHeader;
-    struct split_window* SplitWindow;
-    struct empty_window* EmptyWindow;
-    struct root_window* RootWindow;
-  };
-
 };
 
 #define GetContainingNode( WindowPtr )  (container_node*) ( ((u8*)(WindowPtr)) - OffsetOf(container_node, WindowPointer))
@@ -436,21 +410,25 @@ struct tabbed_header_window
 {
   r32 HeaderSize;
 
-  // Window Dragging
-  container_node* RootWindow;
-  v2 RootDraggingStart;
-  v2 DraggingStart;
-  b32 WindowDrag;
+  // Tabs
+  u32 TabCount;
+  container_node* Tabs[12];
+  u32 SelectedTabOrdinal; // [1,3,4,5...], 0 means no tab selected
 
-  // Window Merging
-  container_node* NodeToMerge;
-  rect2f MergeZone[5];
-  u32 HotMergeZone;
+  b32 TabDrag;
+  v2 TabMouseOffset;
 };
 
 struct menu_header_window
 {
   r32 HeaderSize;
+  
+  // Window Merging
+  container_node* NodeToMerge;
+  rect2f MergeZone[5];
+  u32 HotMergeZone;
+
+  // Window Dragging
   container_node* RootWindow;
   v2 DraggingStart;
   b32 WindowDrag;
@@ -503,20 +481,12 @@ struct menu_interface
   window_regions HotRegion;
   container_node* HotSubWindow;
 
-
-  b32 ContainerOccupancy[32];
-  b32 TabbedHeaderOccupancy[8];
-  b32 MenuHeaderOccupancy[8];
-  b32 SplitOccupancy[8];
-  b32 EmptyOccupancy[8];
-  b32 RootOccupancy[8];
-
-  container_node ContainerNodes[32];
-  tabbed_header_window TabbedHeaderWindows[8];
-  menu_header_window MenuHeaderWindows[8];
-  split_window SplitWindows[8];
-  empty_window EmptyWindows[8];
-  root_window RootWindows[8];
+  u32 ActiveMemory;
+  u32 MaxMemSize;
+  u8* MemoryBase;
+  u8* Memory;
+  
+  container_node Sentinel;
 
   v2 MousePos;
   binary_signal_state MouseLeftButton;
