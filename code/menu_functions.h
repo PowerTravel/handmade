@@ -576,42 +576,35 @@ MENU_HANDLE_INPUT( MenuHeaderHandleInput )
       }else{
         Window->HotMergeZone = ArrayCount(Window->MergeZone);
       }
-
-      Platform.DEBUGPrint("MergeRegion: %d\n", Window->HotMergeZone);
     }
 
 
-    v2 Delta = Interface->MousePos - Interface->MouseLeftButtonPush;
     game_window_size WindowSize = GameGetWindowSize();
     r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
-    rect2f Surroundings = Rect2f(0,0,Width,1);
+    rect2f NormalizedScreenSize = Rect2f(0,0,Width,1);
+    r32 ScreenBoundary = 0.01;
+    v2 MousePos = Interface->MousePos;
+    if(MousePos.X < NormalizedScreenSize.X + ScreenBoundary)
+    {
+      MousePos.X = NormalizedScreenSize.X + ScreenBoundary;
+    }
+    if( MousePos.X > (NormalizedScreenSize.X + NormalizedScreenSize.W - ScreenBoundary))
+    {
+      MousePos.X = (NormalizedScreenSize.X + NormalizedScreenSize.W - ScreenBoundary);
+    }
+    if(MousePos.Y < NormalizedScreenSize.Y + ScreenBoundary)
+    {
+      MousePos.Y = NormalizedScreenSize.Y + ScreenBoundary;
+    }
+    if(MousePos.Y > (NormalizedScreenSize.Y + NormalizedScreenSize.H - ScreenBoundary))
+    {
+      MousePos.Y = (NormalizedScreenSize.Y + NormalizedScreenSize.H - ScreenBoundary);
+    }
 
-    rect2f* Region = &Window->RootWindow->Region;
-
-    Assert((Surroundings.Y + Surroundings.H)<=1);
-
+    v2 Delta = MousePos - Interface->MouseLeftButtonPush;
     v2 NewPos = Window->DraggingStart + Delta;
-    #if 0
-    if(NewPos.X < Surroundings.X)
-    {
-      NewPos.X = Surroundings.X;
-    }
-    if( (NewPos.X + Region->W) > (Surroundings.X + Surroundings.W))
-    {
-      NewPos.X = (Surroundings.X + Surroundings.W) - Region->W;
-    }
-    if(NewPos.Y < Surroundings.Y)
-    {
-      NewPos.Y = Surroundings.Y;
-    }
-    if(NewPos.Y + Region->H > (Surroundings.Y + Surroundings.H))
-    {
-      NewPos.Y = (Surroundings.Y + Surroundings.H) - Region->H;
-    }
-    #endif
-
-    Region->X = NewPos.X;
-    Region->Y = NewPos.Y;
+    Window->RootWindow->Region->X = NewPos.X;
+    Window->RootWindow->Region->Y = NewPos.Y;
   }
 }
 
@@ -801,49 +794,117 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
     HeaderSplitRegion.Y -= HeaderSplitRegion.H;
     HeaderSplitRegion.H += 2*HeaderSplitRegion.H;
 
-    if(!Intersects(HeaderSplitRegion,Interface->MousePos))
+    if(!Intersects(HeaderSplitRegion, Interface->MousePos))
     {
       TabbedHeader->TabDrag = false;
       Assert(Node->Parent)
 
-      container_node* ParentContainer = Node->Parent;
-      container_node* OppositeNode = 0;
-      if(ParentContainer->Type == container_type::VerticalSplit || 
-         ParentContainer->Type == container_type::HorizontalSplit)
+      if( TabbedHeader->TabCount == 1)
       {
-        if(Node == ParentContainer->FirstChild)
+        container_node* ParentContainer = Node->Parent;
+        container_node* OppositeNode = 0;
+        if(ParentContainer->Type == container_type::VerticalSplit || 
+           ParentContainer->Type == container_type::HorizontalSplit)
         {
-          OppositeNode = Node->NextSibling;
-        }else{
-          OppositeNode = ParentContainer->FirstChild;
-          Assert(Node == OppositeNode->NextSibling);
-        }
-      }
-      if(OppositeNode)
-      {
-        container_node* GrandParentContainer = ParentContainer->Parent;
-
-        if(GrandParentContainer->Type ==  container_type::VerticalSplit ||
-           GrandParentContainer->Type ==  container_type::HorizontalSplit)
-        {
-          if(GrandParentContainer->FirstChild == ParentContainer)
+          if(Node == ParentContainer->FirstChild)
           {
-            container_node* Sibling = ParentContainer->NextSibling;
-            DisconnectNode(Sibling);
-            DisconnectNode(ParentContainer);
-
-            ConnectNode(GrandParentContainer, OppositeNode);
-            ConnectNode(GrandParentContainer, Sibling);
+            OppositeNode = Node->NextSibling;
           }else{
-            DisconnectNode(ParentContainer);
-            ConnectNode(GrandParentContainer, OppositeNode);  
+            OppositeNode = ParentContainer->FirstChild;
+            Assert(Node == OppositeNode->NextSibling);
           }
-        }else{
-          DisconnectNode(ParentContainer);
-          ConnectNode(GrandParentContainer, OppositeNode);
+
+          if(OppositeNode)
+          {
+            container_node* GrandParentContainer = ParentContainer->Parent;
+
+            if(GrandParentContainer->Type ==  container_type::VerticalSplit ||
+               GrandParentContainer->Type ==  container_type::HorizontalSplit)
+            {
+              if(GrandParentContainer->FirstChild == ParentContainer)
+              {
+                container_node* Sibling = ParentContainer->NextSibling;
+                DisconnectNode(Sibling);
+                DisconnectNode(ParentContainer);
+
+                ConnectNode(GrandParentContainer, OppositeNode);
+                ConnectNode(GrandParentContainer, Sibling);
+              }else{
+                DisconnectNode(ParentContainer);
+                ConnectNode(GrandParentContainer, OppositeNode);  
+              }
+            }else{
+              DisconnectNode(ParentContainer);
+              ConnectNode(GrandParentContainer, OppositeNode);
+            }
+            DisconnectNode(Node);
+            DeleteContainer(Interface, ParentContainer);
+
+
+            menu_tree* Root = GetNewMenuTree(Interface);
+            Root->Root = NewContainer(Interface, container_type::Root);
+
+            r32 BorderSize = 0.007;
+            r32 HeaderSize = 0.02;
+
+            container_node* RootContainer = Root->Root;
+            RootContainer->Region = Rect2f(Node->Region.X, Node->Region.Y + BorderSize, Node->Region.W, Node->Region.H);
+
+            root_window* RootWindow = GetContainerPayload(root_window, RootContainer);
+            RootWindow->BorderSize = BorderSize;
+            RootWindow->MinSize = 0.2f;
+
+            container_node* RootHeader = NewContainer(Interface, container_type::MenuHeader);
+            menu_header_window* MenuHeader = GetContainerPayload(menu_header_window, RootHeader);
+            MenuHeader->HeaderSize = HeaderSize;
+            MenuHeader->RootWindow = RootContainer;
+            MenuHeader->WindowDrag = true;
+            MenuHeader->RootWindow = Root->Root;
+            MenuHeader->DraggingStart = V2(RootContainer->Region.X, RootContainer->Region.Y);
+
+            Interface->HotRegion = window_regions::Header;
+            Interface->HotSubWindow = RootHeader;
+
+            ConnectNode(0, Root->Root);
+            ConnectNode(RootContainer, RootHeader);
+            ConnectNode(RootHeader, Node);
+
+            // TODO: Just random numbers that will give a large enought stack to traverse atm
+            //       Fixit
+            Root->Depth = 6;
+            Root->NodeCount = 6;
+
+            menu_tree TopMenu = *Root;
+            MoveMenuToTop(Interface, Interface->RootContainerCount-1);
+            Interface->HotWindow = TopMenu;
+          }
+
+
+
+        }  
+      }else{
+        Assert(TabbedHeader->SelectedTabOrdinal!=0);
+        //Assert(Node->Parent->Type);
+        u32 SelectedTabIndex = TabbedHeader->SelectedTabOrdinal-1;
+        container_node* TabToBreakOut = TabbedHeader->Tabs[SelectedTabIndex];
+        Assert(TabToBreakOut == Node->FirstChild);
+
+        for (u32 TabIndex = SelectedTabIndex; TabIndex < TabbedHeader->TabCount-1; ++TabIndex)
+        {
+          TabbedHeader->Tabs[TabIndex] = TabbedHeader->Tabs[TabIndex+1];
         }
-        DisconnectNode(Node);
-        DeleteContainer(Interface, ParentContainer);
+        if(TabbedHeader->SelectedTabOrdinal == TabbedHeader->TabCount)
+        {
+          --TabbedHeader->SelectedTabOrdinal;
+        }
+        
+        Assert( TabbedHeader->SelectedTabOrdinal > 0 );
+        TabbedHeader->TabCount--;
+
+
+        DisconnectNode(TabToBreakOut);
+        ConnectNode(Node, TabbedHeader->Tabs[TabbedHeader->SelectedTabOrdinal-1] );
+
 
 
         menu_tree* Root = GetNewMenuTree(Interface);
@@ -866,14 +927,21 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
         MenuHeader->WindowDrag = true;
         MenuHeader->RootWindow = Root->Root;
         MenuHeader->DraggingStart = V2(RootContainer->Region.X, RootContainer->Region.Y);
+        
+        container_node* NewTabbedHeader = NewContainer(Interface, container_type::TabbedHeader);
+        tabbed_header_window* TabbedHeaderWindow = GetContainerPayload(tabbed_header_window, NewTabbedHeader);
+        TabbedHeaderWindow->HeaderSize = 0.02;
+        
 
         Interface->HotRegion = window_regions::Header;
         Interface->HotSubWindow = RootHeader;
 
         ConnectNode(0, Root->Root);
         ConnectNode(RootContainer, RootHeader);
-        ConnectNode(RootHeader, Node);
-
+        ConnectNode(RootHeader, NewTabbedHeader);
+        ConnectNode(NewTabbedHeader, TabToBreakOut);
+        TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = TabToBreakOut;
+    
         // TODO: Just random numbers that will give a large enought stack to traverse atm
         //       Fixit
         Root->Depth = 6;
