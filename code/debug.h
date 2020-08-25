@@ -266,9 +266,7 @@ enum class container_type
   None,
   Root,
   Empty,
-  //Split
-  VerticalSplit,
-  HorizontalSplit,
+  Split,
   TabbedHeader,
   MenuHeader
 };
@@ -277,12 +275,9 @@ enum class window_regions
 {
   None,
   WholeBody,
-  LeftBody,
-  RightBody,
-  BotBody,
-  TopBody,
-  HorizontalBorder,
-  VerticalBorder,
+  BodyOne,      // Left / Bot
+  BodyTwo,      // Right / Top
+  MiddleBorder, // Vertical / Horizontal
   LeftBorder,
   RightBorder,
   BotBorder,
@@ -301,12 +296,9 @@ const char* ToString(window_regions Region)
   {
     case window_regions::None: return "None";
     case window_regions::WholeBody: return "WholeBody";
-    case window_regions::LeftBody: return "LeftBody";
-    case window_regions::RightBody: return "RightBody";
-    case window_regions::BotBody: return "BotBody";
-    case window_regions::TopBody: return "TopBody";
-    case window_regions::HorizontalBorder: return "HorizontalBorder";
-    case window_regions::VerticalBorder: return "VerticalBorder";
+    case window_regions::BodyOne: return "BodyOne";
+    case window_regions::BodyTwo: return "BodyTwo";
+    case window_regions::MiddleBorder: return "MiddleBorder";
     case window_regions::LeftBorder: return "LeftBorder";
     case window_regions::RightBorder: return "RightBorder";
     case window_regions::BotBorder: return "BotBorder";
@@ -398,8 +390,7 @@ menu_functions GetEmptyFunctions();
 menu_functions GetRootMenuFunctions();
 menu_functions MenuHeaderMenuFunctions();
 menu_functions TabbedHeaderMenuFunctions();
-menu_functions VerticalSplitMenuFunctions();
-menu_functions HorizontalMenuFunctions();
+menu_functions SplitMenuFunctions();
 
 struct tabbed_header_window
 {

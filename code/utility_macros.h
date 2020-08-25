@@ -81,6 +81,9 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 #define ZeroStruct( Instance ) utils::ZeroSize( sizeof( Instance ), &( Instance ) )
 #define ZeroArray( Count, Pointer ) utils::ZeroSize( Count*sizeof( ( Pointer )[0] ), Pointer )
 
+#define BranchlessArithmatic( Condition, ExpressionIfTrue, ExpressionIfFalse )  ((s32)(Condition)) * (ExpressionIfTrue) + ((s32) !(Condition) ) * (ExpressionIfFalse)
+
+
 namespace utils
 {
   inline void

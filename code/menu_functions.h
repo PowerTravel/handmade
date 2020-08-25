@@ -451,16 +451,15 @@ MENU_MOUSE_UP( MenuHeaderMouseUp )
               ZoneIndex == 3  || ZoneIndex == 4)    // Horizontal
     {
       container_node* OppositeNode = Window->NodeToMerge;
-      container_type Type = (ZoneIndex == 0  || ZoneIndex == 2) ? container_type::VerticalSplit : container_type::HorizontalSplit;
-      container_node* SplitContainer = NewContainer(Interface, Type);
+      container_node* SplitContainer = NewContainer(Interface, container_type::Split);
       split_window* SplitWindow = GetContainerPayload(split_window, SplitContainer);
       SplitWindow->BorderSize = 0.007f;
       SplitWindow->MinSize = 0.02f;
       SplitWindow->SplitFraction = 0.5f; 
+      SplitWindow->VerticalSplit = (ZoneIndex == 0  || ZoneIndex == 2);
 
       container_node* CommonParent = OppositeNode->Parent;
-      if(CommonParent->Type ==  container_type::VerticalSplit ||
-         CommonParent->Type ==  container_type::HorizontalSplit)
+      if(CommonParent->Type ==  container_type::Split)
       {
         if(CommonParent->FirstChild == OppositeNode)
         {
@@ -555,8 +554,8 @@ MENU_HANDLE_INPUT( MenuHeaderHandleInput )
       menu_tree Menu = Interface->RootContainers[WindowIndex];
       node_region_pair NodeRegion = GetRegion(&DebugState->Arena, Menu.NodeCount, Menu.Root, Interface->MousePos);
       if(NodeRegion.Region == window_regions::WholeBody ||
-         NodeRegion.Region == window_regions::LeftBody  ||
-         NodeRegion.Region == window_regions::RightBody )
+         NodeRegion.Region == window_regions::BodyOne  ||
+         NodeRegion.Region == window_regions::BodyTwo )
       {
         while(NodeRegion.Node && NodeRegion.Node->Type != container_type::TabbedHeader)
         {
@@ -849,8 +848,7 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
       {
         container_node* ParentContainer = Node->Parent;
         container_node* OppositeNode = 0;
-        if(ParentContainer->Type == container_type::VerticalSplit || 
-           ParentContainer->Type == container_type::HorizontalSplit)
+        if(ParentContainer->Type == container_type::Split)
         {
           if(Node == ParentContainer->FirstChild)
           {
@@ -864,8 +862,7 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
           {
             container_node* GrandParentContainer = ParentContainer->Parent;
 
-            if(GrandParentContainer->Type ==  container_type::VerticalSplit ||
-               GrandParentContainer->Type ==  container_type::HorizontalSplit)
+            if(GrandParentContainer->Type ==  container_type::Split)
             {
               if(GrandParentContainer->FirstChild == ParentContainer)
               {
@@ -1035,13 +1032,13 @@ menu_functions TabbedHeaderMenuFunctions()
   return Result;
 }
 
-MENU_MOUSE_DOWN( VerticalSplitMouseDown )
+MENU_MOUSE_DOWN( SplitMouseDown )
 {
   split_window* Window = GetContainerPayload(split_window, Node);
   Window->DraggingStart = Window->SplitFraction;
   switch(HotRegion)
   {
-    case window_regions::VerticalBorder:
+    case window_regions::MiddleBorder:
     {
       Window->BorderDrag = true;
     }break;
@@ -1058,24 +1055,28 @@ MENU_MOUSE_UP( SplitMouseUp )
   Window->BorderDrag = false;
 }
 
-MENU_MOUSE_ENTER( VerticalSplitMouseEnter )
+MENU_MOUSE_ENTER( SplitMouseEnter )
 {
   Platform.DEBUGPrint("Vertical Split Mouse Enter\n");
 }
-MENU_MOUSE_EXIT( VerticalSplitMouseExit )
+MENU_MOUSE_EXIT( SplitMouseExit )
 {
   Platform.DEBUGPrint("Vertical Split Mouse Exit\n");
 }
 
-MENU_HANDLE_INPUT( VerticalSplitHandleInput )
+MENU_HANDLE_INPUT( SplitHandleInput )
 {
   split_window* Window = GetContainerPayload(split_window, Node);
   game_window_size WindowSize = GameGetWindowSize();
   r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
-  rect2f Surroundings = Rect2f(0,0,Width,1);
 
-  r32 Delta = (Interface->MousePos.X - Interface->MouseLeftButtonPush.X) / Node->Region.W;
-  r32 MinFrac = Window->MinSize/ Node->Region.H;
+  r32 Delta = BranchlessArithmatic(Window->VerticalSplit,
+                (Interface->MousePos.X - Interface->MouseLeftButtonPush.X) / Node->Region.W,
+                (Interface->MousePos.Y - Interface->MouseLeftButtonPush.Y) / Node->Region.H);
+
+  r32 MinFrac = BranchlessArithmatic(Window->VerticalSplit,
+                              Window->MinSize / Node->Region.H,
+                              Window->MinSize / Node->Region.W);
 
   if(Window->BorderDrag)
   {
@@ -1091,7 +1092,7 @@ MENU_HANDLE_INPUT( VerticalSplitHandleInput )
   }
 }
 
-MENU_GET_REGION_RECT( VerticalSplitGetRegionRect )
+MENU_GET_REGION_RECT( SplitGetRegionRect )
 {
   rect2f Result = {};
   r32 XStart = 0;
@@ -1103,193 +1104,89 @@ MENU_GET_REGION_RECT( VerticalSplitGetRegionRect )
   rect2f Region = Node->Region;
   r32 BorderSize = Window->BorderSize;
 
-  r32 LeftWidth = Window->SplitFraction * Region.W - 0.5f * BorderSize;
-  r32 RightXStart = Region.X + LeftWidth + BorderSize;
-  r32 RightWidth = Region.W - LeftWidth - BorderSize;
-
-  switch(Type)
-  {
-    case window_regions::LeftBody:
+ if(Window->VerticalSplit)
+ {
+    r32 LeftWidth = Window->SplitFraction * Region.W - 0.5f * BorderSize;
+    r32 RightXStart = Region.X + LeftWidth + BorderSize;
+    r32 RightWidth = Region.W - LeftWidth - BorderSize;
+    switch(Type)
     {
-      XStart = Region.X;
-      YStart = Region.Y;
-      Width  = LeftWidth;
-      Height = Region.H;
-    }break;
-    case window_regions::RightBody:
+      case window_regions::BodyOne:
+      {
+        XStart = Region.X;
+        YStart = Region.Y;
+        Width  = LeftWidth;
+        Height = Region.H;
+      }break;
+      case window_regions::BodyTwo:
+      {
+        XStart = RightXStart;
+        YStart = Region.Y;
+        Width  = RightWidth;
+        Height = Region.H;
+      }break;
+      case window_regions::MiddleBorder:
+      {
+        XStart = Region.X + LeftWidth;
+        YStart = Region.Y;
+        Width  = BorderSize;
+        Height = Region.H;
+      }break;
+
+      default:
+      {
+        Assert(0);
+      }break;
+    }
+  }else{
+    r32 BotHeight = Window->SplitFraction * Region.H - 0.5f * BorderSize;
+    r32 TopYStart = Region.Y + BotHeight + BorderSize;
+    r32 TopHeight = Region.H - BotHeight - BorderSize;
+    switch(Type)
     {
-      XStart = RightXStart;
-      YStart = Region.Y;
-      Width  = RightWidth;
-      Height = Region.H;
-    }break;
-    case window_regions::VerticalBorder:
-    {
-      XStart = Region.X + LeftWidth;
-      YStart = Region.Y;
-      Width  = BorderSize;
-      Height = Region.H;
-    }break;
-    default:
-    {
-      Assert(0);
-    }break;
-  }
-
-  Result = Rect2f(XStart, YStart, Width, Height);
-  return Result;
-}
-
-
-MENU_GET_MOUSE_OVER_REGION( VerticalSplitGetMouseOverRegion )
-{
-  window_regions RegionArray[] =
-  {
-    window_regions::LeftBody,
-    window_regions::RightBody,
-    window_regions::VerticalBorder
-  };
-
-  split_window* Window = GetContainerPayload(split_window, Node);
-
-  window_regions Result = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
-
-  return Result;
-}
-
-MENU_DRAW( VerticalSplitDraw )
-{
-  split_window* Window = GetContainerPayload(split_window, Node);
-  v4 BodyColor   = V4(0.2,0.2,0.2,1);
-  v4 BorderColor = V4(0,0,1,1);
-  v4 HeaderColor = V4(0.4,0.4,0.4,1);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::LeftBody, Node),  BodyColor);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::RightBody, Node), BodyColor);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::VerticalBorder, Node), BorderColor);
-
-}
-
-menu_functions VerticalSplitMenuFunctions()
-{
-  menu_functions Result = {};
-  Result.MouseDown = VerticalSplitMouseDown;
-  Result.MouseUp = SplitMouseUp;
-  Result.MouseEnter = VerticalSplitMouseEnter;
-  Result.MouseExit = VerticalSplitMouseExit;
-  Result.HandleInput = VerticalSplitHandleInput;
-  Result.GetRegionRect = VerticalSplitGetRegionRect;
-  Result.GetMouseOverRegion = VerticalSplitGetMouseOverRegion;
-  Result.Draw = VerticalSplitDraw;
-  return Result;
-}
-
-MENU_MOUSE_DOWN( HorizontalMouseDown )
-{
-  split_window* Window = GetContainerPayload(split_window, Node);
-  Window->DraggingStart = Window->SplitFraction;
-  switch(HotRegion)
-  {
-    case window_regions::HorizontalBorder:
-    {
-      Window->BorderDrag = true;
-    }break;
-
-    default:
-    {
-      Assert(0);
-    }break;
-  }
-}
-
-MENU_MOUSE_ENTER( HorizontalMouseEnter )
-{
-
-}
-MENU_MOUSE_EXIT( HorizontalMouseExit )
-{
-
-}
-
-MENU_HANDLE_INPUT( HorizontalHandleInput )
-{
-  split_window* Window = GetContainerPayload(split_window, Node);
-  game_window_size WindowSize = GameGetWindowSize();
-  r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
-  rect2f Surroundings = Rect2f(0,0,Width,1);
-
-  r32 Delta = (Interface->MousePos.Y - Interface->MouseLeftButtonPush.Y) / Node->Region.H;
-  r32 MinFrac = Window->MinSize/ Node->Region.H;
-
-  if(Window->BorderDrag)
-  {
-    Window->SplitFraction = Window->DraggingStart + Delta;
-
-    if(Window->SplitFraction < MinFrac)
-    {
-      Window->SplitFraction = MinFrac;
-    }else if(Window->SplitFraction > 1 - MinFrac)
-    {
-      Window->SplitFraction = 1 - MinFrac;
+      // Bot
+      case window_regions::BodyOne:
+      {
+        XStart = Region.X;
+        YStart = Region.Y;
+        Width  = Region.W;
+        Height = BotHeight;
+      }break;
+      // Top
+      case window_regions::BodyTwo:
+      {
+        XStart = Region.X;
+        YStart = TopYStart;
+        Width  = Region.W;
+        Height = TopHeight;
+      }break;
+      case window_regions::MiddleBorder:
+      {
+        XStart = Region.X;
+        YStart = TopYStart - BorderSize;
+        Width  = Region.W;
+        Height = BorderSize;
+      }break;
+      
+      default:
+      {
+        Assert(0);
+      }break;
     }
   }
-}
-
-MENU_GET_REGION_RECT( HorizontalGetRegionRect )
-{
-  rect2f Result = {};
-  r32 XStart = 0;
-  r32 YStart = 0;
-  r32 Width  = 0;
-  r32 Height = 0;
-
-  split_window* Window = GetContainerPayload(split_window, Node);
-  rect2f Region = Node->Region;
-  r32 BorderSize = Window->BorderSize;
-
-  r32 BotHeight = Window->SplitFraction * Region.H - 0.5f * BorderSize;
-  r32 TopYStart = Region.Y + BotHeight + BorderSize;
-  r32 TopHeight = Region.H - BotHeight - BorderSize;
-
-  switch(Type)
-  {
-    case window_regions::BotBody:
-    {
-      XStart = Region.X;
-      YStart = Region.Y;
-      Width  = Region.W;
-      Height = BotHeight;
-    }break;
-    case window_regions::TopBody:
-    {
-      XStart = Region.X;
-      YStart = TopYStart;
-      Width  = Region.W;
-      Height = TopHeight;
-    }break;
-    case window_regions::HorizontalBorder:
-    {
-      XStart = Region.X;
-      YStart = TopYStart - BorderSize;
-      Width  = Region.W;
-      Height = BorderSize;
-    }break;
-    default:
-    {
-      Assert(0);
-    }break;
-  }
 
   Result = Rect2f(XStart, YStart, Width, Height);
   return Result;
 }
 
-MENU_GET_MOUSE_OVER_REGION( HorizontalGetMouseOverRegion )
+
+MENU_GET_MOUSE_OVER_REGION( SplitGetMouseOverRegion )
 {
   window_regions RegionArray[] =
   {
-    window_regions::BotBody,
-    window_regions::TopBody,
-    window_regions::HorizontalBorder
+    window_regions::BodyOne,
+    window_regions::BodyTwo,
+    window_regions::MiddleBorder
   };
 
   split_window* Window = GetContainerPayload(split_window, Node);
@@ -1299,30 +1196,29 @@ MENU_GET_MOUSE_OVER_REGION( HorizontalGetMouseOverRegion )
   return Result;
 }
 
-MENU_DRAW( HorizontalDraw )
+MENU_DRAW( SplitDraw )
 {
   split_window* Window = GetContainerPayload(split_window, Node);
   v4 BodyColor   = V4(0.2,0.2,0.2,1);
   v4 BorderColor = V4(0,0,1,1);
   v4 HeaderColor = V4(0.4,0.4,0.4,1);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::BotBody, Node), BodyColor);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::TopBody, Node), BodyColor);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::HorizontalBorder, Node), BorderColor);
+
+  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::BodyOne, Node),      BodyColor);
+  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::BodyTwo, Node),      BodyColor);
+  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::MiddleBorder, Node), BorderColor); 
 
 }
 
-
-menu_functions HorizontalMenuFunctions()
+menu_functions SplitMenuFunctions()
 {
   menu_functions Result = {};
-  Result.MouseDown = HorizontalMouseDown;
+  Result.MouseDown = SplitMouseDown;
   Result.MouseUp = SplitMouseUp;
-  Result.MouseEnter = HorizontalMouseEnter;
-  Result.MouseExit = HorizontalMouseExit;
-  Result.HandleInput = HorizontalHandleInput;
-  Result.GetRegionRect = HorizontalGetRegionRect;
-  Result.GetMouseOverRegion = HorizontalGetMouseOverRegion;
-  Result.Draw = HorizontalDraw;
+  Result.MouseEnter = SplitMouseEnter;
+  Result.MouseExit = SplitMouseExit;
+  Result.HandleInput = SplitHandleInput;
+  Result.GetRegionRect = SplitGetRegionRect;
+  Result.GetMouseOverRegion = SplitGetMouseOverRegion;
+  Result.Draw = SplitDraw;
   return Result;
 }
-

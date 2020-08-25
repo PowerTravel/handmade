@@ -127,13 +127,9 @@ menu_functions GetMenuFunction(container_type Type)
     {
       Result = GetEmptyFunctions();
     }break;
-    case container_type::VerticalSplit:
+    case container_type::Split:
     {
-      Result = VerticalSplitMenuFunctions();
-    }break;
-    case container_type::HorizontalSplit:
-    {
-      Result = HorizontalMenuFunctions();
+      Result = SplitMenuFunctions();
     }break;
     case container_type::TabbedHeader:
     {
@@ -162,8 +158,7 @@ u32 GetContainerSize(container_type Type)
     {
       Result += sizeof(empty_window);
     }break;
-    case container_type::VerticalSplit:  // Fallthrough
-    case container_type::HorizontalSplit:
+    case container_type::Split:
     {
       Result += sizeof(split_window);
     }break;
@@ -320,6 +315,7 @@ void InitializeMenuFunctionPointers(container_node* RootWindow, memory_arena* Ar
   }
 }
 
+#define GetContainerPayload( Type, Container )  ((Type*) (((u8*)Container) + sizeof(container_node)))
 
 // Preorder breadth first.
 void UpdateRegions( memory_arena* Arena, u32 NodeCount, container_node* Container )
@@ -345,12 +341,9 @@ void UpdateRegions( memory_arena* Arena, u32 NodeCount, container_node* Containe
     window_regions RegionType = window_regions::WholeBody;
     while(Child)
     {
-      if(Parent->Type == container_type::HorizontalSplit)
+      if(Parent->Type == container_type::Split)
       {
-        RegionType = ChildIndex == 0 ? window_regions::BotBody : window_regions::TopBody;
-      }else if(Parent->Type == container_type::VerticalSplit)
-      {
-        RegionType = ChildIndex == 0 ? window_regions::LeftBody : window_regions::RightBody;
+        RegionType = ChildIndex == 0 ? window_regions::BodyOne : window_regions::BodyTwo;  
       }else{
         Assert(ChildIndex == 0);
       }
@@ -550,7 +543,7 @@ void ConnectNode(container_node* Parent, container_node* NewNode)
   }
 }
 
-#define GetContainerPayload( Type, Container )  ((Type*) (((u8*)Container) + sizeof(container_node)))
+
 
 internal debug_state*
 DEBUGGetState()
@@ -646,11 +639,12 @@ DEBUGGetState()
       MenuHeader->RootWindow = RootContainer;
 
 
-      container_node* SplitContainer = NewContainer(Interface, container_type::VerticalSplit);
+      container_node* SplitContainer = NewContainer(Interface, container_type::Split);
       split_window* SplitWindow =  GetContainerPayload(split_window, SplitContainer);
       SplitWindow->BorderSize = Interface->BorderSize;
       SplitWindow->MinSize = Interface->MinSize;
       SplitWindow->SplitFraction = 0.5f;
+      SplitWindow->VerticalSplit = true;
 
       container_node* TabbedHeader0 = NewContainer(Interface, container_type::TabbedHeader);
       tabbed_header_window* TabbedHeaderWindow0 = GetContainerPayload(tabbed_header_window, TabbedHeader0);
@@ -705,7 +699,7 @@ DEBUGGetState()
       MenuHeader->RootWindow = RootContainer;
 
 
-      container_node* SplitContainer = NewContainer(Interface, container_type::VerticalSplit);
+      container_node* SplitContainer = NewContainer(Interface, container_type::Split);
       split_window* SplitWindow =  GetContainerPayload(split_window, SplitContainer);
       SplitWindow->BorderSize = Interface->BorderSize;
       SplitWindow->MinSize = Interface->MinSize;
