@@ -575,6 +575,9 @@ DEBUGGetState()
     Interface->MaxMemSize = Megabytes(1);
     Interface->MemoryBase = (u8*) PushSize(&DebugState->Arena, Interface->MaxMemSize);
     Interface->Memory = Interface->MemoryBase;
+    Interface->BorderSize = 0.007;
+    Interface->HeaderSize = 0.02;
+    Interface->MinSize = 0.2f;
 
     // Transient Memory Begin
     DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->Arena);
@@ -626,31 +629,32 @@ DEBUGGetState()
     ListInitiate(Sentinel);
 
     {
+
       menu_tree* Root = GetNewMenuTree(Interface);
       Root->Root = NewContainer(Interface, container_type::Root);
 
       container_node* RootContainer = Root->Root;
       RootContainer->Region = Rect2f(0.2,0.2,0.5,0.5);
       root_window* RootWindow = GetContainerPayload(root_window,Root->Root);
-      RootWindow->BorderSize = 0.007;
-      RootWindow->MinSize = 0.2f;
+      RootWindow->BorderSize = Interface->BorderSize;
+      RootWindow->MinSize = Interface->MinSize;
       
 
       container_node* RootHeader = NewContainer(Interface, container_type::MenuHeader);
       menu_header_window* MenuHeader = GetContainerPayload(menu_header_window, RootHeader);
-      MenuHeader->HeaderSize = 0.02;
+      MenuHeader->HeaderSize = Interface->HeaderSize;
       MenuHeader->RootWindow = RootContainer;
 
 
       container_node* SplitContainer = NewContainer(Interface, container_type::VerticalSplit);
       split_window* SplitWindow =  GetContainerPayload(split_window, SplitContainer);
-      SplitWindow->BorderSize = 0.007f;
-      SplitWindow->MinSize = 0.02f;
+      SplitWindow->BorderSize = Interface->BorderSize;
+      SplitWindow->MinSize = Interface->MinSize;
       SplitWindow->SplitFraction = 0.5f;
 
       container_node* TabbedHeader0 = NewContainer(Interface, container_type::TabbedHeader);
       tabbed_header_window* TabbedHeaderWindow0 = GetContainerPayload(tabbed_header_window, TabbedHeader0);
-      TabbedHeaderWindow0->HeaderSize = 0.02;
+      TabbedHeaderWindow0->HeaderSize = Interface->HeaderSize;
 
       container_node* EmptyContainer0 = NewContainer(Interface, container_type::Empty);
       empty_window* EmptyWindow0 =  GetContainerPayload(empty_window, EmptyContainer0);
@@ -658,7 +662,7 @@ DEBUGGetState()
 
       container_node* TabbedHeader1 = NewContainer(Interface, container_type::TabbedHeader);
       tabbed_header_window* TabbedHeaderWindow1 = GetContainerPayload(tabbed_header_window, TabbedHeader1);
-      TabbedHeaderWindow1->HeaderSize = 0.02;
+      TabbedHeaderWindow1->HeaderSize = Interface->HeaderSize;
 
       container_node*  EmptyContainer1 = NewContainer(Interface, container_type::Empty);
       empty_window* EmptyWindow1 =  GetContainerPayload(empty_window, EmptyContainer1);
@@ -691,25 +695,25 @@ DEBUGGetState()
       container_node* RootContainer = Root->Root;
       RootContainer->Region = Rect2f(1,0.2,0.5,0.5);
       root_window* RootWindow = GetContainerPayload(root_window,Root->Root);
-      RootWindow->BorderSize = 0.007;
-      RootWindow->MinSize = 0.2f;
+      RootWindow->BorderSize = Interface->BorderSize;
+      RootWindow->MinSize = Interface->MinSize;
       
 
       container_node* RootHeader = NewContainer(Interface, container_type::MenuHeader);
       menu_header_window* MenuHeader = GetContainerPayload(menu_header_window, RootHeader);
-      MenuHeader->HeaderSize = 0.02;
+      MenuHeader->HeaderSize = Interface->HeaderSize;
       MenuHeader->RootWindow = RootContainer;
 
 
       container_node* SplitContainer = NewContainer(Interface, container_type::VerticalSplit);
       split_window* SplitWindow =  GetContainerPayload(split_window, SplitContainer);
-      SplitWindow->BorderSize = 0.007f;
-      SplitWindow->MinSize = 0.02f;
+      SplitWindow->BorderSize = Interface->BorderSize;
+      SplitWindow->MinSize = Interface->MinSize;
       SplitWindow->SplitFraction = 0.5f;
 
       container_node* TabbedHeader0 = NewContainer(Interface, container_type::TabbedHeader);
       tabbed_header_window* TabbedHeaderWindow0 = GetContainerPayload(tabbed_header_window, TabbedHeader0);
-      TabbedHeaderWindow0->HeaderSize = 0.02;
+      TabbedHeaderWindow0->HeaderSize = Interface->HeaderSize;
 
       container_node* EmptyContainer0 = NewContainer(Interface, container_type::Empty);
       empty_window* EmptyWindow0 =  GetContainerPayload(empty_window, EmptyContainer0);
@@ -717,7 +721,7 @@ DEBUGGetState()
 
       container_node* TabbedHeader1 = NewContainer(Interface, container_type::TabbedHeader);
       tabbed_header_window* TabbedHeaderWindow1 = GetContainerPayload(tabbed_header_window, TabbedHeader1);
-      TabbedHeaderWindow1->HeaderSize = 0.02;
+      TabbedHeaderWindow1->HeaderSize = Interface->HeaderSize;
 
       container_node*  EmptyContainer1 = NewContainer(Interface, container_type::Empty);
       empty_window* EmptyWindow1 =  GetContainerPayload(empty_window, EmptyContainer1);

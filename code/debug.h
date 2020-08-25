@@ -266,6 +266,7 @@ enum class container_type
   None,
   Root,
   Empty,
+  //Split
   VerticalSplit,
   HorizontalSplit,
   TabbedHeader,
@@ -287,10 +288,6 @@ enum class window_regions
   BotBorder,
   TopBorder,
   Header,
-  LeftHeader,
-  RightHeader,
-  BotHeader,
-  TopHeader,
   BotLeftCorner,
   BotRightCorner,
   TopLeftCorner,
@@ -404,8 +401,6 @@ menu_functions TabbedHeaderMenuFunctions();
 menu_functions VerticalSplitMenuFunctions();
 menu_functions HorizontalMenuFunctions();
 
-
-
 struct tabbed_header_window
 {
   r32 HeaderSize;
@@ -443,7 +438,7 @@ struct split_window
   b32 BorderDrag;
   r32 DraggingStart;
 
-  b32 WindowDrag[2];
+  b32 VerticalSplit; // Opposite of HorizontalSplit
 };
 
 struct empty_window
@@ -492,6 +487,10 @@ struct menu_interface
   binary_signal_state MouseLeftButton;
   v2 MouseLeftButtonPush;
   v2 MouseLeftButtonRelese;
+
+  r32 BorderSize;
+  r32 HeaderSize;
+  r32 MinSize;
 };
 
 
