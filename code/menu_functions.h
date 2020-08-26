@@ -756,11 +756,6 @@ container_node* CreateRootWindow(menu_interface* Interface, rect2f Region)
 {
   // Menu Tree -> RootHeader
   menu_tree* Root = GetNewMenuTree(Interface);
-  
-  // TODO: Just random numbers that will give a large enought stack to traverse atm
-  //       Fixit
-  Root->Depth = 6;
-  Root->NodeCount = 6;
 
   Root->Root = NewContainer(Interface, container_type::Root);
 

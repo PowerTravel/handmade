@@ -369,6 +369,8 @@ struct container_node
 {
   container_type Type;
 
+  u32 Depth;
+
   // Tree Links (Menu Structure)
   container_node* Parent;
   container_node* FirstChild;
@@ -490,7 +492,6 @@ menu_tree* GetNewMenuTree(menu_interface* Interface);
 void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree);
 void DisconnectNode(container_node* Node);
 void ConnectNode(container_node* Parent, container_node* NewNode);
-
 
 void SetMouseInput(game_input* GameInput, menu_interface* Interface);
 

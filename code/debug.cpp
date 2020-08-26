@@ -186,10 +186,11 @@ container_node* NewContainer(menu_interface* Interface, container_type Type)
     r32 Percentage = RegionUsed / (r32) TotSize;
     u32 ActiveMemory = Interface->ActiveMemory;
     r32 Fragmentation = ActiveMemory/(r32)RegionUsed;
-    
+    #if 0
     Platform.DEBUGPrint("--==<< Pre Memory >>==--\n");
     Platform.DEBUGPrint(" - Tot Mem Used   : %2.3f  (%d/%d)\n", Percentage, RegionUsed, TotSize );
     Platform.DEBUGPrint(" - Fragmentation  : %2.3f  (%d/%d)\n", Fragmentation, ActiveMemory, RegionUsed );
+    #endif
   }
   
   u32 RegionUsed = (u32)(Interface->Memory - Interface->MemoryBase);
@@ -235,11 +236,11 @@ container_node* NewContainer(menu_interface* Interface, container_type Type)
         SlotCount++;
         CurrentNode2 = CurrentNode2->Next;
       }  
-      
+      #if 0
       Platform.DEBUGPrint("--==<< Middle Inset >>==--\n");
       Platform.DEBUGPrint(" - Slot: [%d,%d]\n", SlotSpace, SlotCount);
       Platform.DEBUGPrint(" - Size: [%d,%d]\n", ContainerSize, SlotSize);
-      //Platform.DEBUGPrint(" - Mem : [%d,%d]\n\n", );
+      #endif
     }
     
     
@@ -248,9 +249,11 @@ container_node* NewContainer(menu_interface* Interface, container_type Type)
   if(!Result)
   {
     Assert(RegionUsed+ContainerSize < Interface->MaxMemSize);
-    //Platform.DEBUGPrint("--==<< Post Inset >>==--\n");
-    //Platform.DEBUGPrint(" - Memory Left  : %d\n",Interface->MaxMemSize - (u32)RegionUsed + ContainerSize);
-    //Platform.DEBUGPrint(" - ContainerSize: %d\n\n", ContainerSize);
+    #if 0
+    Platform.DEBUGPrint("--==<< Post Inset >>==--\n");
+    Platform.DEBUGPrint(" - Memory Left  : %d\n",Interface->MaxMemSize - (u32)RegionUsed + ContainerSize);
+    Platform.DEBUGPrint(" - ContainerSize: %d\n\n", ContainerSize);
+    #endif
     Result = (container_node*) Interface->Memory;
     Interface->Memory += ContainerSize;  
     container_node* Sentinel = &Interface->Sentinel;
@@ -266,10 +269,11 @@ container_node* NewContainer(menu_interface* Interface, container_type Type)
     r32 Percentage = RegionUsed2 / (r32) TotSize;
     u32 ActiveMemory = Interface->ActiveMemory;
     r32 Fragmentation = ActiveMemory/(r32)RegionUsed2;
-    
+    #if 0
     Platform.DEBUGPrint("--==<< Post Memory >>==--\n");
     Platform.DEBUGPrint(" - Tot Mem Used   : %2.3f  (%d/%d)\n", Percentage, RegionUsed, TotSize );
     Platform.DEBUGPrint(" - Fragmentation  : %2.3f  (%d/%d)\n", Fragmentation, ActiveMemory, RegionUsed );
+    #endif
   }
   return Result;
 }
@@ -321,6 +325,51 @@ void InitializeMenuFunctionPointers(container_node* RootWindow, memory_arena* Ar
       Child = Child->NextSibling;
     }
   }
+}
+
+//  PostOrder (Left, Right, Root),  Depth first.
+void TreeSensus(menu_tree* Menu )
+{
+  u32 TotalDepth = 0;
+  u32 CurrentDepth = 0;
+  u32 NodeCount = 0;
+
+  container_node* CurrentNode = Menu->Root;
+
+
+  while(CurrentNode)
+  {
+    // Set the depth of the current Node
+    CurrentNode->Depth = CurrentDepth++;
+    ++NodeCount;
+
+    // Step all the way down (setting depth as you go along)
+    while(CurrentNode->FirstChild)
+    {
+      CurrentNode = CurrentNode->FirstChild;
+      CurrentNode->Depth = CurrentDepth++;
+      ++NodeCount;
+    }
+
+    // The depth is now set until the leaf.
+    TotalDepth = Maximum(CurrentDepth, TotalDepth);
+
+    // Step up until you find another sibling or we reach root
+    while(!CurrentNode->NextSibling && CurrentNode->Parent)
+    {
+      CurrentNode = CurrentNode->Parent;  
+      CurrentDepth--;
+      Assert(CurrentDepth >= 0)
+    }
+
+    // Either we found another sibling and we can straverse that part of the tree
+    //  or we are at root and root has no siblings and we are done.
+    CurrentNode = CurrentNode->NextSibling;
+  }
+
+  Menu->Depth = TotalDepth;
+  Menu->NodeCount = NodeCount;
+  //Platform.DEBUGPrint("Tree Sensus:  Depth: %d, Count: %d\n", TotalDepth, NodeCount);
 }
 
 
@@ -662,9 +711,7 @@ DEBUGGetState()
       TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer2;
       TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer3;      
 
-      Root->Depth = 4;
-      Root->NodeCount = 7;
-
+      TreeSensus(Root);
       UpdateRegions( &DebugState->Arena, Root->NodeCount, Root->Root);
     }
 
@@ -1380,9 +1427,10 @@ void DebugMainWindow(game_input* GameInput)
            WindowIndex >= 0;
          --WindowIndex)
   {
-    menu_tree MenuTree = Interface->RootContainers[WindowIndex];
-    UpdateRegions( &DebugState->Arena, MenuTree.NodeCount, MenuTree.Root);
-    DrawMenu( &DebugState->Arena, Interface, MenuTree.NodeCount, MenuTree.Root);  
+    menu_tree* MenuTree = &Interface->RootContainers[WindowIndex];
+    TreeSensus(MenuTree);
+    UpdateRegions( &DebugState->Arena, MenuTree->NodeCount, MenuTree->Root);
+    DrawMenu( &DebugState->Arena, Interface, MenuTree->NodeCount, MenuTree->Root);  
   }
 }
 
@@ -1602,21 +1650,27 @@ void ActOnInput(memory_arena* Arena, menu_interface* Interface, menu_tree* Menu)
 
   Assert(Menu->Root);
   node_region_pair NodeRegion = GetRegion(Arena, Menu->NodeCount, Menu->Root, MousePos);
-
   if(Interface->MouseLeftButton.Active)
   {
     // Mouse Clicked Event
     if(Interface->MouseLeftButton.Edge)
     {
+
       Interface->HotRegion = NodeRegion.Region;
       Interface->HotSubWindow = NodeRegion.Node;
-      Interface->HotSubWindow->Functions.MouseDown(Interface, Interface->HotSubWindow, Interface->HotRegion, 0);
+      if(Interface->HotSubWindow)
+      {
+        Interface->HotSubWindow->Functions.MouseDown(Interface, Interface->HotSubWindow, Interface->HotRegion, 0);
+      }
     // Mouse Down Movement State
     }else{
 
     }
     
-    Interface->HotSubWindow->Functions.HandleInput(Interface, Interface->HotSubWindow, 0);
+    if(Interface->HotSubWindow)
+    {
+      Interface->HotSubWindow->Functions.HandleInput(Interface, Interface->HotSubWindow, 0);
+    }
   }else{
 
     if(Interface->HotSubWindow)
