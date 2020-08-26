@@ -445,7 +445,7 @@ MENU_MOUSE_UP( MenuHeaderMouseUp )
       }
 
       DisconnectNode(Node->FirstChild);
-      FreeMenuTree(Interface, &Interface->HotWindow);
+      FreeMenuTree(Interface, &Interface->RootContainers[0]);
 
     }else if( ZoneIndex == 0  || ZoneIndex == 2 ||  // Vertical
               ZoneIndex == 3  || ZoneIndex == 4)    // Horizontal
@@ -493,7 +493,7 @@ MENU_MOUSE_UP( MenuHeaderMouseUp )
 
       Assert(OppositeNode->Type == container_type::TabbedHeader);
   
-      FreeMenuTree(Interface, &Interface->HotWindow);
+      FreeMenuTree(Interface, &Interface->RootContainers[0]);
     }
   }
 }
@@ -572,8 +572,9 @@ MENU_HANDLE_INPUT( MenuHeaderHandleInput )
 
     if(Window->NodeToMerge)
     {
-      rect2f Rect = Window->NodeToMerge->Functions.GetRegionRect(window_regions::WholeBody, Window->NodeToMerge);
+      Assert(Window->NodeToMerge->Type == container_type::TabbedHeader);
 
+      rect2f Rect = Window->NodeToMerge->Functions.GetRegionRect(window_regions::WholeBody, Window->NodeToMerge);
       r32 W = Rect.W;
       r32 H = Rect.H;
       r32 S = Minimum(W,H)/4;
@@ -787,7 +788,6 @@ container_node* CreateRootWindow(menu_interface* Interface, rect2f Region)
   Interface->HotRegion = window_regions::Header;
   Interface->HotSubWindow = RootHeader;
   MoveMenuToTop(Interface, Interface->RootContainerCount-1);
-  Interface->HotWindow = Interface->RootContainers[0];
 
   return RootHeader;
 }
@@ -798,17 +798,25 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
 
   rect2f HeaderRegion = Node->Functions.GetRegionRect(window_regions::Header, Node);
 
+  
   if(TabbedHeader->TabDrag)
   {
+    debug_state* DebugState = DEBUGGetState();
+    r32 EnvelopeSize = 1.5f*HeaderRegion.H;
+    rect2f HeaderSplitRegion = HeaderRegion;
+    HeaderSplitRegion.X -= EnvelopeSize;
+    HeaderSplitRegion.W += 2*EnvelopeSize;
+    HeaderSplitRegion.Y -= EnvelopeSize;
+    HeaderSplitRegion.H += 2*EnvelopeSize;
+
     if(TabbedHeader->SelectedTabOrdinal > 0 )
     {
       Assert(TabbedHeader->SelectedTabOrdinal <= TabbedHeader->TabCount)
 
       u32 SelectedTabIndex = TabbedHeader->SelectedTabOrdinal-1;
-      rect2f SelectedTabRegion = GetTabRegion(HeaderRegion, SelectedTabIndex,TabbedHeader->TabCount);
       if( SelectedTabIndex > 0 )
       {
-        rect2f LeftTabRegion = GetTabRegion(HeaderRegion, SelectedTabIndex-1,TabbedHeader->TabCount);
+        rect2f LeftTabRegion = GetTabRegion(HeaderSplitRegion, SelectedTabIndex-1,TabbedHeader->TabCount);
         if(Intersects(LeftTabRegion, Interface->MousePos))
         {
           container_node* Swap = TabbedHeader->Tabs[SelectedTabIndex-1];
@@ -820,7 +828,7 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
 
       if(SelectedTabIndex < TabbedHeader->TabCount-1)
       {
-        rect2f RightTabRegion = GetTabRegion(HeaderRegion, SelectedTabIndex+1,TabbedHeader->TabCount);
+        rect2f RightTabRegion = GetTabRegion(HeaderSplitRegion, SelectedTabIndex+1,TabbedHeader->TabCount);
         if(Intersects(RightTabRegion, Interface->MousePos))
         {
           container_node* Swap = TabbedHeader->Tabs[SelectedTabIndex+1];
@@ -833,18 +841,13 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
 
     v2 Delta = Interface->MousePos - Interface->MouseLeftButtonPush;
 
-    debug_state* DebugState = DEBUGGetState();
-
-    rect2f HeaderSplitRegion = HeaderRegion;
-    HeaderSplitRegion.Y -= HeaderSplitRegion.H;
-    HeaderSplitRegion.H += 2*HeaderSplitRegion.H;
 
     if(!Intersects(HeaderSplitRegion, Interface->MousePos))
     {
       TabbedHeader->TabDrag = false;
       Assert(Node->Parent)
 
-      if( TabbedHeader->TabCount == 1)
+      if(TabbedHeader->TabCount == 1)
       {
         container_node* ParentContainer = Node->Parent;
         container_node* OppositeNode = 0;
@@ -883,14 +886,12 @@ MENU_HANDLE_INPUT( TabbedHeaderHandleInput )
             DisconnectNode(Node);
             DeleteContainer(Interface, ParentContainer);
 
-            //CreateRootWindowFromNode(Interface, Node);
             container_node* RootHeader = CreateRootWindow(Interface, Node->Region);
             ConnectNode(RootHeader, Node);
           }
         }  
       }else{
         Assert(TabbedHeader->SelectedTabOrdinal!=0);
-        //Assert(Node->Parent->Type);
         u32 SelectedTabIndex = TabbedHeader->SelectedTabOrdinal-1;
         container_node* TabToBreakOut = TabbedHeader->Tabs[SelectedTabIndex];
         Assert(TabToBreakOut == Node->FirstChild);
@@ -1017,7 +1018,6 @@ MENU_DRAW( TabbedHeaderDraw )
   }
 }
 
-
 menu_functions TabbedHeaderMenuFunctions()
 {
   menu_functions Result = {};
@@ -1057,11 +1057,11 @@ MENU_MOUSE_UP( SplitMouseUp )
 
 MENU_MOUSE_ENTER( SplitMouseEnter )
 {
-  Platform.DEBUGPrint("Vertical Split Mouse Enter\n");
+  Platform.DEBUGPrint("Split Mouse Enter\n");
 }
 MENU_MOUSE_EXIT( SplitMouseExit )
 {
-  Platform.DEBUGPrint("Vertical Split Mouse Exit\n");
+  Platform.DEBUGPrint("Split Mouse Exit\n");
 }
 
 MENU_HANDLE_INPUT( SplitHandleInput )

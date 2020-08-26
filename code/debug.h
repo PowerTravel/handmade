@@ -349,6 +349,7 @@ typedef MENU_GET_MOUSE_OVER_REGION( menu_get_mouse_over_region );
 #define MENU_DRAW(name) void name( menu_interface* Interface, container_node* Node)
 typedef MENU_DRAW( menu_draw );
 
+#define GetContainerPayload( Type, Container )  ((Type*) (((u8*)Container) + sizeof(container_node)))
 
 struct menu_functions
 {
@@ -462,8 +463,6 @@ struct menu_interface
   u32 RootContainerCount;
   menu_tree RootContainers[32];
 
-  menu_tree HotWindow;
-
   window_regions HotRegion;
   container_node* HotSubWindow;
 
@@ -497,6 +496,6 @@ void SetMouseInput(game_input* GameInput, menu_interface* Interface);
 
 void InitializeMenuFunctionPointers(container_node* Root, memory_arena* Arena, u32 NodeCount);
 void UpdateRegions(container_node* Root, rect2f RootRegion);
-void ActOnInput(memory_arena* Arena, menu_interface* Interface);
+void ActOnInput(memory_arena* Arena, menu_interface* Interface, menu_tree* Menu);
 
 window_regions CheckRegions(rect2f Region, u32 RegionCount, window_regions* RegionArray, r32 BorderSize, r32 HeaderSize, r32 BorderFrac);
