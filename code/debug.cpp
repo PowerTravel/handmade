@@ -327,17 +327,25 @@ void InitializeMenuFunctionPointers(container_node* RootWindow, memory_arena* Ar
   }
 }
 
+
+
 //  PostOrder (Left, Right, Root),  Depth first.
-void TreeSensus(menu_tree* Menu )
+u32_pair UpdateSubTreeDepthAndCount( u32 ParentDepth, container_node* SubTreeRoot )
 {
   u32 TotalDepth = 0;
-  u32 CurrentDepth = 0;
+  u32 CurrentDepth = ParentDepth;
   u32 NodeCount = 0;
 
-  container_node* CurrentNode = Menu->Root;
+  // Make SubTreeRoot look like an actual root node
+  container_node* SubTreeParent = SubTreeRoot->Parent;
+  container_node* SubTreeSibling = SubTreeRoot->NextSibling;
 
+  SubTreeRoot->Parent = 0;
+  SubTreeRoot->NextSibling = 0;
 
-  while(CurrentNode)
+  container_node* CurrentNode = SubTreeRoot;
+
+  while(CurrentNode != SubTreeRoot->Parent)
   {
     // Set the depth of the current Node
     CurrentNode->Depth = CurrentDepth++;
@@ -362,14 +370,30 @@ void TreeSensus(menu_tree* Menu )
       Assert(CurrentDepth >= 0)
     }
 
-    // Either we found another sibling and we can straverse that part of the tree
+    // Either we found another sibling and we can traverse that part of the tree
     //  or we are at root and root has no siblings and we are done.
     CurrentNode = CurrentNode->NextSibling;
   }
 
-  Menu->Depth = TotalDepth;
-  Menu->NodeCount = NodeCount;
-  //Platform.DEBUGPrint("Tree Sensus:  Depth: %d, Count: %d\n", TotalDepth, NodeCount);
+  // Restore the Root
+  SubTreeRoot->Parent = SubTreeParent;
+  SubTreeRoot->NextSibling = SubTreeSibling;
+
+  u32_pair Result = {};
+  Result.a = NodeCount;
+  Result.b = TotalDepth;
+  
+  return Result;
+}
+
+
+void TreeSensus( menu_tree* Menu )
+{
+  u32_pair Pair =  UpdateSubTreeDepthAndCount( 0, Menu->Root );
+
+  Menu->NodeCount = Pair.a;
+  Menu->Depth = Pair.b;
+  Platform.DEBUGPrint("Tree Sensus:  Depth: %d, Count: %d\n", Pair.b, Pair.a);
 }
 
 

@@ -62,6 +62,12 @@ typedef double r64;
 
 #include "math/vector_math.h"
 
+struct u32_pair
+{
+  u32 a;
+  u32 b;
+};
+
 struct rect2f
 {
 	r32 X,Y,W,H;

@@ -423,6 +423,13 @@ MENU_MOUSE_DOWN( MenuHeaderMouseDown )
   }
 }
 
+r32 GetSplitFraction(r32 ParentSize, r32 ChildSize, r32 MinSize)
+{
+  r32 ResultSize = Minimum(ChildSize, ParentSize-MinSize);
+  r32 Result = Maximum(ResultSize/ParentSize, 0.05f);
+  return Result;
+}
+
 MENU_MOUSE_UP( MenuHeaderMouseUp )
 {
   menu_header_window* Window = GetContainerPayload(menu_header_window, Node);
@@ -455,12 +462,13 @@ MENU_MOUSE_UP( MenuHeaderMouseUp )
       split_window* SplitWindow = GetContainerPayload(split_window, SplitContainer);
       SplitWindow->BorderSize = 0.007f;
       SplitWindow->MinSize = 0.02f;
-      SplitWindow->SplitFraction = 0.5f; 
       SplitWindow->VerticalSplit = (ZoneIndex == 0  || ZoneIndex == 2);
 
       container_node* CommonParent = OppositeNode->Parent;
+      rect2f ParentRegion = {};
       if(CommonParent->Type ==  container_type::Split)
       {
+        ParentRegion = CommonParent->Region;
         if(CommonParent->FirstChild == OppositeNode)
         {
           container_node* Sibling = OppositeNode->NextSibling;
@@ -476,19 +484,35 @@ MENU_MOUSE_UP( MenuHeaderMouseUp )
       }else{
         DisconnectNode(OppositeNode);
         ConnectNode(CommonParent, SplitContainer);
+        ParentRegion = CommonParent->Functions.GetRegionRect(window_regions::WholeBody, CommonParent);
       }
-
       container_node* NodeToConnect = Node->FirstChild;
       DisconnectNode(NodeToConnect);
+      
       if( ZoneIndex == 0  || ZoneIndex == 3 )
       {
         // Left || Bot
         ConnectNode(SplitContainer, NodeToConnect);
         ConnectNode(SplitContainer, OppositeNode);
+
+        r32 Fraction = 0;
+        if(SplitWindow->VerticalSplit){
+          Fraction = GetSplitFraction(ParentRegion.W, NodeToConnect->Region.W, Interface->MinSize);
+        }else{
+          Fraction = GetSplitFraction(ParentRegion.H, NodeToConnect->Region.H, Interface->MinSize);
+        }
+        SplitWindow->SplitFraction = Fraction;
       }else if(ZoneIndex == 2  ||  ZoneIndex == 4){  
         // Right || Top
         ConnectNode(SplitContainer, OppositeNode);
         ConnectNode(SplitContainer, NodeToConnect);
+        r32 Fraction = 0;
+        if(SplitWindow->VerticalSplit){
+          Fraction = GetSplitFraction(ParentRegion.W, NodeToConnect->Region.W, Interface->MinSize);
+        }else{
+          Fraction = GetSplitFraction(ParentRegion.H, NodeToConnect->Region.H, Interface->MinSize);
+        }
+        SplitWindow->SplitFraction = 1.f-Fraction;
       }
 
       Assert(OppositeNode->Type == container_type::TabbedHeader);
