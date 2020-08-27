@@ -20,9 +20,10 @@
     - Add a tag-system. I want to get a random asset with a specific tag.
   Debug:
     * Continue w decent Debug-interface.
+    - A global Function-Pointer-Pool that is automatically reinitialized upon recompilation.
     - Time-Plots
     - Item selection w mouse
-    - Continue on caseys Stream, he gets rid of the __COUNT__ macro gimmic which we also use at some point.
+    - Continue on caseys Stream, he gets rid of the __COUNT__ macro gimmic which we also use at some point. (ep 193)
   Physics:
     - Persistent AABB-tree
     - Make gjk-epa sequential impulse work

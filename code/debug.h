@@ -213,6 +213,7 @@ struct active_menu
 struct debug_state
 {
   b32 Initialized;
+
   b32 Paused;
   b32 Resumed;
 
@@ -253,8 +254,10 @@ struct debug_state
   b32 ConfigCollisionPoints;
   b32 ConfigCollider;
   b32 ConfigAABBTree;
+//  b32 UpdateConfig;
 
-  b32 UpdateConfig;
+
+  b32 UpdateFunctionPointers;
 };
 
 void PushDebugOverlay(game_input* GameInput);
@@ -268,7 +271,9 @@ enum class container_type
   Empty,
   Split,
   TabbedHeader,
-  MenuHeader
+  MenuHeader,
+  ContainerList,
+  Button
 };
 
 enum class window_regions
@@ -340,6 +345,9 @@ typedef MENU_MOUSE_EXIT( menu_mouse_exit );
 #define MENU_HANDLE_INPUT(name) void name( menu_interface* Interface, container_node* Node,  void* Params)
 typedef MENU_HANDLE_INPUT( menu_handle_input );
 
+#define MENU_GET_CHILD_REGION(name) rect2f name(container_node* Parent, container_node* Child)
+typedef MENU_GET_CHILD_REGION( menu_get_region );
+
 #define MENU_GET_REGION_RECT(name) rect2f name( window_regions Type, container_node* Node )
 typedef MENU_GET_REGION_RECT( menu_get_region_rect );
 
@@ -357,6 +365,8 @@ struct menu_functions
   menu_mouse_up* MouseUp;
   menu_mouse_enter* MouseEnter;
   menu_mouse_exit* MouseExit;
+
+  menu_get_region* GetChildRegion;
 
   menu_handle_input* HandleInput;
   menu_get_region_rect* GetRegionRect;
@@ -394,6 +404,8 @@ menu_functions GetRootMenuFunctions();
 menu_functions MenuHeaderMenuFunctions();
 menu_functions TabbedHeaderMenuFunctions();
 menu_functions SplitMenuFunctions();
+menu_functions ContainerListFunctions();
+menu_functions GetButtonFunctions();
 
 struct tabbed_header_window
 {
@@ -460,6 +472,20 @@ struct menu_tree
   container_node* Root;
 };
 
+#define ACTIVATE_BUTTON(name) void (name)(struct menu_button* Button, debug_state* DebugState)
+typedef ACTIVATE_BUTTON( activate_button );
+
+struct menu_button
+{
+  v4 Color;
+  c8 Text[32];
+
+  b32 Active;
+  b32 Hot;
+
+  activate_button** Activate;
+};
+
 struct menu_interface
 {
   u32 RootContainerCount;
@@ -480,9 +506,18 @@ struct menu_interface
   v2 MouseLeftButtonPush;
   v2 MouseLeftButtonRelese;
 
+  // TODO: Make concept of min-size more polished and consistent
   r32 BorderSize;
   r32 HeaderSize;
   r32 MinSize;
+
+  // Button Function (Trying out some kind of function pool)
+  activate_button* Activate[4];
+};
+
+struct container_list
+{
+
 };
 
 
@@ -495,7 +530,7 @@ void ConnectNode(container_node* Parent, container_node* NewNode);
 
 void SetMouseInput(game_input* GameInput, menu_interface* Interface);
 
-void InitializeMenuFunctionPointers(container_node* Root, memory_arena* Arena, u32 NodeCount);
+void SetInterfaceFunctionPointers(container_node* Root, memory_arena* Arena, u32 NodeCount);
 void UpdateRegions(container_node* Root, rect2f RootRegion);
 void ActOnInput(memory_arena* Arena, menu_interface* Interface, menu_tree* Menu);
 

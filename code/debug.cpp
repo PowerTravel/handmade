@@ -12,8 +12,6 @@ u8* DEBUGPushSize_(debug_state* DebugState, u32 Size)
 #define DEBUGPushArray(DebugState, count, type) (type*) DEBUGPushSize_(DebugState, count*sizeof(type))
 #define DEBUGPushCopy(DebugState, Size, Src) utils::Copy(Size, (void*) (Src), (void*) DEBUGPushSize_(DebugState, Size))
 
-
-
 internal void RefreshCollation();
 internal void RestartCollation();
 internal inline void DebugRewriteConfigFile();
@@ -43,7 +41,8 @@ TogglePause(debug_state* DebugState, menu_item* Item)
   Item->Active = DebugState->Paused;
 }
 
-void CreateMainMenuFunctions(debug_state* DebugState)
+
+void SetRadialMenuFunctionPointers(debug_state* DebugState)
 {
   radial_menu* MainMenu = &DebugState->RadialMenues[0];
   Assert(MainMenu->MenuRegionCount == 3);
@@ -69,79 +68,20 @@ void CreateMainMenuFunctions(debug_state* DebugState)
   };
 }
 
-void CreateOptionsMenuFunctions(debug_state* DebugState)
-{
-  box_menu* OptionsMenu = &DebugState->BoxMenues[0];
-  Assert(OptionsMenu->MenuItemCount == 4);
-
-  // "Multi Threaded"
-  OptionsMenu->MenuItems[0].Activate =
-  [](debug_state* DebugState, menu_item* Item)
-  {
-    DebugState->ConfigMultiThreaded = !DebugState->ConfigMultiThreaded;
-    Item->Active = (b32) DebugState->ConfigMultiThreaded;
-    DebugRewriteConfigFile();
-  };
-  // "Collision Points"
-  OptionsMenu->MenuItems[1].Activate =
-  [](debug_state* DebugState, menu_item* Item)
-  {
-    DebugState->ConfigCollisionPoints = !DebugState->ConfigCollisionPoints;
-    Item->Active = DebugState->ConfigCollisionPoints;
-    DebugRewriteConfigFile();
-  };
-  // "Colliders"
-  OptionsMenu->MenuItems[2].Activate =
-  [](debug_state* DebugState, menu_item* Item)
-  {
-    DebugState->ConfigCollider = !DebugState->ConfigCollider;
-    Item->Active = DebugState->ConfigCollider;
-    DebugRewriteConfigFile();
-  };
-  // "AABBTree"
-  OptionsMenu->MenuItems[3].Activate =
-  [](debug_state* DebugState, menu_item* Item)
-  {
-    DebugState->ConfigAABBTree = !DebugState->ConfigAABBTree;
-    Item->Active = DebugState->ConfigAABBTree;
-    DebugRewriteConfigFile();
-  };
-}
-
-void InitializeMenuFunctionPointers(debug_state* DebugState)
-{
-  CreateMainMenuFunctions(DebugState);
-  CreateOptionsMenuFunctions(DebugState);
-}
-
 menu_functions GetMenuFunction(container_type Type)
 {
-  menu_functions Result = {};
   switch(Type)
   {
-    case container_type::Root:
-    {
-      Result = GetRootMenuFunctions();
-    }break;
-    case container_type::Empty:
-    {
-      Result = GetEmptyFunctions();
-    }break;
-    case container_type::Split:
-    {
-      Result = SplitMenuFunctions();
-    }break;
-    case container_type::TabbedHeader:
-    {
-      Result = TabbedHeaderMenuFunctions();
-    }break;
-    case container_type::MenuHeader:
-    {
-      Result = MenuHeaderMenuFunctions();
-    }break;
+    case container_type::Root: return GetRootMenuFunctions();
+    case container_type::Empty: return GetEmptyFunctions();
+    case container_type::Split: return SplitMenuFunctions();
+    case container_type::TabbedHeader: return TabbedHeaderMenuFunctions();
+    case container_type::MenuHeader: return MenuHeaderMenuFunctions();
+    case container_type::ContainerList: return ContainerListFunctions();
+    case container_type::Button: return GetButtonFunctions();
     default: Assert(0);
   }
-  return Result;
+  return {};
 }
 
 
@@ -150,26 +90,14 @@ u32 GetContainerSize(container_type Type)
   u32 Result = sizeof(container_node);
   switch(Type)
   {
-    case container_type::Root:
-    {
-      Result += sizeof(root_window);
-    }break;
-    case container_type::Empty:
-    {
-      Result += sizeof(empty_window);
-    }break;
-    case container_type::Split:
-    {
-      Result += sizeof(split_window);
-    }break;
-    case container_type::TabbedHeader:
-    {
-      Result += sizeof(tabbed_header_window);
-    }break;
-    case container_type::MenuHeader:
-    {
-      Result += sizeof(menu_header_window); 
-    }break;
+    case container_type::Root:          {Result += sizeof(root_window);}break;
+    case container_type::Empty:         {Result += sizeof(empty_window);}break;
+    case container_type::Split:         {Result += sizeof(split_window);}break;
+    case container_type::TabbedHeader:  {Result += sizeof(tabbed_header_window);}break;
+    case container_type::MenuHeader:    {Result += sizeof(menu_header_window);}break;
+    case container_type::ContainerList: {Result += sizeof(container_list);}break;
+    case container_type::Button:        {Result += sizeof(menu_button);}break;
+    default: Assert(0);
   }
   return Result;
 }
@@ -290,7 +218,7 @@ void DeleteContainer( menu_interface* Interface, container_node* Node)
 }
 
 // Preorder breadth first.
-void InitializeMenuFunctionPointers(container_node* RootWindow, memory_arena* Arena, u32 NodeCount)
+void SetInterfaceFunctionPointers(container_node* RootWindow, memory_arena* Arena, u32 NodeCount)
 {
   u32 StackElementSize = sizeof(container_node*);
   u32 StackByteSize = NodeCount * StackElementSize;
@@ -326,7 +254,6 @@ void InitializeMenuFunctionPointers(container_node* RootWindow, memory_arena* Ar
     }
   }
 }
-
 
 
 //  PostOrder (Left, Right, Root),  Depth first.
@@ -393,7 +320,7 @@ void TreeSensus( menu_tree* Menu )
 
   Menu->NodeCount = Pair.a;
   Menu->Depth = Pair.b;
-  Platform.DEBUGPrint("Tree Sensus:  Depth: %d, Count: %d\n", Pair.b, Pair.a);
+ // Platform.DEBUGPrint("Tree Sensus:  Depth: %d, Count: %d\n", Pair.b, Pair.a);
 }
 
 
@@ -426,7 +353,14 @@ void UpdateRegions( memory_arena* Arena, u32 NodeCount, container_node* Containe
         RegionType = ChildIndex == 0 ? window_regions::BodyOne : window_regions::BodyTwo;  
       }
 
-      Child->Region = Parent->Functions.GetRegionRect(RegionType, Parent);
+      if(Parent->Functions.GetChildRegion)
+      {
+        Child->Region = Parent->Functions.GetChildRegion(Parent, Child);
+      }else{
+        Child->Region = Parent->Functions.GetRegionRect(RegionType, Parent);  
+      }
+      
+      
       ContainerStack[StackCount++] = Child;
 
       Child = Child->NextSibling;
@@ -620,7 +554,61 @@ void ConnectNode(container_node* Parent, container_node* NewNode)
   }
 }
 
+ACTIVATE_BUTTON( toggle_colliders )
+{
+  DebugState->ConfigCollider = !DebugState->ConfigCollider;
+  Button->Active = DebugState->ConfigCollider;
+}
 
+ACTIVATE_BUTTON( toggle_multi_thread )
+{
+  DebugState->ConfigMultiThreaded = !DebugState->ConfigMultiThreaded;
+  Button->Active = (b32) DebugState->ConfigMultiThreaded;
+}
+
+ACTIVATE_BUTTON( toggle_aabb_tree )
+{
+  DebugState->ConfigAABBTree = !DebugState->ConfigAABBTree;
+  Button->Active = DebugState->ConfigAABBTree;
+}
+
+ACTIVATE_BUTTON( toggle_collision_points )
+{
+  DebugState->ConfigCollisionPoints = !DebugState->ConfigCollisionPoints;
+  Button->Active = DebugState->ConfigCollisionPoints;
+}
+
+ACTIVATE_BUTTON( recompile )
+{
+  DebugRewriteConfigFile();
+}
+
+void SetMenuButtonFunctions(menu_interface* Interface)
+{
+  Interface->Activate[0] = toggle_colliders;
+  Interface->Activate[1] = toggle_multi_thread;
+  Interface->Activate[2] = toggle_aabb_tree;
+  Interface->Activate[3] = toggle_collision_points;
+  Interface->Activate[4] = recompile;
+}
+
+
+void UpdateFunctionPointers(debug_state* DebugState)
+{
+  if(!DebugState->UpdateFunctionPointers)
+  {
+    SetRadialMenuFunctionPointers(DebugState);
+
+    SetMenuButtonFunctions(DebugState->MenuInterface);
+    for (s32 WindowIndex = 0;
+             WindowIndex >= 0;
+           --WindowIndex)
+    {
+      menu_tree* MenuTree = &DebugState->MenuInterface->RootContainers[WindowIndex];
+      SetInterfaceFunctionPointers(MenuTree->Root, &DebugState->Arena, MenuTree->NodeCount);
+    }  
+  }
+}
 
 internal debug_state*
 DEBUGGetState()
@@ -695,10 +683,61 @@ DEBUGGetState()
     OptionsMenu->MenuItemCount = ArrayCount(OptionMenuItems);
     OptionsMenu->MenuItems = (menu_item*) DEBUGPushCopy(DebugState, sizeof(OptionMenuItems), OptionMenuItems);
 
+
+
     container_node* Sentinel = &(Interface->Sentinel);
     ListInitiate(Sentinel);
 
     {
+      // "Toggle Colliders"
+      container_node* ListEntry0 = NewContainer(Interface, container_type::Button);
+      menu_button* Button0 = GetContainerPayload(menu_button, ListEntry0);
+      str::CopyStringsUnchecked("Colliders", Button0->Text);
+      Button0->Color = V4(1,0,0,1);
+      Button0->Active = DebugState->ConfigCollider;
+      Button0->Activate = &Interface->Activate[0];
+
+      // "Toggle Multi Threaded"
+      container_node*  ListEntry1 = NewContainer(Interface, container_type::Button);
+      menu_button* Button1 = GetContainerPayload(menu_button, ListEntry1);
+      str::CopyStringsUnchecked("Multi Threaded", Button1->Text);
+      Button1->Color = V4(0,1,0,1);
+      Button1->Active = DebugState->ConfigMultiThreaded;
+      Button1->Activate = &Interface->Activate[1];
+
+      // "Toggle AABBTree"
+      container_node*  ListEntry2 = NewContainer(Interface, container_type::Button);
+      menu_button* Button2 = GetContainerPayload(menu_button, ListEntry2);
+      str::CopyStringsUnchecked("AABB Tree", Button2->Text);
+      Button2->Color = V4(0,0,1,1);
+      Button2->Active = DebugState->ConfigAABBTree;
+      Button2->Activate = &Interface->Activate[2];
+
+      // "Collision Points"
+      container_node*  ListEntry3 = NewContainer(Interface, container_type::Button);
+      menu_button* Button3 = GetContainerPayload(menu_button, ListEntry3);
+      str::CopyStringsUnchecked("Collision Points", Button3->Text);
+      Button3->Color = V4(0,1,1,1);
+      Button3->Active = DebugState->ConfigCollisionPoints;
+      Button3->Activate = &Interface->Activate[3];
+
+      // "Collision Points"
+      container_node*  ListEntry4 = NewContainer(Interface, container_type::Button);
+      menu_button* Button4 = GetContainerPayload(menu_button, ListEntry4);
+      str::CopyStringsUnchecked("Recompile", Button4->Text);
+      Button4->Color = V4(0,0,0,1);
+      Button4->Active = false;
+      Button4->Activate = &Interface->Activate[4];
+
+      container_node* ContainerList = NewContainer(Interface, container_type::ContainerList);
+      container_list* List = GetContainerPayload(container_list, ContainerList);
+      ConnectNode(ContainerList, ListEntry0);
+      ConnectNode(ContainerList, ListEntry1);
+      ConnectNode(ContainerList, ListEntry2);
+      ConnectNode(ContainerList, ListEntry3);
+      ConnectNode(ContainerList, ListEntry4);
+
+
       menu_tree* Root = GetNewMenuTree(Interface);
       Root->Root = NewContainer(Interface, container_type::Root);
 
@@ -729,8 +768,8 @@ DEBUGGetState()
       ConnectNode(0, Root->Root);
       ConnectNode(RootContainer, RootHeader);
       ConnectNode(RootHeader,    TabbedHeader);
-      ConnectNode(TabbedHeader,  EmptyContainer0);
-      TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer0;
+      ConnectNode(TabbedHeader,  ContainerList);
+      TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = ContainerList;
       TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer1;
       TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer2;
       TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer3;      
@@ -738,7 +777,6 @@ DEBUGGetState()
       TreeSensus(Root);
       UpdateRegions( &DebugState->Arena, Root->NodeCount, Root->Root);
     }
-
     RestartCollation();
   }
   return DebugState;
@@ -764,10 +802,7 @@ RestartCollation()
     DebugState->FrameCount = 0;
     DebugState->FrameBarRange = 0;//60000000.0f;
     DebugState->CollationArrayIndex = GlobalDebugTable->CurrentEventArrayIndex+1;
-    DebugState->CollationFrame = 0;
-
-    InitializeMenuFunctionPointers(DebugState);
-    InitializeMenuFunctionPointers(DebugState->MenuInterface->RootContainers[0].Root, &DebugState->Arena, 7);
+    DebugState->CollationFrame = 0;    
 }
 
 void BeginDebugStatistics(debug_statistics* Statistic)
@@ -1001,7 +1036,7 @@ DebugRewriteConfigFile()
 
   Platform.DEBUGPlatformWriteEntireFile(&Dummy, "W:\\handmade\\code\\debug_config.h", Size, Buffer);
 
-  DebugState->UpdateConfig = false;
+  //DebugState->UpdateConfig = false;
   DebugState->Compiler = Platform.DEBUGExecuteSystemCommand("W:\\handmade\\code", "C:\\windows\\system32\\cmd.exe", "/C build_game.bat");
   DebugState->Compiling = true;
 
@@ -1446,7 +1481,6 @@ void DebugMainWindow(game_input* GameInput)
   }
 
   ActOnInput(&DebugState->Arena, Interface, &Interface->RootContainers[0]);
-
   for (s32 WindowIndex = Interface->RootContainerCount-1;
            WindowIndex >= 0;
          --WindowIndex)
@@ -1465,11 +1499,24 @@ GetActiveDebugFrame(debug_state* DebugState)
   return Result;
 }
 
+
 void PushDebugOverlay(game_input* GameInput)
 {
   TIMED_FUNCTION();
+  
+  // TODO: We don't want to remember to always update function pointers.
+  //       We also don't want to do it each frame.
+  //       Let's create a sort of FunctionPointerPool that gets updated automatically.
+  //       
+  //       The question is: Do other request a function from the pool 
+  //       CallFromPool(foo->FunctionID, (void*) foo->Args )  <-- Can be very hard to read
+  //       or do we somehow register a function pointer to the pool at start.
+  //       RegisterFunction(foo->Function, FunctionID);
+  //       CallFunction(foo->Function);
+
 
   debug_state* DebugState = DEBUGGetState();
+  UpdateFunctionPointers(DebugState);
 
   ResetRenderGroup(GlobalDebugRenderGroup);
 
@@ -1674,28 +1721,42 @@ void ActOnInput(memory_arena* Arena, menu_interface* Interface, menu_tree* Menu)
 
   Assert(Menu->Root);
   node_region_pair NodeRegion = GetRegion(Arena, Menu->NodeCount, Menu->Root, MousePos);
+
   if(Interface->MouseLeftButton.Active)
   {
-    // Mouse Clicked Event
-    if(Interface->MouseLeftButton.Edge)
-    {
-
-      Interface->HotRegion = NodeRegion.Region;
-      Interface->HotSubWindow = NodeRegion.Node;
-      if(Interface->HotSubWindow)
-      {
-        Interface->HotSubWindow->Functions.MouseDown(Interface, Interface->HotSubWindow, Interface->HotRegion, 0);
-      }
-    // Mouse Down Movement State
-    }else{
-
-    }
-    
     if(Interface->HotSubWindow)
     {
+      // Mouse Clicked Event
+      if(Interface->MouseLeftButton.Edge)
+      {
+        if(Interface->HotSubWindow)
+        {
+          Interface->HotSubWindow->Functions.MouseDown(Interface, Interface->HotSubWindow, Interface->HotRegion, 0);
+        }
+      // Mouse Down Movement State
+      }else{
+
+      }
+
       Interface->HotSubWindow->Functions.HandleInput(Interface, Interface->HotSubWindow, 0);
     }
   }else{
+
+    if(NodeRegion.Node != Interface->HotSubWindow)
+    {
+      if(NodeRegion.Node)
+      {
+        NodeRegion.Node->Functions.MouseEnter(Interface, NodeRegion.Node, NodeRegion.Region, 0);  
+      }
+
+      if(Interface->HotSubWindow)
+      {
+        Interface->HotSubWindow->Functions.MouseExit(Interface, Interface->HotSubWindow, Interface->HotRegion, 0);
+      }
+    }
+
+    Interface->HotRegion = NodeRegion.Region;
+    Interface->HotSubWindow = NodeRegion.Node;
 
     if(Interface->HotSubWindow)
     {
@@ -1709,7 +1770,7 @@ void ActOnInput(memory_arena* Arena, menu_interface* Interface, menu_tree* Menu)
       Interface->HotSubWindow = 0;
       // Mouse Exploration State
     }else{
-
+      
     }
   }
 }

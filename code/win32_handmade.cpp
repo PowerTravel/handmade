@@ -318,7 +318,7 @@ Win32LoadGameCode(char* SourceDLLName, char* TempDLLName, char* LockFileName)
       Result.UpdateAndRender = (game_update_and_render* )
         GetProcAddress(Result.GameCodeDLL, "GameUpdateAndRender");
 
-      Result.GetSoundSamples = (game_get_sound_samples* )\
+      Result.GetSoundSamples = (game_get_sound_samples* )
         GetProcAddress(Result.GameCodeDLL, "GameGetSoundSamples");
 
       Result.DEBUGGameFrameEnd = (debug_frame_end* )

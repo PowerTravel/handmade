@@ -14,7 +14,6 @@ window_regions CheckRegions( v2 MousePos, u32 RegionCount, window_regions* Regio
   return window_regions::None;
 }
 
-#if 0
 MENU_MOUSE_DOWN( MouseDown )
 {
 
@@ -23,7 +22,6 @@ MENU_MOUSE_UP( MouseUp )
 {
 
 }
-
 MENU_MOUSE_ENTER( MouseEnter )
 {
 
@@ -32,24 +30,28 @@ MENU_MOUSE_EXIT( MouseExit )
 {
 
 }
-
 MENU_HANDLE_INPUT( HandleInput )
 {
 
 }
-
 MENU_GET_REGION_RECT( GetRegionRect )
 {
+  return Node->Region;
+}
+MENU_GET_CHILD_REGION( GetChildRegion )
+{
+  return Child->Region;
 }
 MENU_GET_MOUSE_OVER_REGION( GetMouseOverRegion )
 {
-
+  return window_regions::WholeBody;
 }
 MENU_DRAW( Draw )
 {
 
 }
-menu_functions GetFunctions()
+
+menu_functions GetDefaultFunctions()
 {
   menu_functions Result = {};
   Result.MouseDown = MouseDown;
@@ -57,12 +59,12 @@ menu_functions GetFunctions()
   Result.MouseEnter = MouseEnter;
   Result.MouseExit = MouseExit;
   Result.HandleInput = HandleInput;
+  Result.GetChildRegion = GetChildRegion;
   Result.GetRegionRect = GetRegionRect;
   Result.GetMouseOverRegion = GetMouseOverRegion;
   Result.Draw = Draw;
   return Result;
 }
-#endif
 
 MENU_MOUSE_DOWN( EmptyMouseDown )
 {
@@ -92,6 +94,7 @@ MENU_GET_REGION_RECT( EmptyGetRegionRect )
   Assert(Type == window_regions::WholeBody);
   return Node->Region;
 }
+
 MENU_GET_MOUSE_OVER_REGION( EmptyGetMouseOverRegion )
 {
   if(Intersects(Node->Region, MousePos))
@@ -1003,6 +1006,7 @@ MENU_DRAW( TabbedHeaderDraw )
 
   r32 Fill = 0.8;
   v4 HeaderColor = V4(0.3,0.5,0.3,1);
+  v4 DefaultHeaderColor = V4(0.5,0.5,0.5,1);
 
   rect2f HeaderRegion = Node->Functions.GetRegionRect(window_regions::Header, Node);
 
@@ -1030,10 +1034,15 @@ MENU_DRAW( TabbedHeaderDraw )
       Child = Child->FirstChild;
     }
 
-    Assert(Child->Type == container_type::Empty);
-
-    empty_window* EmptyWindow = GetContainerPayload(empty_window, Child);
-    DEBUGPushQuad(TabRegion, V4(0.8*V3(EmptyWindow->Color),1));
+    if(Child->Type == container_type::Empty)
+    {
+      empty_window* EmptyWindow = GetContainerPayload(empty_window, Child);
+      DEBUGPushQuad(TabRegion, V4(Fill*V3(EmptyWindow->Color),1));
+    }else{
+      DEBUGPushQuad(TabRegion, DefaultHeaderColor);
+    }
+    
+    
   }
 }
 
@@ -1198,7 +1207,6 @@ MENU_GET_REGION_RECT( SplitGetRegionRect )
   return Result;
 }
 
-
 MENU_GET_MOUSE_OVER_REGION( SplitGetMouseOverRegion )
 {
   window_regions RegionArray[] =
@@ -1239,5 +1247,142 @@ menu_functions SplitMenuFunctions()
   Result.GetRegionRect = SplitGetRegionRect;
   Result.GetMouseOverRegion = SplitGetMouseOverRegion;
   Result.Draw = SplitDraw;
+  return Result;
+}
+
+
+MENU_MOUSE_DOWN( ContainerListMouseDown )
+{
+
+}
+MENU_MOUSE_UP( ContainerListMouseUp )
+{
+
+}
+
+MENU_MOUSE_ENTER( ContainerListMouseEnter )
+{
+
+}
+MENU_MOUSE_EXIT( ContainerListMouseExit )
+{
+
+}
+
+MENU_HANDLE_INPUT( ContainerListHandleInput )
+{
+
+}
+
+MENU_GET_CHILD_REGION(ContainerListGetChildRegion)
+{
+  container_node* ChildNode = Parent->FirstChild;
+  rect2f Result = {};
+  if(ChildNode)
+  {
+    r32 ChildIndex = 0;
+    r32 ChildCount = 0;
+    b32 ChildFound = false;
+    while(ChildNode)
+    {
+      if(ChildNode == Child)
+      {
+        ChildIndex = ChildCount;
+        ChildFound = true; 
+      }
+      ++ChildCount;
+      ChildNode = ChildNode->NextSibling;
+    }
+
+    Assert(ChildFound)
+
+    rect2f Region = Parent->Region;
+    r32 H = Region.H/ChildCount;
+    r32 Y0 = Region.Y + ChildIndex * H;
+
+    Result = Rect2f(Region.X, Y0, Region.W, H);
+  }
+  return Result;
+}
+
+MENU_GET_REGION_RECT( ContainerListGetRegionRect )
+{
+  return Node->Region;
+}
+MENU_GET_MOUSE_OVER_REGION( ContainerListGetMouseOverRegion )
+{
+  return window_regions::WholeBody;
+}
+MENU_DRAW( ContainerListDraw )
+{
+
+}
+
+menu_functions ContainerListFunctions()
+{
+  menu_functions Result = {};
+  Result.MouseDown = ContainerListMouseDown;
+  Result.MouseUp = ContainerListMouseUp;
+  Result.MouseEnter = ContainerListMouseEnter;
+  Result.MouseExit = ContainerListMouseExit;
+  Result.HandleInput = ContainerListHandleInput;
+  Result.GetChildRegion = ContainerListGetChildRegion;
+  Result.GetRegionRect = ContainerListGetRegionRect;
+  Result.GetMouseOverRegion = ContainerListGetMouseOverRegion;
+  Result.Draw = ContainerListDraw;
+  return Result;
+}
+
+MENU_MOUSE_DOWN( ButtonMouseDown )
+{
+  menu_button* Button = GetContainerPayload(menu_button,Node);
+  debug_state* DebugState = DEBUGGetState();
+  (*Button->Activate)(Button, DebugState);
+}
+MENU_MOUSE_UP( ButtonMouseUp )
+{
+}
+MENU_MOUSE_ENTER( ButtonMouseEnter )
+{
+  menu_button* Button = GetContainerPayload(menu_button,Node);
+  Button->Hot = true;
+}
+MENU_MOUSE_EXIT( ButtonMouseExit )
+{
+  menu_button* Button = GetContainerPayload(menu_button,Node);
+  Button->Hot = false;
+}
+
+MENU_DRAW( ButtonDraw )
+{
+  menu_button* Button = GetContainerPayload(menu_button,Node);
+  rect2f TextRect = DEBUGTextSize(0, 0, Button->Text);
+  v2 MiddlePoint = V2(Node->Region.X + Node->Region.W/2.f, Node->Region.Y + Node->Region.H/2.f);
+  v2 TextOffset  = V2(TextRect.W/2.f, TextRect.H/2.f);
+  TextRect.X = MiddlePoint.X - TextOffset.X;
+  TextRect.Y = MiddlePoint.Y - TextOffset.Y;
+
+  r32 ColorMultipier = BranchlessArithmatic(Button->Hot, 0.5f, 0.2f);
+  if(Button->Active)
+  {
+    DEBUGPushQuad(Node->Region, Button->Color);
+    DEBUGPushQuad(Shrink(Node->Region, Interface->BorderSize), V4(ColorMultipier*V3(Button->Color),1));
+  }else{
+    DEBUGPushQuad(Node->Region, V4(ColorMultipier*V3(Button->Color),1));
+  }
+
+
+
+  DEBUGTextOutAt(TextRect.X,TextRect.Y, Button->Text, V4(1,1,1,1));
+}
+
+menu_functions GetButtonFunctions()
+{
+  menu_functions Result = GetDefaultFunctions();
+  Result.MouseDown  = ButtonMouseDown;
+  Result.MouseUp    = ButtonMouseUp;
+  Result.MouseEnter = ButtonMouseEnter;
+  Result.MouseExit  = ButtonMouseExit;
+  Result.Draw = ButtonDraw;
   return Result;
 }

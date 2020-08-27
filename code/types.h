@@ -83,6 +83,17 @@ rect2f Rect2f( r32 X, r32 Y, r32 W, r32 H )
 	return Result;
 };
 
+inline rect2f
+Shrink(rect2f Rect, r32 dx)
+{
+  rect2f Result = Rect;
+  Result.X += dx;
+  Result.Y += dx;
+  Result.H -= 2*dx;
+  Result.W -= 2*dx;
+  return Result;
+}
+
 inline b32
 Intersects(const rect2f & Rect, v2 P)
 {
