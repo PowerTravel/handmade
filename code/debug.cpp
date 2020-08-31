@@ -79,6 +79,7 @@ menu_functions GetMenuFunction(container_type Type)
     case container_type::MenuHeader: return MenuHeaderMenuFunctions();
     case container_type::ContainerList: return ContainerListFunctions();
     case container_type::Button: return GetButtonFunctions();
+    case container_type::Profiler: return GetProfilerFunctions();
     default: Assert(0);
   }
   return {};
@@ -97,6 +98,7 @@ u32 GetContainerSize(container_type Type)
     case container_type::MenuHeader:    {Result += sizeof(menu_header_window);}break;
     case container_type::ContainerList: {Result += sizeof(container_list);}break;
     case container_type::Button:        {Result += sizeof(menu_button);}break;
+    case container_type::Profiler:      {Result += sizeof(profiling_window);}break;
     default: Assert(0);
   }
   return Result;
@@ -689,6 +691,9 @@ DEBUGGetState()
     ListInitiate(Sentinel);
 
     {
+
+      /// Options Menu
+
       // "Toggle Colliders"
       container_node* ListEntry0 = NewContainer(Interface, container_type::Button);
       menu_button* Button0 = GetContainerPayload(menu_button, ListEntry0);
@@ -738,6 +743,12 @@ DEBUGGetState()
       ConnectNode(ContainerList, ListEntry4);
 
 
+      /// Profiling Menu
+      container_node* ProfilingContainer = NewContainer(Interface, container_type::Profiler);
+
+
+      /// Tabbed Window
+
       menu_tree* Root = GetNewMenuTree(Interface);
       Root->Root = NewContainer(Interface, container_type::Root);
 
@@ -756,10 +767,6 @@ DEBUGGetState()
       tabbed_header_window* TabbedHeaderWindow = GetContainerPayload(tabbed_header_window, TabbedHeader);
       TabbedHeaderWindow->HeaderSize = Interface->HeaderSize;
 
-      container_node* EmptyContainer0 = NewContainer(Interface, container_type::Empty);
-      GetContainerPayload(empty_window, EmptyContainer0)->Color = V4(0,0,0.4,1);
-      container_node*  EmptyContainer1 = NewContainer(Interface, container_type::Empty);
-      GetContainerPayload(empty_window, EmptyContainer1)->Color = V4(0,0.4,0.4,1);
       container_node*  EmptyContainer2 = NewContainer(Interface, container_type::Empty);
       GetContainerPayload(empty_window, EmptyContainer2)->Color = V4(0.4,0,0,1);
       container_node*  EmptyContainer3 = NewContainer(Interface, container_type::Empty);
@@ -770,7 +777,7 @@ DEBUGGetState()
       ConnectNode(RootHeader,    TabbedHeader);
       ConnectNode(TabbedHeader,  ContainerList);
       TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = ContainerList;
-      TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer1;
+      TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = ProfilingContainer;
       TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer2;
       TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer3;      
 
@@ -1576,7 +1583,7 @@ void PushDebugOverlay(game_input* GameInput)
 
   debug_record* HotRecord = 0;
 
-
+#if 0
   for(u32 FrameIndex = 0; FrameIndex < MaxFramesToDisplay; ++FrameIndex)
   {
     debug_frame* Frame = DebugState->Frames + DebugState->FrameCount - (FrameIndex+1);
@@ -1612,7 +1619,6 @@ void PushDebugOverlay(game_input* GameInput)
       }
     }
   }
-
   if(GameInput->MouseButton[PlatformMouseButton_Left].Pushed)
   {
     if((GameInput->MouseX >= 0) && (GameInput->MouseX <= AspectRatio) &&
@@ -1627,6 +1633,8 @@ void PushDebugOverlay(game_input* GameInput)
       RefreshCollation();
     }
   }
+
+  #endif
 }
 
 

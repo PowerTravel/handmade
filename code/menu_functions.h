@@ -1034,12 +1034,23 @@ MENU_DRAW( TabbedHeaderDraw )
       Child = Child->FirstChild;
     }
 
+
+    v4 ColorTable[] = {V4(1,0,0,1),
+                       V4(0,1,0,1),
+                       V4(0,0,1,1),
+                       V4(1,1,0,1),
+                       V4(1,0,1,1),
+                       V4(0,1,1,1),
+                       V4(1,1,1,1),
+                       V4(0,0,0,1)};
+
+
     if(Child->Type == container_type::Empty)
     {
       empty_window* EmptyWindow = GetContainerPayload(empty_window, Child);
       DEBUGPushQuad(TabRegion, V4(Fill*V3(EmptyWindow->Color),1));
     }else{
-      DEBUGPushQuad(TabRegion, DefaultHeaderColor);
+      DEBUGPushQuad(TabRegion, ColorTable[ TabIndex & ArrayCount(ColorTable)]);
     }
     
     
@@ -1386,3 +1397,137 @@ menu_functions GetButtonFunctions()
   Result.Draw = ButtonDraw;
   return Result;
 }
+
+
+
+
+MENU_MOUSE_DOWN( ProfilerMouseDown )
+{
+  rect2f Chart = Node->Region;
+  profiling_window* Profiler = GetContainerPayload(profiling_window,Node);
+  debug_state* DebugState = DEBUGGetState();
+
+  u32 MaxFramesToDisplay = DebugState->FrameCount < 10 ? DebugState->FrameCount : 10;
+  r32 BarWidth = Chart.H/MaxFramesToDisplay;
+  r32 LaneWidth = BarWidth/(r32)DebugState->FrameBarLaneCount;
+  r32 LaneScale = Chart.W/(r32)DebugState->FrameBarRange;
+
+  v4 ColorTable[] = {V4(1,0,0,1),
+                     V4(0,1,0,1),
+                     V4(0,0,1,1),
+                     V4(1,1,0,1),
+                     V4(1,0,1,1),
+                     V4(0,1,1,1),
+                     V4(1,1,1,1),
+                     V4(0,0,0,1)};
+
+  debug_record* HotRecord = 0;
+
+  for(u32 FrameIndex = 0; FrameIndex < MaxFramesToDisplay; ++FrameIndex)
+  {
+    debug_frame* Frame = DebugState->Frames + DebugState->FrameCount - (FrameIndex+1);
+    r32 StackX = Chart.X;
+    r32 StackY = Chart.Y+Chart.H - (r32)(FrameIndex+1)*BarWidth;
+    for(u32 RegionIndex = 0; RegionIndex < Frame->RegionCount; ++RegionIndex)
+    {
+      debug_frame_region* Region = Frame->Regions + RegionIndex;
+      v4 Color = ColorTable[(u32)(Region->ColorIndex%ArrayCount(ColorTable))];
+      r32 MinX = StackX + LaneScale*Region->MinT;
+      r32 MaxX = StackX + LaneScale*Region->MaxT;
+      r32 MinY = StackY + LaneWidth*Region->LaneIndex;
+      r32 MaxY = MinY + LaneWidth;
+      rect2f Rect = {};
+      Rect.X = MinX;
+      Rect.Y = MinY;
+      Rect.W = MaxX-MinX;
+      Rect.H = (MaxY-MinY)*0.9f;
+
+      if(Intersects(Rect, Interface->MousePos))
+      {
+        HotRecord = Region->Record;
+      }
+    }
+  }
+
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
+  rect2f Window = Rect2f(0,0,Width,1);
+  if(Intersects(Window, Interface->MousePos))
+  {
+    if(HotRecord)
+    {
+      DebugState->ScopeToRecord = HotRecord;
+    }else if(DebugState->ScopeToRecord){
+      DebugState->ScopeToRecord = 0;
+    }
+    RefreshCollation();
+  }
+}
+
+MENU_DRAW( ProfilerDraw )
+{
+  rect2f Chart = Node->Region;
+  profiling_window* Profiler = GetContainerPayload(profiling_window,Node);
+  debug_state* DebugState = DEBUGGetState();
+
+  u32 MaxFramesToDisplay = DebugState->FrameCount < 10 ? DebugState->FrameCount : 10;
+  r32 BarWidth = Chart.H/MaxFramesToDisplay;
+  r32 LaneWidth = BarWidth/(r32)DebugState->FrameBarLaneCount;
+  r32 LaneScale = Chart.W/(r32)DebugState->FrameBarRange;
+
+  v4 ColorTable[] = {V4(1,0,0,1),
+                     V4(0,1,0,1),
+                     V4(0,0,1,1),
+                     V4(1,1,0,1),
+                     V4(1,0,1,1),
+                     V4(0,1,1,1),
+                     V4(1,1,1,1),
+                     V4(0,0,0,1)};
+
+  for(u32 FrameIndex = 0; FrameIndex < MaxFramesToDisplay; ++FrameIndex)
+  {
+    debug_frame* Frame = DebugState->Frames + DebugState->FrameCount - (FrameIndex+1);
+    r32 StackX = Chart.X;
+    r32 StackY = Chart.Y+Chart.H - (r32)(FrameIndex+1)*BarWidth;
+    for(u32 RegionIndex = 0; RegionIndex < Frame->RegionCount; ++RegionIndex)
+    {
+      debug_frame_region* Region = Frame->Regions + RegionIndex;
+      v4 Color = ColorTable[(u32)(Region->ColorIndex%ArrayCount(ColorTable))];
+      r32 MinX = StackX + LaneScale*Region->MinT;
+      r32 MaxX = StackX + LaneScale*Region->MaxT;
+      r32 MinY = StackY + LaneWidth*Region->LaneIndex;
+      r32 MaxY = MinY + LaneWidth;
+      rect2f Rect = {};
+      Rect.X = MinX;
+      Rect.Y = MinY;
+      Rect.W = MaxX-MinX;
+      Rect.H = (MaxY-MinY)*0.9f;
+
+      DEBUGPushQuad(Rect, Color);
+
+      if(Intersects(Rect, Interface->MousePos))
+      {
+        c8 StringBuffer[256] = {};
+        Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
+        "%s : %2.2f MCy", Region->Record->BlockName, (Region->MaxT-Region->MinT)/1000000.f);
+        DEBUGTextOutAt(Interface->MousePos.X, Interface->MousePos.Y+0.02f, StringBuffer);
+      }
+    }
+  }
+}
+
+menu_functions GetProfilerFunctions()
+{
+  menu_functions Result = GetDefaultFunctions();
+  Result.MouseDown = ProfilerMouseDown;
+  Result.Draw = ProfilerDraw;
+  return Result;
+}
+
+
+
+
+
+
+
+

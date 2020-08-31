@@ -273,7 +273,8 @@ enum class container_type
   TabbedHeader,
   MenuHeader,
   ContainerList,
-  Button
+  Button,
+  Profiler
 };
 
 enum class window_regions
@@ -406,6 +407,8 @@ menu_functions TabbedHeaderMenuFunctions();
 menu_functions SplitMenuFunctions();
 menu_functions ContainerListFunctions();
 menu_functions GetButtonFunctions();
+menu_functions GetProfilerFunctions();
+
 
 struct tabbed_header_window
 {
@@ -520,6 +523,11 @@ struct container_list
 
 };
 
+
+struct profiling_window
+{
+
+};
 
 container_node* NewContainer(menu_interface* Interface, container_type Type);
 void DeleteContainer(menu_interface* Interface, container_node* Node);
