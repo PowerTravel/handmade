@@ -10,6 +10,7 @@
 #include "assets.h"
 #include "entity_components.h"
 #include "epa_collision_data.h"
+#include "menu_interface.h"
 
 struct world
 {
@@ -35,6 +36,7 @@ struct game_state
 
   game_asset_manager* AssetManager;
   entity_manager* EntityManager;
+  menu_interface* MenuInterface;
 
   world* World;
 

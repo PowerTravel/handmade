@@ -14,7 +14,6 @@ u8* DEBUGPushSize_(debug_state* DebugState, u32 Size)
 
 internal void RefreshCollation();
 internal void RestartCollation();
-internal inline void DebugRewriteConfigFile();
 
 internal void
 TogglePause(debug_state* DebugState, menu_item* Item)
@@ -68,549 +67,6 @@ void SetRadialMenuFunctionPointers(debug_state* DebugState)
   };
 }
 
-menu_functions GetMenuFunction(container_type Type)
-{
-  switch(Type)
-  {
-    case container_type::Root: return GetRootMenuFunctions();
-    case container_type::Empty: return GetEmptyFunctions();
-    case container_type::Split: return SplitMenuFunctions();
-    case container_type::TabbedHeader: return TabbedHeaderMenuFunctions();
-    case container_type::MenuHeader: return MenuHeaderMenuFunctions();
-    case container_type::ContainerList: return ContainerListFunctions();
-    case container_type::Button: return GetButtonFunctions();
-    case container_type::Profiler: return GetProfilerFunctions();
-    default: Assert(0);
-  }
-  return {};
-}
-
-
-u32 GetContainerSize(container_type Type)
-{
-  u32 Result = sizeof(container_node);
-  switch(Type)
-  {
-    case container_type::Root:          {Result += sizeof(root_window);}break;
-    case container_type::Empty:         {Result += sizeof(empty_window);}break;
-    case container_type::Split:         {Result += sizeof(split_window);}break;
-    case container_type::TabbedHeader:  {Result += sizeof(tabbed_header_window);}break;
-    case container_type::MenuHeader:    {Result += sizeof(menu_header_window);}break;
-    case container_type::ContainerList: {Result += sizeof(container_list);}break;
-    case container_type::Button:        {Result += sizeof(menu_button);}break;
-    case container_type::Profiler:      {Result += sizeof(profiling_window);}break;
-    default: Assert(0);
-  }
-  return Result;
-}
-
-container_node* NewContainer(menu_interface* Interface, container_type Type)
-{
-  u32 ContainerSize = GetContainerSize(Type);
-  Interface->ActiveMemory += ContainerSize;
-
-  container_node* Result = 0;
-  {
-    u32 RegionUsed = (u32)(Interface->Memory - Interface->MemoryBase);
-    u32 TotSize = (u32) Interface->MaxMemSize;
-    r32 Percentage = RegionUsed / (r32) TotSize;
-    u32 ActiveMemory = Interface->ActiveMemory;
-    r32 Fragmentation = ActiveMemory/(r32)RegionUsed;
-    #if 0
-    Platform.DEBUGPrint("--==<< Pre Memory >>==--\n");
-    Platform.DEBUGPrint(" - Tot Mem Used   : %2.3f  (%d/%d)\n", Percentage, RegionUsed, TotSize );
-    Platform.DEBUGPrint(" - Fragmentation  : %2.3f  (%d/%d)\n", Fragmentation, ActiveMemory, RegionUsed );
-    #endif
-  }
-  
-  u32 RegionUsed = (u32)(Interface->Memory - Interface->MemoryBase);
-  r32 MemoryFragmentation = Interface->ActiveMemory/(r32)RegionUsed;
-  b32 MemoryTooFragmented = MemoryFragmentation < 0.8;
-  if( MemoryTooFragmented || RegionUsed == Interface->MaxMemSize )
-  {
-    u32 Slot = 0;
-    u32 SlotSpace = 0;
-    u32 SlotSize = 0;
-
-    container_node* CurrentNode = Interface->Sentinel.Next;
-    container_node* NextNode = CurrentNode->Next;
-    while( CurrentNode->Next != &Interface->Sentinel)
-    {
-      midx Base = (midx) CurrentNode + CurrentNode->ContainerSize;
-      midx NextNodeAddress    = (midx)  CurrentNode->Next;
-      Assert(Base <= NextNodeAddress);
-
-      midx OpenSpace = NextNodeAddress - Base;
-
-      if(OpenSpace >= ContainerSize)
-      {
-        Result = (container_node*) Base;
-        ListInsertAfter(CurrentNode, Result);
-        SlotSpace = (u32) Slot;
-        SlotSize = (u32) OpenSpace;
-        break;
-      }
-
-      Slot++;
-      CurrentNode =  CurrentNode->Next;
-    }
-
-   
-    {
-      u32 SlotCount = 0;
-      container_node* CurrentNode2 = Interface->Sentinel.Next;
-      container_node* NextNode2 = CurrentNode->Next;
-     
-      while( CurrentNode2->Next != &Interface->Sentinel)
-      {
-        SlotCount++;
-        CurrentNode2 = CurrentNode2->Next;
-      }  
-      #if 0
-      Platform.DEBUGPrint("--==<< Middle Inset >>==--\n");
-      Platform.DEBUGPrint(" - Slot: [%d,%d]\n", SlotSpace, SlotCount);
-      Platform.DEBUGPrint(" - Size: [%d,%d]\n", ContainerSize, SlotSize);
-      #endif
-    }
-    
-    
-  }
-  
-  if(!Result)
-  {
-    Assert(RegionUsed+ContainerSize < Interface->MaxMemSize);
-    #if 0
-    Platform.DEBUGPrint("--==<< Post Inset >>==--\n");
-    Platform.DEBUGPrint(" - Memory Left  : %d\n",Interface->MaxMemSize - (u32)RegionUsed + ContainerSize);
-    Platform.DEBUGPrint(" - ContainerSize: %d\n\n", ContainerSize);
-    #endif
-    Result = (container_node*) Interface->Memory;
-    Interface->Memory += ContainerSize;  
-    container_node* Sentinel = &Interface->Sentinel;
-    ListInsertBefore( Sentinel, Result );
-  }
-  
-  Result->Type = Type;
-  Result->ContainerSize = ContainerSize;
-  Result->Functions = GetMenuFunction(Type);
-  {
-    u32 RegionUsed2 = (u32)(Interface->Memory - Interface->MemoryBase);
-    u32 TotSize = (u32) Interface->MaxMemSize;
-    r32 Percentage = RegionUsed2 / (r32) TotSize;
-    u32 ActiveMemory = Interface->ActiveMemory;
-    r32 Fragmentation = ActiveMemory/(r32)RegionUsed2;
-    #if 0
-    Platform.DEBUGPrint("--==<< Post Memory >>==--\n");
-    Platform.DEBUGPrint(" - Tot Mem Used   : %2.3f  (%d/%d)\n", Percentage, RegionUsed, TotSize );
-    Platform.DEBUGPrint(" - Fragmentation  : %2.3f  (%d/%d)\n", Fragmentation, ActiveMemory, RegionUsed );
-    #endif
-  }
-  return Result;
-}
-void DeleteContainer( menu_interface* Interface, container_node* Node)
-{
-  Node->Previous->Next = Node->Next;
-  Node->Next->Previous = Node->Previous;
-  Interface->ActiveMemory -= Node->ContainerSize;
-  
-  // Note: We should in theory not have to zerosize the deleted containers, 
-  //       But if we don't we sometimes crash, so look out for that when refactoring.
-  //       This is probably masking some bug.
-  utils::ZeroSize(Node->ContainerSize, (void*)Node);
-}
-
-// Preorder breadth first.
-void SetInterfaceFunctionPointers(container_node* RootWindow, memory_arena* Arena, u32 NodeCount)
-{
-  u32 StackElementSize = sizeof(container_node*);
-  u32 StackByteSize = NodeCount * StackElementSize;
-
-  u32 StackCount = 0;
-  container_node** ContainerStack = PushArray(Arena, NodeCount, container_node*);
-
-  // Push Root
-  ContainerStack[StackCount++] = RootWindow;
-
-  while(StackCount>0)
-  {
-    // Pop new parent from Stack
-    container_node* Parent = ContainerStack[--StackCount];
-    ContainerStack[StackCount] = 0;
-
-    Parent->Functions = GetMenuFunction(Parent->Type);
-    if(Parent->Type == container_type::TabbedHeader)
-    {
-      tabbed_header_window* TabbedHeader = GetContainerPayload(tabbed_header_window, Parent);
-      for (u32 TabIndex = 0; TabIndex < TabbedHeader->TabCount; ++TabIndex)
-      {
-        TabbedHeader->Tabs[TabIndex]->Functions = GetMenuFunction(TabbedHeader->Tabs[TabIndex]->Type);
-      }
-    }
-
-    container_node* Child = Parent->FirstChild;
-    while(Child)
-    {
-      ContainerStack[StackCount++] = Child;
-
-      Child = Child->NextSibling;
-    }
-  }
-}
-
-
-//  PostOrder (Left, Right, Root),  Depth first.
-u32_pair UpdateSubTreeDepthAndCount( u32 ParentDepth, container_node* SubTreeRoot )
-{
-  u32 TotalDepth = 0;
-  u32 CurrentDepth = ParentDepth;
-  u32 NodeCount = 0;
-
-  // Make SubTreeRoot look like an actual root node
-  container_node* SubTreeParent = SubTreeRoot->Parent;
-  container_node* SubTreeSibling = SubTreeRoot->NextSibling;
-
-  SubTreeRoot->Parent = 0;
-  SubTreeRoot->NextSibling = 0;
-
-  container_node* CurrentNode = SubTreeRoot;
-
-  while(CurrentNode != SubTreeRoot->Parent)
-  {
-    // Set the depth of the current Node
-    CurrentNode->Depth = CurrentDepth++;
-    ++NodeCount;
-
-    // Step all the way down (setting depth as you go along)
-    while(CurrentNode->FirstChild)
-    {
-      CurrentNode = CurrentNode->FirstChild;
-      CurrentNode->Depth = CurrentDepth++;
-      ++NodeCount;
-    }
-
-    // The depth is now set until the leaf.
-    TotalDepth = Maximum(CurrentDepth, TotalDepth);
-
-    // Step up until you find another sibling or we reach root
-    while(!CurrentNode->NextSibling && CurrentNode->Parent)
-    {
-      CurrentNode = CurrentNode->Parent;  
-      CurrentDepth--;
-      Assert(CurrentDepth >= 0)
-    }
-
-    // Either we found another sibling and we can traverse that part of the tree
-    //  or we are at root and root has no siblings and we are done.
-    CurrentNode = CurrentNode->NextSibling;
-  }
-
-  // Restore the Root
-  SubTreeRoot->Parent = SubTreeParent;
-  SubTreeRoot->NextSibling = SubTreeSibling;
-
-  u32_pair Result = {};
-  Result.a = NodeCount;
-  Result.b = TotalDepth;
-  
-  return Result;
-}
-
-
-void TreeSensus( menu_tree* Menu )
-{
-  u32_pair Pair =  UpdateSubTreeDepthAndCount( 0, Menu->Root );
-
-  Menu->NodeCount = Pair.a;
-  Menu->Depth = Pair.b;
- // Platform.DEBUGPrint("Tree Sensus:  Depth: %d, Count: %d\n", Pair.b, Pair.a);
-}
-
-
-// Preorder breadth first.
-void UpdateRegions( memory_arena* Arena, u32 NodeCount, container_node* Container )
-{
-  u32 StackElementSize = sizeof(container_node*);
-  u32 StackByteSize = NodeCount * StackElementSize;
-
-  u32 StackCount = 0;
-  container_node** ContainerStack = PushArray(Arena, NodeCount, container_node*);
-
-  // Push Root
-  ContainerStack[StackCount++] = Container;
-
-  while(StackCount>0)
-  {
-    // Pop new parent from Stack
-    container_node* Parent = ContainerStack[--StackCount];
-    ContainerStack[StackCount] = 0;
-
-    // Update the region of all children and push them to the stack
-    container_node* Child = Parent->FirstChild;
-    u32 ChildIndex = 0;
-    window_regions RegionType = window_regions::WholeBody;
-    while(Child)
-    {
-      if(Parent->Type == container_type::Split)
-      {
-        RegionType = ChildIndex == 0 ? window_regions::BodyOne : window_regions::BodyTwo;  
-      }
-
-      if(Parent->Functions.GetChildRegion)
-      {
-        Child->Region = Parent->Functions.GetChildRegion(Parent, Child);
-      }else{
-        Child->Region = Parent->Functions.GetRegionRect(RegionType, Parent);  
-      }
-      
-      
-      ContainerStack[StackCount++] = Child;
-
-      Child = Child->NextSibling;
-      ChildIndex++;
-    }
-  }
-}
-
-// Preorder breadth first.
-void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, container_node* Container )
-{
-  u32 StackElementSize = sizeof(container_node*);
-  u32 StackByteSize = NodeCount * StackElementSize;
-
-  u32 StackCount = 0;
-  container_node** ContainerStack = PushArray(Arena, NodeCount, container_node*);
-
-  // Push Root
-  ContainerStack[StackCount++] = Container;
-
-  while(StackCount>0)
-  {
-    // Pop new parent from Stack
-    container_node* Parent = ContainerStack[--StackCount];
-    ContainerStack[StackCount] = 0;
-
-    Parent->Functions.Draw(Interface, Parent);
-    // Update the region of all children and push them to the stack
-    container_node* Child = Parent->FirstChild;
-    while(Child)
-    {
-      ContainerStack[StackCount++] = Child;
-      Child = Child->NextSibling;
-    }
-  }
-}
-
-
-node_region_pair GetRegion(memory_arena* Arena, u32 NodeCount, container_node* Container, v2 MousePos)
-{
-  node_region_pair Result = {};
-  u32 StackElementSize = sizeof(container_node*);
-  u32 StackByteSize = NodeCount * StackElementSize;
-
-  u32 StackCount = 0;
-  container_node** ContainerStack = PushArray(Arena, NodeCount, container_node*);
-
-  // Push Root
-  ContainerStack[StackCount++] = Container;
-
-  while(StackCount>0)
-  {
-    // Pop new parent from Stack
-    container_node* Parent = ContainerStack[--StackCount];
-    ContainerStack[StackCount] = 0;
-
-    window_regions Region = Parent->Functions.GetMouseOverRegion(Parent, MousePos);
-
-    if(Region == window_regions::None)
-    {
-      Result.Node = 0;
-      Result.Region = window_regions::None;
-      return Result;
-    }
-
-    rect2f RegionRect = Parent->Functions.GetRegionRect(Region, Parent);
-
-    // Check if mouse is inside the child region and push those to the stack.
-    container_node* Child = Parent->FirstChild;
-    while(Child)
-    {
-      if(Intersects(Child->Region, MousePos))
-      {
-        ContainerStack[StackCount++] = Child;
-      }
-      Child = Child->NextSibling;
-    }
-
-    if(StackCount == 0)
-    {
-      Result.Node = Parent;
-      Result.Region = Region;
-      return Result;
-    }
-  }
-
-  return Result;
-}
-
-
-menu_tree* GetNewMenuTree(menu_interface* Interface)
-{
-  menu_tree* Result = &Interface->RootContainers[Interface->RootContainerCount++];
-  return Result;
-}
-
-void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree)
-{
-  container_node* Root = MenuToFree->Root;
-
-  // Remove the menu from RootContainers
-  u32 WindowIndex = 0;
-  while(WindowIndex < Interface->RootContainerCount)
-  {
-    menu_tree* MenuTree = &Interface->RootContainers[WindowIndex];
-    if( MenuTree->Root == Root )
-    {
-      break;
-    }
-    ++WindowIndex;
-  }
-
-  Assert(WindowIndex != Interface->RootContainerCount);
-
-  while(WindowIndex < Interface->RootContainerCount-1)
-  {
-    Interface->RootContainers[WindowIndex] = Interface->RootContainers[WindowIndex+1];
-    WindowIndex++;
-  }
-
-  Interface->RootContainers[Interface->RootContainerCount-1] = {};
-  Interface->RootContainerCount--;
-
-
-  // Free the nodes;
-  // 1: Go to the bottom
-  // 2: Step up Once
-  // 3: Delete FirstChild 
-  // 4: Set NextSibling as FirstChild
-  // 5: Repeat from 1
-  container_node* Node = Root->FirstChild;
-  while(Node)
-  {
-    while(Node->FirstChild)
-    {
-      Node = Node->FirstChild;
-    }
-
-    Node = Node->Parent;
-    if(Node)
-    {
-      container_node* NodeToDelete = Node->FirstChild;
-      Node->FirstChild = NodeToDelete->NextSibling;
-      DeleteContainer(Interface, NodeToDelete);
-    }
-  }
-  DeleteContainer(Interface, Root);
-}
-
-void DisconnectNode(container_node* Node)
-{
-  container_node* Parent = Node->Parent;
-
-  if(Parent)
-  {
-    Assert(Parent->FirstChild);
-    if(Parent->FirstChild == Node)
-    {
-      Parent->FirstChild = Node->NextSibling; 
-    }else{
-      container_node* Child = Parent->FirstChild;
-      while(Child->NextSibling)
-      {
-        if(Child->NextSibling == Node)
-        {
-          Child->NextSibling = Node->NextSibling;
-          break;
-        }
-      }  
-    }
-  } 
-
-  Node->NextSibling = 0;
-  Node->Parent = 0;
-}
-
-
-
-void ConnectNode(container_node* Parent, container_node* NewNode)
-{
-  NewNode->Parent = Parent;
-
-  if( Parent )
-  {
-    container_node** Child = &Parent->FirstChild;
-    while(*Child)
-    {
-      Child = &((*Child)->NextSibling);
-    }
-    *Child = NewNode;
-  }
-}
-
-ACTIVATE_BUTTON( toggle_colliders )
-{
-  DebugState->ConfigCollider = !DebugState->ConfigCollider;
-  Button->Active = DebugState->ConfigCollider;
-}
-
-ACTIVATE_BUTTON( toggle_multi_thread )
-{
-  DebugState->ConfigMultiThreaded = !DebugState->ConfigMultiThreaded;
-  Button->Active = (b32) DebugState->ConfigMultiThreaded;
-}
-
-ACTIVATE_BUTTON( toggle_aabb_tree )
-{
-  DebugState->ConfigAABBTree = !DebugState->ConfigAABBTree;
-  Button->Active = DebugState->ConfigAABBTree;
-}
-
-ACTIVATE_BUTTON( toggle_collision_points )
-{
-  DebugState->ConfigCollisionPoints = !DebugState->ConfigCollisionPoints;
-  Button->Active = DebugState->ConfigCollisionPoints;
-}
-
-ACTIVATE_BUTTON( recompile )
-{
-  DebugRewriteConfigFile();
-}
-
-void SetMenuButtonFunctions(menu_interface* Interface)
-{
-  Interface->Activate[0] = toggle_colliders;
-  Interface->Activate[1] = toggle_multi_thread;
-  Interface->Activate[2] = toggle_aabb_tree;
-  Interface->Activate[3] = toggle_collision_points;
-  Interface->Activate[4] = recompile;
-}
-
-
-void UpdateFunctionPointers(debug_state* DebugState)
-{
-  if(!DebugState->UpdateFunctionPointers)
-  {
-    SetRadialMenuFunctionPointers(DebugState);
-
-    SetMenuButtonFunctions(DebugState->MenuInterface);
-    for (s32 WindowIndex = 0;
-             WindowIndex >= 0;
-           --WindowIndex)
-    {
-      menu_tree* MenuTree = &DebugState->MenuInterface->RootContainers[WindowIndex];
-      SetInterfaceFunctionPointers(MenuTree->Root, &DebugState->Arena, MenuTree->NodeCount);
-    }  
-  }
-}
 
 internal debug_state*
 DEBUGGetState()
@@ -628,16 +84,6 @@ DEBUGGetState()
     DebugState->MemorySize = (midx) Megabytes(1);
     DebugState->MemoryBase = PushArray(&DebugState->Arena, DebugState->MemorySize, u8);
     DebugState->Memory = DebugState->MemoryBase;
-
-    DebugState->MenuInterface = PushStruct(&DebugState->Arena, menu_interface);
-    menu_interface* Interface = DebugState->MenuInterface;
-    Interface->ActiveMemory = 0;
-    Interface->MaxMemSize = Megabytes(1);
-    Interface->MemoryBase = (u8*) PushSize(&DebugState->Arena, Interface->MaxMemSize);
-    Interface->Memory = Interface->MemoryBase;
-    Interface->BorderSize = 0.007;
-    Interface->HeaderSize = 0.02;
-    Interface->MinSize = 0.2f;
 
     // Transient Memory Begin
     DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->Arena);
@@ -686,104 +132,6 @@ DEBUGGetState()
     OptionsMenu->MenuItems = (menu_item*) DEBUGPushCopy(DebugState, sizeof(OptionMenuItems), OptionMenuItems);
 
 
-
-    container_node* Sentinel = &(Interface->Sentinel);
-    ListInitiate(Sentinel);
-
-    {
-
-      /// Options Menu
-
-      // "Toggle Colliders"
-      container_node* ListEntry0 = NewContainer(Interface, container_type::Button);
-      menu_button* Button0 = GetContainerPayload(menu_button, ListEntry0);
-      str::CopyStringsUnchecked("Colliders", Button0->Text);
-      Button0->Color = V4(1,0,0,1);
-      Button0->Active = DebugState->ConfigCollider;
-      Button0->Activate = &Interface->Activate[0];
-
-      // "Toggle Multi Threaded"
-      container_node*  ListEntry1 = NewContainer(Interface, container_type::Button);
-      menu_button* Button1 = GetContainerPayload(menu_button, ListEntry1);
-      str::CopyStringsUnchecked("Multi Threaded", Button1->Text);
-      Button1->Color = V4(0,1,0,1);
-      Button1->Active = DebugState->ConfigMultiThreaded;
-      Button1->Activate = &Interface->Activate[1];
-
-      // "Toggle AABBTree"
-      container_node*  ListEntry2 = NewContainer(Interface, container_type::Button);
-      menu_button* Button2 = GetContainerPayload(menu_button, ListEntry2);
-      str::CopyStringsUnchecked("AABB Tree", Button2->Text);
-      Button2->Color = V4(0,0,1,1);
-      Button2->Active = DebugState->ConfigAABBTree;
-      Button2->Activate = &Interface->Activate[2];
-
-      // "Collision Points"
-      container_node*  ListEntry3 = NewContainer(Interface, container_type::Button);
-      menu_button* Button3 = GetContainerPayload(menu_button, ListEntry3);
-      str::CopyStringsUnchecked("Collision Points", Button3->Text);
-      Button3->Color = V4(0,1,1,1);
-      Button3->Active = DebugState->ConfigCollisionPoints;
-      Button3->Activate = &Interface->Activate[3];
-
-      // "Collision Points"
-      container_node*  ListEntry4 = NewContainer(Interface, container_type::Button);
-      menu_button* Button4 = GetContainerPayload(menu_button, ListEntry4);
-      str::CopyStringsUnchecked("Recompile", Button4->Text);
-      Button4->Color = V4(0,0,0,1);
-      Button4->Active = false;
-      Button4->Activate = &Interface->Activate[4];
-
-      container_node* ContainerList = NewContainer(Interface, container_type::ContainerList);
-      container_list* List = GetContainerPayload(container_list, ContainerList);
-      ConnectNode(ContainerList, ListEntry0);
-      ConnectNode(ContainerList, ListEntry1);
-      ConnectNode(ContainerList, ListEntry2);
-      ConnectNode(ContainerList, ListEntry3);
-      ConnectNode(ContainerList, ListEntry4);
-
-
-      /// Profiling Menu
-      container_node* ProfilingContainer = NewContainer(Interface, container_type::Profiler);
-
-
-      /// Tabbed Window
-
-      menu_tree* Root = GetNewMenuTree(Interface);
-      Root->Root = NewContainer(Interface, container_type::Root);
-
-      container_node* RootContainer = Root->Root;
-      RootContainer->Region = Rect2f(0.2,0.2,0.5,0.5);
-      root_window* RootWindow = GetContainerPayload(root_window,Root->Root);
-      RootWindow->BorderSize = Interface->BorderSize;
-      RootWindow->MinSize = Interface->MinSize; 
-
-      container_node* RootHeader = NewContainer(Interface, container_type::MenuHeader);
-      menu_header_window* MenuHeader = GetContainerPayload(menu_header_window, RootHeader);
-      MenuHeader->HeaderSize = Interface->HeaderSize;
-      MenuHeader->RootWindow = RootContainer;
-
-      container_node* TabbedHeader = NewContainer(Interface, container_type::TabbedHeader);
-      tabbed_header_window* TabbedHeaderWindow = GetContainerPayload(tabbed_header_window, TabbedHeader);
-      TabbedHeaderWindow->HeaderSize = Interface->HeaderSize;
-
-      container_node*  EmptyContainer2 = NewContainer(Interface, container_type::Empty);
-      GetContainerPayload(empty_window, EmptyContainer2)->Color = V4(0.4,0,0,1);
-      container_node*  EmptyContainer3 = NewContainer(Interface, container_type::Empty);
-      GetContainerPayload(empty_window, EmptyContainer3)->Color = V4(0,0.4,0,1);
-
-      ConnectNode(0, Root->Root);
-      ConnectNode(RootContainer, RootHeader);
-      ConnectNode(RootHeader,    TabbedHeader);
-      ConnectNode(TabbedHeader,  ContainerList);
-      TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = ContainerList;
-      TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = ProfilingContainer;
-      TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer2;
-      TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer3;      
-
-      TreeSensus(Root);
-      UpdateRegions( &DebugState->Arena, Root->NodeCount, Root->Root);
-    }
     RestartCollation();
   }
   return DebugState;
@@ -809,7 +157,7 @@ RestartCollation()
     DebugState->FrameCount = 0;
     DebugState->FrameBarRange = 0;//60000000.0f;
     DebugState->CollationArrayIndex = GlobalDebugTable->CurrentEventArrayIndex+1;
-    DebugState->CollationFrame = 0;    
+    DebugState->CollationFrame = 0;
 }
 
 void BeginDebugStatistics(debug_statistics* Statistic)
@@ -1024,7 +372,7 @@ RefreshCollation()
   CollateDebugRecords();
 }
 
-internal inline void
+inline void
 DebugRewriteConfigFile()
 {
   debug_state* DebugState = DEBUGGetState();
@@ -1185,6 +533,7 @@ EndRadialMenu(radial_menu* RadialMenu)
   RadialMenu->MenuY = 0;
 
 }
+
 void SetMenuInput(game_input* GameInput, debug_state* DebugState, radial_menu* RadialMenu)
 {
   b32 RightButtonReleased = GameInput->MouseButton[PlatformMouseButton_Right].Released;
@@ -1364,20 +713,6 @@ void DrawMenu( radial_menu* RadialMenu )
 }
 
 
-
-
-void MoveMenuToTop(menu_interface* Interface, u32 WindowIndex)
-{
-  Assert(WindowIndex < Interface->RootContainerCount)
-  menu_tree Menu = Interface->RootContainers[WindowIndex];
-  while(WindowIndex > 0)
-  {
-    Interface->RootContainers[WindowIndex] = Interface->RootContainers[WindowIndex-1];
-    WindowIndex--;
-  }
-  Interface->RootContainers[0] = Menu;
-}
-
 void DebugMainWindow(game_input* GameInput)
 {
   game_window_size WindowSize = GameGetWindowSize();
@@ -1445,58 +780,6 @@ void DebugMainWindow(game_input* GameInput)
     EndRadialMenu(DebugState->ActiveMenu.RadialMenu);
     DebugState->ActiveMenu = {};
   }
-
-
-  menu_interface* Interface = DebugState->MenuInterface;
-
-  SetMouseInput(GameInput, Interface);
-
-  // Hot Window is at index 0; Here we sort the windows such that the klicked window
-  // Has index 0 and we push all the other windows up one.
-  // [w1]            | Becomes -> | [w3] |
-  // [w2]            |            | [w1] |
-  // [w3] <- Clicked |            | [w2] |
-  // [w4]            |            | [w4] |
-
-  // Find the clicked window and set HotWindow
-  if(Interface->MouseLeftButton.Active &&
-     Interface->MouseLeftButton.Edge)
-  {
-    u32 WindowIndex = 0;
-    u32 HotWindowIndex = 0;
-    b32 MenuClicked = false;
-    while(true)
-    {
-      menu_tree MenuTree = Interface->RootContainers[WindowIndex];
-      if(!MenuTree.Root)
-      {
-        break;
-      }
-      if(Intersects(MenuTree.Root->Region, Interface->MousePos))
-      {
-        HotWindowIndex = WindowIndex;
-        MenuClicked = true;
-        break;
-      }
-      ++WindowIndex;
-    }
-
-    if(MenuClicked)
-    {
-      MoveMenuToTop(Interface, HotWindowIndex);
-    }
-  }
-
-  ActOnInput(&DebugState->Arena, Interface, &Interface->RootContainers[0]);
-  for (s32 WindowIndex = Interface->RootContainerCount-1;
-           WindowIndex >= 0;
-         --WindowIndex)
-  {
-    menu_tree* MenuTree = &Interface->RootContainers[WindowIndex];
-    TreeSensus(MenuTree);
-    UpdateRegions( &DebugState->Arena, MenuTree->NodeCount, MenuTree->Root);
-    DrawMenu( &DebugState->Arena, Interface, MenuTree->NodeCount, MenuTree->Root);  
-  }
 }
 
 inline internal debug_frame*
@@ -1506,16 +789,23 @@ GetActiveDebugFrame(debug_state* DebugState)
   return Result;
 }
 
+void UpdateFunctionPointers(debug_state* DebugState)
+{
+  if(!DebugState->UpdateFunctionPointers)
+  {
+    SetRadialMenuFunctionPointers(DebugState);
+  }
+}
 
 void PushDebugOverlay(game_input* GameInput)
 {
   TIMED_FUNCTION();
-  
+
   // TODO: We don't want to remember to always update function pointers.
   //       We also don't want to do it each frame.
   //       Let's create a sort of FunctionPointerPool that gets updated automatically.
-  //       
-  //       The question is: Do other request a function from the pool 
+  //
+  //       The question is: Do other request a function from the pool
   //       CallFromPool(foo->FunctionID, (void*) foo->Args )  <-- Can be very hard to read
   //       or do we somehow register a function pointer to the pool at start.
   //       RegisterFunction(foo->Function, FunctionID);
@@ -1563,9 +853,9 @@ void PushDebugOverlay(game_input* GameInput)
   }
 
   if(!DebugState->ChartVisible) return;
-  if(!DebugState->MenuInterface->RootContainers[0].Root) return;
+  if(!GlobalGameState->MenuInterface->RootContainers[0].Root) return;
 
-  rect2f Chart = DebugState->MenuInterface->RootContainers[0].Root->Functions.GetRegionRect(window_regions::WholeBody, DebugState->MenuInterface->RootContainers[0].Root);
+  rect2f Chart = GlobalGameState->MenuInterface->RootContainers[0].Root->Functions.GetRegionRect(window_regions::WholeBody, GlobalGameState->MenuInterface->RootContainers[0].Root);
 
   u32 MaxFramesToDisplay = DebugState->FrameCount < 10 ? DebugState->FrameCount : 10;
   r32 BarWidth = Chart.H/MaxFramesToDisplay;
@@ -1704,83 +994,6 @@ void DrawFunctionCount(){
     Line++;
   }
 #endif
-}
-
-void SetMouseInput(game_input* GameInput, menu_interface* Interface)
-{
-  v2 MousePos = V2(GameInput->MouseX, GameInput->MouseY);
-
-  Update(&Interface->MouseLeftButton, GameInput->MouseButton[PlatformMouseButton_Left].EndedDown);
-  if( Interface->MouseLeftButton.Edge )
-  {
-    if(Interface->MouseLeftButton.Active )
-    {
-      Interface->MouseLeftButtonPush = MousePos;
-    }else{
-      Interface->MouseLeftButtonRelese = MousePos;
-    }
-  }
-  Interface->MousePos = MousePos;
-}
-
-void ActOnInput(memory_arena* Arena, menu_interface* Interface, menu_tree* Menu)
-{
-  v2 MousePos = Interface->MousePos;
-
-  Assert(Menu->Root);
-  node_region_pair NodeRegion = GetRegion(Arena, Menu->NodeCount, Menu->Root, MousePos);
-
-  if(Interface->MouseLeftButton.Active)
-  {
-    if(Interface->HotSubWindow)
-    {
-      // Mouse Clicked Event
-      if(Interface->MouseLeftButton.Edge)
-      {
-        if(Interface->HotSubWindow)
-        {
-          Interface->HotSubWindow->Functions.MouseDown(Interface, Interface->HotSubWindow, Interface->HotRegion, 0);
-        }
-      // Mouse Down Movement State
-      }else{
-
-      }
-
-      Interface->HotSubWindow->Functions.HandleInput(Interface, Interface->HotSubWindow, 0);
-    }
-  }else{
-
-    if(NodeRegion.Node != Interface->HotSubWindow)
-    {
-      if(NodeRegion.Node)
-      {
-        NodeRegion.Node->Functions.MouseEnter(Interface, NodeRegion.Node, NodeRegion.Region, 0);  
-      }
-
-      if(Interface->HotSubWindow)
-      {
-        Interface->HotSubWindow->Functions.MouseExit(Interface, Interface->HotSubWindow, Interface->HotRegion, 0);
-      }
-    }
-
-    Interface->HotRegion = NodeRegion.Region;
-    Interface->HotSubWindow = NodeRegion.Node;
-
-    if(Interface->HotSubWindow)
-    {
-      Interface->HotSubWindow->Functions.MouseUp(Interface, Interface->HotSubWindow, Interface->HotRegion, 0);
-    }
-
-    // Mouse Released Event
-    if(Interface->MouseLeftButton.Edge)
-    {
-      Interface->HotRegion = window_regions::None;
-      Interface->HotSubWindow = 0;
-      // Mouse Exploration State
-    }else{
-      
-    }
-  }
 }
 
 #include "menu_functions.h"

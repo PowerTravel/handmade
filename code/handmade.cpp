@@ -69,6 +69,7 @@ game_memory* DebugGlobalMemory = 0;
 #include "system_camera.cpp"
 #include "assets.cpp"
 #include "asset_loading.cpp"
+#include "menu_interface.cpp"
 
 #include "debug.h"
 
@@ -372,8 +373,9 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
 
     GlobalGameState->RenderCommands = RenderCommands;
 
-    GlobalGameState->AssetManager = CreateAssetManager();
+    GlobalGameState->AssetManager  = CreateAssetManager();
     GlobalGameState->EntityManager = CreateEntityManager();
+    GlobalGameState->MenuInterface = CreateMenuInterface(GlobalGameState->PersistentArena, Megabytes(1));
 
     GlobalGameState->World = CreateWorld(2048);
 
@@ -434,6 +436,18 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
 //
 //  RenderCommands->DebugRenderGroup->ScreenWidth  = (r32) RenderCommands->ScreenWidthPixels;
 //  RenderCommands->DebugRenderGroup->ScreenHeight = (r32) RenderCommands->ScreenHeightPixels;
+
+#if HANDMADE_INTERNAL
+  // Recompilation issues is only an issue when building with Debug
+  SetMenuButtonFunctions(GlobalGameState->MenuInterface);
+  for (s32 WindowIndex = 0;
+           WindowIndex >= 0;
+         --WindowIndex)
+  {
+    menu_tree* MenuTree = &GlobalGameState->MenuInterface->RootContainers[WindowIndex];
+    SetInterfaceFunctionPointers(MenuTree->Root, GlobalGameState->TransientArena, MenuTree->NodeCount);
+  }
+#endif
 };
 
 /*
@@ -469,8 +483,17 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
   if(Memory->DebugState)
   {
+    // Note: We are clearing the Debug Render Buffer HERE.
+    //       Which means anything pushing to that needs to do so below here.
+    //       Thats stupid right?
+
+    // TODO: We should clear the render buffers EITHER at the beginning of the frame
+    //       or immediately after render
     PushDebugOverlay(Input);
   }
+
+
+  UpdateAndRenderMenuInterface(Input, GlobalGameState->MenuInterface);
 }
 
 extern "C" GAME_GET_SOUND_SAMPLES(GameGetSoundSamples)

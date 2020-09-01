@@ -44,7 +44,11 @@ MENU_GET_CHILD_REGION( GetChildRegion )
 }
 MENU_GET_MOUSE_OVER_REGION( GetMouseOverRegion )
 {
-  return window_regions::WholeBody;
+  if(Intersects(Node->Region, MousePos))
+  {
+    return window_regions::WholeBody;
+  }
+  return window_regions::None;
 }
 MENU_DRAW( Draw )
 {
@@ -66,43 +70,6 @@ menu_functions GetDefaultFunctions()
   return Result;
 }
 
-MENU_MOUSE_DOWN( EmptyMouseDown )
-{
-
-}
-MENU_MOUSE_UP( EmptyMouseUp )
-{
-
-}
-
-MENU_MOUSE_ENTER( EmptyMouseEnter )
-{
-
-}
-MENU_MOUSE_EXIT( EmptyMouseExit )
-{
-
-}
-
-MENU_HANDLE_INPUT( EmptyHandleInput )
-{
-
-}
-
-MENU_GET_REGION_RECT( EmptyGetRegionRect )
-{
-  Assert(Type == window_regions::WholeBody);
-  return Node->Region;
-}
-
-MENU_GET_MOUSE_OVER_REGION( EmptyGetMouseOverRegion )
-{
-  if(Intersects(Node->Region, MousePos))
-  {
-    return window_regions::WholeBody;
-  }
-  return window_regions::None;
-}
 MENU_DRAW( EmptyDraw )
 {
   DEBUGPushQuad(Node->Region, GetContainerPayload(empty_window, Node)->Color);
@@ -110,270 +77,199 @@ MENU_DRAW( EmptyDraw )
 
 menu_functions GetEmptyFunctions()
 {
-  menu_functions Result = {};
-  Result.MouseDown = EmptyMouseDown;
-  Result.MouseUp = EmptyMouseUp;
-  Result.MouseEnter = EmptyMouseEnter;
-  Result.MouseExit = EmptyMouseExit;
-  Result.HandleInput = EmptyHandleInput;
-  Result.GetRegionRect = EmptyGetRegionRect;
-  Result.GetMouseOverRegion = EmptyGetMouseOverRegion;
+  menu_functions Result = GetDefaultFunctions();
   Result.Draw = EmptyDraw;
   return Result;
 }
 
-
-MENU_MOUSE_DOWN( RootWindowMouseDown )
+internal inline
+v2 NewWindowPos( v2 DraggingStart, v2 MousePos, v2 MouseDownPos)
 {
-  root_window* Window = GetContainerPayload(root_window, Node);
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
+  r32 Boundary = 0.01;
+  rect2f Limit = Rect2f(Boundary,Boundary,
+                        Width-2*Boundary,1-2*Boundary);
 
-  Window->WindowDraggingStart = Node->Region;
-  switch(HotRegion)
+  if(MousePos.X < Limit.X)
   {
-    case window_regions::LeftBorder:
-    {
-      Window->LeftBorderDrag = true;
-    }break;
-    case window_regions::RightBorder:
-    {
-      Window->RightBorderDrag = true;
-    }break;
-    case window_regions::BotBorder:
-    {
-      Window->BotBorderDrag = true;
-    }break;
-    case window_regions::TopBorder:
-    {
-      Window->TopBorderDrag = true;
-    }break;
-
-    case window_regions::BotLeftCorner:
-    {
-      Window->BotBorderDrag = true;
-      Window->LeftBorderDrag = true;
-    }break;
-    case window_regions::BotRightCorner:
-    {
-      Window->BotBorderDrag = true;
-      Window->RightBorderDrag = true;
-    }break;
-    case window_regions::TopLeftCorner:
-    {
-      Window->TopBorderDrag = true;
-      Window->LeftBorderDrag = true;
-    }break;
-    case window_regions::TopRightCorner:
-    {
-      Window->TopBorderDrag = true;
-      Window->RightBorderDrag = true;
-    }break;
-
-    default:
-    {
-      Assert(0);
-    }break;
+    MousePos.X = Limit.X;
   }
-}
+  if( MousePos.X > (Limit.X + Limit.W))
+  {
+    MousePos.X = (Limit.X + Limit.W);
+  }
+  if(MousePos.Y < Limit.Y)
+  {
+    MousePos.Y = Limit.Y;
+  }
+  if(MousePos.Y > (Limit.Y + Limit.H))
+  {
+    MousePos.Y = (Limit.Y + Limit.H);
+  }
 
-MENU_MOUSE_UP( RootWindowMouseUp )
-{
-  root_window* Window = GetContainerPayload(root_window, Node);
-  Window->LeftBorderDrag  = false;
-  Window->RightBorderDrag = false;
-  Window->BotBorderDrag   = false;
-  Window->TopBorderDrag   = false;
-}
-
-MENU_MOUSE_ENTER( RootWindowMouseEnter )
-{
-}
-MENU_MOUSE_EXIT( RootWindowMouseExit )
-{
+  v2 Delta = MousePos - MouseDownPos;
+  v2 Result = DraggingStart + Delta;
+  return Result;
 }
 
 MENU_HANDLE_INPUT( RootWindowHandleInput )
 {
   root_window* Window = GetContainerPayload(root_window, Node);
 
-  r32 MinWidth  = Window->MinSize + 2*Window->BorderSize;
-  r32 MinHeight = Window->MinSize + 2*Window->BorderSize;
+  rect2f R = Node->Region;
+  r32 W = Node->Region.W;
+  r32 H = Node->Region.H;
+  r32 BS = Window->BorderSize;
+  r32 HS = Window->HeaderSize;
+  r32 X0 = Node->Region.X;
+  r32 Y0 = Node->Region.Y;
+  r32 X1 = X0 + W;
+  r32 Y1 = Y0 + H;
+  
+  rect2f Header         = Rect2f(X0 + BS, Y1-HS-BS, W-2*BS, HS);
+  rect2f LeftBorder     = Rect2f(X0,      Y0 + BS, BS, H - 2*BS);
+  rect2f RightBorder    = Rect2f(X1 - BS, Y0 + BS, BS, H - 2*BS);
+  rect2f BotBorder      = Rect2f(X0 + BS, Y0,    W - 2*BS, BS);  
+  rect2f TopBorder      = Rect2f(X0 + BS, Y1-BS, W - 2*BS, BS);  
+  rect2f BotLeftCorner  = Rect2f(X0,    Y0,      BS, BS); 
+  rect2f BotRightCorner = Rect2f(X1-BS, Y0,      BS, BS); 
+  rect2f TopLeftCorner  = Rect2f(X0,    Y1 - BS, BS, BS); 
+  rect2f TopRightCorner = Rect2f(X1-BS, Y1 - BS, BS, BS); 
 
-  v2 Delta = Interface->MousePos - Interface->MouseLeftButtonPush;
-
-  if(Window->RightBorderDrag)
+  v2 MousePos = Interface->MousePos;
+  if(Interface->MouseLeftButton.Edge)
   {
-    game_window_size WindowSize = GameGetWindowSize();
-    r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
+    if(Interface->MouseLeftButton.Active)
+    {
+      Window->DraggingStart = Node->Region;
 
-    r32 NewWidth = Window->WindowDraggingStart.W + Delta.X;
-    if(Window->WindowDraggingStart.X + NewWidth > Width )
-    {
-      NewWidth = Width - Window->WindowDraggingStart.X;
-    }else if(NewWidth < MinWidth)
-    {
-      NewWidth = MinWidth;
+      if(Intersects(Header, MousePos))
+      {
+        Window->HeaderDrag = true;
+      }
+      else if(Intersects(LeftBorder, MousePos))
+      {
+        Window->LeftBorderDrag = true;
+      }
+      else if(Intersects(RightBorder, MousePos))
+      {
+        Window->RightBorderDrag = true;
+      }
+      else if(Intersects(BotBorder, MousePos))
+      {
+        Window->BotBorderDrag = true;
+      }
+      else if(Intersects(TopBorder, MousePos))
+      {
+        Window->TopBorderDrag = true;
+      }
+      else if(Intersects(BotLeftCorner, MousePos))
+      {
+        Window->BotBorderDrag = true;
+        Window->LeftBorderDrag = true;
+      }
+      else if(Intersects(BotRightCorner, MousePos))
+      {
+        Window->BotBorderDrag = true;
+        Window->RightBorderDrag = true;
+      }
+      else if(Intersects(TopLeftCorner, MousePos))
+      {
+        Window->TopBorderDrag = true;
+        Window->LeftBorderDrag = true;
+      }
+      else if(Intersects(TopRightCorner, MousePos))
+      {
+        Window->TopBorderDrag = true;
+        Window->RightBorderDrag = true;
+      }
+    }else{
+      Window->HeaderDrag      = false;
+      Window->LeftBorderDrag  = false;
+      Window->RightBorderDrag = false;
+      Window->BotBorderDrag   = false;
+      Window->TopBorderDrag   = false;
     }
-    Node->Region.W = NewWidth;
-  }
+  }else{
+    if(Interface->MouseLeftButton.Active)
+    {
+      r32 MinWidth  = Window->MinSize + 2*Window->BorderSize;
+      r32 MinHeight = Window->MinSize + 2*Window->BorderSize;
 
-  if(Window->LeftBorderDrag)
-  {
-    r32 NewXPos   = Window->WindowDraggingStart.X + Delta.X;
-    r32 NewWidth  = Window->WindowDraggingStart.W - Delta.X;
-    if(NewXPos < 0)
-    {
-      NewXPos = 0;
-      NewWidth = (Window->WindowDraggingStart.X) + Window->WindowDraggingStart.W;
-    }else if(NewWidth < MinWidth)
-    {
-      NewXPos  = Window->WindowDraggingStart.X + Window->WindowDraggingStart.W - MinWidth;
-      NewWidth = MinWidth;
+      v2 Delta = Interface->MousePos - Interface->MouseLeftButtonPush;
+
+      if(Window->HeaderDrag)
+      {
+        v2 NewPos = NewWindowPos(V2(Window->DraggingStart.X,Window->DraggingStart.Y), MousePos, Interface->MouseLeftButtonPush);
+        Node->Region.X = NewPos.X;
+        Node->Region.Y = NewPos.Y;
+      }
+
+      if(Window->RightBorderDrag)
+      {
+        game_window_size WindowSize = GameGetWindowSize();
+        r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
+
+        r32 NewWidth = Window->DraggingStart.W + Delta.X;
+        if(Window->DraggingStart.X + NewWidth > Width )
+        {
+          NewWidth = Width - Window->DraggingStart.X;
+        }else if(NewWidth < MinWidth)
+        {
+          NewWidth = MinWidth;
+        }
+        Node->Region.W = NewWidth;
+      }
+
+      if(Window->LeftBorderDrag)
+      {
+        r32 NewXPos   = Window->DraggingStart.X + Delta.X;
+        r32 NewWidth  = Window->DraggingStart.W - Delta.X;
+        if(NewXPos < 0)
+        {
+          NewXPos = 0;
+          NewWidth = (Window->DraggingStart.X) + Window->DraggingStart.W;
+        }else if(NewWidth < MinWidth)
+        {
+          NewXPos  = Window->DraggingStart.X + Window->DraggingStart.W - MinWidth;
+          NewWidth = MinWidth;
+        }
+        Node->Region.X = NewXPos;
+        Node->Region.W = NewWidth;
+      }
+
+      if(Window->BotBorderDrag)
+      {
+        r32 NewYPos   = Window->DraggingStart.Y + Delta.Y;
+        r32 NewHeight = Window->DraggingStart.H - Delta.Y;
+        if(NewYPos < 0)
+        {
+          NewYPos = 0;
+          NewHeight = (Window->DraggingStart.Y) + Window->DraggingStart.H;
+        }else if(NewHeight < MinHeight)
+        {
+          NewYPos = Window->DraggingStart.Y + Window->DraggingStart.H - MinHeight;
+          NewHeight = MinHeight;
+        }
+        Node->Region.Y = NewYPos;
+        Node->Region.H = NewHeight;
+      }
+
+      if(Window->TopBorderDrag)
+      {
+        r32 NewHeight = Window->DraggingStart.H + Delta.Y;
+        if((Window->DraggingStart.Y + NewHeight) > 1)
+        {
+          NewHeight = 1 - Window->DraggingStart.Y;
+        }else if(NewHeight < MinHeight)
+        {
+          NewHeight = MinHeight;
+        }
+        Node->Region.H = NewHeight;
+      }
     }
-    Node->Region.X = NewXPos;
-    Node->Region.W = NewWidth;
   }
-
-  if(Window->BotBorderDrag)
-  {
-    r32 NewYPos   = Window->WindowDraggingStart.Y + Delta.Y;
-    r32 NewHeight = Window->WindowDraggingStart.H - Delta.Y;
-    if(NewYPos < 0)
-    {
-      NewYPos = 0;
-      NewHeight = (Window->WindowDraggingStart.Y) + Window->WindowDraggingStart.H;
-    }else if(NewHeight < MinHeight)
-    {
-      NewYPos = Window->WindowDraggingStart.Y + Window->WindowDraggingStart.H - MinHeight;
-      NewHeight = MinHeight;
-    }
-    Node->Region.Y = NewYPos;
-    Node->Region.H = NewHeight;
-  }
-
-  if(Window->TopBorderDrag)
-  {
-    r32 NewHeight = Window->WindowDraggingStart.H + Delta.Y;
-    if((Window->WindowDraggingStart.Y + NewHeight) > 1)
-    {
-      NewHeight = 1 - Window->WindowDraggingStart.Y;
-    }else if(NewHeight < MinHeight)
-    {
-      NewHeight = MinHeight;
-    }
-    Node->Region.H = NewHeight;
-  }
-}
-
-
-MENU_GET_REGION_RECT( RootWindowGetRegionRect )
-{
-  rect2f Result = {};
-  r32 XStart = 0;
-  r32 YStart = 0;
-  r32 Width  = 0;
-  r32 Height = 0;
-
-  rect2f Region = Node->Region;
-  root_window* Window = GetContainerPayload(root_window, Node);
-  r32 BorderSize = Window->BorderSize;
-
-  switch(Type)
-  {
-    // Root
-    case window_regions::WholeBody:
-    {
-      XStart = Region.X + BorderSize;
-      YStart = Region.Y + BorderSize;
-      Width  = Region.W - 2*BorderSize;
-      Height = Region.H - 2*BorderSize;
-    }break;
-
-    case window_regions::LeftBorder:
-    {
-      XStart = Region.X;
-      YStart = Region.Y + BorderSize;
-      Width  = BorderSize;
-      Height = Region.H - 2*BorderSize;
-    }break;
-    case window_regions::RightBorder:
-    {
-      XStart = Region.X + Region.W - BorderSize;
-      YStart = Region.Y + BorderSize;
-      Width  = BorderSize;
-      Height = Region.H - 2*BorderSize;
-    }break;
-    case window_regions::BotBorder:
-    {
-      XStart = Region.X + BorderSize;
-      YStart = Region.Y;
-      Width  = Region.W - 2*BorderSize;
-      Height = BorderSize;
-    }break;
-    case window_regions::TopBorder:
-    {
-      XStart = Region.X + BorderSize;
-      YStart = Region.Y + Region.H - BorderSize;
-      Width  = Region.W - 2*BorderSize;
-      Height = BorderSize;
-    }break;
-    case window_regions::BotLeftCorner:
-    {
-      XStart = Region.X;
-      YStart = Region.Y;
-      Width  = BorderSize;
-      Height = BorderSize;
-    }break;
-    case window_regions::BotRightCorner:
-    {
-      XStart = Region.X + Region.W - BorderSize;
-      YStart = Region.Y;
-      Width  = BorderSize;
-      Height = BorderSize;
-    }break;
-    case window_regions::TopLeftCorner:
-    {
-      XStart = Region.X;
-      YStart = Region.Y + Region.H - BorderSize;
-      Width  = BorderSize;
-      Height = BorderSize;
-    }break;
-    case window_regions::TopRightCorner:
-    {
-      XStart = Region.X + Region.W - BorderSize;
-      YStart = Region.Y + Region.H - BorderSize;
-      Width  = BorderSize;
-      Height = BorderSize;
-    }break;
-    default:
-    {
-      Assert(0);
-    }break;
-  }
-
-  Result = Rect2f(XStart, YStart, Width, Height);
-  return Result;
-}
-
-MENU_GET_MOUSE_OVER_REGION( RootWindowGetMouseOverRegion )
-{
-  window_regions RegionArray[] =
-  {
-    window_regions::WholeBody,
-    window_regions::LeftBorder,
-    window_regions::RightBorder,
-    window_regions::BotBorder,
-    window_regions::TopBorder,
-    window_regions::BotLeftCorner,
-    window_regions::BotRightCorner,
-    window_regions::TopLeftCorner,
-    window_regions::TopRightCorner
-  };
-
-  root_window* Window = GetContainerPayload(root_window, Node);
-
-  window_regions Result = CheckRegions(MousePos, ArrayCount(RegionArray), RegionArray, Node);
-
-  return Result;
 }
 
 MENU_DRAW( RootWindowDraw )
@@ -382,27 +278,45 @@ MENU_DRAW( RootWindowDraw )
   v4 CornerColor = V4(1,0,1,1);
   v4 BorderColor = V4(0,0,1,1);
   v4 HeaderColor = V4(1,0,0,1);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::LeftBorder,     Node), BorderColor);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::RightBorder,    Node), BorderColor);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::TopBorder,      Node), BorderColor);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::BotBorder,      Node), BorderColor);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::BotLeftCorner,  Node), CornerColor);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::BotRightCorner, Node), CornerColor);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::TopLeftCorner,  Node), CornerColor);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::TopRightCorner, Node), CornerColor);
+
+  rect2f R = Node->Region;
+  r32 W = Node->Region.W;
+  r32 H = Node->Region.H;
+  r32 BS = Window->BorderSize;
+  r32 HS = Window->HeaderSize;
+  r32 X0 = Node->Region.X;
+  r32 Y0 = Node->Region.Y;
+  r32 X1 = X0 + W;
+  r32 Y1 = Y0 + H;
+  
+  rect2f Header         = Rect2f(X0 + BS, Y1-HS-BS, W-2*BS, HS);
+  rect2f LeftBorder     = Rect2f(X0,      Y0 + BS, BS, H - 2*BS);
+  rect2f RightBorder    = Rect2f(X1 - BS, Y0 + BS, BS, H - 2*BS);
+  rect2f BotBorder      = Rect2f(X0 + BS, Y0,    W - 2*BS, BS);  
+  rect2f TopBorder      = Rect2f(X0 + BS, Y1-BS, W - 2*BS, BS);  
+  rect2f BotLeftCorner  = Rect2f(X0,    Y0,      BS, BS); 
+  rect2f BotRightCorner = Rect2f(X1-BS, Y0,      BS, BS); 
+  rect2f TopLeftCorner  = Rect2f(X0,    Y1 - BS, BS, BS); 
+  rect2f TopRightCorner = Rect2f(X1-BS, Y1 - BS, BS, BS); 
+
+  DEBUGPushQuad(LeftBorder, BorderColor); // Left Border
+  DEBUGPushQuad(RightBorder, BorderColor); // Right Border
+
+  DEBUGPushQuad(BotBorder, BorderColor);   // Bot Border
+  DEBUGPushQuad(TopBorder, BorderColor);   // Top Border
+
+  DEBUGPushQuad(BotLeftCorner, CornerColor);  // Bot Left Corner
+  DEBUGPushQuad(BotRightCorner, CornerColor);  // Bot Right Corner
+  DEBUGPushQuad(TopLeftCorner, CornerColor);  // Top Left Corner
+  DEBUGPushQuad(TopRightCorner, CornerColor);  // Top Right Corner
+
+  DEBUGPushQuad(Rect2f(X0 + BS, Y1-HS-BS, W-2*BS, HS),  HeaderColor);   // Header
 }
 
 menu_functions GetRootMenuFunctions()
 {
-  menu_functions Result = {};
-  Result.MouseDown = RootWindowMouseDown;
-  Result.MouseUp = RootWindowMouseUp;
-  Result.MouseEnter = RootWindowMouseEnter;
-  Result.MouseExit = RootWindowMouseExit;
+  menu_functions Result = GetDefaultFunctions();
   Result.HandleInput = RootWindowHandleInput;
-
-  Result.GetRegionRect = RootWindowGetRegionRect;
-  Result.GetMouseOverRegion = RootWindowGetMouseOverRegion;
   Result.Draw = RootWindowDraw;
   return Result;
 }
@@ -534,36 +448,6 @@ MENU_MOUSE_EXIT( MenuHeaderMouseExit )
 
 }
 
-internal inline
-v2 NewWindowPos( v2 DraggingStart, v2 MousePos, v2 MouseDownPos)
-{
-  game_window_size WindowSize = GameGetWindowSize();
-  r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
-  r32 Boundary = 0.01;
-  rect2f Limit = Rect2f(Boundary,Boundary,
-                        Width-2*Boundary,1-2*Boundary);
-
-  if(MousePos.X < Limit.X)
-  {
-    MousePos.X = Limit.X;
-  }
-  if( MousePos.X > (Limit.X + Limit.W))
-  {
-    MousePos.X = (Limit.X + Limit.W);
-  }
-  if(MousePos.Y < Limit.Y)
-  {
-    MousePos.Y = Limit.Y;
-  }
-  if(MousePos.Y > (Limit.Y + Limit.H))
-  {
-    MousePos.Y = (Limit.Y + Limit.H);
-  }
-
-  v2 Delta = MousePos - MouseDownPos;
-  v2 Result = DraggingStart + Delta;
-  return Result;
-}
 
 MENU_HANDLE_INPUT( MenuHeaderHandleInput )
 {
@@ -698,7 +582,8 @@ MENU_DRAW( MenuHeaderDraw )
 {
   menu_header_window* Window = GetContainerPayload(menu_header_window, Node);
   v4 HeaderColor = V4(0.8,0.2,0.2,1);
-  DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::Header, Node), HeaderColor);
+  //DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::Header, Node), HeaderColor);
+  DEBUGPushQuad(Node->Region, HeaderColor);
   if(Window->NodeToMerge)
   {
     rect2f Rect = Window->NodeToMerge->Functions.GetRegionRect(window_regions::WholeBody, Window->NodeToMerge);
@@ -1524,10 +1409,69 @@ menu_functions GetProfilerFunctions()
   return Result;
 }
 
+MENU_HANDLE_INPUT( BorderHandleInput )
+{
+  border_leaf* Border = GetBorder(Node);
+
+  v2 MousePos = Interface->MousePos;
+  if(Interface->MouseLeftButton.Edge)
+  {
+    if(Interface->MouseLeftButton.Active)
+    {
+      Border->DraggingStart = Border->Position;
+      Border->Drag = true;
+    }else{
+      Border->Drag = false;
+    }
+  }else{
+    if(Interface->MouseLeftButton.Active)
+    {
+      if(Border->Drag)
+      {
+        if(Border->Vertical)
+        {
+          r32 Delta = (Interface->MousePos.X - Interface->MouseLeftButtonPush.X)/Node->Parent->Region.W;
+          Border->Position = Border->DraggingStart + Delta;
+        }else{
+          r32 Delta = (Interface->MousePos.Y - Interface->MouseLeftButtonPush.Y)/Node->Parent->Region.H;
+          Border->Position = Border->DraggingStart + Delta;
+        }
+        
+      }
+    }
+  }
+}
+
+MENU_DRAW( BorderDraw )
+{
+  DEBUGPushQuad(Node->Region, GetContainerPayload(border_leaf, Node)->Color);
+}
+
+menu_functions GetBorderFunctions()
+{
+  menu_functions Result = GetDefaultFunctions();
+  Result.HandleInput = BorderHandleInput;
+  Result.Draw = BorderDraw;
+  return Result;
+}
 
 
-
-
-
-
-
+menu_functions GetMenuFunction(container_type Type)
+{
+  switch(Type)
+  {   
+    case container_type::None: return GetDefaultFunctions();
+    case container_type::Root: return GetRootMenuFunctions();
+    case container_type::Body:
+    case container_type::Empty: return GetEmptyFunctions();
+    case container_type::Split: return SplitMenuFunctions();
+    case container_type::TabbedHeader: return TabbedHeaderMenuFunctions();
+    case container_type::MenuHeader: return MenuHeaderMenuFunctions();
+    case container_type::ContainerList: return ContainerListFunctions();
+    case container_type::Button: return GetButtonFunctions();
+    case container_type::Profiler: return GetProfilerFunctions();
+    case container_type::Border: return GetBorderFunctions();
+    default: Assert(0);
+  }
+  return {};
+}

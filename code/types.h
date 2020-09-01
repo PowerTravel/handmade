@@ -83,6 +83,16 @@ rect2f Rect2f( r32 X, r32 Y, r32 W, r32 H )
 	return Result;
 };
 
+rect2f Rect2f( v2 Pos, v2 Size )
+{
+  rect2f Result = {};
+  Result.X = Pos.X;
+  Result.Y = Pos.Y;
+  Result.W = Size.X;
+  Result.H = Size.Y;
+  return Result;
+};
+
 inline rect2f
 Shrink(rect2f Rect, r32 dx)
 {
@@ -110,4 +120,21 @@ Intersects(const rect2f& A, const rect2f& B)
                ( (A.Y+A.H) <  B.Y)       ||
                (  A.Y      > (B.Y+B.H));
   return Result;
+}
+
+
+struct binary_signal_state
+{
+  // if     Active and     Edge -> We just became active (rising edge)
+  // if     Active and not Edge -> We have been active for more than one frame
+  // if not Active and     Edge -> We just became inactive (falling edge)
+  // if not Active and not Edge -> We have been inactive for more than one frame
+  b32 Active;
+  b32 Edge;
+};
+
+inline void Update(binary_signal_state* DigitalState, b32 Value )
+{
+  DigitalState->Edge   = (DigitalState->Active != Value); // <- Edge is true if state changed
+  DigitalState->Active = Value;
 }
