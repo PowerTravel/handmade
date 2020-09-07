@@ -582,7 +582,6 @@ MENU_DRAW( MenuHeaderDraw )
 {
   menu_header_window* Window = GetContainerPayload(menu_header_window, Node);
   v4 HeaderColor = V4(0.8,0.2,0.2,1);
-  //DEBUGPushQuad(Node->Functions.GetRegionRect(window_regions::Header, Node), HeaderColor);
   DEBUGPushQuad(Node->Region, HeaderColor);
   if(Window->NodeToMerge)
   {
@@ -1436,7 +1435,6 @@ MENU_HANDLE_INPUT( BorderHandleInput )
           r32 Delta = (Interface->MousePos.Y - Interface->MouseLeftButtonPush.Y)/Node->Parent->Region.H;
           Border->Position = Border->DraggingStart + Delta;
         }
-        
       }
     }
   }
@@ -1447,6 +1445,7 @@ MENU_DRAW( BorderDraw )
   DEBUGPushQuad(Node->Region, GetContainerPayload(border_leaf, Node)->Color);
 }
 
+
 menu_functions GetBorderFunctions()
 {
   menu_functions Result = GetDefaultFunctions();
@@ -1454,6 +1453,86 @@ menu_functions GetBorderFunctions()
   Result.Draw = BorderDraw;
   return Result;
 }
+
+
+MENU_HANDLE_INPUT( HeaderHandleInput )
+{
+  header_leaf* Header = GetContainerPayload(header_leaf, Node);
+
+  v2 MousePos = Interface->MousePos;
+  if(Interface->MouseLeftButton.Edge)
+  {
+    if(Interface->MouseLeftButton.Active)
+    {
+      Header->DraggingStart = MousePos;
+      Header->Drag = true;
+    }else{
+      Header->Drag = false;
+    }
+  }else{
+    if(Interface->MouseLeftButton.Active)
+    {
+      if(Header->Drag)
+      {
+        Assert(Node->Parent->Parent);
+        container_node* Parent = Node->Parent->Parent->FirstChild;
+        u32 VerticalBorderCount = 0;
+        u32 HorizontalBorderCount = 0;
+        while(Parent)
+        {
+          if(Parent->Type == container_type::Border && GetBorder(Parent)->Vertical)
+          {
+            VerticalBorderCount++;
+          }
+          else if(Parent->Type == container_type::Border && !GetBorder(Parent)->Vertical)
+          {
+            HorizontalBorderCount++;
+          }
+          Parent = Parent->NextSibling;
+        }
+
+        if(VerticalBorderCount == 2 && HorizontalBorderCount==2)
+        {
+          Parent = Node->Parent->Parent->FirstChild;
+          while(Parent)
+          {
+
+            if(Parent->Type == container_type::Border)
+            {
+              r32 DeltaX = (Interface->MousePos.X - Header->DraggingStart.X)/Node->Parent->Parent->Region.W;
+              r32 DeltaY = (Interface->MousePos.Y - Header->DraggingStart.Y)/Node->Parent->Parent->Region.H;
+              border_leaf* Border = GetBorder(Parent);
+              if(Border->Vertical)
+              {
+                Border->Position += DeltaX;
+              }else{
+                Border->Position += DeltaY;
+              }
+            }
+            Parent = Parent->NextSibling;
+          }
+        }
+      }
+
+      Header->DraggingStart = MousePos; 
+    }
+
+     
+  }
+}
+MENU_DRAW( HeaderDraw )
+{
+  DEBUGPushQuad(Node->Region, GetContainerPayload(header_leaf, Node)->Color);
+}
+
+menu_functions GetHeaderFunctions()
+{
+  menu_functions Result = GetDefaultFunctions();
+  Result.HandleInput = HeaderHandleInput;
+  Result.Draw = HeaderDraw;
+  return Result;
+}
+
 
 
 menu_functions GetMenuFunction(container_type Type)
@@ -1471,6 +1550,7 @@ menu_functions GetMenuFunction(container_type Type)
     case container_type::Button: return GetButtonFunctions();
     case container_type::Profiler: return GetProfilerFunctions();
     case container_type::Border: return GetBorderFunctions();
+    case container_type::Header: return GetHeaderFunctions();
     default: Assert(0);
   }
   return {};

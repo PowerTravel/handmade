@@ -12,7 +12,8 @@ enum class container_type
   Button,
   Profiler,
   Border,
-  Body
+  Body,
+  Header
 };
 
 enum class window_regions
@@ -140,7 +141,6 @@ menu_functions GetMenuFunction(container_type Type);
 
 #define GetContainingNode( WindowPtr )  (container_node*) ( ((u8*)(WindowPtr)) - OffsetOf(container_node, WindowPointer))
 
-
 struct border_leaf
 {
   b32 Vertical;
@@ -149,6 +149,15 @@ struct border_leaf
   v4 Color;
 
   r32 DraggingStart;
+  b32 Drag;
+};
+
+struct header_leaf
+{
+  r32 Thickness;
+  v4 Color;
+
+  v2 DraggingStart;
   b32 Drag;
 };
 

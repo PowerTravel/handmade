@@ -17,6 +17,7 @@ u32 GetContainerSize(container_type Type)
     case container_type::Button:        {Result += sizeof(menu_button);}break;
     case container_type::Profiler:      {Result += sizeof(profiling_window);}break;
     case container_type::Border:        {Result += sizeof(border_leaf);}break;
+    case container_type::Header:        {Result += sizeof(header_leaf);}break;
     default: Assert(0);
   }
   return Result;
@@ -592,11 +593,41 @@ void SetChildRegions(memory_arena* Arena,container_node* Node)
     }
     Assert(RowCount * ColumnCount == NodeCount); 
   }else{
-    container_node* Body = Node->FirstChild;
-    if(Body)
+
+    container_node* Child = Node->FirstChild;
+    while(Child)
     {
-      Body->Region = Body->Parent->Region;
-      Assert(!Body->NextSibling);  
+      Child->Region = Node->Region;
+      Child = Child->NextSibling;
+    }
+
+    container_node* HeaderNode = Node->FirstChild;
+    r32 Y0 = Node->Region.Y + Node->Region.H;
+    while(HeaderNode)
+    {
+      if(HeaderNode->Type == container_type::Header)
+      {
+        header_leaf* Header = GetContainerPayload(header_leaf, HeaderNode);
+        HeaderNode->Region = Node->Region;
+        HeaderNode->Region.Y = Y0 - Header->Thickness;
+        HeaderNode->Region.H =  Header->Thickness;
+        Y0 -= Header->Thickness;
+        break;
+      }
+      HeaderNode = HeaderNode->NextSibling;
+    }
+
+    container_node* EmptyBody = Node->FirstChild;
+    while(EmptyBody)
+    {
+      if(EmptyBody->Type == container_type::Empty)
+      {
+        EmptyBody->Region = Node->Region;
+        EmptyBody->Region.Y = Node->Region.Y;
+        EmptyBody->Region.H = Y0 - Node->Region.Y;
+        break;
+      }
+      EmptyBody = EmptyBody->NextSibling;
     }
     
     /*
@@ -1544,19 +1575,37 @@ struct container_node
     PushBorder(Interface, R, Border(false, 0.75));
     PushBorder(Interface, R, Border(true,  0.25));
     PushBorder(Interface, R, Border(true,  0.75));
-    PushBorder(Interface, R, Border(true,  0.5));
-//    container_node* C0 = ConnectNode(R, NewContainer(Interface, container_type::None));    
-//    PushBorder(Interface, C0, Border(true, 0.5));
 
-    container_node* C1 = ConnectNode(R, NewContainer(Interface, container_type::None));
+#if 1
+    container_node* HW = ConnectNode(R, NewContainer(Interface, container_type::None));
+    container_node* HeaderNode = ConnectNode(HW, NewContainer(Interface, container_type::Header));
+    header_leaf* Header = GetContainerPayload(header_leaf, HeaderNode);
+    Header->Color = V4(0.2,0.2,0.2,1);
+    Header->Thickness = 0.1;
+    
+    container_node* HB = ConnectNode(HW, NewContainer(Interface, container_type::None));
+    PushBorder(Interface, HB, Border(true));
+    PushEmptyWindow(Interface, HB, V4(0.2,0,0,1));
+    PushEmptyWindow(Interface, HB, V4(0,0.2,0,1));
+    //container_node* W = ConnectNode(R, NewContainer(Interface, container_type::None));
+#else
+    container_node* HW = ConnectNode(R, NewContainer(Interface, container_type::None));
+    container_node* H = ConnectNode(HW, NewContainer(Interface, container_type::None));
+    container_node* W = ConnectNode(HW, NewContainer(Interface, container_type::None));
+
+    PushBorder(Interface, W, Border(true,  0.5));
+
+    container_node* C1 = ConnectNode(W, NewContainer(Interface, container_type::None));
     PushBorder(Interface, C1, Border(false, 0.5, 2*BorderColor));
     PushEmptyWindow(Interface, C1, BodyColor+V4(0.2,0,0,0));
     PushEmptyWindow(Interface, C1, BodyColor+V4(0,0.2,0,0));
 
-    container_node* C2 = ConnectNode(R, NewContainer(Interface, container_type::None));
+    container_node* C2 = ConnectNode(W, NewContainer(Interface, container_type::None));
     PushBorder(Interface, C2, Border(false, 0.5, 2*BorderColor));
     PushEmptyWindow(Interface, C2, BodyColor+V4(0,0.2,0,0));
     PushEmptyWindow(Interface, C2, BodyColor+V4(0.2,0,0,0));
+#endif
+
 
     TreeSensus(Root);
 
