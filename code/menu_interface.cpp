@@ -17,6 +17,7 @@ u32 GetContainerSize(container_type Type)
     case container_type::Button:        {Result += sizeof(menu_button);}break;
     case container_type::Profiler:      {Result += sizeof(profiling_window);}break;
     case container_type::Border:        {Result += sizeof(border_leaf);}break;
+    case container_type::FrameBorder:   {Result += sizeof(frame_border_leaf);}break;
     case container_type::Header:        {Result += sizeof(header_leaf);}break;
     default: Assert(0);
   }
@@ -218,6 +219,8 @@ u32_pair UpdateSubTreeDepthAndCount( u32 ParentDepth, container_node* SubTreeRoo
       Assert(CurrentDepth >= 0)
     }
 
+    CurrentDepth--;
+
     // Either we found another sibling and we can traverse that part of the tree
     //  or we are at root and root has no siblings and we are done.
     CurrentNode = CurrentNode->NextSibling;
@@ -314,6 +317,23 @@ GetChildCount(container_node* Node)
 }
 
 internal inline container_node*
+GetNextBorder(container_node* Node)
+{
+  container_node* Result = 0;
+  while(Node)
+  {
+    if(Node->Type == container_type::Border)
+    {
+      Result = Node;
+      break;  
+    }
+    Node = Node->NextSibling;
+  }
+  return Result;
+}
+
+
+internal inline container_node*
 GetNextHorizontalBorder(container_node* Node)
 {
   container_node* Result = 0;
@@ -346,6 +366,7 @@ GetNextVerticalBorder(container_node* Node)
   }
   return Result;
 }
+
 border_leaf* GetBorder(container_node* Node)
 {
   border_leaf* Result = GetContainerPayload(border_leaf,Node);
@@ -367,53 +388,84 @@ container_node* GetNextBody(container_node* Node)
   return Result;
 }
 
-internal inline u32
-GetVerticalBorders(container_node* Node, container_node** NodeArray)
+container_node* GetHeaderNode(container_node* Node)
 {
-  container_node* Child = Node->FirstChild;
-  container_node* Sibling = GetNextVerticalBorder(Child);
-  u32 Count = 0;
-  while(Sibling)
+  container_node* Result = Node->FirstChild;
+  while(Result)
   {
-    container_node* Border = Sibling;
-    for (u32 i = 0; i < Count; ++i)
+    if(Result->Type != container_type::Header)
     {
-      if(GetBorder(Border)->Position < GetBorder(NodeArray[i])->Position)
-      {
-        container_node* Swp = NodeArray[i];
-        NodeArray[i] = Border;
-        Border = Swp;
-      }
+      break;
     }
-    NodeArray[Count++] = Border;
-    Sibling = GetNextVerticalBorder(Sibling->NextSibling);
+    Result = Result->NextSibling;
   }
-  return Count;
+  return Result;
 }
 
-internal inline u32
-GetHorizontalBorders(container_node* Node, container_node** NodeArray)
+struct border_result
 {
-  container_node* Child = Node->FirstChild;
-  container_node* Sibling = GetNextHorizontalBorder(Child);
-  u32 Count = 0;
-  while(Sibling)
-  {
-    container_node* Border = Sibling;
-    for (u32 i = 0; i < Count; ++i)
-    {
-      if(GetBorder(Border)->Position < GetBorder(NodeArray[i])->Position)
-      {
-        container_node* Swp = NodeArray[i];
-        NodeArray[i] = Border;
-        Border = Swp;
-      }
-    }
+  rect2f Region;
+  u32 VCount;
+  container_node* V[16];
+  u32 HCount;
+  container_node* H[16];
+};
 
-    NodeArray[Count++] = Border;
-    Sibling = GetNextHorizontalBorder(Sibling->NextSibling);
+b32 BorderSortFunction(void* A, void* B)
+{
+  container_node* BorderA = (container_node*)A;
+  container_node* BorderB = (container_node*)B;
+  r32 PosA = GetBorder(BorderA)->Position;
+  r32 PosB = GetBorder(BorderB)->Position;
+  b32 Result = PosA < PosB;
+  return Result;
+}
+
+void PushSorted(void* Element, u32 Count, void** Array, b32 (*SortFunction)(void* A, void* B))
+{
+  for (u32 i = 0; i < Count; ++i)
+  {
+    if(SortFunction(Element, Array[i]))
+    {
+      void* Swp = Array[i];
+      Array[i] = Element;
+      Element = Swp;
+    }
   }
-  return Count;
+  Array[Count] = Element;
+}
+
+#define PushVerticalBorder(Border,Result) PushSorted((void*)Border, Result.VCount++, (void**) Result.V, BorderSortFunction);
+#define PushHorizontalBorder(Border,Result) PushSorted((void*)Border, Result.HCount++, (void**) Result.H, BorderSortFunction);
+
+internal inline border_result
+GetBorders(container_node* Node)
+{
+  border_result Result = {};
+  container_node* Child = Node->FirstChild;
+  u32 Count = 0;
+  while(Child)
+  {
+    if(Child->Type == container_type::Border)
+    {
+      border_leaf* Border = GetBorder(Child);
+      if(Border->Alignment == alignment::Middle)
+      {
+        if(Border->Vertical)
+        {
+          Assert(Result.VCount < ArrayCount(Result.V));
+          PushVerticalBorder(Child, Result);
+        }else{
+          Assert(Result.HCount < ArrayCount(Result.H));
+          PushHorizontalBorder(Child, Result);
+        }  
+      }
+      
+    }
+    Child = Child->NextSibling;
+  }
+
+  return Result;
 }
 
 internal inline u32
@@ -433,40 +485,111 @@ GetColumns( u32 VerticalBorderCount )
 
 
 internal inline void
-UpdateHorizontalBorders(s32 HorizontalBorderCount, container_node** HorizontalBorders, rect2f Surroundings, rect2f SubWindow)
+UpdateHorizontalBorders(s32 HorizontalBorderCount, container_node** HorizontalBorders, rect2f Region)
 { 
   for(s32 BorderIndex = 0;
-      BorderIndex < HorizontalBorderCount; BorderIndex++)
+          BorderIndex < HorizontalBorderCount;
+          BorderIndex++)
   {
     border_leaf* Border = GetBorder( HorizontalBorders[BorderIndex]);
-    r32 HT = Border->Thickness*0.5f;
-
-    r32 Y0 = Surroundings.Y + Border->Position * Surroundings.H;
-
-    HorizontalBorders[BorderIndex]->Region = Rect2f(
-      SubWindow.X - HT,
-      Y0 - HT,
-      SubWindow.W+Border->Thickness,
+    rect2f BorderRegion = Rect2f(
+      Region.X,
+      Region.Y + Border->Position * Region.H - Border->Thickness*0.5f,
+      Region.W,
       Border->Thickness);
+    HorizontalBorders[BorderIndex]->Region = BorderRegion;
   }
 }
 
 internal inline void
-UpdateVerticalBorders(s32 VerticalBorderCount, container_node** VerticalBorders, rect2f Surroundings, rect2f SubWindow)
+UpdateVerticalBorders(s32 VerticalBorderCount, container_node** VerticalBorders, rect2f Region)
 {
   for(s32 BorderIndex = 0; BorderIndex < VerticalBorderCount; ++BorderIndex)
   {
     border_leaf* Border = GetBorder(VerticalBorders[BorderIndex]);
-    r32 HT = Border->Thickness*0.5f;
-
-    r32 X0 =Surroundings.X + Border->Position*Surroundings.W;
-    
-    VerticalBorders[BorderIndex]->Region = Rect2f(
-      X0 - HT ,
-      SubWindow.Y - HT,
+    rect2f BorderRegion = Rect2f(
+      Region.X + Border->Position * Region.W - Border->Thickness*0.5f,
+      Region.Y,
       Border->Thickness,
-      SubWindow.H + Border->Thickness);
+      Region.H);
+    VerticalBorders[BorderIndex]->Region = BorderRegion;
   }
+}
+
+rect2f UpdateSurroundingBorders(container_node* Parent)
+{
+  r32 Bot = 0;
+  r32 Top = 0;
+  r32 Left = 0;
+  r32 Right = 0;
+  container_node* Child = Parent->FirstChild;
+  u32 BorderIndex = 0;
+  while(Child)
+  {
+    if(Child->Type == container_type::FrameBorder)
+    {
+      // Order decides border: Left->Right->Bot->Top;
+      frame_border_leaf* Border = GetContainerPayload(frame_border_leaf, Child);
+
+      switch(BorderIndex)
+      {
+        case 0: // Left
+        {
+          Child->Region = Rect2f(
+            Parent->Region.X,
+            Parent->Region.Y,
+            Border->Thickness,
+            Parent->Region.H);
+          Left = Child->Region.X + Child->Region.W;
+        }break;
+        case 1: // Right
+        {
+          Child->Region = Rect2f(
+            Parent->Region.X + Parent->Region.W - Border->Thickness,
+            Parent->Region.Y,
+            Border->Thickness,
+            Parent->Region.H);
+          Right = Child->Region.X;
+        }break;
+        case 2: // Bot
+        {
+            Child->Region = Rect2f(
+              Parent->Region.X,
+              Parent->Region.Y,
+              Parent->Region.W,
+              Border->Thickness);
+            Bot = Child->Region.Y + Child->Region.H;
+        }break;
+        case 3: // Top
+        {
+            Child->Region = Rect2f(
+              Parent->Region.X,
+              Parent->Region.Y +  Parent->Region.H - Border->Thickness,
+              Parent->Region.W,
+              Border->Thickness);
+            Top = Child->Region.Y;
+        }break;
+        default:
+        {
+          Assert(0)
+        }break;
+      }
+      ++BorderIndex;  
+    }
+    Child = Child->NextSibling;
+  }
+  
+  rect2f Result = Parent->Region;
+  if(BorderIndex == 4)
+  {
+    Result = Rect2f(
+      Left,
+      Bot,
+      Right - Left,
+      Top-Bot);
+  }
+  Assert(BorderIndex == 4 || BorderIndex == 0);
+  return Result;
 }
 
 internal inline rect2f
@@ -520,57 +643,70 @@ GetSubRegion(u32 Row, u32 Column,
   return Result;
 }
 
+rect2f GetBorderedRegion(border_result* Borders, rect2f NodeRegion)
+{
+  rect2f Result = NodeRegion;
+  r32 Bot = 0;
+  r32 Top = 0;
+  r32 Left = 0;
+  r32 Right = 0;
+  r32 VCount = 0;
+  r32 HCount = 0;
+  for (u32 i = 0; i < 4; ++i)
+  {
+    border_leaf* Border = GetBorder(Borders->H[i]);
+
+    switch(Border->Alignment)
+    {
+      case alignment::Top:
+      {
+        Top = NodeRegion.Y + NodeRegion.H * Border->Position;
+      }break;
+      case alignment::Bot:
+      {
+        Bot = NodeRegion.Y + NodeRegion.H * Border->Position;
+      }break;
+      case alignment::Left:
+      {
+        Left =  NodeRegion.X + NodeRegion.W * Border->Position;
+      }break;
+      case alignment::Right:
+      {
+        Right = NodeRegion.X + NodeRegion.W * Border->Position;
+      }break;
+      default:{
+        Assert(0);
+      }break;
+    }
+  }
+
+  Result.X = Left;
+  Result.W = Right - Left;
+  Result.Y = Bot;
+  Result.H = Top - Bot;
+  return Result;
+}
+
+border_result UpdateInternalBorders(container_node* Node)
+{
+  border_result Borders = GetBorders(Node);
+  UpdateHorizontalBorders(Borders.HCount, Borders.H, Node->Region);
+  UpdateVerticalBorders(Borders.VCount, Borders.V, Node->Region);
+  return Borders;
+}
+
 void SetChildRegions(memory_arena* Arena,container_node* Node)
 {
   temporary_memory TempMem =  BeginTemporaryMemory(Arena);
 
   u32 ChildCount = GetChildCount(Node);
 
-
-  rect2f Surroundings = Node->Region;
-  rect2f SubRegion = Surroundings;
-
-  container_node** HorizontalBorders = PushArray(Arena,ChildCount,container_node*);
-  u32 HorizontalBorderCount = GetHorizontalBorders(Node, HorizontalBorders);
-  if(HorizontalBorderCount > 1)
+  rect2f SurroundingRegion = UpdateSurroundingBorders(Node);
+  border_result Borders = UpdateInternalBorders(Node);
+  if(Borders.VCount || Borders.HCount)
   {
-    r32 Min = R32Max;
-    r32 Max = R32Min;
-    for (u32 i = 0; i < HorizontalBorderCount; ++i)
-    {
-      Min = Minimum(Min, GetBorder(HorizontalBorders[i])->Position);
-      Max = Maximum(Max, GetBorder(HorizontalBorders[i])->Position);
-    }
-    r32 Y0 = Surroundings.Y + Min*Surroundings.H;
-    r32 Y1 = Surroundings.Y + Max*Surroundings.H;
-    SubRegion.Y = Y0;
-    SubRegion.H = Y1-Y0;
-  }
-
-  container_node** VerticalBorders = PushArray(Arena,ChildCount,container_node*);
-  u32 VerticalBorderCount =  GetVerticalBorders(Node, VerticalBorders);
-  if(VerticalBorderCount > 1)
-  {
-    r32 Min = R32Max;
-    r32 Max = R32Min;
-    for (u32 i = 0; i < VerticalBorderCount; ++i)
-    {
-      Min = Minimum(Min, GetBorder(VerticalBorders[i])->Position);
-      Max = Maximum(Max, GetBorder(VerticalBorders[i])->Position);
-    }
-    r32 X0 = Surroundings.X + Min*Surroundings.W;
-    r32 X1 = Surroundings.X + Max*Surroundings.W;
-    SubRegion.X = X0;
-    SubRegion.W = X1-X0;
-  }
-
-  UpdateHorizontalBorders(HorizontalBorderCount, HorizontalBorders, Surroundings, SubRegion);
-  UpdateVerticalBorders(VerticalBorderCount, VerticalBorders, Surroundings, SubRegion);
-
-  if(VerticalBorderCount || HorizontalBorderCount)
-  {
-    u32 RowCount = GetRows(HorizontalBorderCount);
-    u32 ColumnCount = GetColumns(VerticalBorderCount);
+    u32 RowCount = GetRows(Borders.HCount);
+    u32 ColumnCount = GetColumns(Borders.VCount);
     u32 NodeCount = 0;
     u32 Row = 0;
     u32 Column = 0;
@@ -578,8 +714,8 @@ void SetChildRegions(memory_arena* Arena,container_node* Node)
     while (Body)
     {
       rect2f SubWindow = GetSubRegion( Row, Column,
-          HorizontalBorderCount, HorizontalBorders,
-          VerticalBorderCount, VerticalBorders, SubRegion);
+          Borders.HCount, Borders.H,
+          Borders.VCount, Borders.V, SurroundingRegion);
 
       Column++;
       if(Column >= ColumnCount)
@@ -593,22 +729,14 @@ void SetChildRegions(memory_arena* Arena,container_node* Node)
     }
     Assert(RowCount * ColumnCount == NodeCount); 
   }else{
-
-    container_node* Child = Node->FirstChild;
-    while(Child)
-    {
-      Child->Region = Node->Region;
-      Child = Child->NextSibling;
-    }
-
     container_node* HeaderNode = Node->FirstChild;
-    r32 Y0 = Node->Region.Y + Node->Region.H;
+    r32 Y0 = SurroundingRegion.Y + SurroundingRegion.H;
     while(HeaderNode)
     {
       if(HeaderNode->Type == container_type::Header)
       {
         header_leaf* Header = GetContainerPayload(header_leaf, HeaderNode);
-        HeaderNode->Region = Node->Region;
+        HeaderNode->Region = SurroundingRegion;
         HeaderNode->Region.Y = Y0 - Header->Thickness;
         HeaderNode->Region.H =  Header->Thickness;
         Y0 -= Header->Thickness;
@@ -620,54 +748,16 @@ void SetChildRegions(memory_arena* Arena,container_node* Node)
     container_node* EmptyBody = Node->FirstChild;
     while(EmptyBody)
     {
-      if(EmptyBody->Type == container_type::Empty)
+      if(EmptyBody->Type == container_type::Empty || 
+         EmptyBody->Type == container_type::None )
       {
-        EmptyBody->Region = Node->Region;
-        EmptyBody->Region.Y = Node->Region.Y;
-        EmptyBody->Region.H = Y0 - Node->Region.Y;
+        EmptyBody->Region = SurroundingRegion;
+        EmptyBody->Region.Y = SurroundingRegion.Y;
+        EmptyBody->Region.H = Y0 - SurroundingRegion.Y;
         break;
       }
       EmptyBody = EmptyBody->NextSibling;
     }
-    
-    /*
-    container_node* Body = Node->FirstChild;
-    r32 X0 = Surroundings.X;
-    r32 Y0 = Surroundings.Y + Surroundings.H;
-    r32 YStep = 0;
-    while(Body)
-    {
-
-    }
-    
-    
-    if(Body->Fixed[2])
-    {
-      Body->Region.Y = Y0 - Body->Size.Y;
-      YStep = Max(YStep, Body->Size.Y);
-    }else{
-
-    }
-    if(Body->Fixed[0])
-    {
-      Body->Region.X = X0 + Body->Size.X;
-      X0 += Body->Size.X;
-    }
-    while (Body)
-    {
-      rect2f SubRegion = GetSubRegion( Row, Column,
-          HorizontalBorderCount, HorizontalBorders,
-          VerticalBorderCount, VerticalBorders, Surroundings);
-      if(Row >= RowCount)
-      {
-        Row = 0;
-        Column++;
-      }
-      Body->Region = SubRegion;
-      Body = GetNextBody(Body->NextSibling);
-      NodeCount++;
-    } 
-    */ 
   }
   
 
@@ -1083,8 +1173,6 @@ void DisconnectNode(container_node* Node)
   Node->Parent = 0;
 }
 
-
-
 container_node* ConnectNode(container_node* Parent, container_node* NewNode)
 {
   NewNode->Parent = Parent;
@@ -1155,8 +1243,6 @@ void MoveMenuToTop(menu_interface* Interface, u32 WindowIndex)
   Interface->RootContainers[0] = Menu;
 }
 
-
-
 void SetMouseInput(memory_arena* Arena, game_input* GameInput, menu_interface* Interface)
 {
   v2 MousePos = V2(GameInput->MouseX, GameInput->MouseY);
@@ -1168,12 +1254,123 @@ void SetMouseInput(memory_arena* Arena, game_input* GameInput, menu_interface* I
     if(Interface->MouseLeftButton.Active )
     {
       Interface->MouseLeftButtonPush = MousePos;
+      u32 WindowIndex = 0;
+      u32 HotWindowIndex = 0;
+      b32 MenuClicked = false;
+      while(true)
+      {
+        menu_tree MenuTree = Interface->RootContainers[WindowIndex];
+        if(!MenuTree.Root)
+        {
+          break;
+        }
+        if(Intersects(MenuTree.Root->Region, Interface->MousePos))
+        {
+          HotWindowIndex = WindowIndex;
+          MenuClicked = true;
+          break;
+        }
+        ++WindowIndex;
+      }
+      if(MenuClicked)
+      {
+        MoveMenuToTop(Interface, HotWindowIndex);
+      }
       Interface->HotLeafCount = GetIntersectingNodes(Arena,  Interface->RootContainers[0].NodeCount, Interface->RootContainers[0].Root, Interface->MousePos, Interface->HotLeaves);
     }else{
       Interface->MouseLeftButtonRelese = MousePos;
       Interface->HotLeafCount = 0;
     }
   }
+  
+  if(Interface->HotLeafCount>0)
+  {
+    container_node* Node = Interface->HotLeaves[0];
+    
+    u32 Depth = 0;
+    r32 XOff = 0;
+    
+    stb_font_map* FontMap = &GlobalGameState->AssetManager->FontMap;
+    game_window_size WindowSize = GameGetWindowSize();
+    r32 HeightStep = (FontMap->Ascent - FontMap->Descent)/WindowSize.HeightPx;
+    r32 WidthStep  = 0.02;
+    r32 YOff = 1 - 2*HeightStep;
+
+    container_node* Nodes[32] = {};
+    u32 DepthCount = Node->Depth;
+    while(Node)
+    {
+      Nodes[Node->Depth] = Node;
+      Node = Node->Parent;
+    }
+    Assert(Nodes[0]->Depth == 0);
+
+    for (u32 j = 0; j <= DepthCount; ++j)
+    {
+      container_node* Sibling = Nodes[j];
+      if(j!=0)
+      {
+        Sibling = Nodes[j]->Parent->FirstChild;
+      }
+       
+      while(Sibling)
+      {
+        c8 StringBuffer[512] = {};
+        Platform.DEBUGFormatString(StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer),
+        "%s", ToString(Sibling->Type));
+
+        v4 Color = V4(1,1,1,1);
+        if(Sibling ==  Nodes[j])
+        {
+          Color = V4(1,1,0,1);
+        }
+        for (u32 i = 0; i < Interface->HotLeafCount; ++i)
+        {
+          if(Sibling == Interface->HotLeaves[i]){
+            Color = V4(1,0,0,1);
+          } 
+        }
+
+        XOff = WidthStep * Sibling->Depth;
+        Platform.DEBUGPrint("%d %s %s\n", Sibling->Depth, ToString(Sibling->Type) , j==0 ? "(root)" : "");
+        DEBUGTextOutAt(XOff, YOff, StringBuffer, Color);
+        YOff -= HeightStep;
+        Sibling = Sibling->NextSibling;
+      }
+
+    }
+#if 0
+    while(Node)
+    {
+      if(Node->Parent)
+      {
+        container_node* Sibling = Node->Parent->FirstChild;
+        while(Sibling)
+        {
+          c8 StringBuffer[512] = {};
+          Platform.DEBUGFormatString(StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer),
+          "%s", ToString(Sibling->Type));
+
+          v4 Color = V4(1,1,1,1);
+          if(Sibling == Node)
+          {
+            Color = V4(0,1,1,1);
+          }
+
+          XOff = WidthStep * Sibling->Depth;
+          Platform.DEBUGPrint("%d %s\n", Sibling->Depth,ToString(Sibling->Type) );
+          DEBUGTextOutAt(XOff, YOff, StringBuffer, Color);
+          YOff -= HeightStep;
+          Sibling = Sibling->NextSibling;
+        }
+      }
+
+      Node = Node->Parent; 
+    }
+    
+  #endif
+  }
+  Interface->PreviousMousePos = Interface->MousePos;
   Interface->MousePos = MousePos;
 }
 
@@ -1246,36 +1443,9 @@ void ActOnInput(memory_arena* Arena, menu_interface* Interface, menu_tree* Menu)
 
 void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interface)
 {
+
+
   SetMouseInput(GlobalGameState->TransientArena, GameInput, Interface);
-
-  // Find the clicked window and set HotWindow
-  if(Interface->MouseLeftButton.Active &&
-     Interface->MouseLeftButton.Edge)
-  {
-    u32 WindowIndex = 0;
-    u32 HotWindowIndex = 0;
-    b32 MenuClicked = false;
-    while(true)
-    {
-      menu_tree MenuTree = Interface->RootContainers[WindowIndex];
-      if(!MenuTree.Root)
-      {
-        break;
-      }
-      if(Intersects(MenuTree.Root->Region, Interface->MousePos))
-      {
-        HotWindowIndex = WindowIndex;
-        MenuClicked = true;
-        break;
-      }
-      ++WindowIndex;
-    }
-
-    if(MenuClicked)
-    {
-      MoveMenuToTop(Interface, HotWindowIndex);
-    }
-  }
 
   ActOnInput(GlobalGameState->TransientArena, Interface, &Interface->RootContainers[0]);
   for (s32 WindowIndex = Interface->RootContainerCount-1;
@@ -1297,12 +1467,58 @@ container_node* PushBorder(menu_interface* Interface, container_node* Parent, bo
   return Node;
 }
 
+container_node* PushFrameBorder(menu_interface* Interface, container_node* Parent)
+{
+  container_node* Node = NewContainer(Interface, container_type::FrameBorder);
+  *GetContainerPayload(frame_border_leaf, Node) = CreateFrameBorder();
+  ConnectNode(Parent, Node);
+  return Node;
+}
+
 container_node* PushEmptyWindow(menu_interface* Interface,  container_node* Parent, v4 Color = V4(0.2,0.4,0.2,1))
 {
   container_node* Node = NewContainer(Interface, container_type::Empty);
   GetContainerPayload(empty_window, Node)->Color = Color;
   ConnectNode(Parent, Node);
   return Node;
+}
+
+
+container_node* CreateHeaderWindow(menu_interface* Interface, v4 Color)
+{
+  container_node* Result = NewContainer(Interface, container_type::None); 
+  container_node* Header = ConnectNode(Result, NewContainer(Interface, container_type::Header));
+  header_leaf* H = GetContainerPayload(header_leaf, Header);
+  H->Color = V4(0.2,0.2,0.2,1);
+  H->Thickness = 0.05;
+  PushEmptyWindow(Interface, Result, Color);
+  return Result;
+}
+
+container_node* CreateSplitWindow(menu_interface* Interface, container_node* LeftContainer, container_node* RightContainer, b32 Vertical)
+{
+  container_node* Result = NewContainer(Interface, container_type::None);
+  PushBorder(Interface, Result, CreateBorder(Vertical,  alignment::Middle));
+  ConnectNode(Result, LeftContainer);
+  ConnectNode(Result, RightContainer); 
+  return Result;
+}
+
+container_node* CreateRootWindow(menu_interface* Interface)
+{
+  container_node* Result = NewContainer(Interface, container_type::None);
+  Result->Region = Rect2f(0.25,0.25,0.5,0.5);
+  
+  PushFrameBorder(Interface, Result);
+  PushFrameBorder(Interface, Result);
+  PushFrameBorder(Interface, Result);
+  PushFrameBorder(Interface, Result);
+  
+  container_node* Header = ConnectNode(Result, NewContainer(Interface, container_type::Header));
+  header_leaf* H = GetContainerPayload(header_leaf, Header);
+  H->Color = V4(0.2,0.3,0.2,1);
+  H->Thickness = 0.05;
+  return Result;
 }
 
 menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
@@ -1378,181 +1594,7 @@ menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
       /// Profiling Menu
       container_node* ProfilingContainer = NewContainer(Interface, container_type::Profiler);
 
-
-      /// Tabbed Window
-
-      menu_tree* Root = GetNewMenuTree(Interface);
-      Root->Root = NewContainer(Interface, container_type::Root);
-
-      container_node* RootContainer = Root->Root;
-      RootContainer->Region = Rect2f(0.2,0.2,0.5,0.5);
-      root_window* RootWindow = GetContainerPayload(root_window,Root->Root);
-      RootWindow->BorderSize = Interface->BorderSize;
-      RootWindow->MinSize = Interface->MinSize;
-
-      container_node* RootHeader = NewContainer(Interface, container_type::MenuHeader);
-      menu_header_window* MenuHeader = GetContainerPayload(menu_header_window, RootHeader);
-      MenuHeader->HeaderSize = Interface->HeaderSize;
-      MenuHeader->RootWindow = RootContainer;
-
-      container_node* TabbedHeader = NewContainer(Interface, container_type::TabbedHeader);
-      tabbed_header_window* TabbedHeaderWindow = GetContainerPayload(tabbed_header_window, TabbedHeader);
-      TabbedHeaderWindow->HeaderSize = Interface->HeaderSize;
-
-      container_node*  EmptyContainer2 = NewContainer(Interface, container_type::Empty);
-      GetContainerPayload(empty_window, EmptyContainer2)->Color = V4(0.4,0,0,1);
-      container_node*  EmptyContainer3 = NewContainer(Interface, container_type::Empty);
-      GetContainerPayload(empty_window, EmptyContainer3)->Color = V4(0,0.4,0,1);
-
-      ConnectNode(0, Root->Root);
-      ConnectNode(RootContainer, RootHeader);
-      ConnectNode(RootHeader,    TabbedHeader);
-      ConnectNode(TabbedHeader,  ContainerList);
-      TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = ContainerList;
-      TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = ProfilingContainer;
-      TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer2;
-      TabbedHeaderWindow->Tabs[TabbedHeaderWindow->TabCount++] = EmptyContainer3;
-
-      TreeSensus(Root);
-      UpdateRegions( &DebugState->Arena, Root->NodeCount, Root->Root);
-    }
 #endif
-
-/*
-  // Order and type determines position and actions
-
-   Note: - Elements can be
-            * Vertical   (Relative size in Height, Absolute size in Width)
-            * Horizontal (Relative size in Width,  Absolute size in Height)
-            * Both       (Block Container with relative size as % of parent window).
-            * None       (Block Container with absolute size, they stack up first left to right, then top to bottom).
-         - Order goes from Top->Bot, Left->Right
-         - Order doesn't matter Between Orthogonal elements.  {Top,Left} = {Left,Top}
-         - Corners are regions where Borders intersect
-         - Only BlockContainers can be Nodes with Children.
-         - Everything else is leaves.
-
-    RootContainer:
-      -----------------------
-      Border, Vertical    // VerticalBorder at beginning is a Left border  , Absolute Height, Relative Width
-      Border, Horizontal  // HorizontalBorder at beginning is a top border , Absolute Width,  Relative Height
-      -----------------------
-      Header,Vertical    // A Vertical container region,                  , Absolute Height, Relative Width
-      -----------------------
-      Container,Vertical, Horizontal // Just a container region,          , Relative Width,  Relative Height
-      -----------------------
-      Border,Vertical    (Top)
-      Border,Horizontal  (Left)
-      ------------------------
-
-    Horizontal SplitWindow:
-      -----------------------
-      Container, Vertical, Horizontal
-      -----------------------
-      Border,Vertical
-      -----------------------
-      Container, Vertical, Horizontal
-      -----------------------
-
-Example Window: A  H-split window with Button grid in the top widnow and Profiling window in the bottom
-
-  Container           (Container) (Root, Defines valid drag-region for borders and headers)
-      VBorder         (V-Container)
-      HBorder         (H-Container)
-      Header          (V-Container)
-      Container       (V-H-Container)
-        Container     (V-H-Container)  -> A grid of buttons
-          Button      (Container)
-          Button      (Container)
-          Button      (Container)
-          Button      (Container)
-        HBorder       (H-Container)
-        Container     (V-H-Container)
-          ProfilerA   (V-Container) - Some Profiler Widget
-          ProfilerB   (V-Container) - Some Profiler Widget
-      VBorder
-      HBorder
-
-
-struct container_node
-{
-  // Memory
-  u32 ContainerSize;
-  container_type Type;
-
-  // List (Memory)
-  container_node* Next;
-  container_node* Previous;
-
-
-  // Tree (Menu Structure)
-  u32 Depth;
-  container_node* Parent;
-  container_node* FirstChild;
-  container_node* NextSibling;
-
-  // b32 Horizontal;
-  // b32 Vertical;
-
-};
-
-*/
-
-/*
-    {
-      menu_tree* Root = GetNewMenuTree(Interface);
-      Root->Root = NewContainer(Interface, container_type::Root);
-
-      container_node* RootContainer = Root->Root;
-      RootContainer->Region = Rect2f(0.6,0.2,0.5,0.5);
-      RootContainer->SubRegion = Rect2f(0,0,1,1);
-      root_window* RootWindow = GetContainerPayload(root_window,Root->Root);
-      RootWindow->BorderSize = Interface->BorderSize;
-      RootWindow->HeaderSize = Interface->HeaderSize;
-      RootWindow->MinSize = Interface->MinSize;
-
-
-      container_node* Container = NewContainer(Interface, container_type::Split);
-
-      // Do a function called something  like GetOffsetFrom(  root_window*, container_node* )
-      Container->TopOffset = RootWindow->BorderSize + RootWindow->HeaderSize;
-      Container->BotOffset = RootWindow->BorderSize;
-      Container->LeftOffset = RootWindow->BorderSize;
-      Container->RightOffset = RootWindow->BorderSize;
-
-      //split_window* Split = GetContainerPayload(split_window, Container);
-      //RootContainer->TopOffset = Interface->BorderSize + Interface->HeaderSize;
-      //RootContainer->BotOffset = Interface->BorderSize;
-      //Split->BorderSize = Interface->BorderSize;
-      //Split->MinSize = 0.1;
-      //Split->SplitFraction = 0.5;
-
-      container_node*  EmptyContainer0 = NewContainer(Interface, container_type::Empty);
-      GetContainerPayload(empty_window, EmptyContainer0)->Color = V4(0,0.4,0,1);
-
-      container_node*  EmptyContainer1 = NewContainer(Interface, container_type::Empty);
-      // Do a function called something  like GetOffsetFrom(  split_window*, container_node* )
-      Container->TopOffset = RootWindow->BorderSize + RootWindow->HeaderSize;
-      Container->BotOffset = RootWindow->BorderSize;
-      Container->LeftOffset = RootWindow->BorderSize;
-      Container->RightOffset = RootWindow->BorderSize;
-      EmptyContainer1->SubRegion = Rect2f(0, 0, 1, 1/2.f);
-      GetContainerPayload(empty_window, EmptyContainer1)->Color = V4(0,0.4,0,1);
-
-
-
-      container_node*  EmptyContainer2 = NewContainer(Interface, container_type::Empty);
-      EmptyContainer2->SubRegion = Rect2f(0, 1/2.f, 1, 1/2.f);
-      GetContainerPayload(empty_window, EmptyContainer2)->Color = V4(0.4,0,0,1);
-
-      ConnectNode(0, RootContainer);
-      ConnectNode(RootContainer,   EmptyContainer0);
-      ConnectNode(EmptyContainer0, EmptyContainer1);
-      ConnectNode(EmptyContainer0, EmptyContainer2);
-
-      UpdateRegions( &DebugState->Arena, Root);
-    }
-*/
   {
     r32 BorderSize = 0.01;
     r32 HeaderSize = 0.07;
@@ -1563,49 +1605,11 @@ struct container_node
     v4 HeaderColor = V4(0.4,0.2,0.2,1);
 
     menu_tree* Root = GetNewMenuTree(Interface);
-    Root->Root = NewContainer(Interface, container_type::None);
-
-    game_window_size WindowSize = GameGetWindowSize();
-    r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
-
-    container_node* R = Root->Root;
-    R->Region = Rect2f(0,0,Width,1);
-    
-    PushBorder(Interface, R, Border(false, 0.25));
-    PushBorder(Interface, R, Border(false, 0.75));
-    PushBorder(Interface, R, Border(true,  0.25));
-    PushBorder(Interface, R, Border(true,  0.75));
-
-#if 1
-    container_node* HW = ConnectNode(R, NewContainer(Interface, container_type::None));
-    container_node* HeaderNode = ConnectNode(HW, NewContainer(Interface, container_type::Header));
-    header_leaf* Header = GetContainerPayload(header_leaf, HeaderNode);
-    Header->Color = V4(0.2,0.2,0.2,1);
-    Header->Thickness = 0.1;
-    
-    container_node* HB = ConnectNode(HW, NewContainer(Interface, container_type::None));
-    PushBorder(Interface, HB, Border(true));
-    PushEmptyWindow(Interface, HB, V4(0.2,0,0,1));
-    PushEmptyWindow(Interface, HB, V4(0,0.2,0,1));
-    //container_node* W = ConnectNode(R, NewContainer(Interface, container_type::None));
-#else
-    container_node* HW = ConnectNode(R, NewContainer(Interface, container_type::None));
-    container_node* H = ConnectNode(HW, NewContainer(Interface, container_type::None));
-    container_node* W = ConnectNode(HW, NewContainer(Interface, container_type::None));
-
-    PushBorder(Interface, W, Border(true,  0.5));
-
-    container_node* C1 = ConnectNode(W, NewContainer(Interface, container_type::None));
-    PushBorder(Interface, C1, Border(false, 0.5, 2*BorderColor));
-    PushEmptyWindow(Interface, C1, BodyColor+V4(0.2,0,0,0));
-    PushEmptyWindow(Interface, C1, BodyColor+V4(0,0.2,0,0));
-
-    container_node* C2 = ConnectNode(W, NewContainer(Interface, container_type::None));
-    PushBorder(Interface, C2, Border(false, 0.5, 2*BorderColor));
-    PushEmptyWindow(Interface, C2, BodyColor+V4(0,0.2,0,0));
-    PushEmptyWindow(Interface, C2, BodyColor+V4(0.2,0,0,0));
-#endif
-
+    Root->Root = CreateRootWindow(Interface);
+    container_node* Window1 = CreateHeaderWindow(Interface, V4(0.2,0,0,1));
+    container_node* Window2 = CreateHeaderWindow(Interface, V4(0,0.2,0,1));
+    container_node* SplitWindow = CreateSplitWindow(Interface, Window1, Window2, true);
+    ConnectNode(Root->Root, SplitWindow); 
 
     TreeSensus(Root);
 

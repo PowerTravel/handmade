@@ -1001,7 +1001,7 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
             entry_type_text* Text = (entry_type_text*) Body;
             TexData.QuadRect = Text->QuadRect;
             TexData.UVRect = Text->UVRect;
-            TexData.Color = V4(1,1,1,1);
+            TexData.Color = Text->Colour;
             TextBuffer[TextInstnceIndex++] = TexData;
           }break;
         }

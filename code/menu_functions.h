@@ -1427,14 +1427,41 @@ MENU_HANDLE_INPUT( BorderHandleInput )
     {
       if(Border->Drag)
       {
+        rect2f* ParentRegion = &Node->Parent->Region;
+        r32 DeltaX = Interface->MousePos.X - Interface->PreviousMousePos.X;
+        r32 DeltaY = Interface->MousePos.Y - Interface->PreviousMousePos.Y;
+        switch(Border->Alignment)
+        {
+          case alignment::Left:
+          {
+            ParentRegion->X += DeltaX;
+            ParentRegion->W -= DeltaX;
+          }break;
+          case alignment::Right:
+          {
+            ParentRegion->W += DeltaX;
+          }break;
+          case alignment::Bot:
+          {
+            ParentRegion->Y += DeltaY;
+            ParentRegion->H -= DeltaY;
+          }break;
+          case alignment::Top:
+          {
+            ParentRegion->H += DeltaY;
+          }break;
+        }
         if(Border->Vertical)
         {
-          r32 Delta = (Interface->MousePos.X - Interface->MouseLeftButtonPush.X)/Node->Parent->Region.W;
-          Border->Position = Border->DraggingStart + Delta;
+          Border->Position += DeltaX/Node->Parent->Region.W;
+          Platform.DEBUGPrint("KEKBUR\n");
         }else{
-          r32 Delta = (Interface->MousePos.Y - Interface->MouseLeftButtonPush.Y)/Node->Parent->Region.H;
-          Border->Position = Border->DraggingStart + Delta;
+          Border->Position += DeltaY/Node->Parent->Region.H;
+          Platform.DEBUGPrint("BELARUS\n");
         }
+        //border_result Borders = GetBorders(Node);
+        //rect2f Surroundings = GetBorderedRegion(&Borders, Node->Region);
+        //Node->Region = Surroundings;
       }
     }
   }
@@ -1444,7 +1471,6 @@ MENU_DRAW( BorderDraw )
 {
   DEBUGPushQuad(Node->Region, GetContainerPayload(border_leaf, Node)->Color);
 }
-
 
 menu_functions GetBorderFunctions()
 {
@@ -1464,7 +1490,6 @@ MENU_HANDLE_INPUT( HeaderHandleInput )
   {
     if(Interface->MouseLeftButton.Active)
     {
-      Header->DraggingStart = MousePos;
       Header->Drag = true;
     }else{
       Header->Drag = false;
@@ -1474,29 +1499,51 @@ MENU_HANDLE_INPUT( HeaderHandleInput )
     {
       if(Header->Drag)
       {
-        Assert(Node->Parent->Parent);
-        container_node* Parent = Node->Parent->Parent->FirstChild;
-        u32 VerticalBorderCount = 0;
-        u32 HorizontalBorderCount = 0;
-        while(Parent)
+        // Root Window:
+        if(Node->Parent->Parent == 0)
         {
-          if(Parent->Type == container_type::Border && GetBorder(Parent)->Vertical)
+          r32 DeltaX = Interface->MousePos.X - Interface->PreviousMousePos.X;
+          r32 DeltaY = Interface->MousePos.Y - Interface->PreviousMousePos.Y;
+          Node->Parent->Region.X += DeltaX;
+          Node->Parent->Region.Y += DeltaY;  
+        }else{
+          rect2f HeaderSplitRegion = Shrink(Node->Region, -Node->Region.H/2);
+          container_node* FreeWindow = Node->Parent;
+          container_node* ContainingWindow = FreeWindow->Parent;
+          container_node* BorderNode = GetNextBorder(ContainingWindow->FirstChild);
+          if(BorderNode && !Intersects(HeaderSplitRegion,MousePos))
           {
-            VerticalBorderCount++;
-          }
-          else if(Parent->Type == container_type::Border && !GetBorder(Parent)->Vertical)
-          {
-            HorizontalBorderCount++;
-          }
-          Parent = Parent->NextSibling;
-        }
+            // We only handle one border for now
+            Assert(  GetNextBorder(BorderNode->NextSibling) == 0 );
+            DisconnectNode(BorderNode);
+            DeleteContainer(Interface, BorderNode);
 
-        if(VerticalBorderCount == 2 && HorizontalBorderCount==2)
+            DisconnectNode(FreeWindow);
+
+            menu_tree* Root = GetNewMenuTree(Interface);
+            Root->Root = FreeWindow;
+            
+            PushFrameBorder(Interface, FreeWindow);
+            PushFrameBorder(Interface, FreeWindow);
+            PushFrameBorder(Interface, FreeWindow);
+            PushFrameBorder(Interface, FreeWindow);
+
+            MoveMenuToTop(Interface, Interface->RootContainerCount-1);
+            //Interface->HotLeafCount = 1;
+            //Interface->HotLeaves[0] = Node;
+          }
+      }
+
+      }
+
+
+
+#if 0
+        if(HasBorderWindows(Node))
         {
-          Parent = Node->Parent->Parent->FirstChild;
+          Parent = Node->Parent->FirstChild;
           while(Parent)
           {
-
             if(Parent->Type == container_type::Border)
             {
               r32 DeltaX = (Interface->MousePos.X - Header->DraggingStart.X)/Node->Parent->Parent->Region.W;
@@ -1512,12 +1559,36 @@ MENU_HANDLE_INPUT( HeaderHandleInput )
             Parent = Parent->NextSibling;
           }
         }
+
+        else if( IsSplitWindow() )
+        {
+          
+          rect2f DragBorder = Shrink(Node->Region, -Node->Region.H/2);
+          if(!Intersects(DragBorder,MousePos))
+          {
+            container_node* NodeToDisconnect = Node->Parent;
+            container_node* ContainingWindow = NodeToDisconnect->Parent;
+
+            container_node* BorderNode = GetNextBorder(ContainingWindow->FirstChild);
+            DisconnectNode(BorderNode);
+            DeleteContainer(Interface,BorderNode);
+
+            DisconnectNode(NodeToDisconnect);
+
+            game_window_size WindowSize = GameGetWindowSize();
+            r32 Width = WindowSize.WidthPx/WindowSize.HeightPx;
+
+            menu_tree* Root = GetNewMenuTree(Interface);
+            Root->Root = CreateRootWindow(Interface);
+            Header->Drag = false;
+
+          }
+        }
+        
       }
-
+      #endif
       Header->DraggingStart = MousePos; 
-    }
-
-     
+    } 
   }
 }
 MENU_DRAW( HeaderDraw )
@@ -1530,6 +1601,87 @@ menu_functions GetHeaderFunctions()
   menu_functions Result = GetDefaultFunctions();
   Result.HandleInput = HeaderHandleInput;
   Result.Draw = HeaderDraw;
+  return Result;
+}
+
+u32 GetFrameBorderIndex(container_node* Node)
+{
+  container_node* Child = Node->Parent->FirstChild;
+  u32 Result = 0;
+  while(Child)
+  {
+    if(Child->Type == container_type::FrameBorder)
+    {
+      if(Child == Node)
+      {
+        break;
+      }
+      Result++;
+    }
+    Child = Child->NextSibling;
+  }
+  return Result;
+}
+
+MENU_HANDLE_INPUT( FrameBorderHandleInput )
+{
+  frame_border_leaf* Border = GetContainerPayload(frame_border_leaf, Node);
+
+  v2 MousePos = Interface->MousePos;
+  if(Interface->MouseLeftButton.Edge)
+  {
+    if(Interface->MouseLeftButton.Active)
+    {
+      Border->Drag = true;
+    }else{
+      Border->Drag = false;
+    }
+  }else{
+    if(Interface->MouseLeftButton.Active)
+    {
+      if(Border->Drag)
+      {
+        u32 BorderIndex = GetFrameBorderIndex(Node);
+        rect2f* ParentRegion = &Node->Parent->Region;
+        r32 DeltaX = Interface->MousePos.X - Interface->PreviousMousePos.X;
+        r32 DeltaY = Interface->MousePos.Y - Interface->PreviousMousePos.Y;
+        switch(BorderIndex)
+        {
+          case 0: // Left
+          {
+            ParentRegion->X += DeltaX;
+            ParentRegion->W -= DeltaX;
+          }break;
+          case 1: // Right
+          {
+            ParentRegion->W += DeltaX;
+          }break;
+          case 2: // Bot
+          {
+            ParentRegion->Y += DeltaY;
+            ParentRegion->H -= DeltaY;
+          }break;
+          case 3: // Top
+          {
+            ParentRegion->H += DeltaY;
+          }break;
+        }
+      }
+    }
+  }
+}
+
+
+MENU_DRAW( FrameBorderDraw )
+{
+  DEBUGPushQuad(Node->Region, GetContainerPayload(frame_border_leaf, Node)->Color);
+}
+
+menu_functions GetFrameBorderFunctions()
+{
+  menu_functions Result = GetDefaultFunctions();
+  Result.HandleInput = FrameBorderHandleInput;
+  Result.Draw = FrameBorderDraw;
   return Result;
 }
 
@@ -1550,6 +1702,7 @@ menu_functions GetMenuFunction(container_type Type)
     case container_type::Button: return GetButtonFunctions();
     case container_type::Profiler: return GetProfilerFunctions();
     case container_type::Border: return GetBorderFunctions();
+    case container_type::FrameBorder: return GetFrameBorderFunctions();
     case container_type::Header: return GetHeaderFunctions();
     default: Assert(0);
   }

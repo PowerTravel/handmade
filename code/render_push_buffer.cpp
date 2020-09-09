@@ -129,7 +129,7 @@ GetSTBGlyphRect(r32 xPosPx, r32 yPosPx, stbtt_bakedchar* CH )
   return Result;
 }
 
-void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, c8* String, v4 Color = V4(1,1,1,1))
+void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, const c8* String, v4 Color = V4(1,1,1,1))
 {
   game_window_size WindowSize = GameGetWindowSize();
   r32 PixelPosX = CanPosX*WindowSize.HeightPx;
@@ -163,7 +163,7 @@ void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, c8* String, v4 Color = V4(1,1,1,1)
   }
 }
 
-void DEBUGAddTextSTB(c8* String, r32 LineNumber)
+void DEBUGAddTextSTB(const c8* String, r32 LineNumber)
 {
   TIMED_FUNCTION();
   game_window_size WindowSize = GameGetWindowSize();

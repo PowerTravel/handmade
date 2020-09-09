@@ -12,8 +12,29 @@ enum class container_type
   Button,
   Profiler,
   Border,
+  FrameBorder,
   Body,
   Header
+};
+const c8* ToString(container_type Type)
+{
+  switch(Type)
+  {
+    case container_type::None: return "None";
+    case container_type::Root: return "Root";
+    case container_type::Empty: return "Empty";
+    case container_type::Split: return "Split";
+    case container_type::TabbedHeader: return "TabbedHeader";
+    case container_type::MenuHeader: return "MenuHeader";
+    case container_type::ContainerList: return "ContainerList";
+    case container_type::Button: return "Button";
+    case container_type::Profiler: return "Profiler";
+    case container_type::Border: return "Border";
+    case container_type::FrameBorder: return "FrameBorder";
+    case container_type::Body: return "Body";
+    case container_type::Header: return "Header";
+  }
+  return "";
 };
 
 enum class window_regions
@@ -137,9 +158,35 @@ struct container_node
   menu_functions Functions;
 };
 
+enum class alignment
+{
+  Left,
+  Right,
+  Top,
+  Bot,
+  Middle,
+};
+
 menu_functions GetMenuFunction(container_type Type);
 
 #define GetContainingNode( WindowPtr )  (container_node*) ( ((u8*)(WindowPtr)) - OffsetOf(container_node, WindowPointer))
+
+struct frame_border_leaf
+{
+  r32 Thickness;
+  v4 Color;
+
+  r32 DraggingStart;
+  b32 Drag;
+};
+
+inline frame_border_leaf CreateFrameBorder(v4 Color =  V4(0,0,0.4,1), r32 Thickness = 0.01)
+{
+  frame_border_leaf Result = {};
+  Result.Thickness = Thickness;
+  Result.Color = Color;
+  return Result;
+};
 
 struct border_leaf
 {
@@ -148,9 +195,21 @@ struct border_leaf
   r32 Thickness;
   v4 Color;
 
+  alignment Alignment;
   r32 DraggingStart;
   b32 Drag;
 };
+
+inline border_leaf CreateBorder(b32 Vertical, alignment Alignment = alignment::Middle, r32 Position = 0.5f,  v4 Color =  V4(0,0,0.4,1), r32 Thickness = 0.01)
+{
+  border_leaf Result = {};
+  Result.Vertical = Vertical;
+  Result.Position = Position;
+  Result.Alignment = Alignment;
+  Result.Thickness = Thickness;
+  Result.Color = Color;  
+  return Result;
+}
 
 struct header_leaf
 {
@@ -160,16 +219,6 @@ struct header_leaf
   v2 DraggingStart;
   b32 Drag;
 };
-
-inline border_leaf Border(b32 Vertical, r32 Position = 0.5f,  v4 Color =  V4(0,0,0.4,1), r32 Thickness = 0.01)
-{
-  border_leaf Result = {};
-  Result.Vertical = Vertical;
-  Result.Position = Position;
-  Result.Thickness = Thickness;
-  Result.Color = Color;  
-  return Result;
-}
 
 struct tabbed_header_window
 {
@@ -284,9 +333,11 @@ struct menu_interface
   container_node Sentinel;
 
   v2 MousePos;
+  v2 PreviousMousePos;
   binary_signal_state MouseLeftButton;
   v2 MouseLeftButtonPush;
   v2 MouseLeftButtonRelese;
+
 
   // TODO: Make concept of min-size more polished and consistent
   r32 BorderSize;
@@ -309,6 +360,8 @@ menu_tree* GetNewMenuTree(menu_interface* Interface);
 void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree);
 void DisconnectNode(container_node* Node);
 container_node* ConnectNode(container_node* Parent, container_node* NewNode);
+
+//container_node* PushBorder(menu_interface* Interface, container_node* Parent, border_leaf Border);
 
 void SetMouseInput(memory_arena* Arena, game_input* GameInput, menu_interface* Interface);
 
