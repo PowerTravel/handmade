@@ -1508,27 +1508,75 @@ MENU_HANDLE_INPUT( HeaderHandleInput )
           Node->Parent->Region.Y += DeltaY;  
         }else{
           rect2f HeaderSplitRegion = Shrink(Node->Region, -Node->Region.H/2);
-          container_node* FreeWindow = Node->Parent;
-          container_node* ContainingWindow = FreeWindow->Parent;
-          container_node* BorderNode = GetNextBorder(ContainingWindow->FirstChild);
+          container_node* WindowToSplit = Node->Parent;
+          container_node* BorderWindow = WindowToSplit->Parent;
+
+          container_node* BorderNode = GetNextBorder(BorderWindow->FirstChild);
           if(BorderNode && !Intersects(HeaderSplitRegion,MousePos))
           {
-            // We only handle one border for now
-            Assert(  GetNextBorder(BorderNode->NextSibling) == 0 );
-            DisconnectNode(BorderNode);
-            DeleteContainer(Interface, BorderNode);
+            container_node* WindowToRemain = GetNextBody(BorderWindow->FirstChild);
+            if(WindowToRemain == WindowToSplit)
+            {
+              WindowToRemain = WindowToRemain->NextSibling;
+            }
+            Assert(WindowToRemain);
 
-            DisconnectNode(FreeWindow);
+            // We only handle one border for now
+            Assert( GetNextBorder(BorderNode->NextSibling) == 0 );
+
+            DisconnectNode(WindowToSplit);
+            DisconnectNode(WindowToRemain);
+
+            container_node* NewParent = BorderWindow->Parent;
+            Assert(NewParent);
+            DisconnectNode(BorderNode);
+            DisconnectNode(BorderWindow);
+            DeleteContainer(Interface, BorderNode);
+            DeleteContainer(Interface, BorderWindow);
+
+            ConnectNode(NewParent, WindowToRemain);
 
             menu_tree* Root = GetNewMenuTree(Interface);
-            Root->Root = FreeWindow;
-            
-            PushFrameBorder(Interface, FreeWindow);
-            PushFrameBorder(Interface, FreeWindow);
-            PushFrameBorder(Interface, FreeWindow);
-            PushFrameBorder(Interface, FreeWindow);
+            Root->Root = NewContainer(Interface, container_type::None);
+            Root->Root->Region = NewParent->Region;
+
+            container_node* OldRootWindow = NewParent;
+            while(OldRootWindow->Parent)
+            {
+              OldRootWindow = OldRootWindow->Parent;
+            }
+
+            r32 OffsetX = Interface->MouseLeftButtonPush.X - OldRootWindow->Region.X;
+            r32 OffsetY = Interface->MouseLeftButtonPush.Y - (OldRootWindow->Region.Y + OldRootWindow->Region.H);
+
+            Root->Root->Region.X += OffsetX;
+            Root->Root->Region.Y += OffsetY;
+
+
+            PushFrameBorder(Interface, Root->Root);
+            PushFrameBorder(Interface, Root->Root);
+            PushFrameBorder(Interface, Root->Root);
+            PushFrameBorder(Interface, Root->Root);
+            container_node* HeaderNode = ConnectNode(Root->Root, NewContainer(Interface, container_type::Header) );
+            header_leaf* H = GetContainerPayload(header_leaf, HeaderNode);
+            H->Color = V4(0.2,0.4,0.2,1);
+            H->Thickness = 0.05;
+            H->Drag = true;
+            Header->Drag = false;
+
+            ConnectNode(Root->Root, WindowToSplit);
 
             MoveMenuToTop(Interface, Interface->RootContainerCount-1);
+
+            Root->HotLeafCount = GetIntersectingNodes( GlobalGameState->TransientArena,
+              Root->NodeCount,
+              Root->Root,
+              MousePos, Root->HotLeafs);
+            Root->ActiveLeafCount = GetIntersectingNodes( GlobalGameState->TransientArena,
+              Root->NodeCount,
+              Root->Root,
+              MousePos, Root->ActiveLeafs);
+
             //Interface->HotLeafCount = 1;
             //Interface->HotLeaves[0] = Node;
           }

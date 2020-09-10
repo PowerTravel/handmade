@@ -298,8 +298,14 @@ struct menu_tree
   u32 NodeCount;
   u32 Depth;
   container_node* Root;
+  //menu_tree* Next;
 
-  menu_tree* Next;
+
+  u32 HotLeafCount;
+  container_node* HotLeafs[32];
+
+  u32 ActiveLeafCount;
+  container_node* ActiveLeafs[32];
 };
 
 #define ACTIVATE_BUTTON(name) void (name)(struct menu_button* Button, debug_state* DebugState)
@@ -347,8 +353,6 @@ struct menu_interface
   // Button Function (Trying out some kind of function pool)
   activate_button* Activate[5];
 
-  u32 HotLeafCount;
-  container_node* HotLeaves[32];
 };
 
 
