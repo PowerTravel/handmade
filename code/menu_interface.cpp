@@ -378,7 +378,7 @@ container_node* GetNextBody(container_node* Node)
   container_node* Result = 0;
   while(Node)
   {
-    if(Node->Type != container_type::Border)
+    if(Node->Type != container_type::Border && Node->Type != container_type::FrameBorder)
     {
       Result = Node;
       break;
@@ -393,7 +393,7 @@ container_node* GetHeaderNode(container_node* Node)
   container_node* Result = Node->FirstChild;
   while(Result)
   {
-    if(Result->Type != container_type::Header)
+    if(Result->Type == container_type::Header)
     {
       break;
     }
@@ -1348,6 +1348,10 @@ void SetMouseInput(memory_arena* Arena, game_input* GameInput, menu_interface* I
     }else{
       menu_tree* DeselectedMenu = &Interface->RootContainers[0];
       Interface->MouseLeftButtonRelese = MousePos;
+      for (u32 i = 0; i < DeselectedMenu->ActiveLeafCount; ++i)
+      {
+        DeselectedMenu->ActiveLeafs[i]->Functions.HandleInput(Interface, DeselectedMenu->ActiveLeafs[i], 0);
+      }
       DeselectedMenu->ActiveLeafCount = 0;
     }
   }
@@ -1375,6 +1379,7 @@ void ActOnInput(memory_arena* Arena, menu_interface* Interface, menu_tree* Menu)
   {
     ActiveMenu->ActiveLeafs[i]->Functions.HandleInput(Interface, ActiveMenu->ActiveLeafs[i], 0);
   }
+
 #if 0
   if(Interface->MouseLeftButton.Active)
   {
@@ -1459,7 +1464,7 @@ container_node* PushBorder(menu_interface* Interface, container_node* Parent, bo
 container_node* PushFrameBorder(menu_interface* Interface, container_node* Parent)
 {
   container_node* Node = NewContainer(Interface, container_type::FrameBorder);
-  *GetContainerPayload(frame_border_leaf, Node) = CreateFrameBorder();
+  *GetContainerPayload(frame_border_leaf, Node) = CreateFrameBorder(Interface->BorderSize);
   ConnectNode(Parent, Node);
   return Node;
 }
@@ -1472,14 +1477,14 @@ container_node* PushEmptyWindow(menu_interface* Interface,  container_node* Pare
   return Node;
 }
 
-
 container_node* CreateHeaderWindow(menu_interface* Interface, v4 Color)
 {
   container_node* Result = NewContainer(Interface, container_type::None); 
   container_node* Header = ConnectNode(Result, NewContainer(Interface, container_type::Header));
+
   header_leaf* H = GetContainerPayload(header_leaf, Header);
   H->Color = V4(0.2,0.2,0.2,1);
-  H->Thickness = 0.05;
+  H->Thickness = Interface->HeaderSize;
   PushEmptyWindow(Interface, Result, Color);
   return Result;
 }
@@ -1487,7 +1492,7 @@ container_node* CreateHeaderWindow(menu_interface* Interface, v4 Color)
 container_node* CreateSplitWindow(menu_interface* Interface, container_node* LeftContainer, container_node* RightContainer, b32 Vertical)
 {
   container_node* Result = NewContainer(Interface, container_type::None);
-  PushBorder(Interface, Result, CreateBorder(Vertical,  alignment::Middle));
+  PushBorder(Interface, Result, CreateBorder(Vertical, Interface->BorderSize));
   ConnectNode(Result, LeftContainer);
   ConnectNode(Result, RightContainer); 
   return Result;
@@ -1502,11 +1507,11 @@ container_node* CreateRootWindow(menu_interface* Interface)
   PushFrameBorder(Interface, Result);
   PushFrameBorder(Interface, Result);
   PushFrameBorder(Interface, Result);
-  
+
   container_node* Header = ConnectNode(Result, NewContainer(Interface, container_type::Header));
   header_leaf* H = GetContainerPayload(header_leaf, Header);
-  H->Color = V4(0.2,0.3,0.2,1);
-  H->Thickness = 0.05;
+  H->Color = V4(0.2,0.4,0.2,1);
+  H->Thickness = Interface->HeaderSize;
   return Result;
 }
 
@@ -1583,21 +1588,33 @@ menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
 
 #endif
   {
-    r32 BorderSize = 0.01;
-    r32 HeaderSize = 0.07;
-
     v4 BorderColor = V4(0,0,0.4,1);
     v4 CornerColor = V4(0,0.4,0.2,1);
     v4 BodyColor   = V4(0.2,0.4,0.2,1);
     v4 HeaderColor = V4(0.4,0.2,0.2,1);
 
+#if 1
     menu_tree* Root = GetNewMenuTree(Interface);
     Root->Root = CreateRootWindow(Interface);
     container_node* Window1 = CreateHeaderWindow(Interface, V4(0.2,0,0,1));
     container_node* Window2 = CreateHeaderWindow(Interface, V4(0,0.2,0,1));
-    container_node* SplitWindow = CreateSplitWindow(Interface, Window1, Window2, true);
-    ConnectNode(Root->Root, SplitWindow); 
+    container_node* Window3 = CreateHeaderWindow(Interface, V4(0,0,0.2,1));
+    container_node* Window4 = CreateHeaderWindow(Interface, V4(0,0.2,0.2,1));
+    container_node* SplitWindow1 = CreateSplitWindow(Interface, Window1, Window2, false);
+    container_node* SplitWindow2 = CreateSplitWindow(Interface, Window3, Window4, false);
+    container_node* SplitWindow3 = CreateSplitWindow(Interface, SplitWindow1, SplitWindow2, true);
+    ConnectNode(Root->Root, SplitWindow3);
+#else
+    menu_tree* Root = GetNewMenuTree(Interface);
+    Root->Root = CreateRootWindow(Interface);
+    container_node* Window1 = CreateHeaderWindow(Interface, V4(0.2,0,0,1));
+    container_node* Window2 = CreateHeaderWindow(Interface, V4(0,0.2,0,1));
+    container_node* Window1Header = GetHeaderNode(Window1);
+    container_node* Window2Header = GetHeaderNode(Window2);
+    header_leaf* Header1 = GetContainerPayload(header_leaf, Window1Header);
+    ConnectNode(Root->Root, Window1);
 
+#endif
     TreeSensus(Root);
 
     UpdateRegions( GlobalGameState->TransientArena, Root);

@@ -136,6 +136,8 @@ struct menu_functions
   menu_draw*  Draw;
 };
 
+menu_functions GetMenuFunction(container_type Type);
+
 
 struct container_node
 {
@@ -167,8 +169,6 @@ enum class alignment
   Middle,
 };
 
-menu_functions GetMenuFunction(container_type Type);
-
 #define GetContainingNode( WindowPtr )  (container_node*) ( ((u8*)(WindowPtr)) - OffsetOf(container_node, WindowPointer))
 
 struct frame_border_leaf
@@ -180,7 +180,7 @@ struct frame_border_leaf
   b32 Drag;
 };
 
-inline frame_border_leaf CreateFrameBorder(v4 Color =  V4(0,0,0.4,1), r32 Thickness = 0.01)
+inline frame_border_leaf CreateFrameBorder(r32 Thickness = 0.01, v4 Color =  V4(0,0,0.4,1))
 {
   frame_border_leaf Result = {};
   Result.Thickness = Thickness;
@@ -200,7 +200,7 @@ struct border_leaf
   b32 Drag;
 };
 
-inline border_leaf CreateBorder(b32 Vertical, alignment Alignment = alignment::Middle, r32 Position = 0.5f,  v4 Color =  V4(0,0,0.4,1), r32 Thickness = 0.01)
+inline border_leaf CreateBorder(b32 Vertical, r32 Thickness = 0.01, r32 Position = 0.5f,  v4 Color =  V4(0,0,0.4,1),  alignment Alignment = alignment::Middle)
 {
   border_leaf Result = {};
   Result.Vertical = Vertical;
@@ -218,6 +218,15 @@ struct header_leaf
 
   v2 DraggingStart;
   b32 Drag;
+
+  container_node* NodeToMerge = 0;
+  u32 HotMergeZone;
+  rect2f MergeZone[5];
+
+  // Tabs
+  u32 TabCount;
+  container_node* Tabs[12];
+  u32 SelectedTabOrdinal; // [1,3,4,5...], 0 means no tab selected
 };
 
 struct tabbed_header_window
