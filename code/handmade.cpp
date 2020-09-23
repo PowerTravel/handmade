@@ -439,13 +439,13 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
 
 #if HANDMADE_INTERNAL
   // Recompilation issues is only an issue when building with Debug
-  SetMenuButtonFunctions(GlobalGameState->MenuInterface);
+//  SetMenuButtonFunctions(GlobalGameState->MenuInterface);
   for (s32 WindowIndex = 0;
            WindowIndex >= 0;
          --WindowIndex)
   {
     menu_tree* MenuTree = &GlobalGameState->MenuInterface->RootContainers[WindowIndex];
-    SetInterfaceFunctionPointers(MenuTree->Root, GlobalGameState->TransientArena, MenuTree->NodeCount);
+  //  SetInterfaceFunctionPointers(MenuTree->Root, GlobalGameState->TransientArena, MenuTree->NodeCount);
   }
 #endif
 };

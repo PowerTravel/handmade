@@ -855,7 +855,7 @@ void PushDebugOverlay(game_input* GameInput)
   if(!DebugState->ChartVisible) return;
   if(!GlobalGameState->MenuInterface->RootContainers[0].Root) return;
 
-  rect2f Chart = GlobalGameState->MenuInterface->RootContainers[0].Root->Functions.GetRegionRect(window_regions::WholeBody, GlobalGameState->MenuInterface->RootContainers[0].Root);
+  rect2f Chart = GlobalGameState->MenuInterface->RootContainers[0].Root->Region;
 
   u32 MaxFramesToDisplay = DebugState->FrameCount < 10 ? DebugState->FrameCount : 10;
   r32 BarWidth = Chart.H/MaxFramesToDisplay;
