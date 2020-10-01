@@ -1,5 +1,5 @@
 #include "menu_interface.h"
-
+#include "string.h"
 u32 GetContainerPayloadSize(container_type Type)
 {
   switch(Type)
@@ -7,7 +7,7 @@ u32 GetContainerPayloadSize(container_type Type)
     case container_type::None:
     case container_type::Split:
     case container_type::Root:    return 0;
-    case container_type::Color:   return sizeof(empty_leaf);
+    case container_type::Color:   return sizeof(color_leaf);
     case container_type::Border:  return sizeof(border_leaf);
     case container_type::HBF:     return sizeof(hbf_node);
     default: INVALID_CODE_PATH;
@@ -15,13 +15,14 @@ u32 GetContainerPayloadSize(container_type Type)
   return 0;
 }
 
-u32 GetAttributeSize(container_attribute Attributes)
+u32 GetAttributeSize(container_attribute Attribute)
 {
-  switch(Attributes)
+  switch(Attribute)
   {
-    case ATTRIBUTE_DRAG:  return sizeof(draggable_attribute);
-    case ATTRIBUTE_MERGE: return sizeof(mergable_attribute);
-    case ATTRIBUTE_MERGE_SLOT: return 0;
+    case ATTRIBUTE_DRAG:       return sizeof(draggable_attribute);
+    case ATTRIBUTE_MERGE:      return sizeof(mergable_attribute);
+    case ATTRIBUTE_MERGE_SLOT: return sizeof(merge_slot_attribute);
+    case ATTRIBUTE_TABS: return sizeof(tabbed_attribute);
     default: INVALID_CODE_PATH;
   }
   return 0; 
@@ -50,15 +51,13 @@ u32 GetAttributeBatchSize(container_attribute Attri)
     Result += GetAttributeSize(Attribute);
     Attributes -= Attribute;
   }
-  
-  Result += (Attributes & ATTRIBUTE_DRAG)  * sizeof(draggable_attribute);
-  Result += (Attributes & ATTRIBUTE_MERGE) * sizeof(mergable_attribute);
-  Result += (Attributes & ATTRIBUTE_MERGE_SLOT) * 0;
+
   return Result;
 }
 
 u8* GetAttributePointer(container_node* Node, container_attribute Attri)
 {
+  Assert(Attri & Node->Attributes);
   u8* Result = 0;
   u32 NodeAttributes = (u32) Node->Attributes;
   u32 Attribute = (u32) Attri; 
@@ -83,8 +82,26 @@ u8* GetAttributePointer(container_node* Node, container_attribute Attri)
   return Result;
 }
 
+#define DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION 1
+
+void CheckMemoryListIntegrity(menu_interface* Interface)
+{
+  container_node* IntegrityNode = Interface->Sentinel.Next;
+  u32 ListCount = 0;
+  while(IntegrityNode != &Interface->Sentinel)
+  {
+    Assert(IntegrityNode == IntegrityNode->Next->Previous);
+    Assert(IntegrityNode == IntegrityNode->Previous->Next);
+    IntegrityNode = IntegrityNode->Next;
+    ListCount++;
+  }
+}
+
 container_node* NewContainer(menu_interface* Interface, container_type Type,  u32 Attributes)
 {
+
+  CheckMemoryListIntegrity(Interface);
+
   u32 BaseNodeSize    = sizeof(container_node);
   u32 NodePayloadSize = GetContainerPayloadSize(Type);
   u32 AttributeSize   = GetAttributeBatchSize( (container_attribute) Attributes);
@@ -112,15 +129,16 @@ container_node* NewContainer(menu_interface* Interface, container_type Type,  u3
   b32 MemoryTooFragmented = MemoryFragmentation < 0.8;
   if( MemoryTooFragmented || RegionUsed == Interface->MaxMemSize )
   {
+    #if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
     u32 Slot = 0;
     u32 SlotSpace = 0;
     u32 SlotSize = 0;
+    #endif
 
     container_node* CurrentNode = Interface->Sentinel.Next;
-    container_node* NextNode = CurrentNode->Next;
     while( CurrentNode->Next != &Interface->Sentinel)
     {
-      midx Base = (midx) CurrentNode + ContainerSize;
+      midx Base = (midx) CurrentNode + CurrentNode->ContainerSize;
       midx NextNodeAddress    = (midx)  CurrentNode->Next;
       Assert(Base <= NextNodeAddress);
 
@@ -130,16 +148,26 @@ container_node* NewContainer(menu_interface* Interface, container_type Type,  u3
       {
         Result = (container_node*) Base;
         ListInsertAfter(CurrentNode, Result);
+        Assert(CurrentNode < CurrentNode->Next);
+        Assert(Result < Result->Next);
+        Assert(CurrentNode->Next == Result);
+
+        Assert(((u8*)Result - (u8*)CurrentNode) == CurrentNode->ContainerSize);
+        Assert(((u8*)Result->Next - (u8*)Result) >= ContainerSize);
+        #if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
         SlotSpace = (u32) Slot;
-        SlotSize = (u32) OpenSpace;
+        SlotSize  = (u32) OpenSpace;
+        #endif
+
         break;
       }
-
+      #if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
       Slot++;
+      #endif
       CurrentNode =  CurrentNode->Next;
     }
 
-    #if 0
+    #if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
     {
       u32 SlotCount = 0;
       container_node* CurrentNode2 = Interface->Sentinel.Next;
@@ -156,8 +184,6 @@ container_node* NewContainer(menu_interface* Interface, container_type Type,  u3
       Platform.DEBUGPrint(" - Size: [%d,%d]\n", ContainerSize, SlotSize);
     }
     #endif
-
-
   }
 
   // Otherwise push it to the end
@@ -195,11 +221,15 @@ container_node* NewContainer(menu_interface* Interface, container_type Type,  u3
     
   }
   #endif
+
+  CheckMemoryListIntegrity(Interface);
+
   return Result;
 }
 
 void DeleteContainer( menu_interface* Interface, container_node* Node)
 {
+  CheckMemoryListIntegrity(Interface);
   Node->Previous->Next = Node->Next;
   Node->Next->Previous = Node->Previous;
   Interface->ActiveMemory -= Node->ContainerSize;
@@ -208,6 +238,8 @@ void DeleteContainer( menu_interface* Interface, container_node* Node)
   //       But if we don't we sometimes crash, so look out for that when refactoring.
   //       This is probably masking some bug.
   utils::ZeroSize(Node->ContainerSize, (void*)Node);
+
+  CheckMemoryListIntegrity(Interface);
 }
 
 
@@ -373,6 +405,18 @@ void UpdateRegions( menu_tree* Menu )
   EndTemporaryMemory(TempMem);
 }
 
+void DrawMergeSlots(container_node* Node)
+{
+  mergable_attribute* Merge = (mergable_attribute*) GetAttributePointer(Node, ATTRIBUTE_MERGE);
+  merge_slot_attribute* Slot = Merge->Slot;
+  if(Slot)
+  {
+    for (u32 Index = 0; Index < ArrayCount(Slot->MergeZone); ++Index)
+    {
+      DEBUGPushQuad(Slot->MergeZone[Index], Index == Slot->HotMergeZone ? V4(0,1,0,0.5) : V4(0,1,0,0.3));
+    }
+  }
+}
 
 // Preorder breadth first.
 void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, container_node* Container )
@@ -393,6 +437,11 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
     ContainerStack[StackCount] = 0;
 
     Parent->Functions.Draw(Interface, Parent);
+    if(Parent->Attributes & ATTRIBUTE_MERGE)
+    {
+      DrawMergeSlots(Parent);
+    }
+
     // Update the region of all children and push them to the stack
     container_node* Child = Parent->FirstChild;
     while(Child)
@@ -502,6 +551,41 @@ void MoveMenuToTop(menu_interface* Interface, u32 WindowIndex)
   Interface->RootContainers[0] = Menu;
 }
 
+void FormatNodeString(container_node* Node, u32 BufferSize, c8 StringBuffer[])
+{
+  u32 Attributes = Node->Attributes;
+  Platform.DEBUGFormatString(StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer),
+  "%s", ToString(Node->Type));
+  b32 First = true;
+  while(Attributes)
+  {
+    bit_scan_result ScanResult = FindLeastSignificantSetBit(Attributes);
+    Assert(ScanResult.Found);
+    u32 Attribute = (1 << ScanResult.Index);
+    Attributes -= Attribute;
+    if(First)
+    {
+      First = false;
+      str::CatStrings( str::StringLength(StringBuffer), StringBuffer,
+              2, ": ",
+              BufferSize, StringBuffer);  
+    }else{
+      str::CatStrings( str::StringLength(StringBuffer), StringBuffer,
+              3, " | ",
+              BufferSize, StringBuffer);  
+    }
+    
+
+    const c8* AttributeString = ToString(Attribute);
+    str::CatStrings( str::StringLength(StringBuffer), StringBuffer,
+                str::StringLength(AttributeString), AttributeString,
+                ArrayCount(StringBuffer), StringBuffer);
+
+
+  }
+
+}
+
 void PrintHotLeafs(menu_interface* Interface)
 {
   stb_font_map* FontMap = &GlobalGameState->AssetManager->FontMap;
@@ -553,9 +637,9 @@ void PrintHotLeafs(menu_interface* Interface)
             }
           }
 
-          c8 StringBuffer[512] = {};
-          Platform.DEBUGFormatString(StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer),
-          "%s %d", ToString(Sibling->Type), Sibling->Attributes);
+          u32 Attributes = Sibling->Attributes;
+          c8 StringBuffer[1024] = {};
+          FormatNodeString(Sibling, ArrayCount(StringBuffer), StringBuffer);
 
           XOff = WidthStep * Sibling->Depth;
           DEBUGTextOutAt(XOff, YOff, StringBuffer, Color);
@@ -589,18 +673,12 @@ void PrintHotLeafs(menu_interface* Interface)
             }
           }
 
-          c8 StringBuffer[512] = {};
-          Platform.DEBUGFormatString(StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer),
-          "%s %d", ToString(Sibling->Type), Sibling->Attributes);
-
+          c8 StringBuffer[1024] = {};
+          FormatNodeString(Sibling, ArrayCount(StringBuffer), StringBuffer);
           XOff = WidthStep * Sibling->Depth;
           DEBUGTextOutAt(XOff, YOff, StringBuffer, Color);
           YOff -= HeightStep;
 
-          if(CheckPoints[Depth])
-          {
-            break;
-          }
           Sibling = Sibling->NextSibling;
         }
       }
@@ -630,7 +708,7 @@ void UpdateDraggableAttribute( menu_interface* Interface, draggable_attribute* A
   }
 }
 */
-inline container_node* GetRootNode(container_node* Node)
+inline container_node* GetRoot(container_node* Node)
 {
   while(Node->Parent)
   {
@@ -639,36 +717,56 @@ inline container_node* GetRootNode(container_node* Node)
   return Node;
 }
 
-void UpdateMergableAttribute( menu_interface* Interface, mergable_attribute* Attr )
+container_node* GetMergeSlotNode(menu_interface* Interface, container_node* Node)
 {
-  Attr->DstNode = 0;
-  Attr->HotMergeZone = ArrayCount(Attr->MergeZone);
+  container_node* Result = 0;
+  container_node* OwnRoot = GetRoot(Node);
   for (u32 MenuIndex = 0; MenuIndex < Interface->RootContainerCount; ++MenuIndex)
   {
-    container_node* SrcRoot = GetRootNode(Attr->SrcNode);
-    
-    menu_tree* DstMenu = &Interface->RootContainers[MenuIndex];
-    if(SrcRoot!=DstMenu->Root)
+    menu_tree* MenuRoot = &Interface->RootContainers[MenuIndex];
+    if(OwnRoot == MenuRoot->Root) continue;
+
+    for (u32 LeafIndex = 0; LeafIndex < MenuRoot->HotLeafCount; ++LeafIndex)
     {
-      for (u32 LeafIndex = 0; LeafIndex < DstMenu->HotLeafCount; ++LeafIndex)
+      container_node* HotLeafNode = MenuRoot->HotLeafs[LeafIndex];
+      while(HotLeafNode)
       {
-        container_node* Node = DstMenu->HotLeafs[LeafIndex];
-        while(Node)
+        if(HasAttribute(HotLeafNode, ATTRIBUTE_MERGE_SLOT))
         {
-          if(HasAttribute(Node, ATTRIBUTE_MERGE_SLOT))
-          {
-            Attr->DstNode = Node;
-            break;
-          }
-          Node = Node->Parent;
+          Result = HotLeafNode;
+          return Result;
         }
+        HotLeafNode = HotLeafNode->Parent;
       }
     }
   }
+  return Result;
+}
 
-  if(Attr->DstNode)
+menu_tree* GetMenu(menu_interface* Interface, container_node* Node)
+{
+  menu_tree* Result = 0;
+  container_node* Root = GetRoot(Node);
+  for (u32 MenuIndex = 0; MenuIndex < Interface->RootContainerCount; ++MenuIndex)
   {
-    rect2f Rect = Attr->DstNode->Region;
+    menu_tree* MenuRoot = &Interface->RootContainers[MenuIndex];
+    if(Root == MenuRoot->Root)
+    {
+      Result = MenuRoot;
+      break;
+    }
+  }
+  return Result;
+}
+
+void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
+{
+  container_node* SlotNode = GetMergeSlotNode(Interface, Node);
+  merge_slot_attribute* Slot = 0;
+  if(SlotNode)
+  {
+    Slot = (merge_slot_attribute*) GetAttributePointer(SlotNode, ATTRIBUTE_MERGE_SLOT);
+    rect2f Rect = SlotNode->Region;
     r32 W = Rect.W;
     r32 H = Rect.H;
     r32 S = Minimum(W,H)/4;
@@ -679,32 +777,99 @@ void UpdateMergableAttribute( menu_interface* Interface, mergable_attribute* Att
     v2 BQ = V2(MP.X,   MP.Y-S);        // Bot Quarter
     v2 TQ = V2(MP.X,   MP.Y+S);        // Top Quarter
 
-    Attr->MergeZone[0] = Rect2f(LQ.X-S/2.f, LQ.Y-S/2.f,S/1.1f,S/1.1f); // Left Quarter
-    Attr->MergeZone[1] = Rect2f(MP.X-S/2.f, MP.Y-S/2.f,S/1.1f,S/1.1f); // Middle Point
-    Attr->MergeZone[2] = Rect2f(RQ.X-S/2.f, RQ.Y-S/2.f,S/1.1f,S/1.1f); // Right Quarter
-    Attr->MergeZone[3] = Rect2f(BQ.X-S/2.f, BQ.Y-S/2.f,S/1.1f,S/1.1f); // Bot Quarter
-    Attr->MergeZone[4] = Rect2f(TQ.X-S/2.f, TQ.Y-S/2.f,S/1.1f,S/1.1f); // Top Quarter
+    Slot->MergeZone[0] = Rect2f(LQ.X-S/2.f, LQ.Y-S/2.f,S/1.1f,S/1.1f); // Left Quarter
+    Slot->MergeZone[1] = Rect2f(MP.X-S/2.f, MP.Y-S/2.f,S/1.1f,S/1.1f); // Middle Point
+    Slot->MergeZone[2] = Rect2f(RQ.X-S/2.f, RQ.Y-S/2.f,S/1.1f,S/1.1f); // Right Quarter
+    Slot->MergeZone[3] = Rect2f(BQ.X-S/2.f, BQ.Y-S/2.f,S/1.1f,S/1.1f); // Bot Quarter
+    Slot->MergeZone[4] = Rect2f(TQ.X-S/2.f, TQ.Y-S/2.f,S/1.1f,S/1.1f); // Top Quarter
 
-    if(Intersects(Attr->MergeZone[0], Interface->MousePos))
+    if(Intersects(Slot->MergeZone[0], Interface->MousePos))
     {
-      Attr->HotMergeZone = 0;
-    }else if(Intersects(Attr->MergeZone[1], Interface->MousePos)){
-      Attr->HotMergeZone = 1;
-    }else if(Intersects(Attr->MergeZone[2], Interface->MousePos)){
-      Attr->HotMergeZone = 2;
-    }else if(Intersects(Attr->MergeZone[3], Interface->MousePos)){
-      Attr->HotMergeZone = 3;
-    }else if(Intersects(Attr->MergeZone[4], Interface->MousePos)){
-      Attr->HotMergeZone = 4;
+      Slot->HotMergeZone = 0;
+    }else if(Intersects(Slot->MergeZone[1], Interface->MousePos)){
+      Slot->HotMergeZone = 1;
+    }else if(Intersects(Slot->MergeZone[2], Interface->MousePos)){
+      Slot->HotMergeZone = 2;
+    }else if(Intersects(Slot->MergeZone[3], Interface->MousePos)){
+      Slot->HotMergeZone = 3;
+    }else if(Intersects(Slot->MergeZone[4], Interface->MousePos)){
+      Slot->HotMergeZone = 4;
     }else{
-      Attr->HotMergeZone = ArrayCount(Attr->MergeZone);
+      Slot->HotMergeZone = ArrayCount(Slot->MergeZone);
     }
   }
 
-  if(Interface->MouseLeftButton.Edge && !Interface->MouseLeftButton.Active && Attr->HotMergeZone <  ArrayCount(Attr->MergeZone) )
+  mergable_attribute* Merge = (mergable_attribute*) GetAttributePointer(Node, ATTRIBUTE_MERGE);
+  Merge->Slot = Slot;
+
+  if(Slot && Interface->MouseLeftButton.Edge && !Interface->MouseLeftButton.Active )
   {
-    Platform.DEBUGPrint("Merging Event!");
-  } 
+    u32 ZoneIndex = Slot->HotMergeZone;
+    Merge->Slot = 0;
+    if( ZoneIndex == 1)
+    {
+      #if 0
+      // Middle
+      header_leaf* SrcHeader = GetContainerPayload(header_leaf, Node);
+      header_leaf* DstHeader = GetContainerPayload(header_leaf, GetHeaderNode(Header->NodeToMerge->Parent));
+      DstHeader->SelectedTabOrdinal = SrcHeader->SelectedTabOrdinal + DstHeader->TabCount;
+      for(u32 TabIndex = 0; TabIndex < SrcHeader->TabCount; TabIndex++)
+      {
+        DstHeader->Tabs[DstHeader->TabCount++] = SrcHeader->Tabs[TabIndex];
+        Assert( DstHeader->TabCount < ArrayCount(DstHeader->Tabs))
+      }
+//
+      DisconnectNode(Node->Parent);
+      
+      FreeMenuTree(Interface, &Interface->RootContainers[0]);
+      #endif
+    }else if( ZoneIndex == 0  || ZoneIndex == 2 ||  // Vertical
+              ZoneIndex == 3  || ZoneIndex == 4)    // Horizontal
+    {
+      container_node* Home = SlotNode->Parent;
+      container_node* Visitor = Node->Parent;
+
+      Assert(Home->Type == container_type::HBF);
+      Assert(Visitor->Type == container_type::HBF);
+
+      
+      container_node* HomeHead = ReallocateNode(Interface, Home->FirstChild, ATTRIBUTE_DRAG);
+      draggable_attribute* HomeDrag = (draggable_attribute*) GetAttributePointer(HomeHead, ATTRIBUTE_DRAG);
+      HomeDrag->Data = 0;
+      HomeDrag->Update = SplitWindowHeaderDrag;
+      
+      if(Visitor->Parent->Type == container_type::Root)
+      {
+        Visitor = Node->NextSibling;
+      }
+      
+      container_node* VisitorHead = ReallocateNode(Interface, Visitor->FirstChild, ATTRIBUTE_DRAG);
+      draggable_attribute* VisitorDrag = (draggable_attribute*) GetAttributePointer(VisitorHead, ATTRIBUTE_DRAG);
+      VisitorDrag->Data = 0;
+      VisitorDrag->Update = SplitWindowHeaderDrag;
+      
+      menu_tree* MenuToRemove = GetMenu(Interface, Visitor);
+      DisconnectNode(Visitor);
+      TreeSensus(MenuToRemove);
+      FreeMenuTree(Interface, MenuToRemove);
+
+      container_node* SplitNode = NewContainer(Interface, container_type::Split);
+      container_node* BorderNode = CreateBorderNode(Interface, (ZoneIndex == 0 || ZoneIndex == 2), 0.5);
+      SetSplitDragAttribute(SplitNode, BorderNode);
+      ConnectNode(SplitNode, BorderNode);
+      SwapNode(Home, SplitNode);
+
+      if( ZoneIndex == 0  || ZoneIndex == 3)
+      {
+        ConnectNode(SplitNode, Visitor);  
+        ConnectNode(SplitNode, Home);
+      }else{
+        ConnectNode(SplitNode, Home);
+        ConnectNode(SplitNode, Visitor);  
+      }
+    }
+
+  }
 }
 
 void ActOnInput(menu_interface* Interface, menu_tree* Menu)
@@ -718,13 +883,15 @@ void ActOnInput(menu_interface* Interface, menu_tree* Menu)
     if(HasAttribute(Node, ATTRIBUTE_DRAG))
     {
       draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(Node, ATTRIBUTE_DRAG);
-      Draggable->Update(Interface, Node ,Draggable);
+      if(Draggable->Update)
+      {
+        Draggable->Update(Interface, Node, Draggable);  
+      }
     }
 
     if(HasAttribute(Node, ATTRIBUTE_MERGE))
     {
-      mergable_attribute* Mergable = (mergable_attribute*) GetAttributePointer(Node, ATTRIBUTE_MERGE);
-      UpdateMergableAttribute(Interface, Mergable);
+      UpdateMergableAttribute(Interface, Node);
     }
   }
 }
@@ -785,8 +952,6 @@ void SetMouseInput(memory_arena* Arena, game_input* GameInput, menu_interface* I
   Interface->MousePos = MousePos;
 }
 
-
-
 void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interface)
 {
   SetMouseInput(GlobalGameState->TransientArena, GameInput, Interface);
@@ -806,7 +971,7 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
 container_node* PushEmptyWindow(menu_interface* Interface,  container_node* Parent, v4 Color = V4(0.2,0.4,0.2,1))
 {
   container_node* Node = NewContainer(Interface, container_type::Color);
-  GetContainerPayload(empty_leaf, Node)->Color = Color;
+  GetColorNode(Node)->Color = Color;
   ConnectNode(Parent, Node);
   return Node;
 }
@@ -823,7 +988,7 @@ void UpdateFrameBorder( menu_interface* Interface, border_leaf* Border )
 
 void UpdateFrameBorder( menu_interface* Interface, container_node* Node, draggable_attribute* Attr )
 {
-  UpdateFrameBorder(Interface, GetContainerPayload(border_leaf, Node));
+  UpdateFrameBorder(Interface, GetBorderNode(Node));
 }
 
 void UpdateSplitBorder( menu_interface* Interface, container_node* SplitNode, border_leaf* Border)
@@ -838,7 +1003,7 @@ void UpdateSplitBorder( menu_interface* Interface, container_node* SplitNode, bo
 
 void UpdateSplitBorder( menu_interface* Interface, container_node* Node, draggable_attribute* Attr )
 {
-  border_leaf* Border = GetContainerPayload(border_leaf, Node);
+  border_leaf* Border = GetBorderNode(Node);
   UpdateSplitBorder(Interface, (container_node*) Attr->Data, Border);
 }
 
@@ -848,9 +1013,233 @@ void UpdateHeaderPosition( menu_interface* Interface, container_node* Node, drag
   container_node* Child = Root->FirstChild;
   while(Child->Type == container_type::Border)
   {
-    border_leaf* Border = GetContainerPayload(border_leaf, Child);
+    border_leaf* Border = GetBorderNode(Child);
     UpdateFrameBorder(Interface, Border);
     Child = Child->NextSibling;
+  }
+}
+
+b32 SplitWindowSignal(menu_interface* Interface, container_node* HeaderNode, draggable_attribute* Attr )
+{
+  rect2f HeaderSplitRegion = Shrink(HeaderNode->Region, -2*HeaderNode->Region.H);
+  if(!Intersects(HeaderSplitRegion, Interface->MousePos))
+  {
+    return true;
+  }
+  return false;
+}
+
+container_node* GetPreviousSibling(container_node* Node)
+{
+  container_node* Result = 0;
+  if(Node->Parent)
+  {
+    container_node* Sibling = Node->Parent->FirstChild;
+    if(Sibling != Node)
+    {
+      while(Sibling->NextSibling != Node)
+      {
+        Sibling = Sibling->NextSibling;
+      }
+      Result = Sibling;
+    }
+  }
+  return Result;
+}
+
+inline void
+SwapNode(container_node* Out, container_node* In)
+{  
+  In->Parent = Out->Parent;
+  In->NextSibling = Out->NextSibling;
+
+  container_node* Sibling = GetPreviousSibling(Out);
+  if(Sibling)
+  {
+    Assert(Sibling->NextSibling == Out);
+    Sibling->NextSibling = In;
+  }else{
+    Assert(Out->Parent->FirstChild == Out);
+    In->Parent->FirstChild = In;
+  }
+
+  Out->NextSibling = 0;
+  Out->Parent = 0;
+}
+
+void SetFrameDragAttribute(container_node* BorderNode)
+{
+  border_leaf* BorderLeaf = GetBorderNode(BorderNode);
+  draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(BorderNode, ATTRIBUTE_DRAG);
+  Draggable->Data = 0;
+  Draggable->Update = UpdateFrameBorder;
+}
+
+container_node* ReallocateNode(menu_interface* Interface, container_node* SrcNode, u32 InputAttributes)
+{
+  container_node* Result = NewContainer(Interface, SrcNode->Type, InputAttributes);
+  utils::Copy(GetContainerPayloadSize(SrcNode->Type), GetContainerPayload(SrcNode), GetContainerPayload(Result));
+  
+  Result->Attributes = InputAttributes;
+  #if 1
+  u32 Attributes = InputAttributes;
+  while(Attributes)
+  {
+    bit_scan_result ScanResult = FindLeastSignificantSetBit(Attributes);
+    Assert(ScanResult.Found);
+
+    u32 Attribute = (1 << ScanResult.Index);
+    if(SrcNode->Attributes & Attribute)
+    {
+      utils::Copy(GetAttributeSize(Attribute), 
+                  GetAttributePointer(SrcNode, (container_attribute) Attribute),
+                  GetAttributePointer(Result, (container_attribute) Attribute));
+    }
+    Attributes -= Attribute;
+  }
+  #endif
+  SwapNode(SrcNode, Result);
+
+  DeleteContainer(Interface, SrcNode); 
+
+  return Result;
+}
+  
+
+void SplitWindow(menu_interface* Interface, container_node* WindowToRemove, rect2f Region)
+{  
+  Assert(WindowToRemove->Type == container_type::HBF);
+  if(WindowToRemove->Parent->Type != container_type::Split)
+  {
+    return;
+  }
+
+  container_node* WindowToRemain = WindowToRemove->NextSibling;
+  if(!WindowToRemain)
+  {
+    WindowToRemain = WindowToRemove->Parent->FirstChild->NextSibling;
+    Assert(WindowToRemain);
+    Assert(WindowToRemain->NextSibling == WindowToRemove);
+  }
+
+  container_node* SplitNodeToSwapOut = WindowToRemain->Parent;
+
+  DisconnectNode(WindowToRemove);
+  DisconnectNode(WindowToRemain);
+
+  SwapNode(SplitNodeToSwapOut, WindowToRemain);
+
+  // The remaining window is a single HBF under a RootHBF
+  if(WindowToRemain->Parent->Type == container_type::HBF)
+  {
+    container_node* RootHBF = WindowToRemain->Parent;
+    Assert(RootHBF->Parent->Type == container_type::Root);
+    container_node* RootHeader = RootHBF->FirstChild;
+
+    container_node* NewRootHeader = ReallocateNode(Interface, RootHeader, ATTRIBUTE_DRAG | ATTRIBUTE_MERGE);
+
+    if(WindowToRemain->Type == container_type::HBF)
+    {
+      container_node* NewHBFHeader = ReallocateNode(Interface, WindowToRemain->FirstChild);  
+    }
+  }
+
+  SplitNodeToSwapOut->NextSibling = 0;
+
+  container_node* Border = SplitNodeToSwapOut->FirstChild;
+  Assert(Border->Type == container_type::Border);
+  Assert(Border->NextSibling == 0);
+  DisconnectNode(Border);
+  DisconnectNode(SplitNodeToSwapOut);
+  DeleteContainer(Interface, Border);
+  DeleteContainer(Interface, SplitNodeToSwapOut);
+
+  menu_tree* Root = NewMenuTree(Interface); // Root
+  Root->Root = NewContainer(Interface, container_type::Root);
+
+  container_node* RootHeader = 0;
+  // Root Header
+  {
+    RootHeader = NewContainer(Interface, container_type::Color, ATTRIBUTE_DRAG | ATTRIBUTE_MERGE);
+    GetColorNode(RootHeader)->Color = V4(0.4,0.2,0.2,1);
+
+    draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(RootHeader, ATTRIBUTE_DRAG);
+    Draggable->Data = (void*) Root->Root;
+    Draggable->Update = UpdateHeaderPosition;
+  }
+
+  // Header Body Footer
+  container_node* RHBF = 0;    
+  {
+    RHBF = NewContainer(Interface, container_type::HBF);
+    hbf_node* HBFP = GetHBFNode(RHBF);
+    HBFP->HeaderSize = 0.02;
+    HBFP->FooterSize = 0;
+
+    ConnectNode(RHBF, RootHeader); // Header
+    ConnectNode(RHBF, WindowToRemove); // Body
+    ConnectNode(RHBF, NewContainer(Interface, container_type::Color)); // Footer
+  }
+
+
+  //  Root Node Complex, 4 Borders, 1 Header, 1 None
+  container_node* RootBody = 0; // Output
+  { 
+    container_node* Border1 = CreateBorderNode(Interface, true, Region.X);
+    ConnectNode(Root->Root, Border1);
+    SetFrameDragAttribute(Border1);
+    container_node* Border2 = CreateBorderNode(Interface, true, Region.X + Region.W);
+    ConnectNode(Root->Root, Border2);
+    SetFrameDragAttribute(Border2);
+    container_node* Border3 = CreateBorderNode(Interface, false,Region.Y);
+    ConnectNode(Root->Root, Border3);
+    SetFrameDragAttribute(Border3);
+    container_node* Border4 = CreateBorderNode(Interface, false, Region.Y + Region.H);
+    ConnectNode(Root->Root, Border4);
+    SetFrameDragAttribute(Border4);
+    
+    ConnectNode(Root->Root, RHBF);
+  }
+
+  TreeSensus(Root);
+
+  UpdateRegions(Root);
+  Root->HotLeafCount = GetIntersectingNodes( GlobalGameState->TransientArena,
+    Root->NodeCount,
+    Root->Root,
+    Interface->MousePos, Root->HotLeafs);
+  Root->ActiveLeafCount = GetIntersectingNodes( GlobalGameState->TransientArena,
+    Root->NodeCount,
+    Root->Root,
+    Interface->MousePos, Root->ActiveLeafs);
+
+  MoveMenuToTop(Interface, Interface->RootContainerCount-1);
+}
+
+
+void SplitWindowHeaderDrag( menu_interface* Interface, container_node* Node, draggable_attribute* Attr )
+{
+  if(SplitWindowSignal(Interface, Node, Attr))
+  {
+    v2 MouseDownPos = V2(Interface->MouseLeftButtonPush.X, Interface->MouseLeftButtonPush.Y);
+    v2 HeaderOrigin = V2(Node->Region.X, Node->Region.Y);
+    v2 WindowSize = V2(Node->Parent->Region.W, Node->Parent->Region.H);
+
+    v2 MouseDownHeaderFrame = MouseDownPos - HeaderOrigin;
+    v2 NewOrigin = Interface->MousePos - MouseDownHeaderFrame - V2(0, WindowSize.Y - Interface->HeaderSize);
+    rect2f NewRegion = Rect2f(NewOrigin.X, NewOrigin.Y, WindowSize.X, WindowSize.Y);
+    NewRegion = Shrink(NewRegion, -Interface->BorderSize/2);
+    SplitWindow(Interface, Node->Parent, NewRegion);
+
+    Node = ReallocateNode(Interface, Node);
+
+    if(Node->Parent->Type == container_type::HBF &&
+      (Node->Parent->FirstChild->Attributes & ATTRIBUTE_MERGE))
+    {
+      container_node* Header = Node->Parent->FirstChild;
+      ReallocateNode(Interface, Header->FirstChild);
+    }
+
   }
 }
 
@@ -863,23 +1252,15 @@ CreateBorderNode(menu_interface* Interface, b32 Vertical, r32 Position, v4 Color
   Border.Thickness = Interface->BorderSize;
   Border.Color = Color;  
   container_node* Result = NewContainer(Interface, container_type::Border, ATTRIBUTE_DRAG);
-  border_leaf* BorderLeaf = GetContainerPayload(border_leaf, Result);
+  border_leaf* BorderLeaf = GetBorderNode(Result);
+  Assert(Result->Type == container_type::Border);
   *BorderLeaf = Border;
   return Result;
 }
 
-void SetFrameDragAttribute(container_node* BorderNode)
-{
-  border_leaf* BorderLeaf = GetContainerPayload(border_leaf, BorderNode);
-  draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(BorderNode, ATTRIBUTE_DRAG);
-  Draggable->Data = 0;
-  Draggable->Update = UpdateFrameBorder;
-}
-
-
 void SetSplitDragAttribute(container_node* SplitNode, container_node* BorderNode)
 {
-  border_leaf* BorderLeaf = GetContainerPayload(border_leaf, BorderNode);
+  border_leaf* BorderLeaf = GetBorderNode(BorderNode);
   draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(BorderNode, ATTRIBUTE_DRAG);
 
   Draggable->Data = (void*) SplitNode;
@@ -890,40 +1271,61 @@ void CreateSplitRootWindow( menu_interface* Interface, rect2f Region, b32 Vertic
                               v4 HeaderColor1, v4 BodyColor1, v4 FooterColor1,
                               v4 HeaderColor2, v4 BodyColor2, v4 FooterColor2)
 {
+  container_node* Header1 = 0;
+  {
+    Header1 = NewContainer(Interface, container_type::Color, ATTRIBUTE_DRAG);
+
+    GetColorNode(Header1)->Color = HeaderColor1;
+    Assert(Header1->Type == container_type::Color);
+    draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(Header1, ATTRIBUTE_DRAG);
+    Draggable->Data = 0;
+    Draggable->Update = SplitWindowHeaderDrag;
+  }
+
   // "Widget Body 1
   container_node* HBF1 = 0; // Root
   {
-    container_node* Header = NewContainer(Interface, container_type::Color);
-    GetContainerPayload(empty_leaf, Header)->Color = HeaderColor1;
-    container_node* Body = NewContainer(Interface, container_type::Color);
-    GetContainerPayload(empty_leaf, Body)->Color = BodyColor1;
+    container_node* Body = NewContainer(Interface, container_type::Color, ATTRIBUTE_MERGE_SLOT);
+    GetColorNode(Body)->Color = BodyColor1;
     container_node* Footer = NewContainer(Interface, container_type::Color);
-    GetContainerPayload(empty_leaf, Footer)->Color = FooterColor1;
+    GetColorNode(Footer)->Color = FooterColor1;
 
     HBF1 = NewContainer(Interface, container_type::HBF);
-    hbf_node* HBFP = GetContainerPayload(hbf_node, HBF1);
+    hbf_node* HBFP = GetHBFNode(HBF1);
     HBFP->HeaderSize = 0.02;
     HBFP->FooterSize = 0.02;
-    ConnectNode(HBF1, Header);
+    ConnectNode(HBF1, Header1);
     ConnectNode(HBF1, Body);
     ConnectNode(HBF1, Footer);
+  }
+
+  container_node* Header2 = 0;
+  {
+    Header2 = NewContainer(Interface, container_type::Color, ATTRIBUTE_DRAG); 
+    GetColorNode(Header2)->Color = HeaderColor2;
+    draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(Header2, ATTRIBUTE_DRAG);
+    Draggable->Data = 0;
+    Draggable->Update = SplitWindowHeaderDrag;
   }
 
   // "Widget Body 2
   container_node* HBF2 = 0; // Root
   {
-    container_node* Header = NewContainer(Interface, container_type::Color);
-    GetContainerPayload(empty_leaf, Header)->Color = HeaderColor2;
-    container_node* Body = NewContainer(Interface, container_type::Color);
-    GetContainerPayload(empty_leaf, Body)->Color = BodyColor2;
+    container_node* Body = NewContainer(Interface, container_type::Color, ATTRIBUTE_MERGE_SLOT);
+    GetColorNode(Body)->Color = BodyColor2;
     container_node* Footer = NewContainer(Interface, container_type::Color);
-    GetContainerPayload(empty_leaf, Footer)->Color = FooterColor2;
+    GetColorNode(Footer)->Color = FooterColor2;
 
     HBF2 = NewContainer(Interface, container_type::HBF);
-    hbf_node* HBFP = GetContainerPayload(hbf_node, HBF2);
+    hbf_node* HBFP = GetHBFNode(HBF2);
     HBFP->HeaderSize = 0.02;
     HBFP->FooterSize = 0.02;
-    ConnectNode(HBF2, Header);
+
+    merge_slot_attribute* MergeSlot = (merge_slot_attribute*) GetAttributePointer(Body, ATTRIBUTE_MERGE_SLOT);
+    MergeSlot->HotMergeZone = ArrayCount(MergeSlot->MergeZone);
+    *MergeSlot->MergeZone = {};
+
+    ConnectNode(HBF2, Header2);
     ConnectNode(HBF2, Body);
     ConnectNode(HBF2, Footer);
   }
@@ -936,14 +1338,10 @@ void CreateSplitRootWindow( menu_interface* Interface, rect2f Region, b32 Vertic
     SetSplitDragAttribute(SplitNode,BorderNode);
 
     // Connection 1
-    container_node* SplitBody1 = NewContainer(Interface, container_type::None, ATTRIBUTE_MERGE_SLOT);
-    ConnectNode(SplitNode, SplitBody1);
-    ConnectNode(SplitBody1, HBF1);
+    ConnectNode(SplitNode, HBF1);
 
     // Connection 2
-    container_node* SplitBody2 = NewContainer(Interface, container_type::None, ATTRIBUTE_MERGE_SLOT);
-    ConnectNode(SplitNode, SplitBody2);      
-    ConnectNode(SplitBody2, HBF2);
+    ConnectNode(SplitNode, HBF2);
   }
 
   menu_tree* Root = NewMenuTree(Interface); // Root
@@ -952,25 +1350,19 @@ void CreateSplitRootWindow( menu_interface* Interface, rect2f Region, b32 Vertic
   container_node* RootHeader = 0;
   // Root Header
   {
-    RootHeader = NewContainer(Interface, container_type::Color, ATTRIBUTE_DRAG| ATTRIBUTE_MERGE); 
-    GetContainerPayload(empty_leaf, RootHeader)->Color = V4(0.4,0.2,0.2,1);
-    
+    RootHeader = NewContainer(Interface, container_type::Color, ATTRIBUTE_DRAG); 
+    GetColorNode(RootHeader)->Color = V4(0.4,0.2,0.2,1);
+
     draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(RootHeader, ATTRIBUTE_DRAG);
     Draggable->Data = (void*) Root->Root;
     Draggable->Update = UpdateHeaderPosition;
-
-    mergable_attribute* Mergable = (mergable_attribute*) GetAttributePointer(RootHeader, ATTRIBUTE_MERGE);
-    Mergable->SrcNode = RootHeader;
-    Mergable->DstNode = 0;
-    Mergable->HotMergeZone = ArrayCount(Mergable->MergeZone);
-    *Mergable->MergeZone ={};
   }
 
   // Header Body Footer
   container_node* RHBF = 0;    
   {
-    RHBF = NewContainer(Interface, container_type::HBF, ATTRIBUTE_MERGE_SLOT);
-    hbf_node* HBFP = GetContainerPayload(hbf_node, RHBF);
+    RHBF = NewContainer(Interface, container_type::HBF);
+    hbf_node* HBFP = GetHBFNode(RHBF);
     HBFP->HeaderSize = 0.02;
     HBFP->FooterSize = 0;
     

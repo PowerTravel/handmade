@@ -29,7 +29,7 @@ menu_functions GetDefaultFunctions()
 
 MENU_DRAW( ColorDraw )
 {
-  DEBUGPushQuad(Node->Region, GetContainerPayload(empty_leaf, Node)->Color);
+  DEBUGPushQuad(Node->Region, GetColorNode(Node)->Color);
 }
 
 menu_functions GetColorFunctions()
@@ -42,7 +42,7 @@ menu_functions GetColorFunctions()
 
 MENU_DRAW( BorderDraw )
 {
-  DEBUGPushQuad(Node->Region, GetContainerPayload(border_leaf, Node)->Color);
+  DEBUGPushQuad(Node->Region, GetBorderNode(Node)->Color);
 }
 
 menu_functions GetBorderFunctions()
@@ -65,7 +65,7 @@ MENU_UPDATE_CHILD_REGIONS( RootUpdateChildRegions )
     {
       // Left->Right->Bot->Top;
       BorderNodes[BorderIndex] = Child;
-      Borders[BorderIndex] = GetContainerPayload(border_leaf, Child);
+      Borders[BorderIndex] = GetBorderNode(Child);
       BorderIndex++;
     }else{
       Assert(!Body);
@@ -150,32 +150,23 @@ MENU_UPDATE_CHILD_REGIONS( UpdateSplitChildRegions )
   container_node* BorderNode = 0;
   while(Child)
   {
-    switch(Child->Type)
+    if( Child->Type == container_type::Border)
     {
-      case container_type::None:
+      BorderNode = Child;
+    }else{
+      if(!Body1Node)
       {
-        if(!Body1Node)
-        {
-          Body1Node = Child;
-        }else{
-          Assert(!Body2Node);
-          Body2Node = Child;
-        }
-      }break;
-      case container_type::Border:
-      {
-        BorderNode = Child;
-      }break;
-      default:
-      {
-        INVALID_CODE_PATH;
-      }break;
+        Body1Node = Child;
+      }else{
+        Assert(!Body2Node);
+        Body2Node = Child;
+      }
     }
     Child = Child->NextSibling;
   }
 
   Assert(Body1Node && Body2Node && BorderNode);
-  border_leaf* Border = GetContainerPayload(border_leaf, BorderNode);
+  border_leaf* Border = GetBorderNode(BorderNode);
   if(Border->Vertical)
   {
     BorderNode->Region = Rect2f(
@@ -225,7 +216,7 @@ MENU_UPDATE_CHILD_REGIONS( UpdateHBFChildRegions )
 {
   container_node* Child = Parent->FirstChild;
   u32 Index = 0;
-  hbf_node* HBF = GetContainerPayload(hbf_node, Parent);
+  hbf_node* HBF = GetHBFNode(Parent);
   while(Child)
   {
     switch(Index)
