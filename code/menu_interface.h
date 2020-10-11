@@ -53,7 +53,7 @@ struct menu_tree;
 
 menu_interface* CreateMenuInterface();
 void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interface);
-container_node* NewContainer(menu_interface* Interface, container_type Type,  u32 Attributes = 0);
+container_node* NewContainer(menu_interface* Interface, container_type Type);
 void DeleteContainer(menu_interface* Interface, container_node* Node);
 menu_tree* NewMenuTree(menu_interface* Interface);
 void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree);
@@ -81,15 +81,26 @@ struct menu_functions
 
 menu_functions GetMenuFunction(container_type Type);
 
+struct memory_link
+{
+  u32 Size;
+  memory_link* Next;
+  memory_link* Previous;
+};
+
+struct menu_attribute_header
+{
+  container_attribute Type;
+  menu_attribute_header* Next;
+};
+
+
 struct container_node
 {
   container_type Type;
-  // TODO: Maybe implement attributes as a list. Just jumping ptrs to the right
-  //       Attribute shouldn't be a major speed problem. The benefit is we don't have to
-  //       reallocate whole nodes when adding or removing attributes and risk invalidating
-  //       pointers. We can use the same memory allocation scheme as for the nodes.
-
   u32 Attributes;
+  menu_attribute_header* FirstAttribute;
+
   // Tree Links (Menu Structure)
   u32 Depth;
   container_node* Parent;
@@ -97,17 +108,10 @@ struct container_node
   container_node* NextSibling;
   container_node* PreviousSibling;
 
-  
-  // List Links (Memory)
-  u32 ContainerSize;
-  u32 AttributeBaseOffset;
-  container_node* Next;
-  container_node* Previous;
-
   rect2f Region;
-
   menu_functions Functions;
 };
+
 
 struct root_node
 {
@@ -135,6 +139,7 @@ struct border_leaf
   r32 Thickness;
   v4 Color;
 };
+
 
 
 struct merge_slot_attribute
@@ -196,7 +201,7 @@ struct menu_interface
   u32 MaxMemSize;
   u8* MemoryBase;
   u8* Memory;
-  container_node Sentinel;
+  memory_link Sentinel;
 
   v2 MousePos;
   v2 PreviousMousePos;

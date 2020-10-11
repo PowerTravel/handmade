@@ -42,30 +42,30 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 
 #define ListInitiate( Sentinel ) \
 {                                          \
-  Sentinel->Previous = Sentinel;           \
-  Sentinel->Next = Sentinel;               \
+  (Sentinel)->Previous = (Sentinel);           \
+  (Sentinel)->Next = (Sentinel);               \
 }
 
 #define ListInsertAfter( Sentinel, Element ) \
 {                                        \
-  Element->Previous = Sentinel;          \
-  Element->Next = Sentinel->Next;        \
-  Element->Previous->Next = Element;     \
-  Element->Next->Previous = Element;     \
+  (Element)->Previous = (Sentinel);          \
+  (Element)->Next = (Sentinel)->Next;        \
+  (Element)->Previous->Next = (Element);     \
+  (Element)->Next->Previous = (Element);     \
 }
 
 #define ListInsertBefore( Sentinel, Element ) \
 {                                         \
-  Element->Previous = Sentinel->Previous; \
-  Element->Next = Sentinel;               \
-  Element->Previous->Next = Element;      \
-  Element->Next->Previous = Element;      \
+  (Element)->Previous = (Sentinel)->Previous; \
+  (Element)->Next = (Sentinel);               \
+  (Element)->Previous->Next = (Element);      \
+  (Element)->Next->Previous = (Element);      \
 }
 
 #define ListRemove( Element )        \
 {                                              \
-  Element->Previous->Next = Element->Next;     \
-  Element->Next->Previous = Element->Previous; \
+  (Element)->Previous->Next = (Element)->Next;     \
+  (Element)->Next->Previous = (Element)->Previous; \
 }
 
 #define Maximum(A, B) ((A > B) ? (A) : (B))
