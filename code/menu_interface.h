@@ -4,10 +4,11 @@ enum class container_type
 {
   None,
   Root,
-  Color,
+  Color, // <-- Should be an attribute
   Border,
   Split,
   HBF, // Header-Body-Footer
+  List,
 };
 
 enum container_attribute
@@ -16,7 +17,7 @@ enum container_attribute
   ATTRIBUTE_DRAG = 0x1,
   ATTRIBUTE_MERGE = 0x2,
   ATTRIBUTE_MERGE_SLOT = 0x4,
-  ATTRIBUTE_TABS = 0x8,
+  ATTRIBUTE_BUTTON = 0x8
 };
 
 
@@ -30,6 +31,7 @@ const c8* ToString(container_type Type)
     case container_type::Border: return "Border";
     case container_type::Split: return "Split";
     case container_type::HBF: return "HBF";
+    case container_type::List: return "List";
   }
   return "";
 };
@@ -41,7 +43,7 @@ const c8* ToString(u32 Type)
     case ATTRIBUTE_DRAG: return "Drag";
     case ATTRIBUTE_MERGE: return "Merge";
     case ATTRIBUTE_MERGE_SLOT: return "Slot";
-    case ATTRIBUTE_TABS: return "Tabs";
+    case ATTRIBUTE_BUTTON: return "Button";
   }
   return "";
 };
@@ -94,7 +96,6 @@ struct menu_attribute_header
   menu_attribute_header* Next;
 };
 
-
 struct container_node
 {
   container_type Type;
@@ -106,12 +107,11 @@ struct container_node
   container_node* Parent;
   container_node* FirstChild;
   container_node* NextSibling;
-  container_node* PreviousSibling;
+  //container_node* PreviousSibling;
 
   rect2f Region;
   menu_functions Functions;
 };
-
 
 struct root_node
 {
@@ -125,13 +125,6 @@ struct hbf_node
   r32 FooterSize;
 };
 
-struct tabbed_node
-{
-  u32 TabCount;
-  container_node* Tabs[12];
-  u32 SelectedTabOrdinal; // [1,3,4,5...], 0 means no tab selected
-};
-
 struct border_leaf
 {
   b32 Vertical;
@@ -140,6 +133,10 @@ struct border_leaf
   v4 Color;
 };
 
+struct list_node
+{
+  b32 Horizontal;
+};
 
 
 struct merge_slot_attribute
@@ -153,15 +150,26 @@ struct mergable_attribute
   merge_slot_attribute* Slot;
 };
 
-struct tabbed_attribute
+struct button_attribute
 {
-  u32 ActiveTabIndex;
-  container_node* Tabs[32];
+  binary_signal_state State;
+  void* Data;
+  void (*Update)( menu_interface* Interface, button_attribute* Attr);
+  void (*FreeMemory)( menu_interface* Interface, button_attribute* Attr);
+};
+
+struct tabbed_button_data
+{
+  container_node* TabbedHBF;
+  container_node* ItemHBF;
+  container_node* ItemHeader;
+  container_node* ItemBody;
+  container_node* ItemFooter;
 };
 
 struct draggable_attribute
 {
-  void* Data;
+  container_node* Node;
   void (*Update)( menu_interface* Interface, container_node* Node, draggable_attribute* Attr);
 };
 
@@ -187,6 +195,8 @@ struct menu_tree
 
   u32 ActiveLeafCount;
   container_node* ActiveLeafs[32];
+
+  // b32 ShouldDelete; <-- Implement later (Delete last in a cleanup phase)
 };
 
 
@@ -242,6 +252,12 @@ inline hbf_node* GetHBFNode(container_node* Container)
 {
   Assert(Container->Type == container_type::HBF);
   hbf_node* Result = (hbf_node*) GetContainerPayload(Container);
+  return Result;
+}
+inline list_node* GetListNode(container_node* Container)
+{
+  Assert(Container->Type == container_type::List);
+  list_node* Result = (list_node*) GetContainerPayload(Container);
   return Result;
 }
 

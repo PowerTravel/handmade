@@ -262,6 +262,34 @@ menu_functions GetHBFFunctions()
   return Result;
 }
 
+MENU_UPDATE_CHILD_REGIONS( UpdateListChildRegions )
+{
+  container_node* Child = Parent->FirstChild;
+  u32 Count = 0;
+  while(Child)
+  {
+    Child = Child->NextSibling;
+    Count++;
+  }
+
+  Child = Parent->FirstChild;
+  u32 Index = 0;
+  b32 Horizontal = GetListNode(Parent)->Horizontal;
+  while(Child)
+  {
+    Child->Region =  Horizontal ? GetHorizontalListRegion(Parent->Region, Index, Count) : GetVerticalListRegion(Parent->Region, Index, Count);
+    Child = Child->NextSibling;
+    Index++;
+  }
+}
+
+menu_functions GetListFunctions()
+{
+  menu_functions Result = GetDefaultFunctions();
+  Result.UpdateChildRegions = UpdateListChildRegions;
+  return Result;
+}
+
 menu_functions GetMenuFunction(container_type Type)
 {
   switch(Type)
@@ -272,6 +300,7 @@ menu_functions GetMenuFunction(container_type Type)
     case container_type::Border: return GetBorderFunctions();
     case container_type::Split: return GetSplitFunctions();
     case container_type::HBF: return GetHBFFunctions();
+    case container_type::List: return GetListFunctions();
     default: Assert(0);
   }
   return {};
