@@ -155,7 +155,6 @@ struct button_attribute
   binary_signal_state State;
   void* Data;
   void (*Update)( menu_interface* Interface, button_attribute* Attr);
-  void (*FreeMemory)( menu_interface* Interface, button_attribute* Attr);
 };
 
 struct tabbed_button_data
@@ -183,6 +182,7 @@ struct color_leaf
 {
   v4 Color;
 };
+
 
 struct menu_tree
 {
@@ -266,3 +266,6 @@ void SetSplitDragAttribute(container_node* SplitNode, container_node* BorderNode
 container_node* ReallocateNode(menu_interface* Interface, container_node* SrcNode, u32 InputAttributes = 0);
 void SwapNode(container_node* Out, container_node* In);
 void SplitWindowHeaderDrag( menu_interface* Interface, container_node* Node, draggable_attribute* Attr );
+
+
+container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical);
