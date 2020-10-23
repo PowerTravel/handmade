@@ -29,13 +29,24 @@ u32 GetAttributeSize(container_attribute Attribute)
   return 0; 
 }
 
+inline container_node* Previous(container_node* Node)
+{
+  return Node->PreviousSibling;
+}
+
+inline container_node* Next(container_node* Node)
+{
+  Assert(Node);
+  return Node->NextSibling;
+}
+
 u32 GetChildCount(container_node* Node)
 {
   container_node* Child = Node->FirstChild;
   u32 Count = 0;
   while(Child)
   {
-    Child = Child->NextSibling;
+    Child = Next(Child);
     Count++;
   }
   return Count;
@@ -48,33 +59,10 @@ u32 GetChildIndex(container_node* Node)
   u32 Count = 0;
   while(Child != Node)
   {
-    Child = Child->NextSibling;
+    Child = Next(Child);
     Count++;
   }
   return Count;
-}
-
-container_node* Next(container_node* Node)
-{
-  return Node->NextSibling;
-}
-
-container_node* Previous(container_node* Node)
-{
-  container_node* Result = 0;
-  if(Node->Parent)
-  {
-    container_node* Sibling = Node->Parent->FirstChild;
-    if(Sibling != Node)
-    {
-      while(Sibling->NextSibling != Node)
-      {
-        Sibling = Sibling->NextSibling;
-      }
-      Result = Sibling;
-    }
-  }
-  return Result;
 }
 
 container_node* GetChildFromIndex(container_node* Parent, u32 ChildIndex)
@@ -88,6 +76,82 @@ container_node* GetChildFromIndex(container_node* Parent, u32 ChildIndex)
   }
   return Result; 
 }
+
+void PivotNodes(container_node* ShiftLeft, container_node* ShiftRight)
+{
+  Assert(ShiftLeft->PreviousSibling == ShiftRight);
+  Assert(ShiftRight->NextSibling == ShiftLeft);
+  
+  ShiftRight->NextSibling = ShiftLeft->NextSibling;
+  if(ShiftRight->NextSibling)
+  {
+    ShiftRight->NextSibling->PreviousSibling = ShiftRight;
+  }
+
+  ShiftLeft->PreviousSibling = ShiftRight->PreviousSibling;
+  if(ShiftLeft->PreviousSibling)
+  {
+    ShiftLeft->PreviousSibling->NextSibling = ShiftLeft;
+  }else{
+    Assert(ShiftRight->Parent->FirstChild == ShiftRight);
+    ShiftRight->Parent->FirstChild = ShiftLeft;
+  }
+
+  ShiftLeft->NextSibling = ShiftRight;
+  ShiftRight->PreviousSibling = ShiftLeft;
+
+  Assert(ShiftRight->PreviousSibling == ShiftLeft);
+  Assert(ShiftLeft->NextSibling == ShiftRight);
+  
+}
+
+void ShiftLeft(container_node* ShiftLeft)
+{
+  if(!ShiftLeft->PreviousSibling)
+  {
+    return;
+  }
+  PivotNodes(ShiftLeft, ShiftLeft->PreviousSibling);
+}
+
+void ShiftRight(container_node* ShiftRight)
+{
+  if(!ShiftRight->NextSibling)
+  {
+    return;
+  }
+  PivotNodes(ShiftRight->NextSibling, ShiftRight); 
+}
+
+inline void
+ReplaceNode(container_node* Out, container_node* In)
+{  
+  if(In == Out) return;
+
+  In->Parent = Out->Parent;
+  if(In->Parent->FirstChild == Out)
+  {
+    In->Parent->FirstChild = In;
+  }
+
+  In->NextSibling = Out->NextSibling;
+  if(In->NextSibling)
+  {
+    In->NextSibling->PreviousSibling = In;  
+  }
+
+  In->PreviousSibling = Out->PreviousSibling;
+  if(In->PreviousSibling)
+  {
+    
+    In->PreviousSibling->NextSibling = In;
+  }
+
+  Out->NextSibling = 0;
+  Out->PreviousSibling = 0;
+  Out->Parent = 0;
+}
+
 
 
 u32 GetAttributeSize(u32 Attributes)
@@ -271,8 +335,6 @@ void* PushSize(menu_interface* Interface, u32 RequestedSize)
     
   }
   #endif
-
-
   return Result;
 }
 
@@ -392,12 +454,13 @@ void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree)
     if(Node)
     {
       container_node* NodeToDelete = Node->FirstChild;
-      Node->FirstChild = NodeToDelete->NextSibling;
+      Node->FirstChild = Next(NodeToDelete);
       DeleteContainer(Interface, NodeToDelete);
     }
   }
   DeleteContainer(Interface, Root);
 }
+
 
 
 //  PostOrder (Left, Right, Root),  Depth first.
@@ -409,7 +472,7 @@ u32_pair UpdateSubTreeDepthAndCount( u32 ParentDepth, container_node* SubTreeRoo
 
   // Make SubTreeRoot look like an actual root node
   container_node* SubTreeParent = SubTreeRoot->Parent;
-  container_node* SubTreeSibling = SubTreeRoot->NextSibling;
+  container_node* SubTreeSibling = Next(SubTreeRoot);
 
   SubTreeRoot->Parent = 0;
   SubTreeRoot->NextSibling = 0;
@@ -434,7 +497,7 @@ u32_pair UpdateSubTreeDepthAndCount( u32 ParentDepth, container_node* SubTreeRoo
     TotalDepth = Maximum(CurrentDepth, TotalDepth);
 
     // Step up until you find another sibling or we reach root
-    while(!CurrentNode->NextSibling && CurrentNode->Parent)
+    while(!Next(CurrentNode) && CurrentNode->Parent)
     {
       CurrentNode = CurrentNode->Parent;
       CurrentDepth--;
@@ -445,7 +508,7 @@ u32_pair UpdateSubTreeDepthAndCount( u32 ParentDepth, container_node* SubTreeRoo
 
     // Either we found another sibling and we can traverse that part of the tree
     //  or we are at root and root has no siblings and we are done.
-    CurrentNode = CurrentNode->NextSibling;
+    CurrentNode = Next(CurrentNode);
   }
 
   // Restore the Root
@@ -493,7 +556,7 @@ void UpdateRegions( menu_tree* Menu )
     while(Child)
     {
       ContainerStack[StackCount++] = Child;
-      Child = Child->NextSibling;
+      Child = Next(Child);
     }
   }
 
@@ -541,7 +604,7 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
     while(Child)
     {
       ContainerStack[StackCount++] = Child;
-      Child = Child->NextSibling;
+      Child = Next(Child);
     }
   }
 }
@@ -578,7 +641,7 @@ u32 GetIntersectingNodes(memory_arena* Arena, u32 NodeCount, container_node* Con
           {
             ContainerStack[StackCount++] = Child;
           }
-          Child = Child->NextSibling;
+          Child = Next(Child);
         }  
       }else{
         Result[IntersectingLeafCount++] = Parent;
@@ -593,15 +656,19 @@ container_node* ConnectNode(container_node* Parent, container_node* NewNode)
 {
   NewNode->Parent = Parent;
 
-  if( Parent )
-  {
-    container_node** Child = &Parent->FirstChild;
-    while(*Child)
+  container_node* Child = Parent->FirstChild;
+  if(!Parent->FirstChild){
+    Parent->FirstChild = NewNode;
+  }else{
+    while(Next(Child))
     {
-      Child = &((*Child)->NextSibling);
-    }
-    *Child = NewNode;
+      Child = Next(Child);
+    }  
+    Child->NextSibling = NewNode;
+    NewNode->PreviousSibling = Child;
   }
+  
+
 
   return NewNode;
 }
@@ -612,26 +679,22 @@ void DisconnectNode(container_node* Node)
   if(Parent)
   {
     Assert(Parent->FirstChild);
+    if(Node->PreviousSibling)
+    {
+      Node->PreviousSibling->NextSibling = Node->NextSibling;  
+    }
+    if(Node->NextSibling)
+    {
+      Node->NextSibling->PreviousSibling = Node->PreviousSibling;  
+    }
     if(Parent->FirstChild == Node)
     {
       Parent->FirstChild = Node->NextSibling;
-    }else{
-      container_node* Child = Parent->FirstChild;
-      while(Child->NextSibling)
-      {
-        if(Child->NextSibling == Node)
-        {
-          Child->NextSibling = Node->NextSibling;
-          break;
-        }
-        Child = Child->NextSibling;
-      }
-    }
-    
-    Node->Parent = 0;
+    }  
   }
-
+  Node->Parent = 0;
   Node->NextSibling = 0;
+  Node->PreviousSibling = 0;
 }
 
 void MoveMenuToTop(menu_interface* Interface, u32 WindowIndex)
@@ -721,7 +784,7 @@ void PrintHotLeafs(menu_interface* Interface)
           if(Sibling == Nodes[Depth])
           {
             Color = V4(1,1,0,1);
-            CheckPoints[Depth] = Sibling->NextSibling;
+            CheckPoints[Depth] = Next(Sibling);
           }
 
           for (u32 LeadIndex = 0; LeadIndex < Menu->HotLeafCount; ++LeadIndex)
@@ -744,7 +807,7 @@ void PrintHotLeafs(menu_interface* Interface)
           {
             break;
           }
-          Sibling = Sibling->NextSibling;
+          Sibling = Next(Sibling);
         }
       }
 
@@ -774,7 +837,7 @@ void PrintHotLeafs(menu_interface* Interface)
           DEBUGTextOutAt(XOff, YOff, StringBuffer, Color);
           YOff -= HeightStep;
 
-          Sibling = Sibling->NextSibling;
+          Sibling = Next(Sibling);
         }
       }
     }
@@ -991,7 +1054,7 @@ void UpdateHeaderPosition( menu_interface* Interface, container_node* Node, drag
   {
     border_leaf* Border = GetBorderNode(Child);
     UpdateFrameBorder(Interface, Border);
-    Child = Child->NextSibling;
+    Child = Next(Child);
   }
 }
 
@@ -1077,8 +1140,8 @@ void SetTabAsActive(container_node* TabbedHBF, u32 NewTabIndex)
 
   button_attribute* Button = (button_attribute*) GetAttributePointer(Tab, ATTRIBUTE_BUTTON);
   tabbed_button_data* Data = (tabbed_button_data*) Button->Data;
-  SwapNode(TabbedHBF->FirstChild->NextSibling, Data->ItemBody);
-  SwapNode(TabbedHBF->FirstChild->NextSibling->NextSibling, Data->ItemFooter);
+  ReplaceNode(TabbedHBF->FirstChild->NextSibling, Data->ItemBody);
+  ReplaceNode(TabbedHBF->FirstChild->NextSibling->NextSibling, Data->ItemFooter);
 }
 
 container_node* ExtractHBFFromTab(menu_interface* Interface, container_node* Tab)
@@ -1107,6 +1170,8 @@ container_node* ExtractHBFFromTab(menu_interface* Interface, container_node* Tab
 
   return HBF;  
 }
+
+
 
 void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 {
@@ -1163,7 +1228,7 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
       Assert(Visitor->Type == container_type::HBF);
       if(Visitor->Parent->Type == container_type::Root)
       {
-        Visitor = Node->NextSibling;
+        Visitor = Next(Node);
       }
 
       auto TabButtonUpdate = [](menu_interface* Interface, button_attribute* Attr)
@@ -1173,8 +1238,8 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
         container_node* ItemHBF = Data->ItemHBF;
         if(Interface->MouseLeftButton.Edge && Interface->MouseLeftButton.Active)
         {
-          SwapNode(TabbedHBF->FirstChild->NextSibling, Data->ItemBody);
-          SwapNode(TabbedHBF->FirstChild->NextSibling->NextSibling, Data->ItemFooter);
+          ReplaceNode(TabbedHBF->FirstChild->NextSibling, Data->ItemBody);
+          ReplaceNode(TabbedHBF->FirstChild->NextSibling->NextSibling, Data->ItemFooter);
         }
       };
 
@@ -1191,25 +1256,14 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
           Assert(PreviousTab);
           if(Interface->MousePos.X < (PreviousTab->Region.X +PreviousTab->Region.W/2.f))
           {
-            DisconnectNode(Node);
-            container_node* PreviousPreviousTab = Previous(PreviousTab);
-            if(!PreviousPreviousTab){
-              PreviousTab->Parent->FirstChild = Node;
-            }else{
-              PreviousPreviousTab->NextSibling = Node;
-            }
-            Node->NextSibling = PreviousTab;
-            Node->Parent = PreviousTab->Parent;
+            ShiftLeft(Node);
           }
         }else if(dX > 0 && Index < Count-1){
           container_node* NextTab = Next(Node);
           Assert(NextTab);
           if(Interface->MousePos.X > (NextTab->Region.X + NextTab->Region.W/2.f))
           {
-            DisconnectNode(Node);
-            Node->NextSibling = NextTab->NextSibling;
-            NextTab->NextSibling = Node;
-            Node->Parent = NextTab->Parent;
+            ShiftRight(Node);
           }
         }else if(SplitWindowSignal(Interface, Node->Parent))
         {
@@ -1237,7 +1291,7 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
             DisconnectNode(TabbedHBF->FirstChild);
             container_node* LastHBF = ExtractHBFFromTab(Interface, List->FirstChild);
 
-            SwapNode(TabbedHBF, LastHBF);
+            ReplaceNode(TabbedHBF, LastHBF);
 
             DeleteContainer(Interface, List);
             DeleteContainer(Interface, TabbedHBF);
@@ -1262,7 +1316,7 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 
         container_node* TabbedHeader = NewContainer(Interface, container_type::List);
         ConnectNode(TabbedHBF, TabbedHeader);
-        SwapNode(HomeHBF, TabbedHBF);
+        ReplaceNode(HomeHBF, TabbedHBF);
 
         GetListNode(TabbedHeader)->Horizontal = true;
 
@@ -1384,8 +1438,8 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
         Assert(ButtonData);
         if(HBFIndex == HBFCount-1)
         {
-          SwapNode(ButtonData->TabbedHBF->FirstChild->NextSibling, ButtonData->ItemBody);
-          SwapNode(ButtonData->TabbedHBF->FirstChild->NextSibling->NextSibling, ButtonData->ItemFooter);
+          ReplaceNode(ButtonData->TabbedHBF->FirstChild->NextSibling, ButtonData->ItemBody);
+          ReplaceNode(ButtonData->TabbedHBF->FirstChild->NextSibling->NextSibling, ButtonData->ItemFooter);
         }
       }
 
@@ -1408,7 +1462,7 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
       
       if(Visitor->Parent->Type == container_type::Root)
       {
-        Visitor = Node->NextSibling;
+        Visitor = Next(Node);
       }
       
       if(Visitor->Type == container_type::HBF)
@@ -1423,7 +1477,7 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
       DisconnectNode(Visitor);
 
       container_node* SplitNode = SplitNode = CreateSplitWindow(Interface, (ZoneIndex == 0 || ZoneIndex == 2));
-      SwapNode(HomeHBF, SplitNode);
+      ReplaceNode(HomeHBF, SplitNode);
 
       if( ZoneIndex == 0  || ZoneIndex == 3)
       {
@@ -1553,35 +1607,14 @@ container_node* GetPreviousSibling(container_node* Node)
     container_node* Sibling = Node->Parent->FirstChild;
     if(Sibling != Node)
     {
-      while(Sibling->NextSibling != Node)
+      while(Next(Sibling) != Node)
       {
-        Sibling = Sibling->NextSibling;
+        Sibling = Next(Sibling);
       }
       Result = Sibling;
     }
   }
   return Result;
-}
-
-inline void
-SwapNode(container_node* Out, container_node* In)
-{  
-  if(In == Out) return;
-  In->Parent = Out->Parent;
-  In->NextSibling = Out->NextSibling;
-
-  container_node* Sibling = GetPreviousSibling(Out);
-  if(Sibling)
-  {
-    Assert(Sibling->NextSibling == Out);
-    Sibling->NextSibling = In;
-  }else{
-    Assert(Out->Parent->FirstChild == Out);
-    In->Parent->FirstChild = In;
-  }
-
-  Out->NextSibling = 0;
-  Out->Parent = 0;
 }
 
 
@@ -1606,7 +1639,7 @@ void SplitWindow(menu_interface* Interface, container_node* WindowToRemove, rect
   DisconnectNode(WindowToRemove);
   DisconnectNode(WindowToRemain);
 
-  SwapNode(SplitNodeToSwapOut, WindowToRemain);
+  ReplaceNode(SplitNodeToSwapOut, WindowToRemain);
 
   // Remove Drag attribute from windows to remain (if it's a single HBF under a RootHBF)
   // and windows to remove

@@ -78,7 +78,7 @@ struct menu_functions
 {
   menu_get_region* UpdateChildRegions;
   menu_handle_input* HandleInput;
-  menu_draw*  Draw;
+  menu_draw* Draw;
 };
 
 menu_functions GetMenuFunction(container_type Type);
@@ -96,6 +96,11 @@ struct menu_attribute_header
   menu_attribute_header* Next;
 };
 
+struct menu_tree_child_list
+{
+  
+};
+
 struct container_node
 {
   container_type Type;
@@ -107,7 +112,7 @@ struct container_node
   container_node* Parent;
   container_node* FirstChild;
   container_node* NextSibling;
-  //container_node* PreviousSibling;
+  container_node* PreviousSibling;
 
   rect2f Region;
   menu_functions Functions;
@@ -183,7 +188,6 @@ struct color_leaf
   v4 Color;
 };
 
-
 struct menu_tree
 {
   u32 NodeCount;
@@ -222,6 +226,7 @@ struct menu_interface
   r32 BorderSize;
   r32 HeaderSize;
   r32 MinSize;
+
 };
 
 inline u8* GetContainerPayload( container_node* Container )

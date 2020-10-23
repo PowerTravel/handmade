@@ -2,7 +2,6 @@
   TODO:
   - Saved game locations
   - Asset loading path
-  - Threading (launch a thread)
   - Raw Input (support for multiple keyboards)
   - Sleep/timeBeginPeriod
   - WM_SETCURSOR (control cursor visibility)
