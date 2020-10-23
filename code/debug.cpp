@@ -8,6 +8,7 @@ u8* DEBUGPushSize_(debug_state* DebugState, u32 Size)
   return Result;
 }
 
+MENU_DRAW(DrawFunctionTimeline);
 #define DEBUGPushStruct(DebugState, type) (type*) DEBUGPushSize_(DebugState, sizeof(type))
 #define DEBUGPushArray(DebugState, count, type) (type*) DEBUGPushSize_(DebugState, count*sizeof(type))
 #define DEBUGPushCopy(DebugState, Size, Src) utils::Copy(Size, (void*) (Src), (void*) DEBUGPushSize_(DebugState, Size))
@@ -131,6 +132,12 @@ DEBUGGetState()
     OptionsMenu->MenuItemCount = ArrayCount(OptionMenuItems);
     OptionsMenu->MenuItems = (menu_item*) DEBUGPushCopy(DebugState, sizeof(OptionMenuItems), OptionMenuItems);
 
+    
+    container_node* Body = NewContainer(GlobalGameState->MenuInterface, container_type::None);
+    Body->Functions.Draw = DrawFunctionTimeline;
+    container_node* HBF = CreateDraggableHBF(GlobalGameState->MenuInterface, V4(0.5,0.5,0.5,1), Body);
+    
+    CreateNewRootContainer(GlobalGameState->MenuInterface, HBF, Rect2f( 0.85, 0.25, 0.5, 0.5));
 
     RestartCollation();
   }
@@ -797,6 +804,93 @@ void UpdateFunctionPointers(debug_state* DebugState)
   }
 }
 
+MENU_DRAW(DrawFunctionTimeline)
+{
+  rect2f Chart = Node->Region;
+
+  DEBUGPushQuad(Chart, V4(0,0,0,0.5));
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 AspectRatio = WindowSize.WidthPx/WindowSize.HeightPx;
+  m4 ScreenToCubeScale =  M4( 2/AspectRatio, 0, 0, 0,
+                                           0, 2, 0, 0,
+                                           0, 0, 0, 0,
+                                           0, 0, 0, 1);
+  m4 ScreenToCubeTrans =  M4( 1, 0, 0, -1,
+                              0, 1, 0, -1,
+                              0, 0, 1,  0,
+                              0, 0, 0,  1);
+
+  debug_state* DebugState = DEBUGGetState();
+  u32 MaxFramesToDisplay = DebugState->FrameCount < 10 ? DebugState->FrameCount : 10;
+  r32 BarWidth = Chart.H/MaxFramesToDisplay;
+  r32 LaneWidth = BarWidth/(r32)DebugState->FrameBarLaneCount;
+  r32 LaneScale = Chart.W/(r32)DebugState->FrameBarRange;
+
+  v4 ColorTable[] = {V4(1,0,0,1),
+                     V4(0,1,0,1),
+                     V4(0,0,1,1),
+                     V4(1,1,0,1),
+                     V4(1,0,1,1),
+                     V4(0,1,1,1),
+                     V4(1,1,1,1),
+                     V4(0,0,0,1)};
+
+  debug_record* HotRecord = 0;
+
+  r32 MouseX = Interface->MousePos.X;
+  r32 MouseY = Interface->MousePos.Y;
+
+  for(u32 FrameIndex = 0; FrameIndex < MaxFramesToDisplay; ++FrameIndex)
+  {
+    debug_frame* Frame = DebugState->Frames + DebugState->FrameCount - (FrameIndex+1);
+    r32 StackX = Chart.X;
+    r32 StackY = Chart.Y+Chart.H - (r32)(FrameIndex+1)*BarWidth;
+    for(u32 RegionIndex = 0; RegionIndex < Frame->RegionCount; ++RegionIndex)
+    {
+      debug_frame_region* Region = Frame->Regions + RegionIndex;
+      v4 Color = ColorTable[(u32)(Region->ColorIndex%ArrayCount(ColorTable))];
+      r32 MinX = StackX + LaneScale*Region->MinT;
+      r32 MaxX = StackX + LaneScale*Region->MaxT;
+      r32 MinY = StackY + LaneWidth*Region->LaneIndex;
+      r32 MaxY = MinY + LaneWidth;
+      rect2f Rect = {};
+      Rect.X = MinX;
+      Rect.Y = MinY;
+      Rect.W = MaxX-MinX;
+      Rect.H = (MaxY-MinY)*0.9f;
+
+      DEBUGPushQuad(Rect, Color);
+
+      if(Intersects(Rect,Interface->MousePos))
+      {
+        c8 StringBuffer[256] = {};
+        Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
+        "%s : %2.2f MCy", Region->Record->BlockName, (Region->MaxT-Region->MinT)/1000000.f);
+        DEBUGTextOutAt(MouseX, MouseY+0.02f, StringBuffer);
+        if(Interface->MouseLeftButton.Edge && Interface->MouseLeftButton.Active)
+        {
+          HotRecord = Region->Record;
+        }
+      }
+    }
+  }
+  if(Interface->MouseLeftButton.Edge && Interface->MouseLeftButton.Active)
+  {
+    if((MouseX >= 0) && (MouseX <= AspectRatio) &&
+       (MouseY >= 0) && (MouseY <= 1))
+    {
+      if(HotRecord)
+      {
+        DebugState->ScopeToRecord = HotRecord;
+      }else if(DebugState->ScopeToRecord){
+        DebugState->ScopeToRecord = 0;
+      }
+      RefreshCollation();
+    }
+  }
+}
+
+
 void PushDebugOverlay(game_input* GameInput)
 {
   TIMED_FUNCTION();
@@ -855,78 +949,7 @@ void PushDebugOverlay(game_input* GameInput)
   if(!DebugState->ChartVisible) return;
   if(!GlobalGameState->MenuInterface->RootContainers[0].Root) return;
 
-  rect2f Chart = GlobalGameState->MenuInterface->RootContainers[0].Root->Region;
-
-  u32 MaxFramesToDisplay = DebugState->FrameCount < 10 ? DebugState->FrameCount : 10;
-  r32 BarWidth = Chart.H/MaxFramesToDisplay;
-  r32 LaneWidth = BarWidth/(r32)DebugState->FrameBarLaneCount;
-  r32 LaneScale = Chart.W/(r32)DebugState->FrameBarRange;
-
-  v4 ColorTable[] = {V4(1,0,0,1),
-                     V4(0,1,0,1),
-                     V4(0,0,1,1),
-                     V4(1,1,0,1),
-                     V4(1,0,1,1),
-                     V4(0,1,1,1),
-                     V4(1,1,1,1),
-                     V4(0,0,0,1)};
-
-  debug_record* HotRecord = 0;
-
-#if 0
-  for(u32 FrameIndex = 0; FrameIndex < MaxFramesToDisplay; ++FrameIndex)
-  {
-    debug_frame* Frame = DebugState->Frames + DebugState->FrameCount - (FrameIndex+1);
-    r32 StackX = Chart.X;
-    r32 StackY = Chart.Y+Chart.H - (r32)(FrameIndex+1)*BarWidth;
-    for(u32 RegionIndex = 0; RegionIndex < Frame->RegionCount; ++RegionIndex)
-    {
-      debug_frame_region* Region = Frame->Regions + RegionIndex;
-      v4 Color = ColorTable[(u32)(Region->ColorIndex%ArrayCount(ColorTable))];
-      r32 MinX = StackX + LaneScale*Region->MinT;
-      r32 MaxX = StackX + LaneScale*Region->MaxT;
-      r32 MinY = StackY + LaneWidth*Region->LaneIndex;
-      r32 MaxY = MinY + LaneWidth;
-      rect2f Rect = {};
-      Rect.X = MinX;
-      Rect.Y = MinY;
-      Rect.W = MaxX-MinX;
-      Rect.H = (MaxY-MinY)*0.9f;
-
-      DEBUGPushQuad(Rect, Color);
-
-      if((GameInput->MouseX >= Rect.X) && (GameInput->MouseX <= Rect.X+Rect.W) &&
-         (GameInput->MouseY >= Rect.Y) && (GameInput->MouseY <= Rect.Y+Rect.H))
-      {
-        c8 StringBuffer[256] = {};
-        Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
-        "%s : %2.2f MCy", Region->Record->BlockName, (Region->MaxT-Region->MinT)/1000000.f);
-        DEBUGTextOutAt(GameInput->MouseX, GameInput->MouseY+0.02f, StringBuffer);
-        if(GameInput->MouseButton[PlatformMouseButton_Left].Pushed)
-        {
-          HotRecord = Region->Record;
-        }
-      }
-    }
-  }
-  if(GameInput->MouseButton[PlatformMouseButton_Left].Pushed)
-  {
-    if((GameInput->MouseX >= 0) && (GameInput->MouseX <= AspectRatio) &&
-       (GameInput->MouseY >= 0) && (GameInput->MouseY <= 1))
-    {
-      if(HotRecord)
-      {
-        DebugState->ScopeToRecord = HotRecord;
-      }else if(DebugState->ScopeToRecord){
-        DebugState->ScopeToRecord = 0;
-      }
-      RefreshCollation();
-    }
-  }
-
-  #endif
 }
-
 
 void DrawFunctionCount(){
   //Assert(DebugState->SnapShotIndex < SNAPSHOT_COUNT);

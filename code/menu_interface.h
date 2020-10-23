@@ -96,11 +96,6 @@ struct menu_attribute_header
   menu_attribute_header* Next;
 };
 
-struct menu_tree_child_list
-{
-  
-};
-
 struct container_node
 {
   container_type Type;
@@ -269,8 +264,9 @@ inline list_node* GetListNode(container_node* Container)
 
 void SetSplitDragAttribute(container_node* SplitNode, container_node* BorderNode);
 container_node* ReallocateNode(menu_interface* Interface, container_node* SrcNode, u32 InputAttributes = 0);
-void SwapNode(container_node* Out, container_node* In);
 void SplitWindowHeaderDrag( menu_interface* Interface, container_node* Node, draggable_attribute* Attr );
+menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* BaseWindow, rect2f Region);
+container_node* CreateDraggableHBF(menu_interface* Interface, v4 HeaderColor, container_node* BodyNode);
 
 
 container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical);

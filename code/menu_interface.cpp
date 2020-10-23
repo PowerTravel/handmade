@@ -1743,6 +1743,29 @@ container_node* CreateDummyHBF(menu_interface* Interface, v4 HeaderColor, v4 Bod
   return HBF;
 }
 
+container_node* CreateDraggableHBF(menu_interface* Interface, v4 HeaderColor, container_node* BodyNode)
+{
+  container_node* Header = NewContainer(Interface, container_type::Color);
+  draggable_attribute* Draggable = (draggable_attribute*) PushAttribute(Interface, Header, ATTRIBUTE_DRAG);
+  Draggable->Node = 0;
+  Draggable->Update = SplitWindowHeaderDrag;
+
+  GetColorNode(Header)->Color = HeaderColor;
+
+  PushOrGetAttribute(Interface, BodyNode, ATTRIBUTE_MERGE_SLOT);
+
+  container_node* Footer = NewContainer(Interface, container_type::None);
+
+  container_node* HBF = NewContainer(Interface, container_type::HBF);
+  hbf_node* HBFP = GetHBFNode(HBF);
+  HBFP->HeaderSize = 0.02;
+  HBFP->FooterSize = 0;
+  ConnectNode(HBF, Header);
+  ConnectNode(HBF, BodyNode);
+  ConnectNode(HBF, Footer);
+
+  return HBF;
+}
 container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical)
 {
   container_node* SplitNode  = NewContainer(Interface, container_type::Split);
