@@ -160,7 +160,8 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   LookAt(Camera, 1*V3(0,3,-8), V3(0,3,0));
 
   component_controller* Controller = GetControllerComponent(ControllableCamera);
-  Controller->Controller = GetController(Input, 1);
+  Controller->Controller = GetController(Input, 0);
+  Controller->Keyboard = &Input->Keyboard;
   Controller->Type = ControllerType_FlyingCamera;
 
   u32 LightEntity = NewEntity( EM );

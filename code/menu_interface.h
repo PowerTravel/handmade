@@ -185,6 +185,8 @@ struct color_leaf
 
 struct menu_tree
 {
+  b32 Visible;
+
   u32 NodeCount;
   u32 Depth;
   container_node* Root;
@@ -215,6 +217,7 @@ struct menu_interface
   v2 MousePos;
   v2 PreviousMousePos;
   binary_signal_state MouseLeftButton;
+  binary_signal_state KeyM;
   v2 MouseLeftButtonPush;
   v2 MouseLeftButtonRelese;
 

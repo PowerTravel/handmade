@@ -344,6 +344,122 @@ struct game_button_state
   b32 Released;
 };
 
+struct keyboard_input
+{
+  union
+  {
+    game_button_state Keys[104];
+    struct
+    {
+      game_button_state Key_BACK;
+      game_button_state Key_TAB;
+      game_button_state Key_SHIFT;
+      game_button_state Key_CTRL;
+      game_button_state Key_CLR;
+      game_button_state Key_ALT;
+      game_button_state Key_ENTER;
+      game_button_state Key_PAUSE;
+      game_button_state Key_CPSLCK;
+      game_button_state Key_ESCAPE;
+      game_button_state Key_SPACE;
+      game_button_state Key_PGUP;
+      game_button_state Key_PDWN;
+      game_button_state Key_END;
+      game_button_state Key_HOME;
+      game_button_state Key_LEFT;
+      game_button_state Key_UP;
+      game_button_state Key_RIGHT;
+      game_button_state Key_DOWN;
+      game_button_state Key_PRTSC;
+      game_button_state Key_INS;
+      game_button_state Key_DEL;
+      game_button_state Key_0;
+      game_button_state Key_1;
+      game_button_state Key_2;
+      game_button_state Key_3;
+      game_button_state Key_4;
+      game_button_state Key_5;
+      game_button_state Key_6;
+      game_button_state Key_7;
+      game_button_state Key_8;
+      game_button_state Key_9;
+      game_button_state Key_A;
+      game_button_state Key_B;
+      game_button_state Key_C;
+      game_button_state Key_D;
+      game_button_state Key_E;
+      game_button_state Key_F;
+      game_button_state Key_G;
+      game_button_state Key_H;
+      game_button_state Key_I;
+      game_button_state Key_J;
+      game_button_state Key_K;
+      game_button_state Key_L;
+      game_button_state Key_M;
+      game_button_state Key_N;
+      game_button_state Key_O;
+      game_button_state Key_P;
+      game_button_state Key_Q;
+      game_button_state Key_R;
+      game_button_state Key_S;
+      game_button_state Key_T;
+      game_button_state Key_U;
+      game_button_state Key_V;
+      game_button_state Key_W;
+      game_button_state Key_X;
+      game_button_state Key_Y;
+      game_button_state Key_Z;
+      game_button_state Key_LWIN;
+      game_button_state Key_RWIN;
+      game_button_state Key_NP_0;
+      game_button_state Key_NP_1;
+      game_button_state Key_NP_2;
+      game_button_state Key_NP_3;
+      game_button_state Key_NP_4;
+      game_button_state Key_NP_5;
+      game_button_state Key_NP_6;
+      game_button_state Key_NP_7;
+      game_button_state Key_NP_8;
+      game_button_state Key_NP_9;
+      game_button_state Key_NP_STAR;
+      game_button_state Key_NP_PLUS;
+      game_button_state Key_NP_DASH;
+      game_button_state Key_NP_DEL;
+      game_button_state Key_NP_SLASH;
+      game_button_state Key_F1;
+      game_button_state Key_F2;
+      game_button_state Key_F3;
+      game_button_state Key_F4;
+      game_button_state Key_F5;
+      game_button_state Key_F6;
+      game_button_state Key_F7;
+      game_button_state Key_F8;
+      game_button_state Key_F9;
+      game_button_state Key_F10;
+      game_button_state Key_F11;
+      game_button_state Key_F12;
+      game_button_state Key_NP_NMLK;
+      game_button_state Key_SCRLK;
+      game_button_state Key_LSHIFT;
+      game_button_state Key_RSHIFT;
+      game_button_state Key_LCTRL;
+      game_button_state Key_RCTRL;
+      game_button_state Key_COLON;
+      game_button_state Key_EQUAL;
+      game_button_state Key_COMMA;
+      game_button_state Key_DASH;
+      game_button_state Key_DOT;
+      game_button_state Key_FSLASH;
+      game_button_state Key_TILDE;
+      game_button_state Key_LBRACKET;
+      game_button_state Key_RBSLASH;
+      game_button_state Key_RBRACKET;
+      game_button_state Key_QUOTE;
+      game_button_state Key_LBSLASH;
+    };
+  };
+};
+
 struct game_controller_input
 {
   b32 IsAnalog;
@@ -415,6 +531,116 @@ enum mouse_button{
   PlatformMouseButton_Count
 };
 
+enum keyboard_button
+{
+  KeyboardButton_BACK,
+  KeyboardButton_TAB,
+  KeyboardButton_SHIFT,
+  KeyboardButton_CTRL,
+  KeyboardButton_CLR,
+  KeyboardButton_ALT,
+  KeyboardButton_ENTER,
+  KeyboardButton_PAUSE,
+  KeyboardButton_CPSLCK,
+  KeyboardButton_ESCAPE,
+  KeyboardButton_SPACE,
+  KeyboardButton_PGUP,
+  KeyboardButton_PDWN,
+  KeyboardButton_END,
+  KeyboardButton_HOME,
+  KeyboardButton_LEFT,
+  KeyboardButton_UP,
+  KeyboardButton_RIGHT,
+  KeyboardButton_DOWN,
+  KeyboardButton_PRTSC,
+  KeyboardButton_INS,
+  KeyboardButton_DEL,
+  KeyboardButton_0,
+  KeyboardButton_1,
+  KeyboardButton_2,
+  KeyboardButton_3,
+  KeyboardButton_4,
+  KeyboardButton_5,
+  KeyboardButton_6,
+  KeyboardButton_7,
+  KeyboardButton_8,
+  KeyboardButton_9,
+  KeyboardButton_A,
+  KeyboardButton_B,
+  KeyboardButton_C,
+  KeyboardButton_D,
+  KeyboardButton_E,
+  KeyboardButton_F,
+  KeyboardButton_G,
+  KeyboardButton_H,
+  KeyboardButton_I,
+  KeyboardButton_J,
+  KeyboardButton_K,
+  KeyboardButton_L,
+  KeyboardButton_M,
+  KeyboardButton_N,
+  KeyboardButton_O,
+  KeyboardButton_P,
+  KeyboardButton_Q,
+  KeyboardButton_R,
+  KeyboardButton_S,
+  KeyboardButton_T,
+  KeyboardButton_U,
+  KeyboardButton_V,
+  KeyboardButton_W,
+  KeyboardButton_X,
+  KeyboardButton_Y,
+  KeyboardButton_Z,
+  KeyboardButton_LWIN,
+  KeyboardButton_RWIN,
+  KeyboardButton_NP_0,
+  KeyboardButton_NP_1,
+  KeyboardButton_NP_2,
+  KeyboardButton_NP_3,
+  KeyboardButton_NP_4,
+  KeyboardButton_NP_5,
+  KeyboardButton_NP_6,
+  KeyboardButton_NP_7,
+  KeyboardButton_NP_8,
+  KeyboardButton_NP_9,
+  KeyboardButton_NP_STAR,
+  KeyboardButton_NP_PLUS,
+  KeyboardButton_NP_DASH,
+  KeyboardButton_NP_DEL,
+  KeyboardButton_NP_SLASH,
+  KeyboardButton_F1,
+  KeyboardButton_F2,
+  KeyboardButton_F3,
+  KeyboardButton_F4,
+  KeyboardButton_F5,
+  KeyboardButton_F6,
+  KeyboardButton_F7,
+  KeyboardButton_F8,
+  KeyboardButton_F9,
+  KeyboardButton_F10,
+  KeyboardButton_F11,
+  KeyboardButton_F12,
+  KeyboardButton_NP_NMLK,
+  KeyboardButton_LSHIFT,
+  KeyboardButton_RSHIFT,
+  KeyboardButton_LCTRL,
+  KeyboardButton_RCTRL,
+  KeyboardButton_COLON,
+  KeyboardButton_EQUAL,
+  KeyboardButton_COMMA,
+  KeyboardButton_DASH,
+  KeyboardButton_DOT,
+  KeyboardButton_FSLASH,
+  KeyboardButton_TILDE,
+  KeyboardButton_LBRACKET,
+  KeyboardButton_RBSLASH,
+  KeyboardButton_RBRACKET,
+  KeyboardButton_QUOTE,
+  KeyboardButton_LBSLASH,
+  KeyboardButton_COUNT
+};
+
+
 struct game_input
 {
   // GameUpdateTime
@@ -425,15 +651,16 @@ struct game_input
   r32 MouseX, MouseY, MouseZ;
 
   // Todo: handle keyboard like this? Use raw input?
-  //game_button_state KeyboardButton[104];
+  //game_button_state KeyboardButton[104];,
 
-  game_controller_input Controllers[5];
+  keyboard_input Keyboard;
+  game_controller_input Controllers[4];
 };
 
 inline game_controller_input* GetController(game_input* Input, s32 ControllerIndex)
 {
   Assert( ControllerIndex < ArrayCount( Input->Controllers ) );
-  game_controller_input* Result  = &Input->Controllers[ControllerIndex];
+  game_controller_input* Result = &Input->Controllers[ControllerIndex];
   return Result;
 }
 

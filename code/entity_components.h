@@ -51,6 +51,7 @@ enum ControllerType
 };
 struct component_controller
 {
+  keyboard_input* Keyboard;
   game_controller_input* Controller;
   u32 Type;
 };

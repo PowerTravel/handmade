@@ -781,24 +781,24 @@ Win32EndInputPlayback(win32_state* aState)
 }
 
 internal void
-Win32RecordInput(win32_state* aState, game_input* aNewInput)
+Win32RecordInput(win32_state* aState, game_input* NewInput)
 {
   DWORD BytesWritten;
-  WriteFile(aState->RecordingHandle, aNewInput, sizeof(*aNewInput), &BytesWritten, 0);
+  WriteFile(aState->RecordingHandle, NewInput, sizeof(*NewInput), &BytesWritten, 0);
 }
 
 internal void
-Win32PlayBackInput(win32_state*  aState, game_input* aNewInput)
+Win32PlayBackInput(win32_state*  aState, game_input* NewInput)
 {
   DWORD BytesRead;
-  if(ReadFile( aState->PlaybackHandle, aNewInput, sizeof( *aNewInput ), &BytesRead, 0 ) )
+  if(ReadFile( aState->PlaybackHandle, NewInput, sizeof( *NewInput ), &BytesRead, 0 ) )
   {
     if(BytesRead==0)
     {
       s32 PlayingIndex =  aState->PlayingIndex;
       Win32EndInputPlayback( aState );
       Win32BeginInputPlayBack( aState, PlayingIndex );
-      ReadFile( aState->PlaybackHandle, aNewInput, sizeof( *aNewInput ), &BytesRead, 0);
+      ReadFile( aState->PlaybackHandle, NewInput, sizeof( *NewInput ), &BytesRead, 0);
     }
   }
 }
@@ -902,16 +902,16 @@ Win32ToggleFullscreen(HWND Window)
 }
 
 internal void
-Win32ProcessKeyboard(win32_state* aState,  game_controller_input*  aOldKeyboardController, game_controller_input* aKeyboardController)
+Win32ProcessKeyboard(win32_state* aState,  keyboard_input*  OldKeyboardController, keyboard_input* NewKeyboardController)
 {
-  *aKeyboardController = {};
-  aKeyboardController->IsConnected = true;
+  *NewKeyboardController = {};
+  Assert(ArrayCount(NewKeyboardController->Keys) == KeyboardButton_COUNT);
   for(s32 ButtonIndex = 0;
-    ButtonIndex  < ArrayCount(aKeyboardController->Button);
+    ButtonIndex  < KeyboardButton_COUNT;
     ++ButtonIndex)
   {
-    aKeyboardController->Button[ButtonIndex].EndedDown =
-      aOldKeyboardController->Button[ButtonIndex].EndedDown;
+    NewKeyboardController->Keys[ButtonIndex].EndedDown =
+      OldKeyboardController->Keys[ButtonIndex].EndedDown;
   }
 
   MSG Message;
@@ -937,153 +937,255 @@ Win32ProcessKeyboard(win32_state* aState,  game_controller_input*  aOldKeyboardC
 
         b32 AltKeyWasDown   = ( Message.lParam & (1 << 29));
         b32 ShiftKeyWasDown = ( GetKeyState(VK_SHIFT) & (1 << 15));
-
+        
         if(WasDown != IsDown)
         {
-
-          if(VKCode == 'W')
+          switch(VKCode)
           {
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->LeftStickUp, IsDown);
-//                &aKeyboardController->LeftStickAverageY, 1.0);
-
-          }else if(VKCode == 'A'){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->LeftStickLeft, IsDown);
-//                &aKeyboardController->LeftStickAverageX, -1.0);
-
-          }else if(VKCode == 'S'){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->LeftStickDown, IsDown);
-//                &aKeyboardController->LeftStickAverageY, -1.0);
-          }else if(VKCode == 'D'){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->LeftStickRight, IsDown);
-//                &aKeyboardController->LeftStickAverageX, 1.0);
-          }else if(VKCode == 'Q'){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->LeftShoulder, IsDown);
-
-          }else if(VKCode == 'E'){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->RightShoulder, IsDown);
-
-          }else if(VKCode == VK_UP){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->RightStickUp, IsDown);
-//                &aKeyboardController->RightStickAverageY, 1.0);
-          }else if(VKCode == VK_LEFT){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->RightStickLeft, IsDown);
-//                &aKeyboardController->RightStickAverageX, -1.0);
-          }else if(VKCode == VK_DOWN){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->RightStickDown, IsDown);
-//                &aKeyboardController->RightStickAverageY, -1.0);
-          }else if(VKCode == VK_RIGHT){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->RightStickRight, IsDown);
-//                &aKeyboardController->RightStickAverageX, 1.0);
-          }else if(VKCode == VK_ESCAPE){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->Select, IsDown);
-            GlobalRunning = false;
-          }else if(VKCode == VK_SPACE){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->Start, IsDown);
-          }
-
-#if 0
-          // TODO: Map all the other buttons to the keyboard
-          else if(VKCode == ){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->DPadUp, IsDown);
-          }else if(VKCode == ){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->DPadLeft, IsDown);
-          }else if(VKCode == ){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->DPadDown, IsDown);
-          }else if(VKCode == ){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->DPadRight, IsDown);
-          }else if(VKCode == ){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->RightTrigger, IsDown);
-//                &aKeyboardController->RightTriggerAverage, 1.0);
-          }else if(VKCode == ){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->LeftTrigger, IsDown);
-//                &aKeyboardController->LeftTriggerAverage, 1.0);
-          }else if(VKCode == ){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->A, IsDown);
-          }else if(VKCode == ){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->B, IsDown);
-          }else if(VKCode == ){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->X, IsDown);
-          }else if(VKCode == ){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->Y, IsDown);
-          }else if(VKCode == ){
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->RightStick, IsDown);
-          }else if(VKCode == ){
-
-            Win32ProcessKeyboardMessage(
-                &aKeyboardController->LeftStick, IsDown);
-          }
-#endif
-
+            ////case VK_LBUTTON:    {}break; // 0x01 Left Button **
+            ////case VK_RBUTTON:    {}break; // 0x02 Right Button **
+            ////case VK_CANCEL:     {}break; // 0x03 Break
+            ////case VK_MBUTTON:    {}break; // 0x04 Middle Button **
+            ////case VK_XBUTTON1:   {}break; // 0x05 X Button 1 **
+            ////case VK_XBUTTON2:   {}break; // 0x06 X Button 2 **
+            case VK_BACK:       { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_BACK, IsDown); }break; // 0x08 Backspace
+            case VK_TAB:        { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_TAB, IsDown); }break; // 0x09 Tab
+            case 0x10:          { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_SHIFT, IsDown); }break; // 0x10 SHIFT
+            case 0x11:          { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_CTRL, IsDown); }break; // 0x011 CTRL
+            case 0x12:          { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_ALT, IsDown); }break; // 0x012 ALT
+            case VK_CLEAR:      {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_CLR, IsDown);}break; // 0x0C Clear
+            case VK_RETURN:     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_ENTER, IsDown); }break; // 0x0D Enter
+            case VK_PAUSE:      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_PAUSE, IsDown); }break; // 0x13 Pause
+            case VK_CAPITAL:    { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_CPSLCK, IsDown); }break; // 0x14 Caps Lock
+            ////case VK_KANA:       {}break; // 0x15 Kana
+            ////case VK_JUNJA:      {}break; // 0x17 Junja
+            ////case VK_FINAL:      {}break; // 0x18 Final
+            ////case VK_KANJI:      {}break; // 0x19 Kanji
+            case VK_ESCAPE:     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_ESCAPE, IsDown); GlobalRunning = false; }break; // 0x1B Esc
+            ////case VK_CONVERT:    {}break; // 0x1C Convert
+            ////case VK_NONCONVERT: {}break; // 0x1D Non Convert
+            ////case VK_ACCEPT:     {}break; // 0x1E Accept
+            ////case VK_MODECHANGE: {}break; // 0x1F Mode Change
+            case VK_SPACE:      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_SPACE, IsDown);}break; // 0x20 Space
+            case VK_PRIOR:      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_PGUP, IsDown);}break;  // 0x21 Page Up
+            case VK_NEXT:       { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_PDWN, IsDown);}break;  // 0x22 Page Down
+            case VK_END:        { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_END, IsDown);}break;    //  0x23  End
+            case VK_HOME:       { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_HOME, IsDown);}break;     // 0x24  Home
+            case VK_LEFT:       { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_LEFT, IsDown);}break;     // 0x25  Arrow Left
+            case VK_UP:         { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_UP, IsDown);}break;     // 0x26  Arrow Up
+            case VK_RIGHT:      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_RIGHT, IsDown);}break;    //  0x27  Arrow Right
+            case VK_DOWN:       { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_DOWN, IsDown);}break;     // 0x28  Arrow Down
+            ////case VK_SELECT:     {}break; // 0x29 Select
+            ////case VK_PRINT:      {}break; // 0x2A Print
+            ////case VK_EXECUTE:    {}break; // 0x2B Execute
+            case VK_SNAPSHOT:   { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_PRTSC, IsDown);} break;     // 0x2C  Print Screen
+            case VK_INSERT:     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_INS, IsDown);} break;     // 0x2D  Insert
+            case VK_DELETE:     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_DEL, IsDown);} break;     // 0x2E  Delete
+            ////case VK_HELP:       {}break; // 0x2F  Help
+            case '0':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_0, IsDown);  } break; //  0x30 ('0')  0
+            case '1':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_1, IsDown);  } break; //  0x31 ('1')  1
+            case '2':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_2, IsDown);  } break; //  0x32 ('2')  2
+            case '3':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_3, IsDown);  } break; //  0x33 ('3')  3
+            case '4':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_4, IsDown);  } break; //  0x34 ('4')  4
+            case '5':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_5, IsDown);  } break; //  0x35 ('5')  5
+            case '6':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_6, IsDown);  } break; //  0x36 ('6')  6
+            case '7':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_7, IsDown);  } break; //  0x37 ('7')  7
+            case '8':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_8, IsDown);  } break; //  0x38 ('8')  8
+            case '9':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_9, IsDown);  } break; //  0x39 ('9')  9
+            case 'A':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_A, IsDown); } break; //  0x41 ('A')  A
+            case 'B':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_B, IsDown); } break; //  0x42 ('B')  B
+            case 'C':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_C, IsDown); } break; //  0x43 ('C')  C
+            case 'D':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_D, IsDown); } break; //  0x44 ('D')  D
+            case 'E':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_E, IsDown); } break; //  0x45 ('E')  E
+            case 'F':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F, IsDown); } break; //  0x46 ('F')  F
+            case 'G':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_G, IsDown); } break; //  0x47 ('G')  G
+            case 'H':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_H, IsDown); } break; //  0x48 ('H')  H
+            case 'I':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_I, IsDown); } break; //  0x49 ('I')  I
+            case 'J':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_J, IsDown); } break; //  0x4A ('J')  J
+            case 'K':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_K, IsDown); } break; //  0x4B ('K')  K
+            case 'L':     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_L, IsDown); //  0x4C ('L')  L
 #if HANDMADE_INTERNAL
-          else if(VKCode == 'P'){
-            if(IsDown)
-            {
-              GlobalPause = !GlobalPause;
-            }
-          }else if(VKCode == 'L'){
-            if(IsDown)
-            {
-              if(AltKeyWasDown){
-                Win32BeginInputPlayBack(aState,1);
-              }else{
-                if(aState->PlayingIndex == 0)
-                {
-                  if(aState->RecordingIndex == 0)
-                  {
-                    Win32BeginRecordingInput(aState, 1);
-                  }else{
-                    Win32EndRecordingInput(aState);
-                    Win32BeginInputPlayBack(aState,1);
-                  }
+              if(IsDown)
+              {
+                if(AltKeyWasDown){
+                  Win32BeginInputPlayBack(aState,1);
                 }else{
-                  Win32EndInputPlayback(aState);
-                  *aKeyboardController ={};
+                  if(aState->PlayingIndex == 0)
+                  {
+                    if(aState->RecordingIndex == 0)
+                    {
+                      Win32BeginRecordingInput(aState, 1);
+                    }else{
+                      Win32EndRecordingInput(aState);
+                      Win32BeginInputPlayBack(aState,1);
+                    }
+                  }else{
+                    Win32EndInputPlayback(aState);
+                    *NewKeyboardController ={};
+                  }
                 }
               }
-            }
-          }
 #endif
-          if(IsDown)
-          {
-            if( (VKCode==VK_F4) && AltKeyWasDown)
-            {
-              GlobalRunning=false;
-            }
-            if( (VKCode==VK_RETURN) && AltKeyWasDown)
-            {
-              if(Message.hwnd)
+            }break;
+            case 'M':    { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_M, IsDown); }break; //  0x4D ('M')  M
+            case 'N':    { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_N, IsDown); }break; //  0x4E ('N')  N
+            case 'O':    { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_O, IsDown); }break; //  0x4F ('O')  O
+            case 'P':    { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_P, IsDown); //  0x50 ('P')  P
+#if HANDMADE_INTERNAL
+              if(IsDown)
               {
-                Win32ToggleFullscreen(Message.hwnd);
+                GlobalPause = !GlobalPause;
               }
+#endif
+            }break;
+            case 'Q':      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_Q, IsDown); }break; // 0x51 ('Q') Q
+            case 'R':      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_R, IsDown); }break; // 0x52 ('R') R
+            case 'S':      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_S, IsDown); }break; // 0x53 ('S') S
+            case 'T':      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_T, IsDown); }break; // 0x54 ('T') T
+            case 'U':      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_U, IsDown); }break; // 0x55 ('U') U
+            case 'V':      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_V, IsDown); }break; // 0x56 ('V') V
+            case 'W':      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_W, IsDown); }break; // 0x57 ('W') W
+            case 'X':      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_X, IsDown); }break; // 0x58 ('X') X
+            case 'Y':      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_Y, IsDown); }break; // 0x59 ('Y') Y
+            case 'Z':      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_Z, IsDown); }break; // 0x5A ('Z') Z
+            case VK_LWIN:      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_LWIN, IsDown); }break; // 0x5B  Left Win
+            case VK_RWIN:      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_RWIN, IsDown); }break; // 0x5C  Right Win
+            ////case VK_APPS:      {}break; // 0x5D  Context Menu
+            ////case VK_SLEEP:     {}break; //  0x5F  Sleep
+            case VK_NUMPAD0:   { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_0, IsDown); }break; //  0x60  Numpad 0
+            case VK_NUMPAD1:   { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_1, IsDown); }break; //  0x61  Numpad 1
+            case VK_NUMPAD2:   { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_2, IsDown); }break; //  0x62  Numpad 2
+            case VK_NUMPAD3:   { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_3, IsDown); }break; //  0x63  Numpad 3
+            case VK_NUMPAD4:   { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_4, IsDown); }break; //  0x64  Numpad 4
+            case VK_NUMPAD5:   { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_5, IsDown); }break; //  0x65  Numpad 5
+            case VK_NUMPAD6:   { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_6, IsDown); }break; //  0x66  Numpad 6
+            case VK_NUMPAD7:   { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_7, IsDown); }break; //  0x67  Numpad 7
+            case VK_NUMPAD8:   { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_8, IsDown); }break; //  0x68  Numpad 8
+            case VK_NUMPAD9:   { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_9, IsDown); }break; //  0x69  Numpad 9
+            case VK_MULTIPLY:  { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_STAR, IsDown); }break; // 0x6A  Numpad *
+            case VK_ADD:       { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_PLUS, IsDown); }break; //  0x6B  Numpad +
+            //case VK_SEPARATOR: { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_, IsDown); }break; //  0x6C  Separator
+            case VK_SUBTRACT:  { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_DASH, IsDown); }break; // 0x6D  Num -
+            case VK_DECIMAL:   { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_DEL, IsDown); }break; //  0x6E  Numpad .
+            case VK_DIVIDE:    { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_SLASH, IsDown); }break; // 0x6F  Numpad /
+            case VK_F1:        { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F1, IsDown); }break; // 0x70  F1
+            case VK_F2:        { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F2, IsDown); }break; // 0x71  F2
+            case VK_F3:        { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F3, IsDown); }break; // 0x72  F3
+            case VK_F4:        { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F4, IsDown); }break; // 0x73  F4
+            case VK_F5:        { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F5, IsDown); }break; // 0x74  F5
+            case VK_F6:        { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F6, IsDown); }break; // 0x75  F6
+            case VK_F7:        { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F7, IsDown); }break; // 0x76  F7
+            case VK_F8:        { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F8, IsDown); }break; // 0x77  F8
+            case VK_F9:        { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F9, IsDown); }break; // 0x78  F9
+            case VK_F10:       { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F10, IsDown); }break; //  0x79  F10
+            case VK_F11:       { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F11, IsDown); }break; //  0x7A  F11
+            case VK_F12:       { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_F12, IsDown); }break; //  0x7B  F12
+            ////case VK_F13:       {}break; //  0x7C  F13
+            ////case VK_F14:       {}break; //  0x7D  F14
+            ////case VK_F15:       {}break; //  0x7E  F15
+            ////case VK_F16:       {}break; //  0x7F  F16
+            ////case VK_F17:       {}break; //  0x80  F17
+            ////case VK_F18:       {}break; //  0x81  F18
+            ////case VK_F19:       {}break; //  0x82  F19
+            ////case VK_F20:       {}break; //  0x83  F20
+            ////case VK_F21:       {}break; //  0x84  F21
+            ////case VK_F22:       {}break; //  0x85  F22
+            ////case VK_F23:       {}break; //  0x86  F23
+            ////case VK_F24:       {}break; //  0x87  F24
+            case VK_NUMLOCK:   {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_NP_NMLK, IsDown);}break; //  0x90  Num Lock
+            case VK_SCROLL:    {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_SCRLK, IsDown);}break; // 0x91  Scrol Lock
+            ////case VK_OEM_FJ_JISHO:    {}break; // 0x92  Jisho
+            ////case VK_OEM_FJ_MASSHOU:  {}break; // 0x93  Mashu
+            ////case VK_OEM_FJ_TOUROKU:  {}break; // 0x94  Touroku
+            ////case VK_OEM_FJ_LOYA:     {}break; //  0x95  Loya
+            ////case VK_OEM_FJ_ROYA:     {}break; //  0x96  Roya
+            case VK_LSHIFT:          {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_LSHIFT, IsDown);}break; // 0xA0  Left Shift
+            case VK_RSHIFT:          {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_RSHIFT, IsDown);}break; // 0xA1  Right Shift
+            case VK_LCONTROL:        {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_LCTRL, IsDown);}break; // 0xA2  Left Ctrl
+            case VK_RCONTROL:        {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_RCTRL, IsDown);}break; // 0xA3  Right Ctrl
+          //case VK_LMENU:           {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_, IsDown);}break; //  0xA4  Left Alt
+          //case VK_RMENU:           {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_, IsDown);}break; //  0xA5  Right Alt
+            ////case VK_BROWSER_BACK:    {}break; // 0xA6  Browser Back
+            ////case VK_BROWSER_FORWARD: {}break; //  0xA7  Browser Forward
+            ////case VK_BROWSER_REFRESH: {}break; //  0xA8  Browser Refresh
+            ////case VK_BROWSER_STOP:      {}break; // 0xA9  Browser Stop
+            ////case VK_BROWSER_SEARCH:    {}break; // 0xAA  Browser Search
+            ////case VK_BROWSER_FAVORITES: {}break; //  0xAB  Browser Favorites
+            ////case VK_BROWSER_HOME:      {}break; // 0xAC  Browser Home
+            ////case VK_VOLUME_MUTE:       {}break; //  0xAD  Volume Mute
+            ////case VK_VOLUME_DOWN:       {}break; //  0xAE  Volume Down
+            ////case VK_VOLUME_UP:         {}break; //  0xAF  Volume Up
+            ////case VK_MEDIA_NEXT_TRACK:  {}break; // 0xB0  Next Track
+            ////case VK_MEDIA_PREV_TRACK:  {}break; // 0xB1  Previous Track
+            ////case VK_MEDIA_STOP:        {}break; // 0xB2  Stop
+            ////case VK_MEDIA_PLAY_PAUSE:  {}break; // 0xB3  Play / Pause
+            ////case VK_LAUNCH_MAIL:       {}break; //  0xB4  Mail
+            ////case VK_LAUNCH_MEDIA_SELECT: {}break; //  0xB5  Media
+            ////case VK_LAUNCH_APP1:         {}break; //  0xB6  App1
+            ////case VK_LAUNCH_APP2:         {}break; //  0xB7  App2
+            case VK_OEM_1:       {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_COLON, IsDown);}break; //  0xBA  OEM_1 (: ;)
+            case VK_OEM_PLUS:    {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_EQUAL, IsDown);}break; // 0xBB  OEM_PLUS (+ =)
+            case VK_OEM_COMMA:   {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_COMMA, IsDown);}break; //  0xBC  OEM_COMMA (< ,)
+            case VK_OEM_MINUS:   {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_DASH, IsDown);}break; //  0xBD  OEM_MINUS (_ -)
+            case VK_OEM_PERIOD:  {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_DOT, IsDown);}break; // 0xBE  OEM_PERIOD (> .)
+            case VK_OEM_2:       {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_FSLASH, IsDown);}break; //  0xBF  OEM_2 (? /)
+            case VK_OEM_3:       {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_TILDE, IsDown);}break; //  0xC0  OEM_3 (~ `)
+//            case VK_ABNT_C1:     {}break; //  0xC1  Abnt C1
+//            case VK_ABNT_C2:     {}break; //  0xC2  Abnt C2
+            case VK_OEM_4:       {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_LBRACKET, IsDown);}break; //  0xDB  OEM_4 ({ [)
+            case VK_OEM_5:       {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_RBSLASH, IsDown);}break; //  0xDC  OEM_5 (| \)
+            case VK_OEM_6:       {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_RBRACKET, IsDown);}break; //  0xDD  OEM_6 (} ])
+            case VK_OEM_7:       {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_QUOTE, IsDown);}break; //  0xDE  OEM_7 (" ')
+            //case VK_OEM_8:       {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_, IsDown);}break; //  0xDF  OEM_8 (§ !)
+            ////case VK_OEM_AX:      {}break; // 0xE1  Ax
+            case VK_OEM_102:     {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_LBSLASH, IsDown);}break; // 0xE2  OEM_102 (> <)
+            ////case VK_ICO_HELP:    {}break; // 0xE3  IcoHlp
+            ////case VK_ICO_00:      {}break; // 0xE4  Ico00 *
+            ////case VK_PROCESSKEY:  {}break; // 0xE5  Process
+            ////case VK_ICO_CLEAR:   {}break; // 0xE6  IcoClr
+            ////case VK_PACKET:      {}break; // 0xE7  Packet
+            ////case VK_OEM_RESET:   {}break; // 0xE9  Reset
+            ////case VK_OEM_JUMP:    {}break; // 0xEA  Jump
+            ////case VK_OEM_PA1:     {}break; // 0xEB  OemPa1
+            ////case VK_OEM_PA2:     {}break; // 0xEC  OemPa2
+            ////case VK_OEM_PA3:     {}break; // 0xED  OemPa3
+            ////case VK_OEM_WSCTRL:  {}break; // 0xEE  WsCtrl
+            ////case VK_OEM_CUSEL:   {}break; // 0xEF  Cu Sel
+            ////case VK_OEM_ATTN:    {}break; // 0xF0  Oem Attn
+            ////case VK_OEM_FINISH:  {}break; // 0xF1  Finish
+            ////case VK_OEM_COPY:    {}break; // 0xF2  Copy
+            ////case VK_OEM_AUTO:    {}break; // 0xF3  Auto
+            ////case VK_OEM_ENLW:    {}break; // 0xF4  Enlw
+            ////case VK_OEM_BACKTAB: {}break; // 0xF5  Back Tab
+            ////case VK_ATTN:        {}break; // 0xF6  Attn
+            ////case VK_CRSEL:       {}break; // 0xF7  Cr Sel
+            ////case VK_EXSEL:       {}break; // 0xF8  Ex Sel
+            ////case VK_EREOF:       {}break; // 0xF9  Er Eof
+            ////case VK_PLAY:        {}break; // 0xFA  Play
+            ////case VK_ZOOM:        {}break; // 0xFB  Zoom
+            ////case VK_NONAME:      {}break; // 0xFC  NoName
+            ////case VK_PA1:         {}break; // 0xFD  Pa1
+            ////case VK_OEM_CLEAR:   {}break; // 0xFE  OemClr
+//            case VK__none_:      {}break; // 0xFF  no VK mapping
+            default: DEBUGPrint("INVALID %d\n", VKCode); break;
+                
+          }
+        }
+        if(IsDown)
+        {
+          if( (VKCode==VK_F4) && AltKeyWasDown)
+          {
+            GlobalRunning=false;
+          }
+          if( (VKCode==VK_RETURN) && AltKeyWasDown)
+          {
+            if(Message.hwnd)
+            {
+              Win32ToggleFullscreen(Message.hwnd);
             }
           }
         }
-
       }break;
-
       default:
       {
         TranslateMessage(&Message);
@@ -1095,16 +1197,15 @@ Win32ProcessKeyboard(win32_state* aState,  game_controller_input*  aOldKeyboardC
 
 
 internal void
-Win32ProcessControllerInput( game_input* aOldInput,
-              game_input* aNewInput)
+Win32ProcessControllerInput( game_input* OldInput, game_input* NewInput)
 {
 
   // Input
   // TODO: Should we poll this more frequently?
   DWORD MaxControllerCount = XUSER_MAX_COUNT;
-  if(MaxControllerCount > (ArrayCount(aNewInput->Controllers)-1))
+  if(MaxControllerCount > (ArrayCount(NewInput->Controllers)-1))
   {
-    MaxControllerCount = (ArrayCount(aNewInput->Controllers)-1);
+    MaxControllerCount = (ArrayCount(NewInput->Controllers)-1);
   }
 
   for( DWORD ControllerIndex = 0;
@@ -1112,10 +1213,9 @@ Win32ProcessControllerInput( game_input* aOldInput,
     ++ControllerIndex )
   {
     DWORD OurControllerIndex = ControllerIndex+1;
-    game_controller_input* OldController =
-                GetController(aOldInput, OurControllerIndex);
-    game_controller_input* NewController =
-                GetController(aNewInput, OurControllerIndex);
+
+    game_controller_input* OldController = GetController(OldInput, OurControllerIndex);
+    game_controller_input* NewController = GetController(NewInput, OurControllerIndex);
     // Note: Performancebug in XInputGetControllerstate.
     //     See HH007 at 15 min. To be ironed out in optimization
     XINPUT_STATE ControllerState;
@@ -1951,11 +2051,11 @@ WinMain(  HINSTANCE Instance,
 
           // Todo: Unify controller and keyboad input into something that makes a bit more sense
 
-          game_controller_input* OldKeyboardController = GetController(OldInput,0);
-          game_controller_input* NewKeyboardController = GetController(NewInput,0);
+          keyboard_input* OldKeyboardController = &OldInput->Keyboard;
+          keyboard_input* NewKeyboardController = &NewInput->Keyboard;
 
           Win32ProcessKeyboard(&GlobalWin32State, OldKeyboardController, NewKeyboardController);
-          Win32ProcessControllerInput( OldInput, NewInput);
+          Win32ProcessControllerInput(OldInput, NewInput);
           POINT MouseP;
           GetCursorPos(&MouseP);
           ScreenToClient( WindowHandle, &MouseP);

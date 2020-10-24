@@ -1062,6 +1062,7 @@ void UpdateHeaderPosition( menu_interface* Interface, container_node* Node, drag
 menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* BaseWindow, rect2f Region)
 {
   menu_tree* Root = NewMenuTree(Interface); // Root
+  Root->Visible = true;
   Root->Root = NewContainer(Interface, container_type::Root);
 
   container_node* RootHeader = 0;
@@ -1140,6 +1141,9 @@ void SetTabAsActive(container_node* TabbedHBF, u32 NewTabIndex)
 
   button_attribute* Button = (button_attribute*) GetAttributePointer(Tab, ATTRIBUTE_BUTTON);
   tabbed_button_data* Data = (tabbed_button_data*) Button->Data;
+  hbf_node* HostHBF = GetHBFNode(TabbedHBF);
+  hbf_node* TabHBF  = GetHBFNode(Data->ItemHBF);
+  HostHBF->FooterSize = TabHBF->FooterSize;
   ReplaceNode(TabbedHBF->FirstChild->NextSibling, Data->ItemBody);
   ReplaceNode(TabbedHBF->FirstChild->NextSibling->NextSibling, Data->ItemFooter);
 }
@@ -1170,8 +1174,6 @@ container_node* ExtractHBFFromTab(menu_interface* Interface, container_node* Tab
 
   return HBF;  
 }
-
-
 
 void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 {
@@ -1238,8 +1240,8 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
         container_node* ItemHBF = Data->ItemHBF;
         if(Interface->MouseLeftButton.Edge && Interface->MouseLeftButton.Active)
         {
-          ReplaceNode(TabbedHBF->FirstChild->NextSibling, Data->ItemBody);
-          ReplaceNode(TabbedHBF->FirstChild->NextSibling->NextSibling, Data->ItemFooter);
+          u32 NewTabIndex = GetChildIndex(Data->ItemHeader);
+          SetTabAsActive(TabbedHBF, NewTabIndex);
         }
       };
 
@@ -1438,8 +1440,8 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
         Assert(ButtonData);
         if(HBFIndex == HBFCount-1)
         {
-          ReplaceNode(ButtonData->TabbedHBF->FirstChild->NextSibling, ButtonData->ItemBody);
-          ReplaceNode(ButtonData->TabbedHBF->FirstChild->NextSibling->NextSibling, ButtonData->ItemFooter);
+          u32 NewTabIndex = GetChildIndex(ButtonData->ItemHeader);
+          SetTabAsActive(ButtonData->TabbedHBF, NewTabIndex);
         }
       }
 
@@ -1530,6 +1532,7 @@ void SetMouseInput(memory_arena* Arena, game_input* GameInput, menu_interface* I
   v2 MousePos = V2(GameInput->MouseX, GameInput->MouseY);
 
   Update(&Interface->MouseLeftButton, GameInput->MouseButton[PlatformMouseButton_Left].EndedDown);
+  Update(&Interface->KeyM, GameInput->MouseButton[PlatformMouseButton_Left].EndedDown);
 
   if( Interface->MouseLeftButton.Edge )
   {

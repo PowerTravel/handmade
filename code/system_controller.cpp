@@ -79,28 +79,29 @@ void FlyingCameraController( component_controller* Controller, component_camera*
   Assert(Controller);
 
   game_controller_input* Input = Controller->Controller;
+  keyboard_input* Keyboard = Controller->Keyboard;
   if( Input->IsAnalog )
   {
     b32 hasMoved = false;
     r32 dr = 0.05;
     r32 da = 0.05;
     r32 Length = 3;
-    if(Input->LeftStickLeft.EndedDown)
+    if(Input->LeftStickLeft.EndedDown || Keyboard->Key_A.EndedDown )
     {
       TranslateCamera( Camera, V3(-dr,0,0));
       hasMoved = true;
     }
-    if(Input->LeftStickRight.EndedDown)
+    if(Input->LeftStickRight.EndedDown || Keyboard->Key_D.EndedDown)
     {
       TranslateCamera( Camera, V3(dr,0,0));
       hasMoved = true;
     }
-    if(Input->LeftStickUp.EndedDown)
+    if(Input->LeftStickUp.EndedDown || Keyboard->Key_W.EndedDown)
     {
       TranslateCamera( Camera, V3(0,dr,0));
       hasMoved = true;
     }
-    if(Input->LeftStickDown.EndedDown)
+    if(Input->LeftStickDown.EndedDown || Keyboard->Key_S.EndedDown)
     {
       TranslateCamera( Camera, V3(0,-dr,0));
       hasMoved = true;
