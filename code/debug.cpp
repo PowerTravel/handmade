@@ -16,32 +16,6 @@ MENU_DRAW(DrawFunctionTimeline);
 internal void RefreshCollation();
 internal void RestartCollation();
 
-internal void
-TogglePause(debug_state* DebugState, menu_item* Item)
-{
-  if(!DebugState->Paused)
-  {
-    DebugState->Paused = true;
-    DebugState->Resumed = false;
-  }else{
-    if(DebugState->Resumed)
-    {
-      RefreshCollation();
-      DebugState->Resumed = false;
-    }
-
-    if(DebugState->Paused)
-    {
-      DebugState->Resumed = true;
-    }
-
-    DebugState->Paused = false;
-  }
-
-  Item->Active = DebugState->Paused;
-}
-
-
 void SetRadialMenuFunctionPointers(debug_state* DebugState)
 {
   radial_menu* MainMenu = &DebugState->RadialMenues[0];
@@ -55,7 +29,7 @@ void SetRadialMenuFunctionPointers(debug_state* DebugState)
   };
 
   // "Pause Collation"
-  MainMenu->MenuItems[1].Activate = TogglePause;
+  //MainMenu->MenuItems[1].Activate = TogglePause;
 
   // "Options"
   MainMenu->MenuItems[2].Activate = [](debug_state* DebugState, menu_item* Item)
@@ -90,7 +64,6 @@ DEBUGGetState()
     DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->Arena);
     DebugState->Initialized = true;
     DebugState->Paused = false;
-    DebugState->Resumed = false;
     DebugState->ScopeToRecord = 0;
 
     // Config state
@@ -132,12 +105,58 @@ DEBUGGetState()
     OptionsMenu->MenuItemCount = ArrayCount(OptionMenuItems);
     OptionsMenu->MenuItems = (menu_item*) DEBUGPushCopy(DebugState, sizeof(OptionMenuItems), OptionMenuItems);
 
+
+    {
+      // Create Option Window
+
+    }
+
+    // Create graph window
+    {
+      container_node* MainContainer = NewContainer(GlobalGameState->MenuInterface, container_type::None);
+      MainContainer->Functions.UpdateChildRegions = [](container_node* Parent){
+        container_node* Child = Parent->FirstChild;
+        rect2f ParentRegion = Parent->Region;
+        Assert(GetChildCount(Parent) == 2);
+
+        r32 ButtonRatio = 0.2;
+        r32 ButtonHeight = ButtonRatio * ParentRegion.H;
+        Child->Region = Rect2f(ParentRegion.X, ParentRegion.Y + ParentRegion.H - ButtonHeight, ParentRegion.W,  ButtonHeight);
+        r32 GraphHeight = (1.f-ButtonRatio) * ParentRegion.H;
+        Child = Next(Child);
+        Child->Region = Rect2f(ParentRegion.X, ParentRegion.Y, ParentRegion.W, GraphHeight);
+      };
+
+      container_node* ButtonContainer = ConnectNode(MainContainer, NewContainer(GlobalGameState->MenuInterface, container_type::Grid));
+      grid_node* Grid = GetGridNode(ButtonContainer);
+      Grid->Col = 2;
+      Grid->TotalMarginX = 0.3;
+      Grid->TotalMarginY = 0.2;
+
+      container_node* Button =  ConnectNode(ButtonContainer, NewContainer(GlobalGameState->MenuInterface, container_type::Color));
+      GetColorNode(Button)->Color = V4(0.3,0.1,0.3,1);
+
+      button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_BUTTON);
+      ButtonAttribute->Update = [](menu_interface* Interface, button_attribute* Attr)
+      {
+        debug_state* DebugState = DEBUGGetState();
+        if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
+        {
+          DebugState->Paused = !DebugState->Paused;
+          if(!DebugState->Paused)
+          {
+            RefreshCollation();
+          }
+        }
+      };
+
+      container_node* GraphContainer =  ConnectNode(MainContainer, NewContainer(GlobalGameState->MenuInterface, container_type::None));
+      GraphContainer->Functions.Draw = DrawFunctionTimeline;
+      
+      container_node* HBF = CreateDraggableHBF(GlobalGameState->MenuInterface, V4(0.5,0.5,0.5,1), MainContainer);
+      CreateNewRootContainer(GlobalGameState->MenuInterface, HBF, Rect2f( 0.85, 0.25, 0.5, 0.5));
+    }
     
-    container_node* Body = NewContainer(GlobalGameState->MenuInterface, container_type::None);
-    Body->Functions.Draw = DrawFunctionTimeline;
-    container_node* HBF = CreateDraggableHBF(GlobalGameState->MenuInterface, V4(0.5,0.5,0.5,1), Body);
-    
-    CreateNewRootContainer(GlobalGameState->MenuInterface, HBF, Rect2f( 0.85, 0.25, 0.5, 0.5));
 
     RestartCollation();
   }
@@ -609,7 +628,7 @@ void ActOnInput(debug_state* DebugState, radial_menu* RadialMenu )
     }
   }
 }
-
+#if 0
 void DrawMenu( radial_menu* RadialMenu )
 {
   v4 IdleColor              = V4(0  ,0  ,0.4,1.f);
@@ -634,7 +653,6 @@ void DrawMenu( radial_menu* RadialMenu )
     v2 ItemLine   = V2(RadialMenu->MenuX + Region->Radius * Cos(AngleCenter),
                      RadialMenu->MenuY + Region->Radius * Sin(AngleCenter));
     DEBUGDrawDottedLine(V2(RadialMenu->MenuX, RadialMenu->MenuY) , ItemLine,  V4(0,0.7,0,1));
-
 
     v4 Color = IdleColor;
 
@@ -697,7 +715,6 @@ void DrawMenu( radial_menu* RadialMenu )
       StopAngle = Anglef0;
     }
 
-
     r32 AngleParameter = GetParametarizedAngle(StartAngle, StopAngle, ItemAngle);
 
     //TextBox
@@ -718,7 +735,7 @@ void DrawMenu( radial_menu* RadialMenu )
                      RadialMenu->MenuY + RadialMenu->MouseRadius * Sin(RadialMenu->MouseAngle));
   DEBUGDrawDottedLine(V2(RadialMenu->MenuX, RadialMenu->MenuY) , MouseLine,  V4(0.7,0,0,1));
 }
-
+#endif
 
 void DebugMainWindow(game_input* GameInput)
 {
@@ -756,11 +773,6 @@ void DebugMainWindow(game_input* GameInput)
       ActOnInput(DebugState, RadialMenu );
 
     }break;
-    case menu_type::Box:
-    {
-
-    }break;
-
   }
 
   switch(DebugState->ActiveMenu.Type)
@@ -770,22 +782,22 @@ void DebugMainWindow(game_input* GameInput)
       Assert(DebugState->ActiveMenu.RadialMenu);
       radial_menu* RadialMenu = DebugState->ActiveMenu.RadialMenu;
 
-      DrawMenu(RadialMenu);
+      //DrawMenu(RadialMenu);
 
-    }break;
-    case menu_type::Box:
-    {
-      DEBUGPushQuad(Rect2f(0.1,0.1,0.3,0.3), V4(0.3,0.3,0.3,0.5));
     }break;
   }
 
-
-  if(RightButtonReleased &&
-    (DebugState->ActiveMenu.Type == menu_type::Radial))
+  switch(DebugState->ActiveMenu.Type)
   {
-    Assert(DebugState->ActiveMenu.RadialMenu);
-    EndRadialMenu(DebugState->ActiveMenu.RadialMenu);
-    DebugState->ActiveMenu = {};
+    case menu_type::Radial:
+    {
+      if(RightButtonReleased)
+      {
+        Assert(DebugState->ActiveMenu.RadialMenu);
+        EndRadialMenu(DebugState->ActiveMenu.RadialMenu);
+        DebugState->ActiveMenu = {};  
+      }
+    }break;
   }
 }
 

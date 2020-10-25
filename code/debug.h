@@ -199,7 +199,6 @@ struct debug_state
   b32 Initialized;
 
   b32 Paused;
-  b32 Resumed;
 
   memory_arena Arena;
   temporary_memory CollateTemp;

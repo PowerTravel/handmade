@@ -10,7 +10,7 @@ u32 GetContainerPayloadSize(container_type Type)
     case container_type::Color:   return sizeof(color_leaf);
     case container_type::Border:  return sizeof(border_leaf);
     case container_type::HBF:     return sizeof(hbf_node);
-    case container_type::List:     return sizeof(list_node);
+    case container_type::Grid:     return sizeof(grid_node);
     default: INVALID_CODE_PATH;
   }
   return 0;
@@ -754,8 +754,7 @@ void PrintHotLeafs(menu_interface* Interface)
   for (u32 ContainerIndex = 0; ContainerIndex < Interface->RootContainerCount; ++ContainerIndex)
   {
     menu_tree* Menu = &Interface->RootContainers[ContainerIndex];
-    /* code */
-    if(Menu->HotLeafCount>0)
+    if(Menu->HotLeafCount>0 && Menu->Visible)
     {
       container_node* Node = Menu->HotLeafs[0];
 
@@ -844,28 +843,7 @@ void PrintHotLeafs(menu_interface* Interface)
     YOff -= HeightStep;
   }
 }
-/*
-void UpdateDraggableAttribute( menu_interface* Interface, draggable_attribute* Attr )
-{
-  if(Interface->MouseLeftButton.Edge)
-  {
-    if(Interface->MouseLeftButton.Active)
-    {
-      Attr->Dragging = true;
-    }else{
-      Attr->Dragging = false;
-    }
-  }else{
-    if(Interface->MouseLeftButton.Active)
-    {
-      if(Attr->Dragging)
-      {
-        Attr->Update(Interface, Attr);
-      }
-    }
-  }
-}
-*/
+
 inline container_node* GetRoot(container_node* Node)
 {
   while(Node->Parent)
@@ -1133,7 +1111,7 @@ menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* Bas
 void SetTabAsActive(container_node* TabbedHBF, u32 NewTabIndex)
 {
   Assert(TabbedHBF->Type == container_type::HBF);
-  Assert(TabbedHBF->FirstChild->Type == container_type::List);
+  Assert(TabbedHBF->FirstChild->Type == container_type::Grid);
   Assert(NewTabIndex >= 0);
 
   container_node* TabList = TabbedHBF->FirstChild;
@@ -1161,9 +1139,9 @@ container_node* ExtractHBFFromTab(menu_interface* Interface, container_node* Tab
   container_node* Footer = Data->ItemFooter;
 
   Assert(!HBF->Parent && !HBF->NextSibling && !HBF->FirstChild);
-  Assert(!Header->Parent && !Header->NextSibling && !Header->FirstChild);
-  Assert(!Body->Parent && !Body->NextSibling && !Body->FirstChild);
-  Assert(!Footer->Parent && !Footer->NextSibling && !Footer->FirstChild);
+  Assert(!Header->Parent && !Header->NextSibling);
+  Assert(!Body->Parent && !Body->NextSibling);
+  Assert(!Footer->Parent && !Footer->NextSibling);
 
   ConnectNode(HBF,Header);
   ConnectNode(HBF,Body);
@@ -1247,7 +1225,7 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 
       auto TabDrag = []( menu_interface* Interface, container_node* Node, draggable_attribute* Attr)
       {
-        Assert(Node->Parent->Type == container_type::List);
+        Assert(Node->Parent->Type == container_type::Grid);
         r32 dX = Interface->MousePos.X - Interface->PreviousMousePos.X;
 
         u32 Count = GetChildCount(Node->Parent);
@@ -1285,17 +1263,17 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
           container_node* HBF = ExtractHBFFromTab(Interface, Node);
           CreateNewRootContainer(Interface, HBF, NewRegion);
 
-          container_node* List = TabbedHBF->FirstChild;
-          if(GetChildCount(List) == 1)
+          container_node* Grid = TabbedHBF->FirstChild;
+          if(GetChildCount(Grid) == 1)
           {
             DisconnectNode(TabbedHBF->FirstChild);
             DisconnectNode(TabbedHBF->FirstChild);
             DisconnectNode(TabbedHBF->FirstChild);
-            container_node* LastHBF = ExtractHBFFromTab(Interface, List->FirstChild);
+            container_node* LastHBF = ExtractHBFFromTab(Interface, Grid->FirstChild);
 
             ReplaceNode(TabbedHBF, LastHBF);
 
-            DeleteContainer(Interface, List);
+            DeleteContainer(Interface, Grid);
             DeleteContainer(Interface, TabbedHBF);
 
             if(LastHBF->Parent->Parent->Type != container_type::Root)
@@ -1308,7 +1286,7 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
         }
       };
 
-      if(HomeHBF->FirstChild->Type != container_type::List)
+      if(HomeHBF->FirstChild->Type != container_type::Grid)
       {
         // TODO: Create Tabbed HBF
         // ConvertToTabbedHBF(TabbedHBF, HomeHBF);
@@ -1316,11 +1294,12 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
         container_node* TabbedHBF = NewContainer(Interface, container_type::HBF);
         *GetHBFNode(TabbedHBF) = *GetHBFNode(HomeHBF);
 
-        container_node* TabbedHeader = NewContainer(Interface, container_type::List);
+        container_node* TabbedHeader = NewContainer(Interface, container_type::Grid);
         ConnectNode(TabbedHBF, TabbedHeader);
         ReplaceNode(HomeHBF, TabbedHBF);
 
-        GetListNode(TabbedHeader)->Horizontal = true;
+        grid_node* Grid = GetGridNode(TabbedHeader);
+        Grid->Row = 1;
 
         if(HasAttribute(HomeHBF->FirstChild, ATTRIBUTE_DRAG))
         {
@@ -1400,12 +1379,12 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
       {
         container_node* HBFTabToAdd = HBFArr[HBFIndex];
         tabbed_button_data* ButtonData = 0;
-        if(HBFTabToAdd->FirstChild->Type == container_type::List)
+        if(HBFTabToAdd->FirstChild->Type == container_type::Grid)
         {
-          container_node* ListHeader = HBFTabToAdd->FirstChild;
-          while(ListHeader->FirstChild)
+          container_node* GridHeader = HBFTabToAdd->FirstChild;
+          while(GridHeader->FirstChild)
           {
-            container_node* Tab = ListHeader->FirstChild;
+            container_node* Tab = GridHeader->FirstChild;
             DisconnectNode(Tab);
             button_attribute* Button = (button_attribute*) GetAttributePointer(Tab, ATTRIBUTE_BUTTON);
             ButtonData = (tabbed_button_data*) Button->Data;
@@ -1500,6 +1479,7 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 void ActOnInput(menu_interface* Interface, menu_tree* Menu)
 {
   Assert(Menu->Root);
+  if(!Menu->Visible) return;
   menu_tree* ActiveMenu = &Interface->RootContainers[0];
   for (u32 i = 0; i < ActiveMenu->ActiveLeafCount; ++i)
   {
@@ -1527,12 +1507,21 @@ void ActOnInput(menu_interface* Interface, menu_tree* Menu)
   }
 }
 
-void SetMouseInput(memory_arena* Arena, game_input* GameInput, menu_interface* Interface)
+void SetMenuInput(memory_arena* Arena, game_input* GameInput, menu_interface* Interface)
 {
   v2 MousePos = V2(GameInput->MouseX, GameInput->MouseY);
 
   Update(&Interface->MouseLeftButton, GameInput->MouseButton[PlatformMouseButton_Left].EndedDown);
-  Update(&Interface->KeyM, GameInput->MouseButton[PlatformMouseButton_Left].EndedDown);
+  Update(&Interface->TAB, GameInput->Keyboard.Key_TAB.EndedDown);
+
+  if(Interface->TAB.Active && Interface->TAB.Edge)
+  {
+    for( u32 MenuIndex = 0; MenuIndex < Interface->RootContainerCount; MenuIndex++)
+    {
+      menu_tree* Menu = &Interface->RootContainers[MenuIndex];
+      Menu->Visible = !Menu->Visible;
+    }
+  }  
 
   if( Interface->MouseLeftButton.Edge )
   {
@@ -1588,17 +1577,21 @@ void SetMouseInput(memory_arena* Arena, game_input* GameInput, menu_interface* I
 
 void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interface)
 {
-  SetMouseInput(GlobalGameState->TransientArena, GameInput, Interface);
+  SetMenuInput(GlobalGameState->TransientArena, GameInput, Interface);
 
+  
   ActOnInput(Interface, &Interface->RootContainers[0]);
   for (s32 WindowIndex = Interface->RootContainerCount-1;
            WindowIndex >= 0;
          --WindowIndex)
   {
     menu_tree* MenuTree = &Interface->RootContainers[WindowIndex];
-    TreeSensus(MenuTree);
-    UpdateRegions( MenuTree );
-    DrawMenu( GlobalGameState->TransientArena, Interface, MenuTree->NodeCount, MenuTree->Root);
+    if(MenuTree->Visible)
+    {
+      TreeSensus(MenuTree);
+      UpdateRegions( MenuTree );
+      DrawMenu( GlobalGameState->TransientArena, Interface, MenuTree->NodeCount, MenuTree->Root);
+    }
   }
 }
 
@@ -1788,7 +1781,8 @@ void CreateSplitRootWindow( menu_interface* Interface, rect2f Region, b32 Vertic
   ConnectNode(SplitNode, HBF1);
   ConnectNode(SplitNode, HBF2);
 
-  CreateNewRootContainer(Interface, SplitNode, Region);
+  menu_tree* Menu = CreateNewRootContainer(Interface, SplitNode, Region);
+  Menu->Visible = true;
 }
 
 menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
@@ -1803,10 +1797,6 @@ menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
   Interface->MinSize = 0.2f;
 
   ListInitiate(&Interface->Sentinel);
-
-  CreateSplitRootWindow( Interface, Rect2f( 0.85, 0.25, 0.5, 0.5), false,
-                         V4(0.15,0.5,0.15,1), V4(0.2,0.4,0.2,1), V4(0.15,0.5,0.15,1),
-                         V4(0.35,0,0.35,1),   V4(0.3,0.1,0.3,1), V4(0.35,0,0.35,1));
 
   CreateSplitRootWindow( Interface, Rect2f( 0.25, 0.25, 0.5, 0.5), true,
                          V4(0.15,0.15,0.5,1), V4(0.2,0.2,0.4,1), V4(0.15,0.15,0.5,1),

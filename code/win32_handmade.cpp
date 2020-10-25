@@ -1199,7 +1199,6 @@ Win32ProcessKeyboard(win32_state* aState,  keyboard_input*  OldKeyboardControlle
 internal void
 Win32ProcessControllerInput( game_input* OldInput, game_input* NewInput)
 {
-
   // Input
   // TODO: Should we poll this more frequently?
   DWORD MaxControllerCount = XUSER_MAX_COUNT;

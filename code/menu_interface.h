@@ -8,7 +8,7 @@ enum class container_type
   Border,
   Split,
   HBF, // Header-Body-Footer
-  List,
+  Grid,
 };
 
 enum container_attribute
@@ -31,7 +31,7 @@ const c8* ToString(container_type Type)
     case container_type::Border: return "Border";
     case container_type::Split: return "Split";
     case container_type::HBF: return "HBF";
-    case container_type::List: return "List";
+    case container_type::Grid: return "Grid";
   }
   return "";
 };
@@ -55,7 +55,7 @@ struct menu_tree;
 
 menu_interface* CreateMenuInterface();
 void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interface);
-container_node* NewContainer(menu_interface* Interface, container_type Type);
+container_node* NewContainer(menu_interface* Interface, container_type Type = container_type::None);
 void DeleteContainer(menu_interface* Interface, container_node* Node);
 menu_tree* NewMenuTree(menu_interface* Interface);
 void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree);
@@ -133,9 +133,12 @@ struct border_leaf
   v4 Color;
 };
 
-struct list_node
+struct grid_node
 {
-  b32 Horizontal;
+  u32 Col;
+  u32 Row;
+  r32 TotalMarginX;
+  r32 TotalMarginY;
 };
 
 
@@ -152,7 +155,7 @@ struct mergable_attribute
 
 struct button_attribute
 {
-  binary_signal_state State;
+  //binary_signal_state State;
   void* Data;
   void (*Update)( menu_interface* Interface, button_attribute* Attr);
 };
@@ -200,7 +203,6 @@ struct menu_tree
   // b32 ShouldDelete; <-- Implement later (Delete last in a cleanup phase)
 };
 
-
 struct menu_interface
 {
   u32 RootContainerCount;
@@ -217,14 +219,13 @@ struct menu_interface
   v2 MousePos;
   v2 PreviousMousePos;
   binary_signal_state MouseLeftButton;
-  binary_signal_state KeyM;
+  binary_signal_state TAB;
   v2 MouseLeftButtonPush;
   v2 MouseLeftButtonRelese;
 
   r32 BorderSize;
   r32 HeaderSize;
   r32 MinSize;
-
 };
 
 inline u8* GetContainerPayload( container_node* Container )
@@ -257,10 +258,10 @@ inline hbf_node* GetHBFNode(container_node* Container)
   hbf_node* Result = (hbf_node*) GetContainerPayload(Container);
   return Result;
 }
-inline list_node* GetListNode(container_node* Container)
+inline grid_node* GetGridNode(container_node* Container)
 {
-  Assert(Container->Type == container_type::List);
-  list_node* Result = (list_node*) GetContainerPayload(Container);
+  Assert(Container->Type == container_type::Grid);
+  grid_node* Result = (grid_node*) GetContainerPayload(Container);
   return Result;
 }
 
@@ -270,6 +271,5 @@ container_node* ReallocateNode(menu_interface* Interface, container_node* SrcNod
 void SplitWindowHeaderDrag( menu_interface* Interface, container_node* Node, draggable_attribute* Attr );
 menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* BaseWindow, rect2f Region);
 container_node* CreateDraggableHBF(menu_interface* Interface, v4 HeaderColor, container_node* BodyNode);
-
 
 container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical);
