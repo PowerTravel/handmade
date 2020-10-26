@@ -105,13 +105,70 @@ DEBUGGetState()
     OptionsMenu->MenuItemCount = ArrayCount(OptionMenuItems);
     OptionsMenu->MenuItems = (menu_item*) DEBUGPushCopy(DebugState, sizeof(OptionMenuItems), OptionMenuItems);
 
-
+    container_node* HBF1 = 0;
     {
       // Create Option Window
+      container_node* ButtonContainer =  NewContainer(GlobalGameState->MenuInterface, container_type::Grid);
+      grid_node* Grid = GetGridNode(ButtonContainer);
+      Grid->Col = 1;
+      Grid->Row = 0;
+      Grid->TotalMarginX = 0.3;
+      Grid->TotalMarginY = 0.2;
 
+      auto CreateButton = []( b32* ButtonFlag, c8* ButtonText)
+      {
+        container_node* ButtonNode = NewContainer(GlobalGameState->MenuInterface);
+        text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_TEXT);
+        Assert(str::StringLength( ButtonText ) < ArrayCount(Text->Text) );
+        str::CopyStringsUnchecked( ButtonText, Text->Text );
+
+        v4 InactiveColor = V4(0.3,0.1,0.1,1);
+        v4 ActiveColor = V4(0.1,0.3,0.1,1);
+
+        color_attribute* ColorAttr = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_COLOR);
+        ColorAttr->Color = *ButtonFlag ?  ActiveColor : InactiveColor;
+
+        button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_BUTTON);
+        ButtonAttribute->Data = ButtonFlag;
+        ButtonAttribute->Update = [](menu_interface* Interface, button_attribute* Attr, container_node* Node)
+        {
+          v4 InactiveColor = V4(0.3,0.1,0.1,1);
+          v4 ActiveColor = V4(0.1,0.3,0.1,1);
+
+          if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
+          {
+            b32* ButtonFlag = (b32*) Attr->Data;
+            *ButtonFlag = !*ButtonFlag;
+            color_attribute* ColorAttr =  (color_attribute*) GetAttributePointer(Node, ATTRIBUTE_COLOR);
+            ColorAttr->Color = (*ButtonFlag) ?  ActiveColor : InactiveColor;
+          }
+        };
+
+        return ButtonNode;
+      };
+
+      ConnectNode(ButtonContainer, CreateButton(&DebugState->ConfigMultiThreaded, "Multithread"));
+      ConnectNode(ButtonContainer, CreateButton(&DebugState->ConfigCollisionPoints, "CollisionPoints"));
+      ConnectNode(ButtonContainer, CreateButton(&DebugState->ConfigCollider, "Colliders"));
+      ConnectNode(ButtonContainer, CreateButton(&DebugState->ConfigAABBTree, "AABBTree"));
+      container_node* RecompileButton = ConnectNode(ButtonContainer, NewContainer(GlobalGameState->MenuInterface));
+      {
+        color_attribute* Color = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_COLOR);
+        Color->Color = V4(0.2,0.1,0.3,1);
+        
+        text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_TEXT);
+        str::CopyStringsUnchecked( "Recompile", Text->Text );
+
+        button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_BUTTON);
+        ButtonAttribute->Update = [](menu_interface* Interface, button_attribute* Attr, container_node* Node)
+        {
+          DebugRewriteConfigFile();
+        };
+      }
+      HBF1 = CreateHBF(GlobalGameState->MenuInterface, V4(0.5,0.5,0.5,1), ButtonContainer);
     }
-
     // Create graph window
+    container_node* HBF2 = 0;
     {
       container_node* MainContainer = NewContainer(GlobalGameState->MenuInterface, container_type::None);
       MainContainer->Functions.UpdateChildRegions = [](container_node* Parent){
@@ -133,11 +190,15 @@ DEBUGGetState()
       Grid->TotalMarginX = 0.3;
       Grid->TotalMarginY = 0.2;
 
-      container_node* Button =  ConnectNode(ButtonContainer, NewContainer(GlobalGameState->MenuInterface, container_type::Color));
-      GetColorNode(Button)->Color = V4(0.3,0.1,0.3,1);
+      container_node* Button =  ConnectNode(ButtonContainer, NewContainer(GlobalGameState->MenuInterface));
+      color_attribute* Color = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_COLOR);
+      Color->Color = V4(0.3,0.1,0.3,1);
+
+      text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_TEXT);
+      str::CopyStringsUnchecked( "Pause", Text->Text );
 
       button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_BUTTON);
-      ButtonAttribute->Update = [](menu_interface* Interface, button_attribute* Attr)
+      ButtonAttribute->Update = [](menu_interface* Interface, button_attribute* Attr, container_node* Node)
       {
         debug_state* DebugState = DEBUGGetState();
         if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
@@ -153,10 +214,13 @@ DEBUGGetState()
       container_node* GraphContainer =  ConnectNode(MainContainer, NewContainer(GlobalGameState->MenuInterface, container_type::None));
       GraphContainer->Functions.Draw = DrawFunctionTimeline;
       
-      container_node* HBF = CreateDraggableHBF(GlobalGameState->MenuInterface, V4(0.5,0.5,0.5,1), MainContainer);
-      CreateNewRootContainer(GlobalGameState->MenuInterface, HBF, Rect2f( 0.85, 0.25, 0.5, 0.5));
+      HBF2 = CreateHBF(GlobalGameState->MenuInterface, V4(0.5,0.5,0.5,1), MainContainer);
+      
     }
-    
+
+    container_node* Split = SetSplitWindows(GlobalGameState->MenuInterface, CreateSplitWindow(GlobalGameState->MenuInterface, true), HBF1, HBF2);
+
+    CreateNewRootContainer(GlobalGameState->MenuInterface, Split, Rect2f( 0.85, 0.25, 0.7, 0.5));
 
     RestartCollation();
   }
@@ -404,7 +468,7 @@ DebugRewriteConfigFile()
   debug_state* DebugState = DEBUGGetState();
 
   c8 Buffer[4096] = {};
-  u32 Size = _snprintf_s(Buffer, sizeof(Buffer),
+  u32 Size = Platform.DEBUGFormatString(Buffer, sizeof(Buffer), sizeof(Buffer)-1,
 "#define MULTI_THREADED %d // b32\n\
 #define SHOW_COLLISION_POINTS %d // b32\n\
 #define SHOW_COLLIDER %d // b32\n\
@@ -957,10 +1021,6 @@ void PushDebugOverlay(game_input* GameInput)
   "%3.1f Hz, %4.2f ms", 1.f/Frame->WallSecondsElapsed, Frame->WallSecondsElapsed*1000);
     DEBUGAddTextSTB(StringBuffer, LineNumber++);
   }
-
-  if(!DebugState->ChartVisible) return;
-  if(!GlobalGameState->MenuInterface->RootContainers[0].Root) return;
-
 }
 
 void DrawFunctionCount(){

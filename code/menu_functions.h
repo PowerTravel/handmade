@@ -27,19 +27,6 @@ menu_functions GetDefaultFunctions()
   return Result;
 }
 
-MENU_DRAW( ColorDraw )
-{
-  DEBUGPushQuad(Node->Region, GetColorNode(Node)->Color);
-}
-
-menu_functions GetColorFunctions()
-{
-  menu_functions Result = GetDefaultFunctions();
-  Result.Draw = ColorDraw;
-  return Result;
-}
-
-
 MENU_DRAW( BorderDraw )
 {
   DEBUGPushQuad(Node->Region, GetBorderNode(Node)->Color);
@@ -331,7 +318,6 @@ menu_functions GetMenuFunction(container_type Type)
   {   
     case container_type::None: return GetDefaultFunctions();
     case container_type::Root: return GetRootMenuFunctions();
-    case container_type::Color: return GetColorFunctions();
     case container_type::Border: return GetBorderFunctions();
     case container_type::Split: return GetSplitFunctions();
     case container_type::HBF: return GetHBFFunctions();

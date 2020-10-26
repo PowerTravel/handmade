@@ -96,44 +96,44 @@ void FlyingCameraController( component_controller* Controller, component_camera*
       TranslateCamera( Camera, V3(dr,0,0));
       hasMoved = true;
     }
-    if(Input->LeftStickUp.EndedDown || Keyboard->Key_W.EndedDown)
+    if(Input->LeftStickUp.EndedDown || Keyboard->Key_R.EndedDown)
     {
       TranslateCamera( Camera, V3(0,dr,0));
       hasMoved = true;
     }
-    if(Input->LeftStickDown.EndedDown || Keyboard->Key_S.EndedDown)
+    if(Input->LeftStickDown.EndedDown || Keyboard->Key_F.EndedDown)
     {
       TranslateCamera( Camera, V3(0,-dr,0));
       hasMoved = true;
     }
-    if(Input->RightStickUp.EndedDown)
+    if(Input->RightStickUp.EndedDown || Keyboard->Key_UP.EndedDown)
     {
       RotateCamera( Camera, da, V3(1,0,0) );
       hasMoved = true;
     }
-    if(Input->RightStickDown.EndedDown)
+    if(Input->RightStickDown.EndedDown || Keyboard->Key_DOWN.EndedDown)
     {
       RotateCamera( Camera, da, V3(-1,0,0) );
       hasMoved = true;
     }
-    if(Input->RightStickLeft.EndedDown)
+    if(Input->RightStickLeft.EndedDown || Keyboard->Key_LEFT.EndedDown)
     {
       v4 WorldUpCamCoord = Camera->V * V4(0,1,0,0);
       RotateCamera( Camera, da, V3( WorldUpCamCoord) );
       hasMoved = true;
     }
-    if(Input->RightStickRight.EndedDown)
+    if(Input->RightStickRight.EndedDown|| Keyboard->Key_RIGHT.EndedDown)
     {
       v4 WorldDownCamCoord = Camera->V * V4(0,-1,0,0);
       RotateCamera( Camera, da, V3( WorldDownCamCoord ) );
       hasMoved = true;
     }
-    if(Input->RightTrigger.EndedDown)
+    if(Input->RightTrigger.EndedDown || Keyboard->Key_W.EndedDown)
     {
       TranslateCamera(Camera, V3(0,0,-dr));
       hasMoved = true;
     }
-    if(Input->LeftTrigger.EndedDown)
+    if(Input->LeftTrigger.EndedDown || Keyboard->Key_S.EndedDown)
     {
       TranslateCamera(Camera, V3( 0, 0, dr));
       hasMoved = true;

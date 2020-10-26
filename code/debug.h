@@ -3,7 +3,6 @@
 #include "types.h"
 #include "intrinsics.h"
 #include "memory.h"
-#include <stdio.h>
 #include "string.h"
 
 #pragma intrinsic(__rdtsc)

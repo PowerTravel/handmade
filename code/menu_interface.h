@@ -4,7 +4,6 @@ enum class container_type
 {
   None,
   Root,
-  Color, // <-- Should be an attribute
   Border,
   Split,
   HBF, // Header-Body-Footer
@@ -17,7 +16,9 @@ enum container_attribute
   ATTRIBUTE_DRAG = 0x1,
   ATTRIBUTE_MERGE = 0x2,
   ATTRIBUTE_MERGE_SLOT = 0x4,
-  ATTRIBUTE_BUTTON = 0x8
+  ATTRIBUTE_BUTTON = 0x8,
+  ATTRIBUTE_COLOR = 0x10,
+  ATTRIBUTE_TEXT = 0x20
 };
 
 
@@ -27,7 +28,6 @@ const c8* ToString(container_type Type)
   {
     case container_type::None: return "None";
     case container_type::Root: return "Root";
-    case container_type::Color: return "Color";
     case container_type::Border: return "Border";
     case container_type::Split: return "Split";
     case container_type::HBF: return "HBF";
@@ -44,6 +44,8 @@ const c8* ToString(u32 Type)
     case ATTRIBUTE_MERGE: return "Merge";
     case ATTRIBUTE_MERGE_SLOT: return "Slot";
     case ATTRIBUTE_BUTTON: return "Button";
+    case ATTRIBUTE_COLOR: return "Color";
+    case ATTRIBUTE_TEXT: return "Text";
   }
   return "";
 };
@@ -141,7 +143,6 @@ struct grid_node
   r32 TotalMarginY;
 };
 
-
 struct merge_slot_attribute
 {
   u32 HotMergeZone;
@@ -157,7 +158,17 @@ struct button_attribute
 {
   //binary_signal_state State;
   void* Data;
-  void (*Update)( menu_interface* Interface, button_attribute* Attr);
+  void (*Update)( menu_interface* Interface, button_attribute* Attr, container_node* Node);
+};
+
+struct color_attribute
+{
+  v4 Color;
+};
+
+struct text_attribute
+{
+  c8 Text[256];
 };
 
 struct tabbed_button_data
@@ -179,11 +190,6 @@ struct split_draggable_data
 {
   container_node* SplitNode;
   border_leaf* Border;
-};
-
-struct color_leaf
-{
-  v4 Color;
 };
 
 struct menu_tree
@@ -240,12 +246,6 @@ inline root_node* GetRootNode(container_node* Container)
   root_node* Result = (root_node*) GetContainerPayload(Container);
   return Result;
 }
-inline color_leaf* GetColorNode(container_node* Container)
-{
-  Assert(Container->Type == container_type::Color);
-  color_leaf* Result = (color_leaf*) GetContainerPayload(Container);
-  return Result;
-}
 inline border_leaf* GetBorderNode(container_node* Container)
 {
   Assert(Container->Type == container_type::Border);
@@ -270,6 +270,6 @@ void SetSplitDragAttribute(container_node* SplitNode, container_node* BorderNode
 container_node* ReallocateNode(menu_interface* Interface, container_node* SrcNode, u32 InputAttributes = 0);
 void SplitWindowHeaderDrag( menu_interface* Interface, container_node* Node, draggable_attribute* Attr );
 menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* BaseWindow, rect2f Region);
-container_node* CreateDraggableHBF(menu_interface* Interface, v4 HeaderColor, container_node* BodyNode);
-
 container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical);
+container_node* CreateHBF(menu_interface* Interface, v4 HeaderColor, container_node* BodyNode);
+container_node* SetSplitWindows( menu_interface* Interface, container_node* SplitNode, container_node* HBF1, container_node* HBF2);
