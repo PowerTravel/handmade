@@ -349,7 +349,7 @@ struct keyboard_input
 {
   union
   {
-    game_button_state Keys[104];
+    game_button_state Keys[105];
     struct
     {
       game_button_state Key_BACK;
@@ -622,6 +622,7 @@ enum keyboard_button
   KeyboardButton_F11,
   KeyboardButton_F12,
   KeyboardButton_NP_NMLK,
+  KeyboardButton_SCRLK,
   KeyboardButton_LSHIFT,
   KeyboardButton_RSHIFT,
   KeyboardButton_LCTRL,
@@ -649,10 +650,8 @@ struct game_input
   b32 ExecutableReloaded;
 
   game_button_state MouseButton[5];
+  r32 MouseDX, MouseDY, MouseDZ;
   r32 MouseX, MouseY, MouseZ;
-
-  // Todo: handle keyboard like this? Use raw input?
-  //game_button_state KeyboardButton[104];,
 
   keyboard_input Keyboard;
   game_controller_input Controllers[4];

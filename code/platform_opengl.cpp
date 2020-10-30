@@ -827,7 +827,7 @@ void PushBitmapToGPU(open_gl* OpenGL, game_asset_manager* AssetManager, bitmap_h
 
 }
 
-#define DRAW_INSTANCED 0
+
 void OpenGLRenderGroupToOutput( game_render_commands* Commands)
 {
   TIMED_FUNCTION();
@@ -954,6 +954,7 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
     }
   }
 
+  ResetRenderGroup(Commands->MainRenderGroup);
 
   
   RenderGroup = Commands->DebugRenderGroup;
@@ -1073,4 +1074,5 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
 
   EndTemporaryMemory(TempMem);
 
+  ResetRenderGroup(Commands->DebugRenderGroup);
 }

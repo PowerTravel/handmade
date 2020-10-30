@@ -52,6 +52,8 @@ struct game_state
   entity_manager* EntityManager;
   menu_interface* MenuInterface;
 
+  game_input* Input;
+
   world* World;
 
   function_pool* FunctionPool;

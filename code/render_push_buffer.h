@@ -103,4 +103,15 @@ struct render_group
 };
 
 render_group* InitiateRenderGroup(game_state* GameState, r32 ScreenWidth, r32 ScreenHeight);
-void ResetRenderGroup(render_group* RenderGroup);
+void ResetRenderGroup(render_group* RenderGroup)
+{
+  EndTemporaryMemory(RenderGroup->PushBufferMemory);
+  RenderGroup->PushBufferMemory = BeginTemporaryMemory(&RenderGroup->Arena);
+
+  RenderGroup->ProjectionMatrix = M4Identity();
+  RenderGroup->ViewMatrix = M4Identity();
+  RenderGroup->ElementCount = 0;
+  RenderGroup->First = 0;
+  RenderGroup->Last = 0;
+  ZeroArray(ArrayCount(RenderGroup->BufferCounts), RenderGroup->BufferCounts);
+}

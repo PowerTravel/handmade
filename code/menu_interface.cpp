@@ -529,7 +529,7 @@ void TreeSensus( menu_tree* Menu )
   Menu->Depth = Pair.b;
  // Platform.DEBUGPrint("Tree Sensus:  Depth: %d, Count: %d\n", Pair.b, Pair.a);
 }
-void FormatNodeString(container_node* Node, u32 BufferSize, c8 StringBuffer[]);
+
 void UpdateRegions( menu_tree* Menu )
 {
   temporary_memory TempMem =  BeginTemporaryMemory(GlobalGameState->TransientArena);
@@ -549,35 +549,8 @@ void UpdateRegions( menu_tree* Menu )
     container_node* Parent = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
 
-    u32 Count = GlobalGameState->FunctionPool->Count;
-    b32 funFound = false;
-    Platform.DEBUGPrint("Checking %p \n", (*Parent->Functions.UpdateChildRegions));
-    menu_get_region* F = 0;
-    for (u32 Index = 0; Index < Count; ++Index)
-    {
-      function_ptr* f = GlobalGameState->FunctionPool->Functions + Index;
-      func_ptr_void* fp = &(f->Function);
-      if( fp == (func_ptr_void*)(Parent->Functions.UpdateChildRegions) )
-      {
-        Platform.DEBUGPrint("%s found\n", f->Name);
-        funFound = true;
-        F = (menu_get_region*) fp;
-      }
-    }
-    if(!funFound)
-    {
-      c8 Buf[1024] = {};
-      FormatNodeString(Parent, ArrayCount(Buf), Buf );
-      Platform.DEBUGPrint("%p NOT FOUND %s \n", (*Parent->Functions.UpdateChildRegions), Buf);
-    }
-
-
-    Assert(funFound);
-
     // Update the region of all children and push them to the stack
-    //CallFunctionPointer(Parent->Functions.UpdateChildRegions, Parent);
-    menu_get_region** func = (menu_get_region**) Parent->Functions.UpdateChildRegions;
-    (**func)(Parent);
+    CallFunctionPointer(Parent->Functions.UpdateChildRegions, Parent);
     container_node* Child = Parent->FirstChild;
     while(Child)
     {
@@ -620,13 +593,18 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
     container_node* Parent = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
 
-    CallFunctionPointer(Parent->Functions.Draw, Interface, Parent);
 
     if(HasAttribute(Parent, ATTRIBUTE_COLOR))
     {
       color_attribute* Color = (color_attribute*) GetAttributePointer(Parent, ATTRIBUTE_COLOR);
       DEBUGPushQuad(Parent->Region, Color->Color);
     }
+
+    if(Parent->Functions.Draw)
+    {
+      CallFunctionPointer(Parent->Functions.Draw, Interface, Parent);  
+    }
+
 
     if(HasAttribute(Parent, ATTRIBUTE_TEXT))
     {
@@ -1522,7 +1500,6 @@ void ActOnInput(menu_interface* Interface, menu_tree* Menu)
   for (u32 i = 0; i < ActiveMenu->ActiveLeafCount; ++i)
   {
     container_node* Node =  ActiveMenu->ActiveLeafs[i];
-    CallFunctionPointer(Node->Functions.HandleInput, Interface, Node);
     if(HasAttribute(Node, ATTRIBUTE_DRAG))
     {
       draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(Node, ATTRIBUTE_DRAG);
@@ -1631,9 +1608,7 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
     {
       TreeSensus(MenuTree);
       UpdateRegions( MenuTree );
-      #if 1
       DrawMenu( GlobalGameState->TransientArena, Interface, MenuTree->NodeCount, MenuTree->Root);
-      #endif
     }
   }
   
@@ -1720,10 +1695,14 @@ CreateBorderNode(menu_interface* Interface, b32 Vertical, r32 Position, v4 Color
   Border.Vertical = Vertical;
   Border.Position = Position;
   Border.Thickness = Interface->BorderSize;
-  Border.Color = Color;  
+
   container_node* Result = NewContainer(Interface, container_type::Border);
   PushAttribute(Interface, Result, ATTRIBUTE_DRAG);
   border_leaf* BorderLeaf = GetBorderNode(Result);
+
+  color_attribute* ColorAttr = (color_attribute*) PushAttribute(Interface, Result, ATTRIBUTE_COLOR);
+  ColorAttr->Color = Color;
+
   Assert(Result->Type == container_type::Border);
   *BorderLeaf = Border;
   return Result;

@@ -26,29 +26,6 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup, render_buffer_entry
   return NewEntryHeader;
 }
 
-#if 0
-void DEBUGPushLine(render_group* RenderGroup, rect2f QuadRect, v2 p0, v2 p1, r32 Thickness, v4 Color)
-{
-  rect2f TextureRect = Rect2f(0,0,1,1);
-  const m4 TextureTranslate = GetTranslationMatrix(V4(TextureRect.X,TextureRect.Y,0,1));
-  const m4 TextureScale     = GetScaleMatrix(V4(TextureRect.W, TextureRect.H,1,0));
-
-  v2 Line = p1-p0;
-  r32 Angle = ATan2(Line.Y, Line.X);
-
-  const m4 QuadScale        = GetScaleMatrix(V4(Norm(Line), Thickness,1,0));
-  const m4 QuadRotation     = GetRotationMatrix( Angle, V4(0,0,0,1));
-  const m4 QuadTranslate    = GetTranslationMatrix(V4(p0.X, p0.Y,0,1));
-  
-  entry_type_overlay_line* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_line);
-  GetHandle(GlobalGameState->AssetManager, "quad", &Body->ObjectHandle);
-  Body->Colour = Color;
-  Body->BitmapHandle = {};
-  Body->M  = QuadTranslate * QuadRotation * QuadScale;
-  Body->TM = TextureTranslate * TextureScale;
-  Body->QuadRect = QuadRect;
-}
-#endif
 void DEBUGPushQuad(rect2f QuadRect, v4 Color)
 { 
   render_group* RenderGroup = GlobalDebugRenderGroup;
@@ -173,18 +150,6 @@ void DEBUGAddTextSTB(const c8* String, r32 LineNumber)
   DEBUGTextOutAt(CanPosX, CanPosY,String);
 }
 
-void ResetRenderGroup(render_group* RenderGroup)
-{
-  EndTemporaryMemory(RenderGroup->PushBufferMemory);
-  RenderGroup->PushBufferMemory = BeginTemporaryMemory(&RenderGroup->Arena);
-
-  RenderGroup->ProjectionMatrix = M4Identity();
-  RenderGroup->ViewMatrix = M4Identity();
-  RenderGroup->ElementCount = 0;
-  RenderGroup->First = 0;
-  RenderGroup->Last = 0;
-  ZeroArray(ArrayCount(RenderGroup->BufferCounts), RenderGroup->BufferCounts);
-}
 
 render_group* InitiateRenderGroup(r32 ScreenWidth, r32 ScreenHeight)
 {

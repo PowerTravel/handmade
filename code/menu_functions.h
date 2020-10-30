@@ -1,10 +1,5 @@
 #include "menu_interface.h"
 
-
-MENU_HANDLE_INPUT(HandleInput)
-{
-
-}
 MENU_UPDATE_CHILD_REGIONS(UpdateChildRegions)
 {
   container_node* Child = Parent->FirstChild;
@@ -14,29 +9,12 @@ MENU_UPDATE_CHILD_REGIONS(UpdateChildRegions)
     Child = Child->NextSibling;
   }
 }
-MENU_DRAW(Draw)
-{
-
-}
 
 menu_functions GetDefaultFunctions()
 {
   menu_functions Result = {};
-  Result.HandleInput = DeclareFunction(menu_handle_input, HandleInput);
   Result.UpdateChildRegions = DeclareFunction(menu_get_region, UpdateChildRegions);
-  Result.Draw = DeclareFunction(menu_draw, Draw);
-  return Result;
-}
-
-MENU_DRAW( BorderDraw )
-{
-  DEBUGPushQuad(Node->Region, GetBorderNode(Node)->Color);
-}
-
-menu_functions GetBorderFunctions()
-{
-  menu_functions Result = GetDefaultFunctions();
-  Result.Draw = DeclareFunction(menu_draw, BorderDraw);
+  Result.Draw = 0;
   return Result;
 }
 
@@ -189,7 +167,6 @@ MENU_UPDATE_CHILD_REGIONS(UpdateSplitChildRegions)
       Parent->Region.W,
       Parent->Region.H - (Border->Position * Parent->Region.H+0.5f*Border->Thickness));
   }
-  
 }
 
 menu_functions GetSplitFunctions()
@@ -319,7 +296,7 @@ menu_functions GetMenuFunction(container_type Type)
   {   
     case container_type::None: return GetDefaultFunctions();
     case container_type::Root: return GetRootMenuFunctions();
-    case container_type::Border: return GetBorderFunctions();
+    case container_type::Border: return GetDefaultFunctions();
     case container_type::Split: return GetSplitFunctions();
     case container_type::HBF: return GetHBFFunctions();
     case container_type::Grid: return GetGridFunctions();

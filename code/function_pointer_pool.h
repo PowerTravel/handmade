@@ -1,16 +1,11 @@
 #pragma once
 
-MENU_HANDLE_INPUT(HandleInput);
-
 MENU_UPDATE_CHILD_REGIONS(UpdateChildRegions);
 MENU_UPDATE_CHILD_REGIONS(RootUpdateChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateSplitChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateHBFChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateGridChildRegions);
-MENU_UPDATE_CHILD_REGIONS(DebugCollationGraphUpdateChildRegions);
 
-MENU_DRAW(Draw);
-MENU_DRAW(BorderDraw);
 MENU_DRAW(DrawFunctionTimeline);
 
 BUTTON_ATTRIBUTE_UPDATE(TabButtonUpdate);
@@ -35,25 +30,21 @@ void _ReinitiatePool(function_pool* Pool)
   for (u32 Index = 0; Index < PoolSize; ++Index)
   {
     function_ptr* Function = &Pool->Functions[Index];
-    NewFunPtr(HandleInput)
     NewFunPtr(UpdateChildRegions)
     NewFunPtr(RootUpdateChildRegions)
     NewFunPtr(UpdateSplitChildRegions)
     NewFunPtr(UpdateHBFChildRegions)
     NewFunPtr(UpdateGridChildRegions)
-    NewFunPtr(Draw)
-    NewFunPtr(BorderDraw)
+    NewFunPtr(DrawFunctionTimeline)
     NewFunPtr(TabButtonUpdate)
-    NewFunPtr(UpdateHeaderPosition)
-    NewFunPtr(TabDrag)
-    NewFunPtr(UpdateSplitBorderCallback)
     NewFunPtr(DebugToggleButton)
     NewFunPtr(DebugRecompileButton)
     NewFunPtr(DebugPauseCollationButton)
-    NewFunPtr(DebugCollationGraphUpdateChildRegions)
-    NewFunPtr(DrawFunctionTimeline)
-    NewFunPtr(SplitWindowHeaderDrag)
     NewFunPtr(UpdateFrameBorderCallback)
+    NewFunPtr(SplitWindowHeaderDrag)
+    NewFunPtr(UpdateHeaderPosition)
+    NewFunPtr(TabDrag)
+    NewFunPtr(UpdateSplitBorderCallback)
     {
       INVALID_CODE_PATH;
     }    

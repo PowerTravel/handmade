@@ -67,9 +67,6 @@ void DisconnectNode(container_node* Node);
 container_node* CreateBorderNode(menu_interface* Interface, b32 Vertical=false, r32 Position = 0.5f,  v4 Color =  V4(0,0,0.4,1));
 
 
-#define MENU_HANDLE_INPUT(name) void name( menu_interface* Interface, container_node* Node)
-typedef MENU_HANDLE_INPUT( menu_handle_input );
-
 #define MENU_UPDATE_CHILD_REGIONS(name) void name(container_node* Parent)
 typedef MENU_UPDATE_CHILD_REGIONS( menu_get_region );
 
@@ -79,7 +76,6 @@ typedef MENU_DRAW( menu_draw );
 struct menu_functions
 {
   menu_get_region** UpdateChildRegions;
-  menu_handle_input** HandleInput;
   menu_draw** Draw;
 };
 
@@ -132,7 +128,6 @@ struct border_leaf
   b32 Vertical;
   r32 Position;
   r32 Thickness;
-  v4 Color;
 };
 
 struct grid_node
@@ -213,11 +208,22 @@ struct menu_tree
   u32 ActiveLeafCount;
   container_node* ActiveLeafs[32];
 
+  // TODO:
   // b32 ShouldDelete; <-- Implement later (Delete last in a cleanup phase)
 };
 
 struct menu_interface
 {
+  // TODO: Right now alot of the tree structure is dynamic, ie, gets freed and applied
+  //       as the windows change.
+  //       Others may want a handle to for example 'menu_tree' to see if it's visible 
+  //       or other things... But 
+  //         1: RootContainers being in an array where the elements get switched around
+  //            makes any ptr garbrage when another window gets focus.
+  //         Solution: Make into a list.
+  //         2: Root Windows gets deleted when we merge and split windows.
+  //         Solution: Not sure, 'Content' windows are permanent. Give them a special
+  //         status and permanent handle?
   u32 RootContainerCount;
   menu_tree RootContainers[32];
 
@@ -280,3 +286,151 @@ menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* Bas
 container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical);
 container_node* CreateHBF(menu_interface* Interface, v4 HeaderColor, container_node* BodyNode);
 container_node* SetSplitWindows( menu_interface* Interface, container_node* SplitNode, container_node* HBF1, container_node* HBF2);
+
+
+
+
+
+
+
+
+
+
+#if 0 
+
+// Leftover code for a radial menu.
+// It's good code, so lets keep it for later.
+
+#define AssertCanonical(Angle) Assert(( (Angle) >= 0 ) && ( (Angle) < Tau32))
+
+// Angle -> [0,Tau]
+inline r32 RecanonicalizeAngle(r32 Angle)
+{
+  r32 Result = Angle - Floor(Angle/Tau32) * Tau32;
+  return Result;
+}
+
+inline r32 GetDeltaAngle(r32 AngleStart, r32 AngleEnd)
+{
+  AssertCanonical(AngleStart);
+  AssertCanonical(AngleEnd);
+
+  b32 Wrapping = (AngleStart > AngleEnd);
+  r32 Result = AngleEnd - AngleStart + Wrapping*Tau32;
+  return Result;
+}
+
+inline r32 GetParametarizedAngle(r32 AngleStart, r32 AngleEnd,  r32 Angle)
+{
+  AssertCanonical(AngleStart);
+  AssertCanonical(AngleEnd);
+  AssertCanonical(Angle);
+
+  r32 Interval = GetDeltaAngle(AngleStart, AngleEnd);
+  r32 Delta = GetDeltaAngle(AngleStart, Angle);
+  r32 Result = Delta / Interval;
+
+  return Result;
+}
+
+inline b32 IsInRegion(r32 AngleStart, r32 AngleEnd, r32 Angle)
+{
+  AssertCanonical(AngleStart);
+  AssertCanonical(AngleEnd);
+  AssertCanonical(Angle);
+  b32 Wrapping = (AngleStart > AngleEnd);
+  b32 BetweenStartAndEnd = (Angle >= AngleStart) && (Angle < AngleEnd);
+  b32 BetweenStartAndTau = (Angle >= AngleStart) && (Angle < Tau32);
+  b32 BetweenZeroAndEnd  = (Angle >= 0) && (Angle < AngleEnd);
+  b32 Result = (!Wrapping && BetweenStartAndEnd) || (Wrapping && (BetweenStartAndTau || BetweenZeroAndEnd) );
+  return Result;
+}
+
+
+struct radial_menu_region
+{
+  r32 AngleStart;
+  r32 AngleEnd;
+  r32 RadiusStart;
+  r32 Radius;
+};
+
+radial_menu_region RadialMenuRegion(r32 AngleStart, r32 AngleEnd, r32 RadiusStart, r32 Radius)
+{
+  radial_menu_region Result = {};
+
+  Result.AngleStart = RecanonicalizeAngle(AngleStart);
+  Result.AngleEnd = RecanonicalizeAngle(AngleEnd);
+  Result.RadiusStart = RadiusStart;
+  Result.Radius = Radius;
+  return Result;
+}
+
+struct radial_menu
+{
+  u32 MenuRegionCount;
+  u32 HotRegionIndex;
+  radial_menu_region* Regions;
+
+  r32 MouseRadius;
+  r32 MouseAngle;
+
+  r32 MenuX;
+  r32 MenuY;
+};
+
+
+void DEBUGDrawDottedLine(v2 Start, v2 End, v4 Color = V4(1,1,1,1), r32 NrDots = 100.f)
+{
+  for (r32 i = 0; i < NrDots; ++i)
+  {
+    v2 Pos = Start + (End-Start) * (i/NrDots);
+    DEBUGPushQuad(Rect2f(Pos.X-0.005f,Pos.Y-0.005f, 0.01, 0.01), Color);
+  }
+}
+
+void DEBUGDrawDottedCircularSection(v2 Origin, r32 AngleStart, r32 AngleEnd, r32 Radius, v4 Color = V4(1,1,1,1), r32 NrDots = 100.f)
+{
+  r32 AngleInterval = GetDeltaAngle(AngleStart, AngleEnd);
+  for (r32 i = 0; i < NrDots; ++i)
+  {
+    r32 Angle = AngleStart + i * AngleInterval / NrDots;
+    v2 Pos = V2(Origin.X + Radius * Cos(Angle),
+                Origin.Y + Radius * Sin(Angle));
+    DEBUGPushQuad(Rect2f(Pos.X-0.005f,Pos.Y-0.005f, 0.01, 0.01), Color);
+  }
+}
+
+void DEBUGDrawRadialRegion( r32 OriginX, r32 OriginY, r32 MouseX, r32 MouseY, r32 AngleStart, r32 AngleEnd, r32 RadiusStart, r32 RadiusEnd )
+{
+  AssertCanonical(AngleStart);
+  AssertCanonical(AngleEnd);
+
+  // Draw Debug Regions
+  v4 Color = V4(1,0,0,1);
+
+  if(RadiusEnd < RadiusStart) RadiusEnd+=(Tau32-RadiusStart);
+
+  v2 Origin = V2(OriginX, OriginY);
+  v2 Mouse = V2(MouseX, MouseY) - Origin;
+  r32 MouseAngle = ATan2(Mouse.Y, Mouse.X);
+  MouseAngle = MouseAngle < 0 ? MouseAngle+Tau32 : MouseAngle;
+  r32 MouseRadius = Norm(Mouse);
+
+  v2 MouseLine  = V2(Origin.X +  MouseRadius * Cos(MouseAngle),
+                     Origin.Y +  MouseRadius * Sin(MouseAngle));
+  v2 StartLine  = V2(Origin.X +  RadiusEnd * Cos(AngleStart+0.1f),
+                     Origin.Y +  RadiusEnd * Sin(AngleStart+0.1f));
+  v2 StopLine   = V2(Origin.X +  RadiusEnd * Cos(AngleEnd-0.1f),
+                     Origin.Y +  RadiusEnd * Sin(AngleEnd-0.1f));
+
+  DEBUGDrawDottedLine(Origin, StartLine,  V4(0,1,0,1));
+  DEBUGDrawDottedLine(Origin, StopLine,   V4(1,0,0,1));
+  DEBUGDrawDottedLine(Origin, MouseLine,  V4(0,0,1,1));
+
+  DEBUGDrawDottedCircularSection(Origin, AngleStart+0.1f, AngleEnd-0.1f, RadiusStart, Color);
+  DEBUGDrawDottedCircularSection(Origin, AngleStart+0.1f, AngleEnd-0.1f, RadiusEnd,   Color);
+  DEBUGDrawDottedCircularSection(Origin, 0, MouseAngle, MouseRadius, Color);
+}
+
+#endif

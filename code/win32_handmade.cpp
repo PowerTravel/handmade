@@ -2062,6 +2062,10 @@ WinMain(  HINSTANCE Instance,
           NewInput->MouseX = (r32) Floor(MouseP.x+0.5f) / (r32) RenderCommands.ScreenHeightPixels;
           NewInput->MouseY = (r32) 1.f-(Floor(MouseP.y+0.5f) / (r32) RenderCommands.ScreenHeightPixels);
           NewInput->MouseZ = 0;
+          NewInput->MouseDX = NewInput->MouseX - OldInput->MouseX;
+          NewInput->MouseDY = NewInput->MouseY - OldInput->MouseY;
+          NewInput->MouseDZ = NewInput->MouseZ - OldInput->MouseZ;
+
 
           DWORD WinButtonID[PlatformMouseButton_Count] =
           {

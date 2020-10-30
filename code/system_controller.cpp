@@ -84,6 +84,9 @@ void FlyingCameraController( component_controller* Controller, component_camera*
   {
     b32 hasMoved = false;
     r32 dr = 0.05;
+    if(Keyboard->Key_SHIFT.EndedDown){
+      dr = 0.1;
+    }
     r32 da = 0.05;
     r32 Length = 3;
     if(Input->LeftStickLeft.EndedDown || Keyboard->Key_A.EndedDown )
@@ -106,28 +109,44 @@ void FlyingCameraController( component_controller* Controller, component_camera*
       TranslateCamera( Camera, V3(0,-dr,0));
       hasMoved = true;
     }
-    if(Input->RightStickUp.EndedDown || Keyboard->Key_UP.EndedDown)
+    if( GlobalGameState->Input->MouseButton[PlatformMouseButton_Right].EndedDown )
     {
-      RotateCamera( Camera, da, V3(1,0,0) );
+      //v4 WorldDownCamCoord = Camera->V * V4(-1,0,0,0);
+      RotateCamera( Camera, 1.5f*GlobalGameState->Input->MouseDY, V3(1,0,0) );
       hasMoved = true;
+    }else{
+      if(Input->RightStickUp.EndedDown || Keyboard->Key_UP.EndedDown)
+      {
+        RotateCamera( Camera, da, V3(1,0,0) );
+        hasMoved = true;
+      }
+      if(Input->RightStickDown.EndedDown || Keyboard->Key_DOWN.EndedDown)
+      {
+        RotateCamera( Camera, da, V3(-1,0,0) );
+        hasMoved = true;
+      }
     }
-    if(Input->RightStickDown.EndedDown || Keyboard->Key_DOWN.EndedDown)
-    {
-      RotateCamera( Camera, da, V3(-1,0,0) );
-      hasMoved = true;
-    }
-    if(Input->RightStickLeft.EndedDown || Keyboard->Key_LEFT.EndedDown)
-    {
-      v4 WorldUpCamCoord = Camera->V * V4(0,1,0,0);
-      RotateCamera( Camera, da, V3( WorldUpCamCoord) );
-      hasMoved = true;
-    }
-    if(Input->RightStickRight.EndedDown|| Keyboard->Key_RIGHT.EndedDown)
+    if( GlobalGameState->Input->MouseButton[PlatformMouseButton_Right].EndedDown )
     {
       v4 WorldDownCamCoord = Camera->V * V4(0,-1,0,0);
-      RotateCamera( Camera, da, V3( WorldDownCamCoord ) );
+      RotateCamera( Camera, 1.5f*GlobalGameState->Input->MouseDX, V3( WorldDownCamCoord ) );
       hasMoved = true;
+    }else{
+      if(Input->RightStickLeft.EndedDown || Keyboard->Key_LEFT.EndedDown)
+      {
+        v4 WorldUpCamCoord = Camera->V * V4(0,1,0,0);
+        RotateCamera( Camera, da, V3( WorldUpCamCoord) );
+        hasMoved = true;
+      }
+      if(Input->RightStickRight.EndedDown || Keyboard->Key_RIGHT.EndedDown)
+      {
+        v4 WorldDownCamCoord = Camera->V * V4(0,-1,0,0);
+        RotateCamera( Camera, da, V3( WorldDownCamCoord ) );
+        hasMoved = true;
+      }  
     }
+    
+    
     if(Input->RightTrigger.EndedDown || Keyboard->Key_W.EndedDown)
     {
       TranslateCamera(Camera, V3(0,0,-dr));

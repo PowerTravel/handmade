@@ -384,6 +384,8 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
 
     GlobalGameState->World = CreateWorld(2048);
 
+    GlobalGameState->Input = Input;
+
     CreateCollisionTestScene(GlobalGameState, Input);
 
     Memory->GameState = GlobalGameState;
@@ -414,13 +416,12 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
     //       Is there a problem with the debug system piping it's drawing through the GameRenderingPipeline?
     //       I mean it already sort of does since it all gets drawn in RenderGroupToOutput.
     RenderCommands->DebugRenderGroup = InitiateRenderGroup((r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
+
+
   }
 }
 
 #include "function_pointer_pool.h"
-
-#define StringifyA(name) #name
-#define StringifyB( name ) #name
 
 void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
 {
@@ -431,6 +432,7 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
 #if HANDMADE_INTERNAL
   GlobalDebugRenderGroup =  RenderCommands->DebugRenderGroup;
   DebugGlobalMemory = Memory;
+
 #endif
 
   Assert(Memory->GameState);
@@ -440,6 +442,26 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
 
   EndTemporaryMemory(GlobalGameState->TransientTempMem);
   GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
+ 
+  if(Input->ExecutableReloaded)
+  {
+    ReinitiatePool();  
+  }
+
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 AspectRatio = WindowSize.WidthPx/WindowSize.HeightPx;
+  m4 ScreenToCubeScale =  M4( 2/AspectRatio, 0, 0, 0,
+                                           0, 2, 0, 0,
+                                           0, 0, 0, 0,
+                                           0, 0, 0, 1);
+  m4 ScreenToCubeTrans =  M4( 1, 0, 0, -1,
+                              0, 1, 0, -1,
+                              0, 0, 1,  0,
+                              0, 0, 0,  1);
+
+  RenderCommands->DebugRenderGroup->ProjectionMatrix = ScreenToCubeTrans*ScreenToCubeScale;
+
+
 
 //  RenderCommands->MainRenderGroup->ScreenWidth  = (r32)RenderCommands->ScreenWidthPixels;
 //  RenderCommands->MainRenderGroup->ScreenHeight = (r32)RenderCommands->ScreenHeightPixels;
@@ -447,23 +469,6 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
 //  RenderCommands->DebugRenderGroup->ScreenWidth  = (r32) RenderCommands->ScreenWidthPixels;
 //  RenderCommands->DebugRenderGroup->ScreenHeight = (r32) RenderCommands->ScreenHeightPixels;
 
-#if HANDMADE_INTERNAL
-  // Recompilation issues is only an issue when building with Debug
-  //SetMenuButtonFunctions(GlobalGameState->MenuInterface);
-
-  if(Input->ExecutableReloaded)
-  {
-    ReinitiatePool();  
-  }
-  
-//  for (s32 WindowIndex = 0;
-//           WindowIndex >= 0;
-//         --WindowIndex)
-//  {
-//    menu_tree* MenuTree = &GlobalGameState->MenuInterface->RootContainers[WindowIndex];
-//    SetInterfaceFunctionPointers(MenuTree->Root, GlobalGameState->TransientArena, MenuTree->NodeCount);
-//  }
-#endif
 }
 
 
@@ -489,11 +494,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
   TIMED_FUNCTION();
 
-  c8 aa[] = StringifyA(abc);
-  c8 ab[] = StringifyA( abc );
-  c8 ba[] = StringifyA(abc);
-  c8 bb[] = StringifyA( abc );
-
   world* World = GlobalGameState->World;
   World->dtForFrame = Input->dt;
   World->GlobalTimeSec += Input->dt;
@@ -506,12 +506,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
   if(Memory->DebugState)
   {
-    // Note: We are clearing the Debug Render Buffer HERE.
-    //       Which means anything pushing to that needs to do so below here.
-    //       Thats stupid right?
-
-    // TODO: We should clear the render buffers EITHER at the beginning of the frame
-    //       or immediately after render
     PushDebugOverlay(Input);
   }
   UpdateAndRenderMenuInterface(Input, GlobalGameState->MenuInterface);
