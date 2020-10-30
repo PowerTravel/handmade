@@ -78,8 +78,7 @@ Contains( char* LookForString, char* SearchInString )
 }
 
 
-b32
-Equals( const char* StringA, const char* StringB )
+b32 Equals( const char* StringA, const char* StringB )
 {
   while( *StringA && *StringB )
   {
@@ -92,7 +91,11 @@ Equals( const char* StringA, const char* StringB )
   return true;
 }
 
-
+b32 ExactlyEquals( const char* StringA, const char* StringB )
+{
+  b32 Result = Equals(StringA, StringB)  && (str::StringLength(StringA) == str::StringLength(StringB));
+  return Result;
+}
 internal char*
 FindFirstOf( char* Tokens, char* String )
 {

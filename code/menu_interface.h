@@ -78,9 +78,9 @@ typedef MENU_DRAW( menu_draw );
 
 struct menu_functions
 {
-  menu_get_region* UpdateChildRegions;
-  menu_handle_input* HandleInput;
-  menu_draw* Draw;
+  menu_get_region** UpdateChildRegions;
+  menu_handle_input** HandleInput;
+  menu_draw** Draw;
 };
 
 menu_functions GetMenuFunction(container_type Type);
@@ -154,11 +154,15 @@ struct mergable_attribute
   merge_slot_attribute* Slot;
 };
 
+
+#define BUTTON_ATTRIBUTE_UPDATE(name) void name( struct  menu_interface* Interface, struct button_attribute* Attr, struct  container_node* Node)
+typedef BUTTON_ATTRIBUTE_UPDATE( button_attribute_update );
+
 struct button_attribute
 {
   //binary_signal_state State;
   void* Data;
-  void (*Update)( menu_interface* Interface, button_attribute* Attr, container_node* Node);
+  button_attribute_update** Update;
 };
 
 struct color_attribute
@@ -180,10 +184,13 @@ struct tabbed_button_data
   container_node* ItemFooter;
 };
 
+#define DRAGGABLE_ATTRIBUTE_UPDATE(name) void name( struct  menu_interface* Interface, struct  container_node* Node,  struct draggable_attribute* Attr)
+typedef DRAGGABLE_ATTRIBUTE_UPDATE( draggable_attribute_update );
+
 struct draggable_attribute
 {
   container_node* Node;
-  void (*Update)( menu_interface* Interface, container_node* Node, draggable_attribute* Attr);
+  draggable_attribute_update** Update;
 };
 
 struct split_draggable_data

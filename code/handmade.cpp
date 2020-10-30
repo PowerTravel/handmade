@@ -107,6 +107,8 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
   }
 }
 
+
+
 world* CreateWorld( u32 MaxNrManifolds )
 {
   world* World = PushStruct(GlobalGameState->PersistentArena, world);
@@ -372,6 +374,8 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
     GlobalGameState->TransientArena = PushStruct(GlobalGameState->PersistentArena, memory_arena);
     GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
 
+    GlobalGameState->FunctionPool = PushStruct(GlobalGameState->PersistentArena, function_pool);
+
     GlobalGameState->RenderCommands = RenderCommands;
 
     GlobalGameState->AssetManager  = CreateAssetManager();
@@ -413,6 +417,11 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
   }
 }
 
+#include "function_pointer_pool.h"
+
+#define StringifyA(name) #name
+#define StringifyB( name ) #name
+
 void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_input* Input )
 {
   Platform = Memory->PlatformAPI;
@@ -440,16 +449,23 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
 
 #if HANDMADE_INTERNAL
   // Recompilation issues is only an issue when building with Debug
-//  SetMenuButtonFunctions(GlobalGameState->MenuInterface);
-  for (s32 WindowIndex = 0;
-           WindowIndex >= 0;
-         --WindowIndex)
+  //SetMenuButtonFunctions(GlobalGameState->MenuInterface);
+
+  if(Input->ExecutableReloaded)
   {
-    menu_tree* MenuTree = &GlobalGameState->MenuInterface->RootContainers[WindowIndex];
-  //  SetInterfaceFunctionPointers(MenuTree->Root, GlobalGameState->TransientArena, MenuTree->NodeCount);
+    ReinitiatePool();  
   }
+  
+//  for (s32 WindowIndex = 0;
+//           WindowIndex >= 0;
+//         --WindowIndex)
+//  {
+//    menu_tree* MenuTree = &GlobalGameState->MenuInterface->RootContainers[WindowIndex];
+//    SetInterfaceFunctionPointers(MenuTree->Root, GlobalGameState->TransientArena, MenuTree->NodeCount);
+//  }
 #endif
-};
+}
+
 
 /*
   Note:
@@ -466,11 +482,17 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
 //                game_memory* Memory,
 //                render_commands* RenderCommands,
 //                game_input* Input )
+
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
+  BeginFrame(Memory, RenderCommands, Input);
+
   TIMED_FUNCTION();
 
-  BeginFrame(Memory, RenderCommands, Input);
+  c8 aa[] = StringifyA(abc);
+  c8 ab[] = StringifyA( abc );
+  c8 ba[] = StringifyA(abc);
+  c8 bb[] = StringifyA( abc );
 
   world* World = GlobalGameState->World;
   World->dtForFrame = Input->dt;
@@ -492,8 +514,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
     //       or immediately after render
     PushDebugOverlay(Input);
   }
-
-
   UpdateAndRenderMenuInterface(Input, GlobalGameState->MenuInterface);
 }
 

@@ -145,6 +145,7 @@ typedef DEBUG_PLATFORM_PRINT(debug_platform_print);
 
 #endif // HANDMADE_INTERNAL
 
+
 inline u32
 SafeTruncateUInt64( u64 Value )
 {

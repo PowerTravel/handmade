@@ -25,6 +25,20 @@ struct world
   world_contact_chunk* ContactManifolds;
 };
 
+typedef void(*func_ptr_void)(void);
+
+struct function_ptr
+{
+  c8* Name;
+  func_ptr_void Function;
+};
+
+struct function_pool
+{
+  u32 Count;
+  function_ptr Functions[256];
+};
+
 // This is to be a ginormous struct where we can set things we wanna access from everywhere.
 struct game_state
 {
@@ -39,6 +53,8 @@ struct game_state
   menu_interface* MenuInterface;
 
   world* World;
+
+  function_pool* FunctionPool;
 
   b32 IsInitialized;
 };
@@ -62,3 +78,33 @@ inline game_window_size GameGetWindowSize()
   Result.HeightPx = (r32)GlobalGameState->RenderCommands->ScreenHeightPixels;
   return Result;
 }
+
+inline func_ptr_void* _DeclareFunction(func_ptr_void Function, const c8* Name)
+{
+  Assert(GlobalGameState);
+  function_pool* Pool = GlobalGameState->FunctionPool;
+  Assert(Pool->Count < ArrayCount(Pool->Functions))
+  function_ptr* Result = Pool->Functions;
+  u32 FunctionIndex = 0;
+  while(Result->Name && !str::ExactlyEquals(Result->Name, Name))
+  {
+    Result++;
+  }
+  if(!Result->Function)
+  {
+    Assert(Pool->Count == (Result - Pool->Functions))
+    Pool->Count++;
+    Result->Name = (c8*) PushCopy(GlobalGameState->PersistentArena, (str::StringLength(Name)+1)*sizeof(c8), (void*) Name);
+    Result->Function = Function;
+  }else{
+    if(Result->Function != Function)
+    {
+      int a = 10;
+    }
+    Result->Function = Function;
+  }
+  return &Result->Function;
+}
+
+#define DeclareFunction(Type, Name) (Type**) _DeclareFunction((func_ptr_void) (&Name), #Name );
+#define CallFunctionPointer(PtrToFunPtr, ... ) (**PtrToFunPtr)(__VA_ARGS__)

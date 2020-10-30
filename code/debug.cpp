@@ -15,7 +15,7 @@ MENU_DRAW(DrawFunctionTimeline);
 
 internal void RefreshCollation();
 internal void RestartCollation();
-
+#if 0
 void SetRadialMenuFunctionPointers(debug_state* DebugState)
 {
   radial_menu* MainMenu = &DebugState->RadialMenues[0];
@@ -41,7 +41,56 @@ void SetRadialMenuFunctionPointers(debug_state* DebugState)
 
   };
 }
+#endif
 
+BUTTON_ATTRIBUTE_UPDATE(DebugToggleButton)
+{
+  v4 InactiveColor = V4(0.3,0.1,0.1,1);
+  v4 ActiveColor = V4(0.1,0.3,0.1,1);
+
+  if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
+  {
+    b32* ButtonFlag = (b32*) Attr->Data;
+    *ButtonFlag = !*ButtonFlag;
+    color_attribute* ColorAttr =  (color_attribute*) GetAttributePointer(Node, ATTRIBUTE_COLOR);
+    ColorAttr->Color = (*ButtonFlag) ?  ActiveColor : InactiveColor;
+  }
+}
+
+BUTTON_ATTRIBUTE_UPDATE(DebugRecompileButton)
+{
+  if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
+  {
+    DebugRewriteConfigFile();
+  }
+}
+
+BUTTON_ATTRIBUTE_UPDATE(DebugPauseCollationButton)      
+{
+  debug_state* DebugState = DEBUGGetState();
+  if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
+  {
+    DebugState->Paused = !DebugState->Paused;
+    if(!DebugState->Paused)
+    {
+      RefreshCollation();
+    }
+  }
+}
+
+MENU_UPDATE_CHILD_REGIONS(DebugCollationGraphUpdateChildRegions)
+{
+  container_node* Child = Parent->FirstChild;
+  rect2f ParentRegion = Parent->Region;
+  Assert(GetChildCount(Parent) == 2);
+
+  r32 ButtonRatio = 0.2;
+  r32 ButtonHeight = ButtonRatio * ParentRegion.H;
+  Child->Region = Rect2f(ParentRegion.X, ParentRegion.Y + ParentRegion.H - ButtonHeight, ParentRegion.W,  ButtonHeight);
+  r32 GraphHeight = (1.f-ButtonRatio) * ParentRegion.H;
+  Child = Next(Child);
+  Child->Region = Rect2f(ParentRegion.X, ParentRegion.Y, ParentRegion.W, GraphHeight);
+}
 
 internal debug_state*
 DEBUGGetState()
@@ -73,6 +122,7 @@ DEBUGGetState()
     DebugState->ConfigAABBTree = SHOW_AABB_TREE;
 
     // Allocate Menu Space
+#if 0    
     DebugState->ActiveMenu = {};
 
     DebugState->RadialMenuEntries =  1;
@@ -104,7 +154,7 @@ DEBUGGetState()
     box_menu* OptionsMenu = &DebugState->BoxMenues[0];
     OptionsMenu->MenuItemCount = ArrayCount(OptionMenuItems);
     OptionsMenu->MenuItems = (menu_item*) DEBUGPushCopy(DebugState, sizeof(OptionMenuItems), OptionMenuItems);
-
+#endif
     container_node* HBF1 = 0;
     {
       // Create Option Window
@@ -130,19 +180,7 @@ DEBUGGetState()
 
         button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_BUTTON);
         ButtonAttribute->Data = ButtonFlag;
-        ButtonAttribute->Update = [](menu_interface* Interface, button_attribute* Attr, container_node* Node)
-        {
-          v4 InactiveColor = V4(0.3,0.1,0.1,1);
-          v4 ActiveColor = V4(0.1,0.3,0.1,1);
-
-          if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
-          {
-            b32* ButtonFlag = (b32*) Attr->Data;
-            *ButtonFlag = !*ButtonFlag;
-            color_attribute* ColorAttr =  (color_attribute*) GetAttributePointer(Node, ATTRIBUTE_COLOR);
-            ColorAttr->Color = (*ButtonFlag) ?  ActiveColor : InactiveColor;
-          }
-        };
+        ButtonAttribute->Update = DeclareFunction(button_attribute_update, DebugToggleButton);
 
         return ButtonNode;
       };
@@ -160,10 +198,7 @@ DEBUGGetState()
         str::CopyStringsUnchecked( "Recompile", Text->Text );
 
         button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_BUTTON);
-        ButtonAttribute->Update = [](menu_interface* Interface, button_attribute* Attr, container_node* Node)
-        {
-          DebugRewriteConfigFile();
-        };
+        ButtonAttribute->Update = DeclareFunction(button_attribute_update, DebugRecompileButton);
       }
       HBF1 = CreateHBF(GlobalGameState->MenuInterface, V4(0.5,0.5,0.5,1), ButtonContainer);
     }
@@ -171,18 +206,7 @@ DEBUGGetState()
     container_node* HBF2 = 0;
     {
       container_node* MainContainer = NewContainer(GlobalGameState->MenuInterface, container_type::None);
-      MainContainer->Functions.UpdateChildRegions = [](container_node* Parent){
-        container_node* Child = Parent->FirstChild;
-        rect2f ParentRegion = Parent->Region;
-        Assert(GetChildCount(Parent) == 2);
-
-        r32 ButtonRatio = 0.2;
-        r32 ButtonHeight = ButtonRatio * ParentRegion.H;
-        Child->Region = Rect2f(ParentRegion.X, ParentRegion.Y + ParentRegion.H - ButtonHeight, ParentRegion.W,  ButtonHeight);
-        r32 GraphHeight = (1.f-ButtonRatio) * ParentRegion.H;
-        Child = Next(Child);
-        Child->Region = Rect2f(ParentRegion.X, ParentRegion.Y, ParentRegion.W, GraphHeight);
-      };
+      MainContainer->Functions.UpdateChildRegions = DeclareFunction(menu_get_region, DebugCollationGraphUpdateChildRegions);
 
       container_node* ButtonContainer = ConnectNode(MainContainer, NewContainer(GlobalGameState->MenuInterface, container_type::Grid));
       grid_node* Grid = GetGridNode(ButtonContainer);
@@ -198,21 +222,10 @@ DEBUGGetState()
       str::CopyStringsUnchecked( "Pause", Text->Text );
 
       button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_BUTTON);
-      ButtonAttribute->Update = [](menu_interface* Interface, button_attribute* Attr, container_node* Node)
-      {
-        debug_state* DebugState = DEBUGGetState();
-        if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
-        {
-          DebugState->Paused = !DebugState->Paused;
-          if(!DebugState->Paused)
-          {
-            RefreshCollation();
-          }
-        }
-      };
+      ButtonAttribute->Update = DeclareFunction(button_attribute_update, DebugPauseCollationButton);
 
       container_node* GraphContainer =  ConnectNode(MainContainer, NewContainer(GlobalGameState->MenuInterface, container_type::None));
-      GraphContainer->Functions.Draw = DrawFunctionTimeline;
+      GraphContainer->Functions.Draw = DeclareFunction(menu_draw, DrawFunctionTimeline);
       
       HBF2 = CreateHBF(GlobalGameState->MenuInterface, V4(0.5,0.5,0.5,1), MainContainer);
       
@@ -816,6 +829,7 @@ void DebugMainWindow(game_input* GameInput)
 
   debug_state* DebugState = DEBUGGetState();
 
+#if 0
   v2 MouseButtonPos = V2(GameInput->MouseX, GameInput->MouseY);
 
   if(RightButtonPushed )
@@ -863,6 +877,7 @@ void DebugMainWindow(game_input* GameInput)
       }
     }break;
   }
+  #endif
 }
 
 inline internal debug_frame*
@@ -872,6 +887,7 @@ GetActiveDebugFrame(debug_state* DebugState)
   return Result;
 }
 
+#if 0
 void UpdateFunctionPointers(debug_state* DebugState)
 {
   if(!DebugState->UpdateFunctionPointers)
@@ -879,7 +895,7 @@ void UpdateFunctionPointers(debug_state* DebugState)
     SetRadialMenuFunctionPointers(DebugState);
   }
 }
-
+#endif
 MENU_DRAW(DrawFunctionTimeline)
 {
   rect2f Chart = Node->Region;
@@ -983,7 +999,7 @@ void PushDebugOverlay(game_input* GameInput)
 
 
   debug_state* DebugState = DEBUGGetState();
-  UpdateFunctionPointers(DebugState);
+//  UpdateFunctionPointers(DebugState);
 
   ResetRenderGroup(GlobalDebugRenderGroup);
 

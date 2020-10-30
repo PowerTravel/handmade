@@ -1,10 +1,11 @@
 #include "menu_interface.h"
 
-MENU_HANDLE_INPUT( HandleInput )
+
+MENU_HANDLE_INPUT(HandleInput)
 {
 
 }
-MENU_UPDATE_CHILD_REGIONS( UpdateChildRegions )
+MENU_UPDATE_CHILD_REGIONS(UpdateChildRegions)
 {
   container_node* Child = Parent->FirstChild;
   while(Child)
@@ -13,7 +14,7 @@ MENU_UPDATE_CHILD_REGIONS( UpdateChildRegions )
     Child = Child->NextSibling;
   }
 }
-MENU_DRAW( Draw )
+MENU_DRAW(Draw)
 {
 
 }
@@ -21,9 +22,9 @@ MENU_DRAW( Draw )
 menu_functions GetDefaultFunctions()
 {
   menu_functions Result = {};
-  Result.HandleInput = HandleInput;
-  Result.UpdateChildRegions = UpdateChildRegions;
-  Result.Draw = Draw;
+  Result.HandleInput = DeclareFunction(menu_handle_input, HandleInput);
+  Result.UpdateChildRegions = DeclareFunction(menu_get_region, UpdateChildRegions);
+  Result.Draw = DeclareFunction(menu_draw, Draw);
   return Result;
 }
 
@@ -35,11 +36,11 @@ MENU_DRAW( BorderDraw )
 menu_functions GetBorderFunctions()
 {
   menu_functions Result = GetDefaultFunctions();
-  Result.Draw = BorderDraw;
+  Result.Draw = DeclareFunction(menu_draw, BorderDraw);
   return Result;
 }
 
-MENU_UPDATE_CHILD_REGIONS( RootUpdateChildRegions )
+MENU_UPDATE_CHILD_REGIONS(RootUpdateChildRegions)
 {
   container_node* Child = Parent->FirstChild;
   u32 BorderIndex = 0;
@@ -124,12 +125,12 @@ MENU_UPDATE_CHILD_REGIONS( RootUpdateChildRegions )
 menu_functions GetRootMenuFunctions()
 {
   menu_functions Result = GetDefaultFunctions();
-  Result.UpdateChildRegions = RootUpdateChildRegions;
+  Result.UpdateChildRegions = DeclareFunction(menu_get_region, RootUpdateChildRegions);
   return Result;
 }
 
 
-MENU_UPDATE_CHILD_REGIONS( UpdateSplitChildRegions )
+MENU_UPDATE_CHILD_REGIONS(UpdateSplitChildRegions)
 {
   container_node* Child = Parent->FirstChild;
   container_node* Body1Node = 0;
@@ -194,7 +195,7 @@ MENU_UPDATE_CHILD_REGIONS( UpdateSplitChildRegions )
 menu_functions GetSplitFunctions()
 {
   menu_functions Result = GetDefaultFunctions();
-  Result.UpdateChildRegions = UpdateSplitChildRegions;
+  Result.UpdateChildRegions = DeclareFunction(menu_get_region,UpdateSplitChildRegions);
   return Result;
 }
 
@@ -245,7 +246,7 @@ MENU_UPDATE_CHILD_REGIONS( UpdateHBFChildRegions )
 menu_functions GetHBFFunctions()
 {
   menu_functions Result = GetDefaultFunctions();
-  Result.UpdateChildRegions = UpdateHBFChildRegions;
+  Result.UpdateChildRegions = DeclareFunction(menu_get_region,UpdateHBFChildRegions);
   return Result;
 }
 
@@ -308,7 +309,7 @@ MENU_UPDATE_CHILD_REGIONS( UpdateGridChildRegions )
 menu_functions GetGridFunctions()
 {
   menu_functions Result = GetDefaultFunctions();
-  Result.UpdateChildRegions = UpdateGridChildRegions;
+  Result.UpdateChildRegions = DeclareFunction(menu_get_region,UpdateGridChildRegions);
   return Result;
 }
 

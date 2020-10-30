@@ -9,6 +9,8 @@
 
 struct debug_state;
 
+internal debug_state* DEBUGGetState();
+
 struct debug_statistics
 {
   r32 Count;
@@ -216,27 +218,27 @@ struct debug_state
   open_debug_block* FirstFreeBlock;
   debug_record* ScopeToRecord;
 
-  r32 ChartVisible;
-  b32 MainMenu;
+  //r32 ChartVisible;
+  //b32 MainMenu;
 
   midx MemorySize;
   u8* MemoryBase;
   u8* Memory;
 
-  u32 RadialMenuEntries;
-  radial_menu* RadialMenues;
+  //u32 RadialMenuEntries;
+  //radial_menu* RadialMenues;
 
-  u32 BoxMenuEntries;
-  box_menu* BoxMenues;
+  //u32 BoxMenuEntries;
+  //box_menu* BoxMenues;
 
-  active_menu ActiveMenu;
+  //active_menu ActiveMenu;
 
   b32 ConfigMultiThreaded;
   b32 ConfigCollisionPoints;
   b32 ConfigCollider;
   b32 ConfigAABBTree;
 
-  b32 UpdateFunctionPointers;
+//  b32 UpdateFunctionPointers;
 };
 
 inline void DebugRewriteConfigFile();
