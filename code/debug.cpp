@@ -15,33 +15,6 @@ MENU_DRAW(DrawFunctionTimeline);
 
 internal void RefreshCollation();
 internal void RestartCollation();
-#if 0
-void SetRadialMenuFunctionPointers(debug_state* DebugState)
-{
-  radial_menu* MainMenu = &DebugState->RadialMenues[0];
-  Assert(MainMenu->MenuRegionCount == 3);
-
-  // "Show Collation"
-  MainMenu->MenuItems[0].Activate = [](debug_state* DebugState, menu_item* Item)
-  {
-    DebugState->ChartVisible = !DebugState->ChartVisible;
-    Item->Active = (b32) DebugState->ChartVisible;
-  };
-
-  // "Pause Collation"
-  //MainMenu->MenuItems[1].Activate = TogglePause;
-
-  // "Options"
-  MainMenu->MenuItems[2].Activate = [](debug_state* DebugState, menu_item* Item)
-  {
-    active_menu ActiveMenu = {};
-    ActiveMenu.Type = menu_type::Box;
-    ActiveMenu.BoxMenu = &DebugState->BoxMenues[0];
-    DebugState->ActiveMenu = ActiveMenu;
-
-  };
-}
-#endif
 
 BUTTON_ATTRIBUTE_UPDATE(DebugToggleButton)
 {
@@ -108,6 +81,11 @@ DEBUGGetState()
     DebugState->ConfigAABBTree = SHOW_AABB_TREE;
 
     // Set menu window
+
+    rect2f ButtonSize = DEBUGTextSize(0, 0, "CollisionPoints");
+    ButtonSize.W+=0.02f;
+    ButtonSize.H+=0.02f;
+    r32 ContainerWidth = 0.7;
     container_node* HBF1 = 0;
     {
       // Create Option Window
@@ -115,18 +93,27 @@ DEBUGGetState()
       grid_node* Grid = GetGridNode(ButtonContainer);
       Grid->Col = 1;
       Grid->Row = 0;
-      Grid->TotalMarginX = 0.3;
-      Grid->TotalMarginY = 0.2;
+      Grid->TotalMarginX = 0.0;
+      Grid->TotalMarginY = 0.0;
 
       color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, ButtonContainer, ATTRIBUTE_COLOR);
       BackgroundColor->Color = V4(0,0,0,0.7);
 
-      auto CreateButton = []( b32* ButtonFlag, c8* ButtonText)
+
+      auto CreateButton = [&ButtonSize]( b32* ButtonFlag, c8* ButtonText)
       {
         container_node* ButtonNode = NewContainer(GlobalGameState->MenuInterface);
         text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_TEXT);
         Assert(str::StringLength( ButtonText ) < ArrayCount(Text->Text) );
         str::CopyStringsUnchecked( ButtonText, Text->Text );
+
+        size_attribute* SizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_SIZE);
+        SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, ButtonSize.W);
+        SizeAttr->Height = ContainerSizeT(menu_size_type::ABSOLUTE, ButtonSize.H);
+        SizeAttr->LeftOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
+        SizeAttr->TopOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
+        SizeAttr->XAlignment = menu_region_alignment::CENTER;
+        SizeAttr->YAlignment = menu_region_alignment::CENTER;
 
         v4 InactiveColor = V4(0.3,0.1,0.1,1);
         v4 ActiveColor = V4(0.1,0.3,0.1,1);
@@ -152,6 +139,14 @@ DEBUGGetState()
         
         text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_TEXT);
         str::CopyStringsUnchecked( "Recompile", Text->Text );
+
+        size_attribute* SizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_SIZE);
+        SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, ButtonSize.W);
+        SizeAttr->Height = ContainerSizeT(menu_size_type::RELATIVE, 1);
+        SizeAttr->LeftOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
+        SizeAttr->TopOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
+        SizeAttr->XAlignment = menu_region_alignment::CENTER;
+        SizeAttr->YAlignment = menu_region_alignment::CENTER;
 
         button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_BUTTON);
         ButtonAttribute->Update = DeclareFunction(button_attribute_update, DebugRecompileButton);
@@ -183,17 +178,18 @@ DEBUGGetState()
       container_node* SplitNode  = NewContainer(GlobalGameState->MenuInterface, container_type::Split);
       color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, SplitNode, ATTRIBUTE_COLOR);
       BackgroundColor->Color = V4(0,0,0,0.7);
+
       container_node* BorderNode = CreateBorderNode(GlobalGameState->MenuInterface, false, 0.2);
       ConnectNode(SplitNode, BorderNode);
       ConnectNode(SplitNode, ButtonContainer);
       ConnectNode(SplitNode, GraphContainer);
 
 
-      HBF2 = CreateHBF(GlobalGameState->MenuInterface, V4(0.5,0.5,0.5,1), SplitNode);
+      HBF2 = CreateHBF(GlobalGameState->MenuInterface, V4(0.5,0.5,ContainerWidth,1), SplitNode);
       
     }
 
-    container_node* Split = SetSplitWindows(GlobalGameState->MenuInterface, CreateSplitWindow(GlobalGameState->MenuInterface, true), HBF1, HBF2);
+    container_node* Split = SetSplitWindows(GlobalGameState->MenuInterface, CreateSplitWindow(GlobalGameState->MenuInterface, true, ButtonSize.W/ContainerWidth), HBF1, HBF2);
 
     CreateNewRootContainer(GlobalGameState->MenuInterface, Split, Rect2f( 0.85, 0.25, 0.7, 0.5));
 

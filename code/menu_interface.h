@@ -18,7 +18,8 @@ enum container_attribute
   ATTRIBUTE_MERGE_SLOT = 0x4,
   ATTRIBUTE_BUTTON = 0x8,
   ATTRIBUTE_COLOR = 0x10,
-  ATTRIBUTE_TEXT = 0x20
+  ATTRIBUTE_TEXT = 0x20,
+  ATTRIBUTE_SIZE = 0x40
 };
 
 
@@ -46,6 +47,7 @@ const c8* ToString(u32 Type)
     case ATTRIBUTE_BUTTON: return "Button";
     case ATTRIBUTE_COLOR: return "Color";
     case ATTRIBUTE_TEXT: return "Text";
+    case ATTRIBUTE_SIZE: return "Size";
   }
   return "";
 };
@@ -94,6 +96,7 @@ struct menu_attribute_header
   menu_attribute_header* Next;
 };
 
+
 struct container_node
 {
   container_type Type;
@@ -109,6 +112,8 @@ struct container_node
 
   rect2f Region;
   menu_functions Functions;
+
+
 };
 
 struct root_node
@@ -192,6 +197,46 @@ struct split_draggable_data
 {
   container_node* SplitNode;
   border_leaf* Border;
+};
+
+enum class menu_region_alignment
+{
+  CENTER,
+  LEFT,
+  RIGHT,
+  TOP,
+  BOT
+};
+
+enum class menu_size_type
+{
+  RELATIVE,
+  ABSOLUTE
+};
+
+struct container_size_t
+{
+  menu_size_type Type;
+  r32 Value;
+};
+
+inline container_size_t
+ContainerSizeT(menu_size_type T, r32 Val)
+{
+  container_size_t Result{};
+  Result.Type = T;
+  Result.Value = Val;
+  return Result;
+}
+
+struct size_attribute
+{
+  container_size_t Width;
+  container_size_t Height;
+  container_size_t LeftOffset;
+  container_size_t TopOffset;
+  menu_region_alignment XAlignment;
+  menu_region_alignment YAlignment;
 };
 
 struct menu_tree
@@ -283,7 +328,7 @@ void SetSplitDragAttribute(container_node* SplitNode, container_node* BorderNode
 container_node* ReallocateNode(menu_interface* Interface, container_node* SrcNode, u32 InputAttributes = 0);
 void SplitWindowHeaderDrag( menu_interface* Interface, container_node* Node, draggable_attribute* Attr );
 menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* BaseWindow, rect2f Region);
-container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical);
+container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical, r32 BorderPos = 0.5);
 container_node* CreateHBF(menu_interface* Interface, v4 HeaderColor, container_node* BodyNode);
 container_node* SetSplitWindows( menu_interface* Interface, container_node* SplitNode, container_node* HBF1, container_node* HBF2);
 

@@ -25,6 +25,7 @@ u32 GetAttributeSize(container_attribute Attribute)
     case ATTRIBUTE_BUTTON:     return sizeof(button_attribute);
     case ATTRIBUTE_COLOR:      return sizeof(color_attribute);
     case ATTRIBUTE_TEXT:      return sizeof(text_attribute);
+    case ATTRIBUTE_SIZE:      return sizeof(size_attribute);
     default: INVALID_CODE_PATH;
   }
   return 0; 
@@ -530,6 +531,72 @@ void TreeSensus( menu_tree* Menu )
  // Platform.DEBUGPrint("Tree Sensus:  Depth: %d, Count: %d\n", Pair.b, Pair.a);
 }
 
+rect2f GetSizedParentRegion(size_attribute* SizeAttr, rect2f BaseRegion)
+{
+  rect2f Result = {};
+  if(SizeAttr->Width.Type == menu_size_type::RELATIVE)
+  {
+    Result.W = SizeAttr->Width.Value * BaseRegion.W;
+  }else if(SizeAttr->Width.Type == menu_size_type::ABSOLUTE){
+    Result.W = SizeAttr->Width.Value;  
+  }
+
+  if(SizeAttr->Height.Type == menu_size_type::RELATIVE)
+  {
+    Result.H = SizeAttr->Height.Value * BaseRegion.H;
+  }else if(SizeAttr->Height.Type == menu_size_type::ABSOLUTE){
+    Result.H = SizeAttr->Height.Value;
+  }
+  
+  
+  switch(SizeAttr->XAlignment)
+  {
+    case menu_region_alignment::LEFT:
+    {
+      Result.X = BaseRegion.X;
+    }break;
+    case menu_region_alignment::RIGHT:
+    {
+      Result.X = BaseRegion.X + BaseRegion.W - Result.W;
+    }break;
+    case menu_region_alignment::CENTER:
+    {
+      Result.X = BaseRegion.X + (BaseRegion.W - Result.W)*0.5f;
+    }break;
+  }
+  switch(SizeAttr->YAlignment)
+  {
+    case menu_region_alignment::TOP:
+    {
+      Result.Y = BaseRegion.Y + BaseRegion.H - Result.Y;
+    }break;
+    case menu_region_alignment::BOT:
+    {
+      Result.Y = BaseRegion.Y;
+    }break;
+    case menu_region_alignment::CENTER:
+    {
+      Result.Y = BaseRegion.Y + (BaseRegion.H - Result.H)*0.5f;
+    }break;
+  }
+
+  if(SizeAttr->LeftOffset.Type == menu_size_type::RELATIVE)
+  {
+    Result.X += SizeAttr->LeftOffset.Value * BaseRegion.W;
+  }else if(SizeAttr->LeftOffset.Type == menu_size_type::ABSOLUTE){
+    Result.X += SizeAttr->LeftOffset.Value;
+  }
+
+  if(SizeAttr->TopOffset.Type == menu_size_type::RELATIVE)
+  {
+    Result.Y -= SizeAttr->TopOffset.Value * BaseRegion.H;
+  }else if(SizeAttr->TopOffset.Type == menu_size_type::ABSOLUTE){
+    Result.Y -= SizeAttr->TopOffset.Value;
+  }
+  
+  return Result;
+}
+
 void UpdateRegions( menu_tree* Menu )
 {
   temporary_memory TempMem =  BeginTemporaryMemory(GlobalGameState->TransientArena);
@@ -548,6 +615,12 @@ void UpdateRegions( menu_tree* Menu )
     // Pop new parent from Stack
     container_node* Parent = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
+
+    if(HasAttribute(Parent, ATTRIBUTE_SIZE))
+    {
+      size_attribute* SizeAttr = (size_attribute*) GetAttributePointer(Parent, ATTRIBUTE_SIZE);
+      Parent->Region = GetSizedParentRegion(SizeAttr, Parent->Region);
+    }
 
     // Update the region of all children and push them to the stack
     CallFunctionPointer(Parent->Functions.UpdateChildRegions, Parent);
@@ -1590,10 +1663,8 @@ void SetMenuInput(memory_arena* Arena, game_input* GameInput, menu_interface* In
 }
 
 void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interface)
-{
-  
+{ 
   SetMenuInput(GlobalGameState->TransientArena, GameInput, Interface);
- 
  
   if(!Interface->RootContainerCount) return;
 
@@ -1772,10 +1843,10 @@ container_node* CreateHBF(menu_interface* Interface, v4 HeaderColor, container_n
   return HBF;
 }
 
-container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical)
+container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical, r32 BorderPos)
 {
   container_node* SplitNode  = NewContainer(Interface, container_type::Split);
-  container_node* BorderNode = CreateBorderNode(Interface, Vertical, 0.5);
+  container_node* BorderNode = CreateBorderNode(Interface, Vertical, BorderPos);
   ConnectNode(SplitNode, BorderNode);
   SetSplitDragAttribute(SplitNode, BorderNode);
   return SplitNode;
