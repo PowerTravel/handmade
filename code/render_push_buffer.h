@@ -38,7 +38,6 @@ struct entry_type_line
   r32 LineThickness;
 };
 
-
 struct entry_type_overlay_line
 {
   v4 Colour;

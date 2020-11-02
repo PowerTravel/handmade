@@ -83,6 +83,8 @@ DEBUGGetState()
     // Set menu window
     u32 FontSize = 18;
     rect2f ButtonSize = DEBUGTextSize(0, 0, "CollisionPoints", FontSize);
+    v4 TextColor = V4(1,1,1,1);
+
     ButtonSize.W+=0.02f;
     ButtonSize.H+=0.02f;
     r32 ContainerWidth = 0.7;
@@ -99,14 +101,14 @@ DEBUGGetState()
       color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, ButtonContainer, ATTRIBUTE_COLOR);
       BackgroundColor->Color = V4(0,0,0,0.7);
 
-
-      auto CreateButton = [&ButtonSize, &FontSize]( b32* ButtonFlag, c8* ButtonText)
+      auto CreateButton = [&ButtonSize, &FontSize, &TextColor]( b32* ButtonFlag, c8* ButtonText)
       {
         container_node* ButtonNode = NewContainer(GlobalGameState->MenuInterface);
         text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_TEXT);
         Assert(str::StringLength( ButtonText ) < ArrayCount(Text->Text) );
         str::CopyStringsUnchecked( ButtonText, Text->Text );
         Text->FontSize = FontSize;
+        Text->Color = TextColor;
 
         size_attribute* SizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_SIZE);
         SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, ButtonSize.W);
@@ -141,6 +143,7 @@ DEBUGGetState()
         text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_TEXT);
         str::CopyStringsUnchecked( "Recompile", Text->Text );
         Text->FontSize = FontSize;
+        Text->Color = TextColor;
 
         size_attribute* SizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_SIZE);
         SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, ButtonSize.W);
@@ -153,7 +156,7 @@ DEBUGGetState()
         button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_BUTTON);
         ButtonAttribute->Update = DeclareFunction(button_attribute_update, DebugRecompileButton);
       }
-      HBF1 = CreateHBF(GlobalGameState->MenuInterface, V4(0.5,0.5,0.5,1), ButtonContainer);
+      HBF1 = CreateHBF(GlobalGameState->MenuInterface, "Settings", V4(0.5,0.5,0.5,1), ButtonContainer);
     }
     // Create graph window
     container_node* HBF2 = 0;
@@ -171,6 +174,7 @@ DEBUGGetState()
       text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_TEXT);
       str::CopyStringsUnchecked( "Pause", Text->Text );
       Text->FontSize = FontSize;
+      Text->Color = TextColor;
 
       button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_BUTTON);
       ButtonAttribute->Update = DeclareFunction(button_attribute_update, DebugPauseCollationButton);
@@ -188,7 +192,7 @@ DEBUGGetState()
       ConnectNode(SplitNode, GraphContainer);
 
 
-      HBF2 = CreateHBF(GlobalGameState->MenuInterface, V4(0.5,0.5,ContainerWidth,1), SplitNode);
+      HBF2 = CreateHBF(GlobalGameState->MenuInterface, "Profiler", V4(0.5,0.5,ContainerWidth,1), SplitNode);
       
     }
 

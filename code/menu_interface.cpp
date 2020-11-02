@@ -684,7 +684,7 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
       text_attribute* Text = (text_attribute*) GetAttributePointer(Parent, ATTRIBUTE_TEXT);
       rect2f TextBox = DEBUGTextSize(0, 0, Text->Text, Text->FontSize);
       DEBUGTextOutAt(Parent->Region.X + Parent->Region.W/2.f - TextBox.W/2.f,
-                     Parent->Region.Y + Parent->Region.H/2.f - TextBox.H/3.f, Text->Text, Text->FontSize, V4(1,1,1,1));
+                     Parent->Region.Y + Parent->Region.H/2.f - TextBox.H/3.f, Text->Text, Text->FontSize, Text->Color);
     }
 
     if(HasAttribute(Parent,ATTRIBUTE_MERGE))
@@ -1574,25 +1574,33 @@ void ActOnInput(menu_interface* Interface, menu_tree* Menu)
   for (u32 i = 0; i < ActiveMenu->ActiveLeafCount; ++i)
   {
     container_node* Node =  ActiveMenu->ActiveLeafs[i];
-    if(HasAttribute(Node, ATTRIBUTE_DRAG))
+
+    container_node* ParentNode = Node;
+    while(ParentNode)
     {
-      draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(Node, ATTRIBUTE_DRAG);
-      if(Draggable->Update)
+      if(HasAttribute(ParentNode, ATTRIBUTE_DRAG))
       {
-        CallFunctionPointer(Draggable->Update,Interface, Node, Draggable);  
+        draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(ParentNode, ATTRIBUTE_DRAG);
+        if(Draggable->Update)
+        {
+          CallFunctionPointer(Draggable->Update,Interface, ParentNode, Draggable);  
+        }
       }
+
+      if(HasAttribute(ParentNode, ATTRIBUTE_BUTTON))
+      {
+        button_attribute* Button = (button_attribute*) GetAttributePointer(ParentNode, ATTRIBUTE_BUTTON);
+        CallFunctionPointer(Button->Update,Interface, Button, ParentNode);
+      }
+
+      if(HasAttribute(ParentNode, ATTRIBUTE_MERGE))
+      {
+        UpdateMergableAttribute(Interface, ParentNode);
+      }
+
+      ParentNode = ParentNode->Parent;
     }
 
-    if(HasAttribute(Node, ATTRIBUTE_BUTTON))
-    {
-      button_attribute* Button = (button_attribute*) GetAttributePointer(Node, ATTRIBUTE_BUTTON);
-      CallFunctionPointer(Button->Update,Interface, Button, Node);
-    }
-
-    if(HasAttribute(Node, ATTRIBUTE_MERGE))
-    {
-      UpdateMergableAttribute(Interface, Node);
-    }
   }
 }
 
@@ -1822,12 +1830,32 @@ container_node* CreateDummyHBF(menu_interface* Interface, v4 HeaderColor, v4 Bod
   return HBF;
 }
 
-container_node* CreateHBF(menu_interface* Interface, v4 HeaderColor, container_node* BodyNode)
+container_node* CreateHBF(menu_interface* Interface, c8* HeaderName, v4 HeaderColor, container_node* BodyNode)
 {
   container_node* Header = NewContainer(Interface);
 
   color_attribute* HColorAttr = (color_attribute*) PushAttribute(Interface, Header, ATTRIBUTE_COLOR);
   HColorAttr->Color = HeaderColor;
+
+  container_node* HeaderText = NewContainer(Interface);
+
+  text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, HeaderText, ATTRIBUTE_TEXT);
+  str::CopyStringsUnchecked( HeaderName, Text->Text );
+  Text->FontSize = 14;
+  Text->Color = V4(0,0,0,1);
+
+  rect2f TextSize = DEBUGTextSize(0, 0, "Name", Text->FontSize);
+  size_attribute* SizeAttr = (size_attribute*) PushAttribute(Interface, HeaderText, ATTRIBUTE_SIZE);
+  SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, TextSize.W);
+  SizeAttr->Height = ContainerSizeT(menu_size_type::ABSOLUTE, TextSize.H);
+  SizeAttr->LeftOffset = ContainerSizeT(menu_size_type::ABSOLUTE, 0.01);
+  SizeAttr->TopOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
+  SizeAttr->XAlignment = menu_region_alignment::LEFT;
+  SizeAttr->YAlignment = menu_region_alignment::CENTER;
+  
+ 
+
+  ConnectNode(Header,HeaderText);
 
   PushOrGetAttribute(Interface, BodyNode, ATTRIBUTE_MERGE_SLOT);
 

@@ -174,6 +174,7 @@ struct text_attribute
 {
   c8 Text[256];
   u32 FontSize;
+  v4 Color;
 };
 
 struct tabbed_button_data
