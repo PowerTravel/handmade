@@ -130,6 +130,11 @@ internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
     AssetManager->EnumeratedMeshes[(u32)predefined_mesh::VOXEL] = ObjectHandle;
   }
 
+
+  object_handle Handle;
+  GetHandle(AssetManager, "voxel", &Handle);
+  GetHandle(AssetManager, "quad", &Handle);
+
 }
 
 internal void stbtt_BakeFontBitmap(game_asset_manager* AssetManager)
@@ -144,49 +149,65 @@ internal void stbtt_BakeFontBitmap(game_asset_manager* AssetManager)
       0x2200, 0x2300    // Mathematical
   };
 
-  stb_font_map* FontMap = &AssetManager->FontMap;
-  FontMap->StartChar = Ranges[0];
-  FontMap->NumChars = Ranges[1] - Ranges[0];
-  FontMap->FontHeightPx = 24.f;
-  FontMap->CharData = PushArray(&AssetManager->AssetArena, FontMap->NumChars, stbtt_bakedchar);
 
   thread_context Thread;
   debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\arial.ttf");
   Assert(TTFFile.Contents);
-  stbtt_GetScaledFontVMetrics((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
-   FontMap->FontHeightPx, &FontMap->Ascent, &FontMap->Descent, &FontMap->LineGap);
 
-  // Todo: Insetead of saving the 8bit font map to a 32 bit, write a custom shader for the 8bit
-  //       texture that can render it with colour.
-  u32 BPP = 32;
-  u32 Width = 512;
-  u32 Height = 512;
-
-  u8* Pixels8BPP = PushArray(GlobalGameState->TransientArena, Width * Height, u8);
-
-  s32 ret = stbtt_BakeFontBitmap((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
-                       FontMap->FontHeightPx,
-                       Pixels8BPP, Width, Height,
-                       FontMap->StartChar, FontMap->NumChars,
-                       FontMap->CharData);
-  Assert(ret>0);
-
-  u32* BasePixel = PushArray(GlobalGameState->TransientArena, Width*Height, u32 );
-  u32* Pixels = BasePixel;
-  u8*  SrcPixel =  Pixels8BPP;
-  u8*  EndSrcPixel = Pixels8BPP + Width * Height;
-  while(SrcPixel != EndSrcPixel)
+  auto push_font = [&Ranges, &AssetManager, &TTFFile](stb_font_map* FontMap, c8* Name, r32 FontHeightPx)
   {
-    u8 Alpha = *SrcPixel;
-    u8 Blue = *SrcPixel;
-    u8 Green = *SrcPixel;
-    u8 Red = *SrcPixel;
-    u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
-    *Pixels++ = PixelData;
-    SrcPixel++;
-  }
-  PushBitmapData(AssetManager, "debug_font", Width, Height, BPP, BasePixel, false);
-  GetHandle(AssetManager, "debug_font", &FontMap->BitmapHandle);
+    FontMap->StartChar = Ranges[0];
+    FontMap->NumChars = Ranges[1] - Ranges[0];
+    FontMap->FontHeightPx = FontHeightPx;
+    FontMap->CharData = PushArray(&AssetManager->AssetArena, FontMap->NumChars, stbtt_bakedchar);
+
+    stbtt_GetScaledFontVMetrics((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
+     FontMap->FontHeightPx, &FontMap->Ascent, &FontMap->Descent, &FontMap->LineGap);
+
+    // Todo: Insetead of saving the 8bit font map to a 32 bit, write a custom shader for the 8bit
+    //       texture that can render it with colour.
+
+    // Todo: Character clipping seems to be dependent on 512x512 texture size. Try to make it dynamic
+    //       so that any texturesize works
+    u32 BPP = 32;
+    u32 Width = 512;
+    u32 Height = 512;
+
+    u8* Pixels8BPP = PushArray(GlobalGameState->TransientArena, Width * Height, u8);
+
+    s32 ret = stbtt_BakeFontBitmap((u8*) TTFFile.Contents, stbtt_GetFontOffsetForIndex((u8*) TTFFile.Contents, 0),
+                         FontMap->FontHeightPx,
+                         Pixels8BPP, Width, Height,
+                         FontMap->StartChar, FontMap->NumChars,
+                         FontMap->CharData);
+    Assert(ret>0);
+
+    u32* BasePixel = PushArray(GlobalGameState->TransientArena, Width*Height, u32 );
+    u32* Pixels = BasePixel;
+    u8*  SrcPixel =  Pixels8BPP;
+    u8*  EndSrcPixel = Pixels8BPP + Width * Height;
+    while(SrcPixel != EndSrcPixel)
+    {
+      u8 Alpha = *SrcPixel;
+      u8 Blue = *SrcPixel;
+      u8 Green = *SrcPixel;
+      u8 Red = *SrcPixel;
+      u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
+      *Pixels++ = PixelData;
+      SrcPixel++;
+    }
+    PushBitmapData(AssetManager, Name, Width, Height, BPP, BasePixel, false);
+    GetHandle(AssetManager, Name, &FontMap->BitmapHandle);
+  };
+
+  push_font(&AssetManager->FontMap[0], "debug_font_12", 12);
+  push_font(&AssetManager->FontMap[1], "debug_font_14", 14);
+  push_font(&AssetManager->FontMap[2], "debug_font_16", 16);
+  push_font(&AssetManager->FontMap[3], "debug_font_18", 18);
+  push_font(&AssetManager->FontMap[4], "debug_font_20", 20);
+  push_font(&AssetManager->FontMap[5], "debug_font_22", 22);
+  push_font(&AssetManager->FontMap[6], "debug_font_24", 24);
+  push_font(&AssetManager->FontMap[7], "debug_font_26", 26);
 
   Platform.DEBUGPlatformFreeFileMemory(&Thread, TTFFile.Contents);
 }
@@ -205,7 +226,7 @@ internal void LoadCubeAsset(game_asset_manager* AssetManager)
       MeshData->nvt, MeshData->vt);
 
   for (u32 i = 0; i < LoadedObjFile->ObjectCount; ++i)
-  {
+  { 
     obj_group* LoadedObjectGroup = LoadedObjFile->Objects + i;
     Assert(LoadedObjectGroup->GroupName);
     PushIndexData(AssetManager,

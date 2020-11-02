@@ -58,6 +58,7 @@ struct entry_type_text
   rect2f QuadRect;
   rect2f UVRect;
   v4 Colour;
+  bitmap_handle BitmapHandle;
 };
 
 struct entry_type_light

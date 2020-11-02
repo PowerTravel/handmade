@@ -172,7 +172,7 @@ struct game_asset_manager
   u32 BitmapPendingLoadCount;
   bitmap_handle BitmapPendingLoad[64];
 
-  stb_font_map FontMap;
+  stb_font_map FontMap[8];
 
   object_handle* EnumeratedMeshes;
 };
@@ -195,6 +195,23 @@ inline bitmap* GetAsset(game_asset_manager* AssetManager, bitmap_handle Handle, 
 inline material* GetAsset(game_asset_manager* AssetManager, material_handle Handle, u32 Index );
 
 
+stb_font_map* GetFontMap(game_asset_manager* AssetManager, u32 FontSize)
+{
+  Assert(ArrayCount(AssetManager->FontMap) == 8);
+  stb_font_map* Result = 0;
+  for (int i = 0; i < ArrayCount(AssetManager->FontMap); ++i)
+  {
+    stb_font_map* Map = &AssetManager->FontMap[i];
+    if(Map->FontHeightPx == FontSize)
+    {
+      Result = Map;
+      break;
+    }
+
+  }
+  Assert(Result);
+  return Result;
+}
 
 
 

@@ -682,9 +682,9 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
     if(HasAttribute(Parent, ATTRIBUTE_TEXT))
     {
       text_attribute* Text = (text_attribute*) GetAttributePointer(Parent, ATTRIBUTE_TEXT);
-      rect2f TextBox = DEBUGTextSize(0, 0, Text->Text);
+      rect2f TextBox = DEBUGTextSize(0, 0, Text->Text, Text->FontSize);
       DEBUGTextOutAt(Parent->Region.X + Parent->Region.W/2.f - TextBox.W/2.f,
-                     Parent->Region.Y + Parent->Region.H/2.f - TextBox.H/3.f, Text->Text);
+                     Parent->Region.Y + Parent->Region.H/2.f - TextBox.H/3.f, Text->Text, Text->FontSize, V4(1,1,1,1));
     }
 
     if(HasAttribute(Parent,ATTRIBUTE_MERGE))
@@ -838,7 +838,8 @@ void FormatNodeString(container_node* Node, u32 BufferSize, c8 StringBuffer[])
 
 void PrintHotLeafs(menu_interface* Interface)
 {
-  stb_font_map* FontMap = &GlobalGameState->AssetManager->FontMap;
+  u32 FontSize = 24;
+  stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
   game_window_size WindowSize = GameGetWindowSize();
   r32 HeightStep = (FontMap->Ascent - FontMap->Descent)/WindowSize.HeightPx;
   r32 WidthStep  = 0.02;
@@ -893,7 +894,7 @@ void PrintHotLeafs(menu_interface* Interface)
           FormatNodeString(Sibling, ArrayCount(StringBuffer), StringBuffer);
 
           XOff = WidthStep * Sibling->Depth;
-          DEBUGTextOutAt(XOff, YOff, StringBuffer, Color);
+          DEBUGTextOutAt(XOff, YOff, StringBuffer, FontSize, Color);
           YOff -= HeightStep;
 
           if(CheckPoints[Depth])
@@ -927,7 +928,7 @@ void PrintHotLeafs(menu_interface* Interface)
           c8 StringBuffer[1024] = {};
           FormatNodeString(Sibling, ArrayCount(StringBuffer), StringBuffer);
           XOff = WidthStep * Sibling->Depth;
-          DEBUGTextOutAt(XOff, YOff, StringBuffer, Color);
+          DEBUGTextOutAt(XOff, YOff, StringBuffer, FontSize, Color);
           YOff -= HeightStep;
 
           Sibling = Next(Sibling);

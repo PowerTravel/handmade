@@ -153,6 +153,7 @@ struct text_data
   rect2f QuadRect;
   rect2f UVRect;
   v4 Color;
+  u32 TextureSlot;
 };
 
 struct overlay_quad_data

@@ -81,8 +81,8 @@ DEBUGGetState()
     DebugState->ConfigAABBTree = SHOW_AABB_TREE;
 
     // Set menu window
-
-    rect2f ButtonSize = DEBUGTextSize(0, 0, "CollisionPoints");
+    u32 FontSize = 18;
+    rect2f ButtonSize = DEBUGTextSize(0, 0, "CollisionPoints", FontSize);
     ButtonSize.W+=0.02f;
     ButtonSize.H+=0.02f;
     r32 ContainerWidth = 0.7;
@@ -100,12 +100,13 @@ DEBUGGetState()
       BackgroundColor->Color = V4(0,0,0,0.7);
 
 
-      auto CreateButton = [&ButtonSize]( b32* ButtonFlag, c8* ButtonText)
+      auto CreateButton = [&ButtonSize, &FontSize]( b32* ButtonFlag, c8* ButtonText)
       {
         container_node* ButtonNode = NewContainer(GlobalGameState->MenuInterface);
         text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_TEXT);
         Assert(str::StringLength( ButtonText ) < ArrayCount(Text->Text) );
         str::CopyStringsUnchecked( ButtonText, Text->Text );
+        Text->FontSize = FontSize;
 
         size_attribute* SizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_SIZE);
         SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, ButtonSize.W);
@@ -139,6 +140,7 @@ DEBUGGetState()
         
         text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_TEXT);
         str::CopyStringsUnchecked( "Recompile", Text->Text );
+        Text->FontSize = FontSize;
 
         size_attribute* SizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_SIZE);
         SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, ButtonSize.W);
@@ -168,6 +170,7 @@ DEBUGGetState()
 
       text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_TEXT);
       str::CopyStringsUnchecked( "Pause", Text->Text );
+      Text->FontSize = FontSize;
 
       button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_BUTTON);
       ButtonAttribute->Update = DeclareFunction(button_attribute_update, DebugPauseCollationButton);
@@ -710,7 +713,7 @@ MENU_DRAW(DrawFunctionTimeline)
         c8 StringBuffer[256] = {};
         Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
         "%s : %2.2f MCy", Region->Record->BlockName, (Region->MaxT-Region->MinT)/1000000.f);
-        DEBUGTextOutAt(MouseX, MouseY+0.02f, StringBuffer);
+        DEBUGTextOutAt(MouseX, MouseY+0.02f, StringBuffer, 24, V4(1,1,1,1));
         if(Interface->MouseLeftButton.Edge && Interface->MouseLeftButton.Active)
         {
           HotRecord = Region->Record;
@@ -749,7 +752,7 @@ void PushDebugOverlay(game_input* GameInput)
     DebugState->Compiling = ProcessState.IsRunning;
     if(DebugState->Compiling)
     {
-      DEBUGAddTextSTB("Compiling", LineNumber++);
+      DEBUGAddTextSTB("Compiling", LineNumber++, 24);
     }
   }
 
@@ -759,7 +762,7 @@ void PushDebugOverlay(game_input* GameInput)
      debug_frame* Frame = GetActiveDebugFrame(DebugState);
     Platform.DEBUGFormatString(StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
   "%3.1f Hz, %4.2f ms", 1.f/Frame->WallSecondsElapsed, Frame->WallSecondsElapsed*1000);
-    DEBUGAddTextSTB(StringBuffer, LineNumber++);
+    DEBUGAddTextSTB(StringBuffer, LineNumber++, 24);
   }
 }
 

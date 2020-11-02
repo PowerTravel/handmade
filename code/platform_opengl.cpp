@@ -34,9 +34,10 @@ internal GLuint OpenGLLoadShader( char* SourceCode, GLenum ShaderType )
     char* Tmp      = (char*) VirtualAlloc(0, CompileMessageSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
     glGetShaderInfoLog(ShaderHandle, CompileMessageSize, NULL, (GLchar*) CompileMessage);
     snprintf((char*)Tmp, CompileMessageSize, "%s", CompileMessage);
-    VirtualFree(CompileMessage, 0, MEM_RELEASE );
-    VirtualFree(Tmp, 0, MEM_RELEASE );
+    
     OutputDebugStringA(CompileMessage);
+    //VirtualFree(CompileMessage, 0, MEM_RELEASE );
+    //VirtualFree(Tmp, 0, MEM_RELEASE );
     //Assert(0);
     exit(1);
   }
@@ -93,11 +94,12 @@ opengl_program OpenGLCreateTextProgram()
 uniform mat4 P;  // Projection Matrix - Transforms points from ScreenSpace to UnitQube.
 layout (location = 0) in vec3 vertice;
 layout (location = 2) in vec2 uv;
-layout (location = 3) in vec4 QuadRect;
-layout (location = 4) in vec4 UVRect;
-layout (location = 5) in vec4 Color;
+layout (location = 3) in int TexSlot;
+layout (location = 4) in vec4 QuadRect;
+layout (location = 5) in vec4 UVRect;
+layout (location = 6) in vec4 Color;
 out vec4 VertexColor;
-out vec2 TextureCoordinate;
+out vec3 ArrayUV;
 void main()
 {
   mat3 projection;
@@ -116,8 +118,9 @@ void main()
   TextureTransform[2] = vec3(UVRect.xy, 1);
 
   gl_Position = vec4((projection*QuadTransform*vec3(vertice.xy,1)).xy,0,1);
-  TextureCoordinate = (TextureTransform*vec3(uv.xy,1)).xy;
+  vec2 TextureCoordinate = (TextureTransform*vec3(uv.xy,1)).xy;
   VertexColor = Color;
+  ArrayUV = vec3(TextureCoordinate.x, TextureCoordinate.y, TexSlot);
 }
 )FOO";
 
@@ -125,13 +128,12 @@ void main()
 #version 330 core
 out vec4 fragColor;
 in vec4 VertexColor;
-in vec2 TextureCoordinate;
-uniform int TextureIndex;
+in vec3 ArrayUV;
 uniform sampler2D ourTexture;
 uniform sampler2DArray TextureSampler;
 void main() 
 {
-  vec3 ArrayUV = vec3(TextureCoordinate.x, TextureCoordinate.y, TextureIndex);
+  
   vec4 Sample = texture(TextureSampler, ArrayUV);
   fragColor = Sample * VertexColor;
 }
@@ -141,7 +143,6 @@ void main()
   Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
   glUseProgram(Result.Program);
   Result.ProjectionMat    = glGetUniformLocation(Result.Program, "ProjectionMat");
-  Result.TextureIndex     = glGetUniformLocation(Result.Program, "TextureSlotIndex");
   glUseProgram(0);
 
   return Result;
@@ -540,12 +541,15 @@ void InitOpenGL(open_gl* OpenGL)
     glEnableVertexAttribArray(3);
     glEnableVertexAttribArray(4);
     glEnableVertexAttribArray(5);
-    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OpenGL->TextBaseOffset + OffsetOf(text_data,QuadRect)));
-    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OpenGL->TextBaseOffset + OffsetOf(text_data,UVRect)));
-    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OpenGL->TextBaseOffset + OffsetOf(text_data,Color)));
+    glEnableVertexAttribArray(6);
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OpenGL->TextBaseOffset + OffsetOf(text_data,TextureSlot)));
+    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OpenGL->TextBaseOffset + OffsetOf(text_data,QuadRect)));
+    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OpenGL->TextBaseOffset + OffsetOf(text_data,UVRect)));
+    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(text_data), (void *)(OpenGL->TextBaseOffset + OffsetOf(text_data,Color)));
     glVertexAttribDivisor(3, 1);
     glVertexAttribDivisor(4, 1);
     glVertexAttribDivisor(5, 1);
+    glVertexAttribDivisor(6, 1);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glBindVertexArray(0);
@@ -1000,6 +1004,11 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
           {
             text_data TexData = {};
             entry_type_text* Text = (entry_type_text*) Body;
+            
+            bitmap_keeper* FontKeeper;
+            GetAsset(AssetManager, Text->BitmapHandle, &FontKeeper);
+            
+            TexData.TextureSlot = FontKeeper->TextureSlot;
             TexData.QuadRect = Text->QuadRect;
             TexData.UVRect = Text->UVRect;
             TexData.Color = Text->Colour;
@@ -1054,12 +1063,6 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
     glUseProgram(TextRenderProgram.Program);
     glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
     glUniformMatrix4fv(QuadOverlayProgram.ProjectionMat, 1, GL_TRUE, RenderGroup->ProjectionMatrix.E);
-
-    bitmap_handle FontHandle;
-    GetHandle(AssetManager, "debug_font", &FontHandle);
-    bitmap_keeper* FontKeeper;
-    GetAsset(AssetManager, FontHandle, &FontKeeper);
-    glUniform1i(PhongShadingProgram.TextureIndex, FontKeeper->TextureSlot);
 
     glBindVertexArray(OpenGL->TextVAO);
     glDrawElementsInstancedBaseVertex(
