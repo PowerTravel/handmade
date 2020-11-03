@@ -370,6 +370,7 @@ void FreeMemory(menu_interface* Interface, void * Payload)
 
 void DeleteAllAttributes(menu_interface* Interface, container_node* Node)
 {
+  // TODO: Free attribute data here too?
   while(Node->FirstAttribute)
   {
     menu_attribute_header* Attribute = Node->FirstAttribute;
@@ -405,39 +406,13 @@ void DeleteContainer( menu_interface* Interface, container_node* Node)
 
 menu_tree* NewMenuTree(menu_interface* Interface)
 {
-  menu_tree* Result = &Interface->RootContainers[Interface->RootContainerCount++];
+  menu_tree* Result = (menu_tree*) PushSize(Interface, sizeof(menu_tree));
+  ListInsertBefore(&Interface->MenuSentitnel, Result);
   return Result;
 }
 
-
-void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree)
+void FreeMenuSubTree(menu_interface* Interface, container_node* Root)
 {
-  container_node* Root = MenuToFree->Root;
-
-  // Remove the menu from RootContainers
-  u32 WindowIndex = 0;
-  while(WindowIndex < Interface->RootContainerCount)
-  {
-    menu_tree* MenuTree = &Interface->RootContainers[WindowIndex];
-    if( MenuTree->Root == Root )
-    {
-      break;
-    }
-    ++WindowIndex;
-  }
-
-  Assert(WindowIndex != Interface->RootContainerCount);
-
-  while(WindowIndex < Interface->RootContainerCount-1)
-  {
-    Interface->RootContainers[WindowIndex] = Interface->RootContainers[WindowIndex+1];
-    WindowIndex++;
-  }
-
-  Interface->RootContainers[Interface->RootContainerCount-1] = {};
-  Interface->RootContainerCount--;
-
-
   // Free the nodes;
   // 1: Go to the bottom
   // 2: Step up Once
@@ -461,6 +436,18 @@ void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree)
     }
   }
   DeleteContainer(Interface, Root);
+}
+
+void FreeMenuTree(menu_interface* Interface, menu_tree* MenuToFree)
+{
+  Assert(MenuToFree != &Interface->MenuSentitnel);
+
+  ListRemove( MenuToFree );
+  container_node* Root = MenuToFree->Root;
+
+  FreeMemory(Interface, (void*)MenuToFree);
+
+  FreeMenuSubTree(Interface, Root);
 }
 
 //  PostOrder (Left, Right, Root),  Depth first.
@@ -789,16 +776,12 @@ void DisconnectNode(container_node* Node)
   Node->PreviousSibling = 0;
 }
 
-void MoveMenuToTop(menu_interface* Interface, u32 WindowIndex)
+void MoveMenuToTop(menu_interface* Interface, menu_tree* Menu)
 {
-  Assert(WindowIndex < Interface->RootContainerCount)
-  menu_tree Menu = Interface->RootContainers[WindowIndex];
-  while(WindowIndex > 0)
-  {
-    Interface->RootContainers[WindowIndex] = Interface->RootContainers[WindowIndex-1];
-    WindowIndex--;
-  }
-  Interface->RootContainers[0] = Menu;
+  Assert(Menu != &Interface->MenuSentitnel);
+  Assert(Menu->Next && Menu->Previous);
+  ListRemove( Menu );
+  ListInsertAfter(&Interface->MenuSentitnel, Menu);
 }
 
 void FormatNodeString(container_node* Node, u32 BufferSize, c8 StringBuffer[])
@@ -835,7 +818,94 @@ void FormatNodeString(container_node* Node, u32 BufferSize, c8 StringBuffer[])
 
   }
 }
+   
+void PrintTree( menu_tree* Menu, r32 YOff, u32 FontSize, r32 HeightStep, r32 WidthStep  )
+{
+  container_node* Node = Menu->HotLeafs[0];
+  r32 XOff = 0;
 
+  container_node* Nodes[64] = {};
+  container_node* CheckPoints[64] = {};
+  u32 DepthCount = Node->Depth;
+  while(Node)
+  {
+    Nodes[Node->Depth] = Node;
+    Node = Node->Parent;
+  }
+  Assert(Nodes[0]->Depth == 0);
+
+  for (u32 Depth = 0; Depth <= DepthCount; ++Depth)
+  {
+    Assert(Depth < ArrayCount(Nodes));
+    Assert(Depth < ArrayCount(CheckPoints));
+    container_node* Sibling = Nodes[Depth];
+    if(Depth!=0)
+    {
+      Sibling = Nodes[Depth]->Parent->FirstChild;
+    }
+    while(Sibling)
+    {
+      v4 Color = V4(1,1,1,1);
+      if(Sibling == Nodes[Depth])
+      {
+        Color = V4(1,1,0,1);
+        CheckPoints[Depth] = Next(Sibling);
+      }
+
+      for (u32 LeadIndex = 0; LeadIndex < Menu->HotLeafCount; ++LeadIndex)
+      {
+        if (Sibling == Menu->HotLeafs[LeadIndex])
+        {
+          Color = V4(1,0,0,1);
+        }
+      }
+
+      u32 Attributes = Sibling->Attributes;
+      c8 StringBuffer[1024] = {};
+      FormatNodeString(Sibling, ArrayCount(StringBuffer), StringBuffer);
+
+      XOff = WidthStep * Sibling->Depth;
+      DEBUGTextOutAt(XOff, YOff, StringBuffer, FontSize, Color);
+      YOff -= HeightStep;
+
+      if(CheckPoints[Depth])
+      {
+        break;
+      }
+      Sibling = Next(Sibling);
+    }
+  }
+
+  for (s32 Depth = DepthCount; Depth >= 0; --Depth)
+  {
+    container_node* Sibling = CheckPoints[Depth];
+    while(Sibling)
+    {
+      v4 Color = V4(1,1,1,1);
+      if(Sibling == Nodes[Depth])
+      {
+        Color = V4(1,1,0,1);
+        CheckPoints[Depth] = Sibling;
+      }
+
+      for (u32 LeadIndex = 0; LeadIndex < Menu->HotLeafCount; ++LeadIndex)
+      {
+        if (Sibling == Menu->HotLeafs[LeadIndex])
+        {
+          Color = V4(1,0,0,1);
+        }
+      }
+
+      c8 StringBuffer[1024] = {};
+      FormatNodeString(Sibling, ArrayCount(StringBuffer), StringBuffer);
+      XOff = WidthStep * Sibling->Depth;
+      DEBUGTextOutAt(XOff, YOff, StringBuffer, FontSize, Color);
+      YOff -= HeightStep;
+
+      Sibling = Next(Sibling);
+    }
+  }
+}
 void PrintHotLeafs(menu_interface* Interface)
 {
   u32 FontSize = 24;
@@ -844,98 +914,16 @@ void PrintHotLeafs(menu_interface* Interface)
   r32 HeightStep = (FontMap->Ascent - FontMap->Descent)/WindowSize.HeightPx;
   r32 WidthStep  = 0.02;
   r32 YOff = 1 - 2*HeightStep;
-  for (u32 ContainerIndex = 0; ContainerIndex < Interface->RootContainerCount; ++ContainerIndex)
+
+  menu_tree* Menu = Interface->MenuSentitnel.Next;
+  while(Menu != &Interface->MenuSentitnel)
   {
-    menu_tree* Menu = &Interface->RootContainers[ContainerIndex];
     if(Menu->HotLeafCount>0 && Menu->Visible)
     {
-      container_node* Node = Menu->HotLeafs[0];
-
-      r32 XOff = 0;
-
-      container_node* Nodes[64] = {};
-      container_node* CheckPoints[64] = {};
-      u32 DepthCount = Node->Depth;
-      while(Node)
-      {
-        Nodes[Node->Depth] = Node;
-        Node = Node->Parent;
-      }
-      Assert(Nodes[0]->Depth == 0);
-
-      for (u32 Depth = 0; Depth <= DepthCount; ++Depth)
-      {
-        Assert(Depth < ArrayCount(Nodes));
-        Assert(Depth < ArrayCount(CheckPoints));
-        container_node* Sibling = Nodes[Depth];
-        if(Depth!=0)
-        {
-          Sibling = Nodes[Depth]->Parent->FirstChild;
-        }
-        while(Sibling)
-        {
-          v4 Color = V4(1,1,1,1);
-          if(Sibling == Nodes[Depth])
-          {
-            Color = V4(1,1,0,1);
-            CheckPoints[Depth] = Next(Sibling);
-          }
-
-          for (u32 LeadIndex = 0; LeadIndex < Menu->HotLeafCount; ++LeadIndex)
-          {
-            if (Sibling == Menu->HotLeafs[LeadIndex])
-            {
-              Color = V4(1,0,0,1);
-            }
-          }
-
-          u32 Attributes = Sibling->Attributes;
-          c8 StringBuffer[1024] = {};
-          FormatNodeString(Sibling, ArrayCount(StringBuffer), StringBuffer);
-
-          XOff = WidthStep * Sibling->Depth;
-          DEBUGTextOutAt(XOff, YOff, StringBuffer, FontSize, Color);
-          YOff -= HeightStep;
-
-          if(CheckPoints[Depth])
-          {
-            break;
-          }
-          Sibling = Next(Sibling);
-        }
-      }
-
-      for (s32 Depth = DepthCount; Depth >= 0; --Depth)
-      {
-        container_node* Sibling = CheckPoints[Depth];
-        while(Sibling)
-        {
-          v4 Color = V4(1,1,1,1);
-          if(Sibling == Nodes[Depth])
-          {
-            Color = V4(1,1,0,1);
-            CheckPoints[Depth] = Sibling;
-          }
-
-          for (u32 LeadIndex = 0; LeadIndex < Menu->HotLeafCount; ++LeadIndex)
-          {
-            if (Sibling == Menu->HotLeafs[LeadIndex])
-            {
-              Color = V4(1,0,0,1);
-            }
-          }
-
-          c8 StringBuffer[1024] = {};
-          FormatNodeString(Sibling, ArrayCount(StringBuffer), StringBuffer);
-          XOff = WidthStep * Sibling->Depth;
-          DEBUGTextOutAt(XOff, YOff, StringBuffer, FontSize, Color);
-          YOff -= HeightStep;
-
-          Sibling = Next(Sibling);
-        }
-      }
+      PrintTree( Menu, YOff, FontSize, HeightStep, WidthStep );
     }
     YOff -= HeightStep;
+    Menu = Menu->Next;
   }
 }
 
@@ -952,24 +940,29 @@ container_node* GetMergeSlotNode(menu_interface* Interface, container_node* Node
 {
   container_node* Result = 0;
   container_node* OwnRoot = GetRoot(Node);
-  for (u32 MenuIndex = 0; MenuIndex < Interface->RootContainerCount; ++MenuIndex)
+  menu_tree* Menu = Interface->MenuSentitnel.Next;
+  
+  menu_tree* MenuRoot = Interface->MenuSentitnel.Next;
+  while(MenuRoot != &Interface->MenuSentitnel)
   {
-    menu_tree* MenuRoot = &Interface->RootContainers[MenuIndex];
-    if(OwnRoot == MenuRoot->Root) continue;
-
-    for (u32 LeafIndex = 0; LeafIndex < MenuRoot->HotLeafCount; ++LeafIndex)
+    if(OwnRoot != MenuRoot->Root)
     {
-      container_node* HotLeafNode = MenuRoot->HotLeafs[LeafIndex];
-      while(HotLeafNode)
+      for (u32 LeafIndex = 0; LeafIndex < MenuRoot->HotLeafCount; ++LeafIndex)
       {
-        if(HasAttribute(HotLeafNode, ATTRIBUTE_MERGE_SLOT))
+        container_node* HotLeafNode = MenuRoot->HotLeafs[LeafIndex];
+        while(HotLeafNode)
         {
-          Result = HotLeafNode;
-          return Result;
+          if(HasAttribute(HotLeafNode, ATTRIBUTE_MERGE_SLOT))
+          {
+            Result = HotLeafNode;
+            return Result;
+          }
+          HotLeafNode = HotLeafNode->Parent;
         }
-        HotLeafNode = HotLeafNode->Parent;
-      }
+      }  
     }
+    
+    MenuRoot = MenuRoot->Next;
   }
   return Result;
 }
@@ -978,14 +971,16 @@ menu_tree* GetMenu(menu_interface* Interface, container_node* Node)
 {
   menu_tree* Result = 0;
   container_node* Root = GetRoot(Node);
-  for (u32 MenuIndex = 0; MenuIndex < Interface->RootContainerCount; ++MenuIndex)
+  
+  menu_tree* MenuRoot = Interface->MenuSentitnel.Next;
+  while(MenuRoot != &Interface->MenuSentitnel)
   {
-    menu_tree* MenuRoot = &Interface->RootContainers[MenuIndex];
     if(Root == MenuRoot->Root)
     {
       Result = MenuRoot;
       break;
     }
+    MenuRoot = MenuRoot->Next;
   }
   return Result;
 }
@@ -1200,7 +1195,7 @@ menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* Bas
   Root->Root,
   Interface->MousePos, Root->ActiveLeafs);
   
-  MoveMenuToTop(Interface, Interface->RootContainerCount-1);
+  MoveMenuToTop(Interface, Root);
 
   return Root;
 }
@@ -1569,11 +1564,11 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 
 void ActOnInput(menu_interface* Interface, menu_tree* Menu)
 {
+  Assert(Menu != &Interface->MenuSentitnel);
   if(!Menu->Visible) return;
-  menu_tree* ActiveMenu = &Interface->RootContainers[0];
-  for (u32 i = 0; i < ActiveMenu->ActiveLeafCount; ++i)
+  for (u32 i = 0; i < Menu->ActiveLeafCount; ++i)
   {
-    container_node* Node =  ActiveMenu->ActiveLeafs[i];
+    container_node* Node =  Menu->ActiveLeafs[i];
 
     container_node* ParentNode = Node;
     while(ParentNode)
@@ -1612,14 +1607,10 @@ void SetMenuInput(memory_arena* Arena, game_input* GameInput, menu_interface* In
   Update(&Interface->TAB, GameInput->Keyboard.Key_TAB.EndedDown);
   if(Interface->TAB.Active && Interface->TAB.Edge)
   {
-    for( u32 MenuIndex = 0; MenuIndex < Interface->RootContainerCount; MenuIndex++)
-    {
-      menu_tree* Menu = &Interface->RootContainers[MenuIndex];
-      Menu->Visible = !Menu->Visible;
-    }
+    Interface->MenuVisible = !Interface->MenuVisible;
   }  
 
-  if( Interface->MouseLeftButton.Edge )
+  if(Interface->MouseLeftButton.Edge)
   {
     if(Interface->MouseLeftButton.Active )
     {
@@ -1627,46 +1618,39 @@ void SetMenuInput(memory_arena* Arena, game_input* GameInput, menu_interface* In
       u32 WindowIndex = 0;
       u32 HotWindowIndex = 0;
       b32 MenuClicked = false;
-      while(true)
+
+      menu_tree* Menu = Interface->MenuSentitnel.Next;
+      while(Menu != &Interface->MenuSentitnel)
       {
-        menu_tree* Menu = &Interface->RootContainers[WindowIndex];
-        if(!Menu->Root)
-        {
-          break;
-        }
         if(Intersects(Menu->Root->Region, Interface->MousePos))
         {
-          HotWindowIndex = WindowIndex;
-          MenuClicked = true;
+          MoveMenuToTop(Interface, Menu);
           break;
         }
-        ++WindowIndex;
+        Menu = Menu->Next;
       }
-      if(MenuClicked)
-      {
-        MoveMenuToTop(Interface, HotWindowIndex);
-      }
-      
-      menu_tree* SelectedMenu = &Interface->RootContainers[0];
-      utils::Copy(sizeof(container_node*)*SelectedMenu->HotLeafCount, SelectedMenu->HotLeafs, SelectedMenu->ActiveLeafs);
-      SelectedMenu->ActiveLeafCount = SelectedMenu->HotLeafCount;
 
+      utils::Copy(sizeof(container_node*)*Menu->HotLeafCount, Menu->HotLeafs, Menu->ActiveLeafs);
+      Menu->ActiveLeafCount = Menu->HotLeafCount;
     }else{
       Interface->MouseLeftButtonRelese = MousePos;
-      ActOnInput(Interface, &Interface->RootContainers[0]);
-      Interface->RootContainers[0].ActiveLeafCount = 0;
+      ActOnInput(Interface, Interface->MenuSentitnel.Next);
+      Interface->MenuSentitnel.Next->ActiveLeafCount = 0;
     }
   }
-  for (u32 Index = 0; Index < Interface->RootContainerCount; ++Index)
+  menu_tree* Menu = Interface->MenuSentitnel.Next;
+  while(Menu != &Interface->MenuSentitnel)
   {
-    menu_tree* Menu = &Interface->RootContainers[Index];
     Menu->HotLeafCount = GetIntersectingNodes(Arena,
       Menu->NodeCount,
       Menu->Root,
       Interface->MousePos, Menu->HotLeafs);
+    Menu = Menu->Next;
   }
-  PrintHotLeafs(Interface);
-
+  if(Menu->Visible)
+  {
+    PrintHotLeafs(Interface);
+  }
   Interface->PreviousMousePos = Interface->MousePos;
   Interface->MousePos = MousePos;
 }
@@ -1675,22 +1659,26 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
 { 
   SetMenuInput(GlobalGameState->TransientArena, GameInput, Interface);
  
-  if(!Interface->RootContainerCount) return;
+  menu_tree* Menu = Interface->MenuSentitnel.Next;
+  if(Menu == &Interface->MenuSentitnel) return;
 
-  ActOnInput(Interface, &Interface->RootContainers[0]);
-
-  for (s32 WindowIndex = Interface->RootContainerCount-1;
-           WindowIndex >= 0;
-         --WindowIndex)
+  ActOnInput(Interface, Menu);
+  
+  if(Interface->MenuVisible)
   {
-    menu_tree* MenuTree = &Interface->RootContainers[WindowIndex];
-    if(MenuTree->Visible)
+    Menu = Interface->MenuSentitnel.Previous;
+    while(Menu != &Interface->MenuSentitnel)
     {
-      TreeSensus(MenuTree);
-      UpdateRegions( MenuTree );
-      DrawMenu( GlobalGameState->TransientArena, Interface, MenuTree->NodeCount, MenuTree->Root);
-    }
+      if(Menu->Visible)
+      {
+        TreeSensus(Menu);
+        UpdateRegions( Menu );
+        DrawMenu( GlobalGameState->TransientArena, Interface, Menu->NodeCount, Menu->Root);
+      }
+      Menu = Menu->Previous;
+    }  
   }
+  
   
 }
 
@@ -1924,6 +1912,7 @@ menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
   Interface->MinSize = 0.2f;
 
   ListInitiate(&Interface->Sentinel);
+  ListInitiate(&Interface->MenuSentitnel);
 
   //CreateSplitRootWindow( Interface, Rect2f( 0.25, 0.25, 0.5, 0.5), true,
   //                       V4(0.15,0.15,0.5,1), V4(0.2,0.2,0.4,1), V4(0.15,0.15,0.5,1),

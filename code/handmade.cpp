@@ -20,12 +20,14 @@
     - Add a tag-system. I want to get a random asset with a specific tag.
   Debug:
     * Continue w decent Debug-interface.
-    - A global Function-Pointer-Pool that is automatically reinitialized upon recompilation.
+      - Drop down Menu Selection of windows in root window header
+         - Add settings and profiler to the drop down menu select
     - Time-Plots
     - Item selection w mouse
     - Continue on caseys Stream, he gets rid of the __COUNT__ macro gimmic which we also use at some point. (ep 193)
   Physics:
     - Persistent AABB-tree
+    - Ray intersection test in AABB-tree
     - Make gjk-epa sequential impulse work
       - Make a super simple box - plane narrow-phase detection algorithm to help verify the sequential impulse algorithm.
     - Make a 2D Collision system (Broad phase, narrow phase, collision resolution) (for fun)
@@ -36,11 +38,12 @@
     - Scene serialization
     - Come up with a "demo-game" to implement using your engine.
     - Editor interface
+  Sound:
+    - Add loading and playback of sound file
   Intrinsics:
     Round( r32 Real32 )
     Roof( r32 Real32 )
     Floor( r32 Real32 )
-
 */
 
 #include "handmade.h"

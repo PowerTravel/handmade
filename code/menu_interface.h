@@ -255,26 +255,16 @@ struct menu_tree
   u32 ActiveLeafCount;
   container_node* ActiveLeafs[32];
 
+  menu_tree* Next;
+  menu_tree* Previous;
   // TODO:
   // b32 ShouldDelete; <-- Implement later (Delete last in a cleanup phase)
 };
 
 struct menu_interface
 {
-  // TODO: Right now alot of the tree structure is dynamic, ie, gets freed and applied
-  //       as the windows change.
-  //       Others may want a handle to for example 'menu_tree' to see if it's visible 
-  //       or other things... But 
-  //         1: RootContainers being in an array where the elements get switched around
-  //            makes any ptr garbrage when another window gets focus.
-  //         Solution: Make into a list.
-  //         2: Root Windows gets deleted when we merge and split windows.
-  //         Solution: Not sure, 'Content' windows are permanent. Give them a special
-  //         status and permanent handle?
-  u32 RootContainerCount;
-  menu_tree RootContainers[32];
-
-  container_node* HotSubWindow;
+  b32 MenuVisible;
+  menu_tree MenuSentitnel;
 
   u32 ActiveMemory;
   u32 MaxMemSize;
@@ -327,7 +317,7 @@ inline grid_node* GetGridNode(container_node* Container)
 
 
 void SetSplitDragAttribute(container_node* SplitNode, container_node* BorderNode);
-container_node* ReallocateNode(menu_interface* Interface, container_node* SrcNode, u32 InputAttributes = 0);
+//container_node* ReallocateNode(menu_interface* Interface, container_node* SrcNode, u32 InputAttributes = 0);
 void SplitWindowHeaderDrag( menu_interface* Interface, container_node* Node, draggable_attribute* Attr );
 menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* BaseWindow, rect2f Region);
 container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical, r32 BorderPos = 0.5);

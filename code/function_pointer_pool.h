@@ -5,6 +5,7 @@ MENU_UPDATE_CHILD_REGIONS(RootUpdateChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateSplitChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateHBFChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateGridChildRegions);
+//MENU_UPDATE_CHILD_REGIONS(DropDownUpdateChildRegions);
 
 MENU_DRAW(DrawFunctionTimeline);
 
@@ -12,6 +13,7 @@ BUTTON_ATTRIBUTE_UPDATE(TabButtonUpdate);
 BUTTON_ATTRIBUTE_UPDATE(DebugToggleButton);
 BUTTON_ATTRIBUTE_UPDATE(DebugRecompileButton);
 BUTTON_ATTRIBUTE_UPDATE(DebugPauseCollationButton);
+BUTTON_ATTRIBUTE_UPDATE(DropDownMenuButton);
 
 DRAGGABLE_ATTRIBUTE_UPDATE(UpdateFrameBorderCallback);
 DRAGGABLE_ATTRIBUTE_UPDATE(SplitWindowHeaderDrag);
@@ -35,11 +37,13 @@ void _ReinitiatePool(function_pool* Pool)
     NewFunPtr(UpdateSplitChildRegions)
     NewFunPtr(UpdateHBFChildRegions)
     NewFunPtr(UpdateGridChildRegions)
+    //NewFunPtr(DropDownUpdateChildRegions)
     NewFunPtr(DrawFunctionTimeline)
     NewFunPtr(TabButtonUpdate)
     NewFunPtr(DebugToggleButton)
     NewFunPtr(DebugRecompileButton)
     NewFunPtr(DebugPauseCollationButton)
+    NewFunPtr(DropDownMenuButton)
     NewFunPtr(UpdateFrameBorderCallback)
     NewFunPtr(SplitWindowHeaderDrag)
     NewFunPtr(UpdateHeaderPosition)
