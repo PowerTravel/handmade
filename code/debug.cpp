@@ -21,9 +21,21 @@ BUTTON_ATTRIBUTE_UPDATE(DropDownMenuButton)
   {
     Assert(Attr->Data);
     menu_tree* Menu = (menu_tree* ) Attr->Data;
-    Menu->Visible = true;
-    MoveMenuToTop(Interface, Menu);
+    Menu->Root->Region.X = Node->Region.X;
+    Menu->Root->Region.Y = Node->Region.Y - Menu->Root->Region.H;
+    UpdateFocusWindow(Interface, Menu);
   }
+}
+
+
+MENU_LOSING_FOCUS(DropDownLosingFocus)
+{
+  Menu->Visible = false;
+}
+
+MENU_GAINING_FOCUS(DropDownGainingFocus)
+{
+  Menu->Visible = true;
 }
 
 //MENU_UPDATE_CHILD_REGIONS(DropDownUpdateChildRegions)
@@ -239,7 +251,6 @@ DEBUGGetState()
 
     color_attribute* ColorAttr = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, ViewMenu, ATTRIBUTE_COLOR);
     ColorAttr->Color = V4(0.3,0,0.3,1);
-
     
     text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, ViewMenu, ATTRIBUTE_TEXT);
     str::CopyStringsUnchecked( "Windows", Text->Text );
@@ -257,14 +268,42 @@ DEBUGGetState()
 
     menu_tree* ViewMenuRoot = NewMenuTree(GlobalGameState->MenuInterface); // Root
     ViewMenuRoot->Root = NewContainer(GlobalGameState->MenuInterface);
-    ViewMenuRoot->Root->Region = Rect2f(0,0,0.05, 0.1);
+    ViewMenuRoot->Root->Region = {};
+    ViewMenuRoot->LosingFocus = DeclareFunction(menu_losing_focus, DropDownLosingFocus);
+    ViewMenuRoot->GainingFocus = DeclareFunction(menu_losing_focus, DropDownGainingFocus);
 
     container_node* ViewMenuItems = ConnectNode(ViewMenuRoot->Root, NewContainer(GlobalGameState->MenuInterface, container_type::Grid));
-    Grid = GetGridNode(DropDownContainer);
+    Grid = GetGridNode(ViewMenuItems);
     Grid->Col = 1;
     Grid->Row = 0;
     Grid->TotalMarginX = 0.0;
     Grid->TotalMarginY = 0.0;
+
+    {
+      container_node* MenuItem = ConnectNode(ViewMenuItems, NewContainer(GlobalGameState->MenuInterface));
+      text_attribute* MenuText = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, MenuItem, ATTRIBUTE_TEXT);
+      str::CopyStringsUnchecked( "Profiler", MenuText->Text );
+      MenuText->FontSize = 12;
+      MenuText->Color = V4(0,0,0,1);
+      
+      rect2f TextSize = DEBUGTextSize(0, 0, MenuText->Text, MenuText->FontSize);
+      ViewMenuRoot->Root->Region.H += TextSize.H;
+      ViewMenuRoot->Root->Region.W = ViewMenuRoot->Root->Region.W >= TextSize.W ? ViewMenuRoot->Root->Region.W : TextSize.W;
+    }
+
+    {
+      container_node* MenuItem = ConnectNode(ViewMenuItems, NewContainer(GlobalGameState->MenuInterface));
+      text_attribute* MenuText = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, MenuItem, ATTRIBUTE_TEXT);
+      str::CopyStringsUnchecked( "Settings", MenuText->Text );
+      MenuText->FontSize = 12;
+      MenuText->Color = V4(0,0,0,1);
+      
+      rect2f TextSize = DEBUGTextSize(0, 0, MenuText->Text, MenuText->FontSize);
+      ViewMenuRoot->Root->Region.H += TextSize.H;
+      ViewMenuRoot->Root->Region.W = ViewMenuRoot->Root->Region.W >= TextSize.W ? ViewMenuRoot->Root->Region.W : TextSize.W;
+    }
+
+
 
     ColorAttr = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, ViewMenuItems, ATTRIBUTE_COLOR);
     ColorAttr->Color = V4(1,1,1,1);

@@ -1,11 +1,16 @@
 #pragma once
 
+MENU_LOSING_FOCUS(DefaultLosingFocus);
+MENU_LOSING_FOCUS(DropDownLosingFocus);
+
+MENU_LOSING_FOCUS(DefaultGainingFocus);
+MENU_GAINING_FOCUS(DropDownGainingFocus);
+
 MENU_UPDATE_CHILD_REGIONS(UpdateChildRegions);
 MENU_UPDATE_CHILD_REGIONS(RootUpdateChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateSplitChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateHBFChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateGridChildRegions);
-//MENU_UPDATE_CHILD_REGIONS(DropDownUpdateChildRegions);
 
 MENU_DRAW(DrawFunctionTimeline);
 
@@ -21,6 +26,8 @@ DRAGGABLE_ATTRIBUTE_UPDATE(UpdateHeaderPosition);
 DRAGGABLE_ATTRIBUTE_UPDATE(TabDrag); 
 DRAGGABLE_ATTRIBUTE_UPDATE(UpdateSplitBorderCallback);
 
+
+
 #ifdef HANDMADE_INTERNAL
 
 #define RedeclareFunction(Name) _DeclareFunction((func_ptr_void) (&Name), #Name );
@@ -32,12 +39,15 @@ void _ReinitiatePool(function_pool* Pool)
   for (u32 Index = 0; Index < PoolSize; ++Index)
   {
     function_ptr* Function = &Pool->Functions[Index];
+    NewFunPtr(DefaultLosingFocus)
+    NewFunPtr(DropDownLosingFocus)
+    NewFunPtr(DefaultGainingFocus)
+    NewFunPtr(DropDownGainingFocus)
     NewFunPtr(UpdateChildRegions)
     NewFunPtr(RootUpdateChildRegions)
     NewFunPtr(UpdateSplitChildRegions)
     NewFunPtr(UpdateHBFChildRegions)
     NewFunPtr(UpdateGridChildRegions)
-    //NewFunPtr(DropDownUpdateChildRegions)
     NewFunPtr(DrawFunctionTimeline)
     NewFunPtr(TabButtonUpdate)
     NewFunPtr(DebugToggleButton)

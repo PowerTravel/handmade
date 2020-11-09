@@ -241,6 +241,13 @@ struct size_attribute
   menu_region_alignment YAlignment;
 };
 
+
+#define MENU_LOSING_FOCUS(name) void name(struct menu_interface* Interface, struct menu_tree* Menu)
+typedef MENU_LOSING_FOCUS( menu_losing_focus );
+#define MENU_GAINING_FOCUS(name) void name(struct menu_interface* Interface, struct menu_tree* Menu)
+typedef MENU_GAINING_FOCUS( menu_gaining_focus );
+
+
 struct menu_tree
 {
   b32 Visible;
@@ -259,12 +266,24 @@ struct menu_tree
   menu_tree* Previous;
   // TODO:
   // b32 ShouldDelete; <-- Implement later (Delete last in a cleanup phase)
+
+  menu_losing_focus** LosingFocus;
+  menu_gaining_focus** GainingFocus;
 };
+
+MENU_LOSING_FOCUS(DefaultLosingFocus)
+{
+}
+
+MENU_GAINING_FOCUS(DefaultGainingFocus)
+{
+}
 
 struct menu_interface
 {
   b32 MenuVisible;
-  menu_tree MenuSentitnel;
+  menu_tree* MenuInFocus;
+  menu_tree MenuSentinel;
 
   u32 ActiveMemory;
   u32 MaxMemSize;

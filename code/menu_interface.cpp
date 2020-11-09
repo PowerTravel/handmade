@@ -407,7 +407,9 @@ void DeleteContainer( menu_interface* Interface, container_node* Node)
 menu_tree* NewMenuTree(menu_interface* Interface)
 {
   menu_tree* Result = (menu_tree*) PushSize(Interface, sizeof(menu_tree));
-  ListInsertBefore(&Interface->MenuSentitnel, Result);
+  Result->LosingFocus = DeclareFunction(menu_losing_focus, DefaultLosingFocus);
+  Result->GainingFocus = DeclareFunction(menu_losing_focus, DefaultGainingFocus);
+  ListInsertBefore(&Interface->MenuSentinel, Result);
   return Result;
 }
 
@@ -440,7 +442,7 @@ void FreeMenuSubTree(menu_interface* Interface, container_node* Root)
 
 void FreeMenuTree(menu_interface* Interface, menu_tree* MenuToFree)
 {
-  Assert(MenuToFree != &Interface->MenuSentitnel);
+  Assert(MenuToFree != &Interface->MenuSentinel);
 
   ListRemove( MenuToFree );
   container_node* Root = MenuToFree->Root;
@@ -665,7 +667,6 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
       CallFunctionPointer(Parent->Functions.Draw, Interface, Parent);  
     }
 
-
     if(HasAttribute(Parent, ATTRIBUTE_TEXT))
     {
       text_attribute* Text = (text_attribute*) GetAttributePointer(Parent, ATTRIBUTE_TEXT);
@@ -776,12 +777,35 @@ void DisconnectNode(container_node* Node)
   Node->PreviousSibling = 0;
 }
 
-void MoveMenuToTop(menu_interface* Interface, menu_tree* Menu)
+void UpdateFocusWindow(menu_interface* Interface, menu_tree* Menu)
 {
-  Assert(Menu != &Interface->MenuSentitnel);
-  Assert(Menu->Next && Menu->Previous);
-  ListRemove( Menu );
-  ListInsertAfter(&Interface->MenuSentitnel, Menu);
+  Assert(Menu != &Interface->MenuSentinel);
+
+  if(Menu)
+  {
+    if(Menu != Interface->MenuSentinel.Next)
+    {
+      // We put the menu in focus at the top of the queue so it get's rendered in the right order
+      ListRemove( Menu );
+      ListInsertAfter(&Interface->MenuSentinel, Menu); 
+    }
+    if(Menu != Interface->MenuInFocus)
+    {
+      if(Interface->MenuInFocus)
+      {
+        CallFunctionPointer(Interface->MenuInFocus->LosingFocus, Interface, Interface->MenuInFocus);  
+      }
+      
+      CallFunctionPointer(Menu->GainingFocus, Interface, Menu);
+      Interface->MenuInFocus = Menu;
+    }
+  }else{
+    if(Interface->MenuInFocus)
+    {
+      CallFunctionPointer(Interface->MenuInFocus->LosingFocus, Interface, Interface->MenuInFocus);  
+    }
+    Interface->MenuInFocus = 0;
+  }
 }
 
 void FormatNodeString(container_node* Node, u32 BufferSize, c8 StringBuffer[])
@@ -915,8 +939,8 @@ void PrintHotLeafs(menu_interface* Interface)
   r32 WidthStep  = 0.02;
   r32 YOff = 1 - 2*HeightStep;
 
-  menu_tree* Menu = Interface->MenuSentitnel.Next;
-  while(Menu != &Interface->MenuSentitnel)
+  menu_tree* Menu = Interface->MenuSentinel.Next;
+  while(Menu != &Interface->MenuSentinel)
   {
     if(Menu->HotLeafCount>0 && Menu->Visible)
     {
@@ -940,10 +964,10 @@ container_node* GetMergeSlotNode(menu_interface* Interface, container_node* Node
 {
   container_node* Result = 0;
   container_node* OwnRoot = GetRoot(Node);
-  menu_tree* Menu = Interface->MenuSentitnel.Next;
+  menu_tree* Menu = Interface->MenuSentinel.Next;
   
-  menu_tree* MenuRoot = Interface->MenuSentitnel.Next;
-  while(MenuRoot != &Interface->MenuSentitnel)
+  menu_tree* MenuRoot = Interface->MenuSentinel.Next;
+  while(MenuRoot != &Interface->MenuSentinel)
   {
     if(OwnRoot != MenuRoot->Root)
     {
@@ -972,8 +996,8 @@ menu_tree* GetMenu(menu_interface* Interface, container_node* Node)
   menu_tree* Result = 0;
   container_node* Root = GetRoot(Node);
   
-  menu_tree* MenuRoot = Interface->MenuSentitnel.Next;
-  while(MenuRoot != &Interface->MenuSentitnel)
+  menu_tree* MenuRoot = Interface->MenuSentinel.Next;
+  while(MenuRoot != &Interface->MenuSentinel)
   {
     if(Root == MenuRoot->Root)
     {
@@ -1195,7 +1219,7 @@ menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* Bas
   Root->Root,
   Interface->MousePos, Root->ActiveLeafs);
   
-  MoveMenuToTop(Interface, Root);
+  UpdateFocusWindow(Interface, Root);
 
   return Root;
 }
@@ -1564,7 +1588,7 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 
 void ActOnInput(menu_interface* Interface, menu_tree* Menu)
 {
-  Assert(Menu != &Interface->MenuSentitnel);
+  Assert(Menu != &Interface->MenuSentinel);
   if(!Menu->Visible) return;
   for (u32 i = 0; i < Menu->ActiveLeafCount; ++i)
   {
@@ -1619,27 +1643,30 @@ void SetMenuInput(memory_arena* Arena, game_input* GameInput, menu_interface* In
       u32 HotWindowIndex = 0;
       b32 MenuClicked = false;
 
-      menu_tree* Menu = Interface->MenuSentitnel.Next;
-      while(Menu != &Interface->MenuSentitnel)
+      menu_tree* Menu = Interface->MenuSentinel.Next;
+      menu_tree* MenuFocusWindow = 0;
+      while(Menu != &Interface->MenuSentinel)
       {
-        if(Intersects(Menu->Root->Region, Interface->MousePos))
+        if(Menu->Visible && Intersects(Menu->Root->Region, Interface->MousePos))
         {
-          MoveMenuToTop(Interface, Menu);
+          MenuFocusWindow = Menu;
           break;
         }
         Menu = Menu->Next;
       }
 
+      UpdateFocusWindow(Interface, MenuFocusWindow);
+
       utils::Copy(sizeof(container_node*)*Menu->HotLeafCount, Menu->HotLeafs, Menu->ActiveLeafs);
       Menu->ActiveLeafCount = Menu->HotLeafCount;
     }else{
       Interface->MouseLeftButtonRelese = MousePos;
-      ActOnInput(Interface, Interface->MenuSentitnel.Next);
-      Interface->MenuSentitnel.Next->ActiveLeafCount = 0;
+      ActOnInput(Interface, Interface->MenuSentinel.Next);
+      Interface->MenuSentinel.Next->ActiveLeafCount = 0;
     }
   }
-  menu_tree* Menu = Interface->MenuSentitnel.Next;
-  while(Menu != &Interface->MenuSentitnel)
+  menu_tree* Menu = Interface->MenuSentinel.Next;
+  while(Menu != &Interface->MenuSentinel)
   {
     Menu->HotLeafCount = GetIntersectingNodes(Arena,
       Menu->NodeCount,
@@ -1659,15 +1686,15 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
 { 
   SetMenuInput(GlobalGameState->TransientArena, GameInput, Interface);
  
-  menu_tree* Menu = Interface->MenuSentitnel.Next;
-  if(Menu == &Interface->MenuSentitnel) return;
+  menu_tree* Menu = Interface->MenuSentinel.Next;
+  if(Menu == &Interface->MenuSentinel) return;
 
   ActOnInput(Interface, Menu);
   
   if(Interface->MenuVisible)
   {
-    Menu = Interface->MenuSentitnel.Previous;
-    while(Menu != &Interface->MenuSentitnel)
+    Menu = Interface->MenuSentinel.Previous;
+    while(Menu != &Interface->MenuSentinel)
     {
       if(Menu->Visible)
       {
@@ -1912,7 +1939,7 @@ menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
   Interface->MinSize = 0.2f;
 
   ListInitiate(&Interface->Sentinel);
-  ListInitiate(&Interface->MenuSentitnel);
+  ListInitiate(&Interface->MenuSentinel);
 
   //CreateSplitRootWindow( Interface, Rect2f( 0.25, 0.25, 0.5, 0.5), true,
   //                       V4(0.15,0.15,0.5,1), V4(0.2,0.2,0.4,1), V4(0.15,0.15,0.5,1),
