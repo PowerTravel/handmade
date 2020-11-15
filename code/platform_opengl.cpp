@@ -835,7 +835,8 @@ void PushBitmapToGPU(open_gl* OpenGL, game_asset_manager* AssetManager, bitmap_h
 void OpenGLRenderGroupToOutput( game_render_commands* Commands)
 {
   TIMED_FUNCTION();
-  render_group* RenderGroup = Commands->MainRenderGroup;
+  render_group* RenderGroup = Commands->RenderGroup;
+  render_group* LightsGroup = Commands->LightsGroup;
   game_asset_manager* AssetManager = Commands->AssetManager;
   open_gl* OpenGL = &Commands->OpenGL;
 
@@ -878,7 +879,6 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
   glUseProgram( PhongShadingProgram.Program);
   glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
 
-  
   glUniformMatrix4fv(PhongShadingProgram.ProjectionMat, 1, GL_TRUE, RenderGroup->ProjectionMatrix.E);
   glUniformMatrix4fv(PhongShadingProgram.ViewMat, 1, GL_TRUE, RenderGroup->ViewMatrix.E);
 
@@ -887,7 +887,7 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
   v4 LightColor    = V4(0,0,0,1);
 
   // For each render group
-  for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
+  for( push_buffer_header* Entry = LightsGroup->First; Entry != 0; Entry = Entry->Next )
   {
     u8* Head = (u8*) Entry;
     u8* Body = Head + sizeof(push_buffer_header);
@@ -958,16 +958,14 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
     }
   }
 
-  ResetRenderGroup(Commands->MainRenderGroup);
+  RenderGroup = Commands->OverlayGroup;
 
-  
-  RenderGroup = Commands->DebugRenderGroup;
   if( !RenderGroup->First) {return;}
  
   temporary_memory TempMem = BeginTemporaryMemory(&RenderGroup->Arena);
 
   {
-
+    // TODO BUFFER: This has to be counted in the sorting
     u32 TextEntryCount = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::TEXT];
     u32 OverlayQuadEntryCount = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::OVERLAY_QUAD];
     { // Send data to VBO
@@ -1077,5 +1075,4 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
 
   EndTemporaryMemory(TempMem);
 
-  ResetRenderGroup(Commands->DebugRenderGroup);
 }

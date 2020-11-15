@@ -325,8 +325,15 @@ struct game_render_commands
   open_gl OpenGL;
 
   struct game_asset_manager* AssetManager;
-  struct render_group* MainRenderGroup;
-  struct render_group* DebugRenderGroup;
+
+  // 3D Lights Render Group
+  struct render_group* LightsGroup;
+
+  // 3D Scene Render Group
+  struct render_group* RenderGroup;
+
+  // 2D Overlay Render Group
+  struct render_group* OverlayGroup;
 };
 
 struct game_sound_output_buffer

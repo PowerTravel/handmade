@@ -98,5 +98,4 @@ struct debug_state
 
 inline void DebugRewriteConfigFile();
 void PushDebugOverlay(game_input* GameInput);
-global_variable render_group* GlobalDebugRenderGroup;
 

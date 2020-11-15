@@ -3,15 +3,14 @@
 #include "entity_components.h"
 #include "epa_collision_data.h"
 
-push_buffer_header* PushNewHeader(render_group* RenderGroup, render_buffer_entry_type Type, u32 RenderState)
+push_buffer_header* PushNewHeader(render_group* RenderGroup, render_buffer_entry_type Type, u32 RenderState, u32 SortKey = 0)
 {
-  Assert(ArrayCount(RenderGroup->BufferCounts) >= (u32)render_buffer_entry_type::COUNT);
   RenderGroup->ElementCount++;
-
   push_buffer_header* NewEntryHeader = PushStruct(&RenderGroup->Arena, push_buffer_header);
+  NewEntryHeader->SortKey = SortKey;
   NewEntryHeader->Next = 0;
 
-  if( !RenderGroup->First )
+  if(!RenderGroup->First)
   {
     RenderGroup->First = NewEntryHeader;
     RenderGroup->Last  = NewEntryHeader;
@@ -21,23 +20,22 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup, render_buffer_entry
   }
   NewEntryHeader->Type = Type;
   NewEntryHeader->RenderState = RenderState;
-
   RenderGroup->BufferCounts[(u32) Type]++;
   return NewEntryHeader;
 }
 
-void DEBUGPushQuad(rect2f QuadRect, v4 Color)
+void PushOverlayQuad(rect2f QuadRect, v4 Color)
 { 
-  render_group* RenderGroup = GlobalDebugRenderGroup;
+  render_group* RenderGroup = GlobalGameState->RenderCommands->OverlayGroup;
   push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::OVERLAY_QUAD, RENDER_STATE_FILL);
   entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);
   Body->Colour = Color;
   Body->QuadRect = QuadRect;
 }
 
-void DEBUGPushText(rect2f QuadRect, rect2f TextureRect, v4 Color, bitmap_handle BitmapHandle)
+void PushOverlayText(rect2f QuadRect, rect2f TextureRect, v4 Color, bitmap_handle BitmapHandle)
 {
-  render_group* RenderGroup = GlobalDebugRenderGroup;
+  render_group* RenderGroup = GlobalGameState->RenderCommands->OverlayGroup;
   push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::TEXT, RENDER_STATE_FILL);
   entry_type_text* Body = PushStruct(&RenderGroup->Arena, entry_type_text);
   Body->BitmapHandle = BitmapHandle;
@@ -46,8 +44,7 @@ void DEBUGPushText(rect2f QuadRect, rect2f TextureRect, v4 Color, bitmap_handle 
   Body->Colour = Color;
 }
 
-
-rect2f DEBUGTextSize(r32 x, r32 y, c8* String, u32 FontSize)
+rect2f GetTextSize(r32 x, r32 y, c8* String, u32 FontSize)
 {
   stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
   
@@ -108,7 +105,7 @@ GetSTBGlyphRect(r32 xPosPx, r32 yPosPx, stbtt_bakedchar* CH )
   return Result;
 }
 
-void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, const c8* String, u32 FontSize, v4 Color)
+void PushTextAt(r32 CanPosX, r32 CanPosY, const c8* String, u32 FontSize, v4 Color)
 {
   game_window_size WindowSize = GameGetWindowSize();
   r32 PixelPosX = CanPosX*WindowSize.HeightPx;
@@ -135,33 +132,19 @@ void DEBUGTextOutAt(r32 CanPosX, r32 CanPosY, const c8* String, u32 FontSize, v4
       GlyphOffset.Y *= ScreenScaleFactor;
       GlyphOffset.W *= ScreenScaleFactor;
       GlyphOffset.H *= ScreenScaleFactor;
-      DEBUGPushText(GlyphOffset, TextureRect,Color, FontMap->BitmapHandle);
+      PushOverlayText(GlyphOffset, TextureRect,Color, FontMap->BitmapHandle);
     }
     PixelPosX += CH->xadvance;
     ++String;
   }
 }
 
-void DEBUGAddTextSTB(const c8* String, r32 LineNumber, u32 FontSize)
-{
-  TIMED_FUNCTION();
-  game_window_size WindowSize = GameGetWindowSize();
-  stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
-  r32 CanPosX = 1/100.f;
-  r32 CanPosY = 1 - ((LineNumber+1) * FontMap->Ascent - LineNumber*FontMap->Descent)/WindowSize.HeightPx;
-  DEBUGTextOutAt(CanPosX, CanPosY, String, FontSize, V4(1,1,1,1));
-}
-
-
-render_group* InitiateRenderGroup(r32 ScreenWidth, r32 ScreenHeight)
+render_group* InitiateRenderGroup()
 {
   render_group* Result = BootstrapPushStruct(render_group, Arena);
   Result->PushBufferMemory = BeginTemporaryMemory(&Result->Arena);
 
   ResetRenderGroup(Result);
-
-  Result->Initialized = true;
-
   return Result;
 }
 
@@ -241,8 +224,11 @@ PushBoxFrame(render_group* RenderGroup, m4 M, aabb3f AABB, v3 CameraPosition, r3
 
 }
 
-void FillRenderPushBuffer(world* World, render_group* RenderGroup )
+void FillRenderPushBuffer(world* World)
 {
+  render_group* RenderGroup = GlobalGameState->RenderCommands->RenderGroup;
+  render_group* LightGroup = GlobalGameState->RenderCommands->LightsGroup;
+
   TIMED_FUNCTION();
   game_asset_manager* AssetManager = GlobalGameState->AssetManager;
   ResetRenderGroup(RenderGroup);
@@ -271,8 +257,8 @@ void FillRenderPushBuffer(world* World, render_group* RenderGroup )
       component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
       Assert(Spatial);
 
-      push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::LIGHT, 0 );
-      entry_type_light* Body = PushStruct(&RenderGroup->Arena, entry_type_light);
+      push_buffer_header* Header = PushNewHeader( LightGroup, render_buffer_entry_type::LIGHT, 0 );
+      entry_type_light* Body = PushStruct(&LightGroup->Arena, entry_type_light);
       Body->Color  = Light->Color;
       Body->M      = GetModelMatrix(Spatial);
     }

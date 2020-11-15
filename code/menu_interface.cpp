@@ -632,7 +632,7 @@ void DrawMergeSlots(container_node* Node)
   {
     for (u32 Index = 0; Index < ArrayCount(Slot->MergeZone); ++Index)
     {
-      DEBUGPushQuad(Slot->MergeZone[Index], Index == Slot->HotMergeZone ? V4(0,1,0,0.5) : V4(0,1,0,0.3));
+      PushOverlayQuad(Slot->MergeZone[Index], Index == Slot->HotMergeZone ? V4(0,1,0,0.5) : V4(0,1,0,0.3));
     }
   }
 }
@@ -659,7 +659,7 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
     if(HasAttribute(Parent, ATTRIBUTE_COLOR))
     {
       color_attribute* Color = (color_attribute*) GetAttributePointer(Parent, ATTRIBUTE_COLOR);
-      DEBUGPushQuad(Parent->Region, Color->Color);
+      PushOverlayQuad(Parent->Region, Color->Color);
     }
 
     if(Parent->Functions.Draw)
@@ -670,8 +670,8 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
     if(HasAttribute(Parent, ATTRIBUTE_TEXT))
     {
       text_attribute* Text = (text_attribute*) GetAttributePointer(Parent, ATTRIBUTE_TEXT);
-      rect2f TextBox = DEBUGTextSize(0, 0, Text->Text, Text->FontSize);
-      DEBUGTextOutAt(Parent->Region.X + Parent->Region.W/2.f - TextBox.W/2.f,
+      rect2f TextBox = GetTextSize(0, 0, Text->Text, Text->FontSize);
+      PushTextAt(Parent->Region.X + Parent->Region.W/2.f - TextBox.W/2.f,
                      Parent->Region.Y + Parent->Region.H/2.f - TextBox.H/3.f, Text->Text, Text->FontSize, Text->Color);
     }
 
@@ -889,7 +889,7 @@ void PrintTree( menu_tree* Menu, r32 YOff, u32 FontSize, r32 HeightStep, r32 Wid
       FormatNodeString(Sibling, ArrayCount(StringBuffer), StringBuffer);
 
       XOff = WidthStep * Sibling->Depth;
-      DEBUGTextOutAt(XOff, YOff, StringBuffer, FontSize, Color);
+      PushTextAt(XOff, YOff, StringBuffer, FontSize, Color);
       YOff -= HeightStep;
 
       if(CheckPoints[Depth])
@@ -923,7 +923,7 @@ void PrintTree( menu_tree* Menu, r32 YOff, u32 FontSize, r32 HeightStep, r32 Wid
       c8 StringBuffer[1024] = {};
       FormatNodeString(Sibling, ArrayCount(StringBuffer), StringBuffer);
       XOff = WidthStep * Sibling->Depth;
-      DEBUGTextOutAt(XOff, YOff, StringBuffer, FontSize, Color);
+      PushTextAt(XOff, YOff, StringBuffer, FontSize, Color);
       YOff -= HeightStep;
 
       Sibling = Next(Sibling);
@@ -1859,7 +1859,7 @@ container_node* CreateHBF(menu_interface* Interface, c8* HeaderName, v4 HeaderCo
   Text->FontSize = 14;
   Text->Color = V4(0,0,0,1);
 
-  rect2f TextSize = DEBUGTextSize(0, 0, "Name", Text->FontSize);
+  rect2f TextSize = GetTextSize(0, 0, "Name", Text->FontSize);
   size_attribute* SizeAttr = (size_attribute*) PushAttribute(Interface, HeaderText, ATTRIBUTE_SIZE);
   SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, TextSize.W);
   SizeAttr->Height = ContainerSizeT(menu_size_type::ABSOLUTE, TextSize.H);

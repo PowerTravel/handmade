@@ -87,8 +87,6 @@ struct push_buffer_header
 
 struct render_group
 {
-  b32 Initialized;
-
   m4 ProjectionMatrix;
   m4 ViewMatrix;
 
@@ -102,7 +100,6 @@ struct render_group
   u32 BufferCounts[16];
 };
 
-render_group* InitiateRenderGroup(game_state* GameState, r32 ScreenWidth, r32 ScreenHeight);
 void ResetRenderGroup(render_group* RenderGroup)
 {
   EndTemporaryMemory(RenderGroup->PushBufferMemory);
@@ -113,5 +110,6 @@ void ResetRenderGroup(render_group* RenderGroup)
   RenderGroup->ElementCount = 0;
   RenderGroup->First = 0;
   RenderGroup->Last = 0;
+
   ZeroArray(ArrayCount(RenderGroup->BufferCounts), RenderGroup->BufferCounts);
 }

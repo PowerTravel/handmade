@@ -116,7 +116,7 @@ DEBUGGetState()
 
     // Set menu window
     u32 FontSize = 18;
-    rect2f ButtonSize = DEBUGTextSize(0, 0, "CollisionPoints", FontSize);
+    rect2f ButtonSize = GetTextSize(0, 0, "CollisionPoints", FontSize);
     v4 TextColor = V4(1,1,1,1);
 
     ButtonSize.W+=0.02f;
@@ -256,7 +256,7 @@ DEBUGGetState()
     str::CopyStringsUnchecked( "Windows", Text->Text );
     Text->FontSize = 12;
     Text->Color = V4(0,0,0,1);
-    rect2f WindowsSize = DEBUGTextSize(0, 0, Text->Text, Text->FontSize);
+    rect2f WindowsSize = GetTextSize(0, 0, Text->Text, Text->FontSize);
 
     size_attribute* SizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, DropDownContainer, ATTRIBUTE_SIZE);
     SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, WindowsSize.W+0.015f);
@@ -286,7 +286,7 @@ DEBUGGetState()
       MenuText->FontSize = 12;
       MenuText->Color = V4(0,0,0,1);
       
-      rect2f TextSize = DEBUGTextSize(0, 0, MenuText->Text, MenuText->FontSize);
+      rect2f TextSize = GetTextSize(0, 0, MenuText->Text, MenuText->FontSize);
       ViewMenuRoot->Root->Region.H += TextSize.H;
       ViewMenuRoot->Root->Region.W = ViewMenuRoot->Root->Region.W >= TextSize.W ? ViewMenuRoot->Root->Region.W : TextSize.W;
     }
@@ -298,7 +298,7 @@ DEBUGGetState()
       MenuText->FontSize = 12;
       MenuText->Color = V4(0,0,0,1);
       
-      rect2f TextSize = DEBUGTextSize(0, 0, MenuText->Text, MenuText->FontSize);
+      rect2f TextSize = GetTextSize(0, 0, MenuText->Text, MenuText->FontSize);
       ViewMenuRoot->Root->Region.H += TextSize.H;
       ViewMenuRoot->Root->Region.W = ViewMenuRoot->Root->Region.W >= TextSize.W ? ViewMenuRoot->Root->Region.W : TextSize.W;
     }
@@ -707,7 +707,7 @@ void DrawMenu( radial_menu* RadialMenu )
     r32 TextPosX = RadialMenu->MenuX + Region->Radius*Cos(AngleCenter);
     r32 TextPosY = RadialMenu->MenuY + Region->Radius*Sin(AngleCenter);
 
-    rect2f TextBox = DEBUGTextSize(TextPosX, TextPosY, MenuItem->Header);
+    rect2f TextBox = GetTextSize(TextPosX, TextPosY, MenuItem->Header);
 
     r32 Anglef0 = Tau32/8.f;
     r32 Anglef1 = 3*Tau32/8.f;
@@ -755,7 +755,7 @@ void DrawMenu( radial_menu* RadialMenu )
     rect2f QuadRect = Rect2f(TextBox.X + Offset.X,
                              TextBox.Y + Offset.Y,
                              TextBox.W,TextBox.H);
-    DEBUGPushQuad(QuadRect, Color);
+    PushOverlayQuad(QuadRect, Color);
 
     DEBUGTextOutAt(TextPosX+Offset.X, TextPosY+Offset.Y, MenuItem->Header, V4(1,1,1,1));
   }
@@ -827,14 +827,14 @@ MENU_DRAW(DrawFunctionTimeline)
       Rect.W = MaxX-MinX;
       Rect.H = (MaxY-MinY)*0.9f;
 
-      DEBUGPushQuad(Rect, Color);
+      PushOverlayQuad(Rect, Color);
 
       if(Intersects(Rect,Interface->MousePos))
       {
         c8 StringBuffer[256] = {};
         Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
         "%s : %2.2f MCy", Region->Record->BlockName, (Region->MaxT-Region->MinT)/1000000.f);
-        DEBUGTextOutAt(MouseX, MouseY+0.02f, StringBuffer, 24, V4(1,1,1,1));
+        PushTextAt(MouseX, MouseY+0.02f, StringBuffer, 24, V4(1,1,1,1));
         if(Interface->MouseLeftButton.Edge && Interface->MouseLeftButton.Active)
         {
           HotRecord = Region->Record;
@@ -858,6 +858,15 @@ MENU_DRAW(DrawFunctionTimeline)
   }
 }
 
+void DEBUGAddTextSTB(const c8* String, r32 LineNumber, u32 FontSize)
+{
+  TIMED_FUNCTION();
+  game_window_size WindowSize = GameGetWindowSize();
+  stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
+  r32 CanPosX = 1/100.f;
+  r32 CanPosY = 1 - ((LineNumber+1) * FontMap->Ascent - LineNumber*FontMap->Descent)/WindowSize.HeightPx;
+  PushTextAt(CanPosX, CanPosY, String, FontSize, V4(1,1,1,1));
+}
 
 void PushDebugOverlay(game_input* GameInput)
 {
@@ -937,7 +946,7 @@ void DrawFunctionCount(){
         r32 yMax = ChartBot + BarScale*SnapShot->CycleCount;
         aabb2f Rect = AABB2f( V2(xMin,ChartBot), V2(xMax,yMax));
         v4 Color = Green + ((SnapShot->CycleCountStat.Avg) / (SnapShot->CycleCountStat.Max) ) * (Yellow - Green);
-        DEBUGPushQuad(GlobalDebugRenderGroup, Rect,Color);
+        PushOverlayQuad(GlobalDebugRenderGroup, Rect,Color);
       }
 
       xMin = ChartLeft + j * BarSegmentWidth;

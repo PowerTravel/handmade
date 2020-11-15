@@ -404,24 +404,20 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
     }
 
     GlobalGameState->IsInitialized = true;
+
+
+    Assert(!RenderCommands->LightsGroup);
+    Assert(!RenderCommands->RenderGroup);
+    Assert(!RenderCommands->OverlayGroup);
+   
+    RenderCommands->LightsGroup = InitiateRenderGroup();
+    RenderCommands->RenderGroup = InitiateRenderGroup();
+    RenderCommands->OverlayGroup = InitiateRenderGroup();
   }
 
-  if(!RenderCommands->MainRenderGroup)
-  {
-    RenderCommands->MainRenderGroup = InitiateRenderGroup((r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
-  }
-
-  if(!RenderCommands->DebugRenderGroup)
-  {
-    // TODO: Right now DebugRenderGroup just solves the problem of drawing the overlay on top of everything else with a special shader.
-    //       This should be supported by just one RenderGroup with sorting capabilities and shaderswitching.
-    //       Maybe DebugRenderGroup is something we want to move away from and consolidate into the DebugState.
-    //       Is there a problem with the debug system piping it's drawing through the GameRenderingPipeline?
-    //       I mean it already sort of does since it all gets drawn in RenderGroupToOutput.
-    RenderCommands->DebugRenderGroup = InitiateRenderGroup((r32)RenderCommands->ScreenWidthPixels, (r32)RenderCommands->ScreenHeightPixels);
-
-
-  }
+  Assert(RenderCommands->LightsGroup);
+  Assert(RenderCommands->RenderGroup);
+  Assert(RenderCommands->OverlayGroup);  
 }
 
 #include "function_pointer_pool.h"
@@ -433,9 +429,7 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
   InitiateGame(Memory, RenderCommands, Input);
 
 #if HANDMADE_INTERNAL
-  GlobalDebugRenderGroup =  RenderCommands->DebugRenderGroup;
   DebugGlobalMemory = Memory;
-
 #endif
 
   Assert(Memory->GameState);
@@ -451,8 +445,16 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
     ReinitiatePool();  
   }
 
+
+  ResetRenderGroup(RenderCommands->LightsGroup);
+  ResetRenderGroup(RenderCommands->RenderGroup);
+  ResetRenderGroup(RenderCommands->OverlayGroup);
+
+
+
   game_window_size WindowSize = GameGetWindowSize();
   r32 AspectRatio = WindowSize.WidthPx/WindowSize.HeightPx;
+
   m4 ScreenToCubeScale =  M4( 2/AspectRatio, 0, 0, 0,
                                            0, 2, 0, 0,
                                            0, 0, 0, 0,
@@ -462,13 +464,9 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
                               0, 0, 1,  0,
                               0, 0, 0,  1);
 
-  RenderCommands->DebugRenderGroup->ProjectionMatrix = ScreenToCubeTrans*ScreenToCubeScale;
-
-
-
+  RenderCommands->OverlayGroup->ProjectionMatrix = ScreenToCubeTrans*ScreenToCubeScale;
 //  RenderCommands->MainRenderGroup->ScreenWidth  = (r32)RenderCommands->ScreenWidthPixels;
 //  RenderCommands->MainRenderGroup->ScreenHeight = (r32)RenderCommands->ScreenHeightPixels;
-//
 //  RenderCommands->DebugRenderGroup->ScreenWidth  = (r32) RenderCommands->ScreenWidthPixels;
 //  RenderCommands->DebugRenderGroup->ScreenHeight = (r32) RenderCommands->ScreenHeightPixels;
 
@@ -505,7 +503,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   SpatialSystemUpdate(World);
   CameraSystemUpdate(World);
   SpriteAnimationSystemUpdate(World);
-  FillRenderPushBuffer(World, RenderCommands->MainRenderGroup );
+  FillRenderPushBuffer(World);
 
   if(Memory->DebugState)
   {
