@@ -1,8 +1,5 @@
 
 # Directories
-data/
-ctime/
-misc/
 shaders/
 tests/
 code/deprecated/
@@ -15,3 +12,5 @@ tests.rar
 *.ctm
 *.swp
 *.svo
+*.html*
+*.db
