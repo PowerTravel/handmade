@@ -1,0 +1,2 @@
+contact_manifold:
+  List of Hash-maps. Needs to grow and shrink with (id,id) -> indexing

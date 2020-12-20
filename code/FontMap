@@ -1,0 +1,1 @@
+debug.cpp:    stb_font_map* FontMap = &GlobalDebugRenderGroup->Assets->STBFontMap;
