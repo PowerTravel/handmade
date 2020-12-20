@@ -947,7 +947,6 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
         buffer_keeper* ObjectKeeper = 0;
         mesh_indeces* Object = GetAsset(AssetManager, AssetTest->Object, &ObjectKeeper);
         
-
         // TODO: Use Unsinged Short
         glBindVertexArray( OpenGL->ElementVAO );
         glDrawElementsBaseVertex( GL_TRIANGLES, ObjectKeeper->Count, GL_UNSIGNED_INT,
@@ -965,112 +964,129 @@ void OpenGLRenderGroupToOutput( game_render_commands* Commands)
   temporary_memory TempMem = BeginTemporaryMemory(&RenderGroup->Arena);
 
   {
-    // TODO BUFFER: This has to be counted in the sorting
-    u32 TextEntryCount = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::TEXT];
-    u32 OverlayQuadEntryCount = RenderGroup->BufferCounts[(u32)render_buffer_entry_type::OVERLAY_QUAD];
-    { // Send data to VBO
-      text_data* TextBuffer = PushArray(&RenderGroup->Arena, TextEntryCount, text_data);
-      overlay_quad_data* QuadBuffer = PushArray(&RenderGroup->Arena, OverlayQuadEntryCount, overlay_quad_data);
-      u32 QuadInstnceIndex = 0;
-      u32 TextInstnceIndex = 0;
-      for( push_buffer_header* Entry = RenderGroup->First; Entry != 0; Entry = Entry->Next )
+    push_buffer_header* StartEntry = RenderGroup->First;
+    push_buffer_header* BreakEntry = 0;
+    while(StartEntry)
+    {
+      u32 TextEntryCount = 0;
+      u32 OverlayQuadEntryCount = 0;
+      for( push_buffer_header* Entry = StartEntry;
+           Entry != 0;
+           Entry = Entry->Next )
       {
-        u8* Head = (u8*) Entry;
-        u8* Body = Head + sizeof(push_buffer_header);
-        switch(Entry->Type)
+        TextEntryCount        += ((Entry->Type == render_buffer_entry_type::TEXT)         ? 1 : 0);
+        OverlayQuadEntryCount += ((Entry->Type == render_buffer_entry_type::OVERLAY_QUAD) ? 1 : 0);
+
+        if(Entry->Type == render_buffer_entry_type::NEW_LEVEL)
         {
-          #if 0
-          case render_buffer_entry_type::OVERLAY_LINE:
-          {
-            entry_type_overlay_line* Quad = (entry_type_overlay_quad*) Body;
-            overlay_line_data LineData = {};
-            LineData.QuadRect = Quad->QuadRect;
-            LineData.Color = Quad->Colour;
-            LineBuffer[QuadInstnceIndex++] = LineData;
-          }break;
-          #endif
-          case render_buffer_entry_type::OVERLAY_QUAD:
-          {
-            entry_type_overlay_quad* Quad = (entry_type_overlay_quad*) Body;
-           
-            overlay_quad_data QuadData = {};
-            QuadData.QuadRect = Quad->QuadRect;
-            QuadData.Color = Quad->Colour;
-            QuadBuffer[QuadInstnceIndex++] = QuadData;
-          }break;
-          case render_buffer_entry_type::TEXT:
-          {
-            text_data TexData = {};
-            entry_type_text* Text = (entry_type_text*) Body;
-            
-            bitmap_keeper* FontKeeper;
-            GetAsset(AssetManager, Text->BitmapHandle, &FontKeeper);
-            
-            TexData.TextureSlot = FontKeeper->TextureSlot;
-            TexData.QuadRect = Text->QuadRect;
-            TexData.UVRect = Text->UVRect;
-            TexData.Color = Text->Colour;
-            TextBuffer[TextInstnceIndex++] = TexData;
-          }break;
+          BreakEntry = Entry;
+          break;
         }
       }
 
-      u32 QuadBufferSize = sizeof(overlay_quad_data)*OverlayQuadEntryCount;
-      u32 TextBufferSize = sizeof(text_data)*TextEntryCount;
+      { // Send data to VBO
+        text_data* TextBuffer = PushArray(&RenderGroup->Arena, TextEntryCount, text_data);
+        overlay_quad_data* QuadBuffer = PushArray(&RenderGroup->Arena, OverlayQuadEntryCount, overlay_quad_data);
+        u32 QuadInstnceIndex = 0;
+        u32 TextInstnceIndex = 0;
+        for( push_buffer_header* Entry = StartEntry; Entry != BreakEntry; Entry = Entry->Next )
+        {
+          u8* Head = (u8*) Entry;
+          u8* Body = Head + sizeof(push_buffer_header);
+          switch(Entry->Type)
+          {
+            case render_buffer_entry_type::OVERLAY_QUAD:
+            {
+              entry_type_overlay_quad* Quad = (entry_type_overlay_quad*) Body;
+             
+              overlay_quad_data QuadData = {};
+              QuadData.QuadRect = Quad->QuadRect;
+              QuadData.Color = Quad->Colour;
+              QuadBuffer[QuadInstnceIndex++] = QuadData;
+            }break;
+            case render_buffer_entry_type::TEXT:
+            {
+              text_data TexData = {};
+              entry_type_text* Text = (entry_type_text*) Body;
+              
+              bitmap_keeper* FontKeeper;
+              GetAsset(AssetManager, Text->BitmapHandle, &FontKeeper);
+              
+              TexData.TextureSlot = FontKeeper->TextureSlot;
+              TexData.QuadRect = Text->QuadRect;
+              TexData.UVRect = Text->UVRect;
+              TexData.Color = Text->Colour;
+              TextBuffer[TextInstnceIndex++] = TexData;
+            }break;
+          }
+        }
 
-      glBindBuffer(GL_ARRAY_BUFFER, OpenGL->InstanceVBO);
-      glBufferSubData( GL_ARRAY_BUFFER,        // Target
-                       OpenGL->QuadBaseOffset, // Offset
-                       QuadBufferSize,         // Size
-                       (GLvoid*) QuadBuffer);  // Data
-      glBufferSubData( GL_ARRAY_BUFFER,        // Target
-                       OpenGL->TextBaseOffset, // Offset
-                       TextBufferSize,         // Size
-                       (GLvoid*) TextBuffer);  // Data
-      glBindBuffer(GL_ARRAY_BUFFER, 0);
+        u32 QuadBufferSize = sizeof(overlay_quad_data)*OverlayQuadEntryCount;
+        u32 TextBufferSize = sizeof(text_data)*TextEntryCount;
 
+        glBindBuffer(GL_ARRAY_BUFFER, OpenGL->InstanceVBO);
+        glBufferSubData( GL_ARRAY_BUFFER,        // Target
+                         OpenGL->QuadBaseOffset, // Offset
+                         QuadBufferSize,         // Size
+                         (GLvoid*) QuadBuffer);  // Data
+        glBufferSubData( GL_ARRAY_BUFFER,        // Target
+                         OpenGL->TextBaseOffset, // Offset
+                         TextBufferSize,         // Size
+                         (GLvoid*) TextBuffer);  // Data
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+      }
+
+      opengl_program QuadOverlayProgram = Commands->OpenGL.QuadOverlayProgram;
+      glUseProgram(QuadOverlayProgram.Program);
+      glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
+      glUniformMatrix4fv(QuadOverlayProgram.ProjectionMat, 1, GL_TRUE, RenderGroup->ProjectionMatrix.E);
+
+      // No need to clearh the depth buffer if we disable depth test
+      glDisable(GL_DEPTH_TEST);
+      // Enable Textures
+      glEnable(GL_TEXTURE_2D);
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+      buffer_keeper* ElementObjectKeeper = 0;
+      object_handle ObjectHandle = GetEnumeratedObjectHandle(AssetManager, predefined_mesh::QUAD);
+      GetAsset(AssetManager, ObjectHandle, &ElementObjectKeeper);
+
+      glBindVertexArray( OpenGL->QuadVAO );
+      glDrawElementsInstancedBaseVertex(
+        GL_TRIANGLES,                           // Mode,
+        ElementObjectKeeper->Count,             // Nr of Elements (Triangles*3)
+        GL_UNSIGNED_INT,                        // Index Data Type  
+        (GLvoid*)(ElementObjectKeeper->Index),  // Pointer somewhere in the index buffer
+        OverlayQuadEntryCount,                  // How many Instances to draw
+        ElementObjectKeeper->VertexOffset);     // Base Offset into the geometry vbo
+      glBindVertexArray(0);
+
+      opengl_program TextRenderProgram = Commands->OpenGL.TextOverlayProgram;
+      glUseProgram(TextRenderProgram.Program);
+      glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
+      glUniformMatrix4fv(QuadOverlayProgram.ProjectionMat, 1, GL_TRUE, RenderGroup->ProjectionMatrix.E);
+
+      glBindVertexArray(OpenGL->TextVAO);
+      glDrawElementsInstancedBaseVertex(
+        GL_TRIANGLES,                           // Mode,
+        ElementObjectKeeper->Count,             // Nr of Elements (Triangles*3)
+        GL_UNSIGNED_INT,                        // Index Data Type  
+        (GLvoid*)(ElementObjectKeeper->Index),  // Pointer somewhere in the index buffer
+        TextEntryCount,                         // How many Instances to draw
+        ElementObjectKeeper->VertexOffset);     // Base Offset into the geometry vbo
+      glBindVertexArray(0);
+
+
+      StartEntry = 0;
+      if(BreakEntry)
+      {
+        StartEntry = BreakEntry->Next;
+        BreakEntry = 0;
+      }
     }
 
-    opengl_program QuadOverlayProgram = Commands->OpenGL.QuadOverlayProgram;
-    glUseProgram(QuadOverlayProgram.Program);
-    glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
-    glUniformMatrix4fv(QuadOverlayProgram.ProjectionMat, 1, GL_TRUE, RenderGroup->ProjectionMatrix.E);
-
-    // No need to clearh the depth buffer if we disable depth test
-    glDisable(GL_DEPTH_TEST);
-    // Enable Textures
-    glEnable(GL_TEXTURE_2D);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    buffer_keeper* ElementObjectKeeper = 0;
-    object_handle ObjectHandle = GetEnumeratedObjectHandle(AssetManager, predefined_mesh::QUAD);
-    GetAsset(AssetManager, ObjectHandle, &ElementObjectKeeper);
-
-    glBindVertexArray( OpenGL->QuadVAO );
-    glDrawElementsInstancedBaseVertex(
-      GL_TRIANGLES,                           // Mode,
-      ElementObjectKeeper->Count,             // Nr of Elements (Triangles*3)
-      GL_UNSIGNED_INT,                        // Index Data Type  
-      (GLvoid*)(ElementObjectKeeper->Index),  // Pointer somewhere in the index buffer
-      OverlayQuadEntryCount,                  // How many Instances to draw
-      ElementObjectKeeper->VertexOffset);     // Base Offset into the geometry vbo
-    glBindVertexArray(0);
-
-    opengl_program TextRenderProgram = Commands->OpenGL.TextOverlayProgram;
-    glUseProgram(TextRenderProgram.Program);
-    glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
-    glUniformMatrix4fv(QuadOverlayProgram.ProjectionMat, 1, GL_TRUE, RenderGroup->ProjectionMatrix.E);
-
-    glBindVertexArray(OpenGL->TextVAO);
-    glDrawElementsInstancedBaseVertex(
-      GL_TRIANGLES,                           // Mode,
-      ElementObjectKeeper->Count,             // Nr of Elements (Triangles*3)
-      GL_UNSIGNED_INT,                        // Index Data Type  
-      (GLvoid*)(ElementObjectKeeper->Index),  // Pointer somewhere in the index buffer
-      TextEntryCount,                         // How many Instances to draw
-      ElementObjectKeeper->VertexOffset);     // Base Offset into the geometry vbo
-    glBindVertexArray(0);
   }
 
   EndTemporaryMemory(TempMem);

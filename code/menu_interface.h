@@ -282,6 +282,12 @@ MENU_GAINING_FOCUS(DefaultGainingFocus)
 struct menu_interface
 {
   b32 MenuVisible;
+
+  menu_tree* MenuBar;
+
+  u32 PermanentWindowCount = 0;
+  container_node* PermanentWindows[32];
+
   menu_tree* MenuInFocus;
   menu_tree MenuSentinel;
 
@@ -336,7 +342,6 @@ inline grid_node* GetGridNode(container_node* Container)
 
 
 void SetSplitDragAttribute(container_node* SplitNode, container_node* BorderNode);
-//container_node* ReallocateNode(menu_interface* Interface, container_node* SrcNode, u32 InputAttributes = 0);
 void SplitWindowHeaderDrag( menu_interface* Interface, container_node* Node, draggable_attribute* Attr );
 menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* BaseWindow, rect2f Region);
 container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical, r32 BorderPos = 0.5);
@@ -344,9 +349,8 @@ container_node* CreateHBF(menu_interface* Interface, v4 HeaderColor, container_n
 container_node* SetSplitWindows( menu_interface* Interface, container_node* SplitNode, container_node* HBF1, container_node* HBF2);
 
 
-
-
-
+menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name);
+void RegisterWindow(menu_interface* Interface, container_node* DropdownMenu, container_node* MenuPage, const c8* Name);
 
 
 

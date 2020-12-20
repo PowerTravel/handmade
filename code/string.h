@@ -291,7 +291,7 @@ void CopyStrings(  memory_index SourceCount, char* Source,
 
   *Dest ='\0';
 }
-void CopyStringsUnchecked( c8* Source, c8* Dest )
+void CopyStringsUnchecked( const c8* Source, c8* Dest )
 {
   while(*Source!= '\0')
   {

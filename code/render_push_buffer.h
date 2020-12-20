@@ -12,6 +12,7 @@ enum class render_buffer_entry_type
   OVERLAY_QUAD,
   LINE,
   TEXT,
+  NEW_LEVEL,
   COUNT
 };
 
@@ -24,6 +25,7 @@ enum data_type
 
 enum render_state
 {
+  RENDER_STATE_NONE         = 0x0,
   RENDER_STATE_CULL_BACK    = 0x1,
   RENDER_STATE_POINTS       = 0x2,
   RENDER_STATE_WIREFRAME    = 0x4,

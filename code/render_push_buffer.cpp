@@ -24,10 +24,15 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup, render_buffer_entry
   return NewEntryHeader;
 }
 
+void PushNewRenderLevel(render_group* RenderGroup)
+{
+  push_buffer_header* Header = PushNewHeader(RenderGroup, render_buffer_entry_type::NEW_LEVEL, RENDER_STATE_NONE);
+}
+
 void PushOverlayQuad(rect2f QuadRect, v4 Color)
 { 
   render_group* RenderGroup = GlobalGameState->RenderCommands->OverlayGroup;
-  push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::OVERLAY_QUAD, RENDER_STATE_FILL);
+  push_buffer_header* Header = PushNewHeader(RenderGroup, render_buffer_entry_type::OVERLAY_QUAD, RENDER_STATE_FILL);
   entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);
   Body->Colour = Color;
   Body->QuadRect = QuadRect;
@@ -44,7 +49,7 @@ void PushOverlayText(rect2f QuadRect, rect2f TextureRect, v4 Color, bitmap_handl
   Body->Colour = Color;
 }
 
-rect2f GetTextSize(r32 x, r32 y, c8* String, u32 FontSize)
+rect2f GetTextSize(r32 x, r32 y, const c8* String, u32 FontSize)
 {
   stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
   

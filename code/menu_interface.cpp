@@ -557,11 +557,12 @@ rect2f GetSizedParentRegion(size_attribute* SizeAttr, rect2f BaseRegion)
   {
     case menu_region_alignment::TOP:
     {
-      Result.Y = BaseRegion.Y + BaseRegion.H - Result.Y;
+      //Result.Y = BaseRegion.Y + BaseRegion.H - Result.Y;
+      Result.Y = BaseRegion.Y;
     }break;
     case menu_region_alignment::BOT:
     {
-      Result.Y = BaseRegion.Y;
+      Result.Y = BaseRegion.Y + BaseRegion.H - Result.Y;
     }break;
     case menu_region_alignment::CENTER:
     {
@@ -843,11 +844,11 @@ void FormatNodeString(container_node* Node, u32 BufferSize, c8 StringBuffer[])
   }
 }
    
-void PrintTree( menu_tree* Menu, r32 YOff, u32 FontSize, r32 HeightStep, r32 WidthStep  )
+r32 PrintTree( menu_tree* Menu, r32 YStart, u32 FontSize, r32 HeightStep, r32 WidthStep  )
 {
   container_node* Node = Menu->HotLeafs[0];
   r32 XOff = 0;
-
+  r32 YOff = YStart;
   container_node* Nodes[64] = {};
   container_node* CheckPoints[64] = {};
   u32 DepthCount = Node->Depth;
@@ -929,7 +930,10 @@ void PrintTree( menu_tree* Menu, r32 YOff, u32 FontSize, r32 HeightStep, r32 Wid
       Sibling = Next(Sibling);
     }
   }
+
+  return YStart-YOff;
 }
+
 void PrintHotLeafs(menu_interface* Interface)
 {
   u32 FontSize = 24;
@@ -944,9 +948,8 @@ void PrintHotLeafs(menu_interface* Interface)
   {
     if(Menu->HotLeafCount>0 && Menu->Visible)
     {
-      PrintTree( Menu, YOff, FontSize, HeightStep, WidthStep );
+      YOff -= PrintTree( Menu, YOff, FontSize, HeightStep, WidthStep );
     }
-    YOff -= HeightStep;
     Menu = Menu->Next;
   }
 }
@@ -1345,7 +1348,6 @@ DRAGGABLE_ATTRIBUTE_UPDATE(TabDrag)
   }
 }
 
-
 void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 {
   container_node* SlotNode = GetMergeSlotNode(Interface, Node);
@@ -1406,9 +1408,6 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 
       if(HomeHBF->FirstChild->Type != container_type::Grid)
       {
-        // TODO: Create Tabbed HBF
-        // ConvertToTabbedHBF(TabbedHBF, HomeHBF);
-
         container_node* TabbedHBF = NewContainer(Interface, container_type::HBF);
         *GetHBFNode(TabbedHBF) = *GetHBFNode(HomeHBF);
 
@@ -1450,8 +1449,6 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
         
         HomeHBF = TabbedHBF;
       }
-
-      
 
       menu_tree* MenuToRemove = GetMenu(Interface, Visitor);
       DisconnectNode(Visitor);
@@ -1674,10 +1671,11 @@ void SetMenuInput(memory_arena* Arena, game_input* GameInput, menu_interface* In
       Interface->MousePos, Menu->HotLeafs);
     Menu = Menu->Next;
   }
-  if(Menu->Visible)
+  if(Interface->MenuVisible)
   {
     PrintHotLeafs(Interface);
   }
+
   Interface->PreviousMousePos = Interface->MousePos;
   Interface->MousePos = MousePos;
 }
@@ -1701,6 +1699,7 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
         TreeSensus(Menu);
         UpdateRegions( Menu );
         DrawMenu( GlobalGameState->TransientArena, Interface, Menu->NodeCount, Menu->Root);
+        PushNewRenderLevel(GlobalGameState->RenderCommands->OverlayGroup);
       }
       Menu = Menu->Previous;
     }  
@@ -1948,3 +1947,188 @@ menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
   return Interface;
 }
 
+internal inline container_node* GetRootHBF( menu_tree* Menu)
+{
+  container_node* Result = Menu->Root->FirstChild->NextSibling->NextSibling->NextSibling->NextSibling;
+  Assert(Result->Type == container_type::HBF);
+  return Result;
+}
+
+BUTTON_ATTRIBUTE_UPDATE(ShowWindowButton)
+{
+  if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
+  {
+    Assert(Attr->Data);
+    container_node* PermanentWindow = (container_node*) Attr->Data;
+    if(!PermanentWindow->Parent)
+    {
+      container_node* Visitor = PermanentWindow;
+      menu_tree* MenuToFocus = CreateNewRootContainer(GlobalGameState->MenuInterface, PermanentWindow, Rect2f( 0.25, 0.25, 0.7, 0.5));
+      UpdateFocusWindow(Interface, MenuToFocus);
+    }else{
+      container_node* WindowToRemove = PermanentWindow;
+      Assert(WindowToRemove->Type == container_type::HBF);
+      if(WindowToRemove->Parent->Type == container_type::Split)
+      {
+        container_node* WindowToRemain = WindowToRemove->NextSibling;
+        if(!WindowToRemain)
+        {
+          WindowToRemain = WindowToRemove->Parent->FirstChild->NextSibling;
+          Assert(WindowToRemain);
+          Assert(WindowToRemain->NextSibling == WindowToRemove);
+        }
+
+        container_node* SplitNodeToSwapOut = WindowToRemain->Parent;
+
+        DisconnectNode(WindowToRemove);
+        DisconnectNode(WindowToRemain);
+
+        ReplaceNode(SplitNodeToSwapOut, WindowToRemain);
+
+        // Remove Drag attribute from windows to remain (if it's a single HBF under a RootHBF)
+        // and windows to remove
+        {
+          if(WindowToRemain->Parent->Type == container_type::HBF &&
+             WindowToRemain->Type == container_type::HBF)
+          {
+            if( HasAttribute(WindowToRemain->FirstChild, ATTRIBUTE_DRAG))
+            {
+              DeleteAttribute(Interface, WindowToRemain->FirstChild, ATTRIBUTE_DRAG);  
+            }
+          }
+
+          Assert(WindowToRemove->Type == container_type::HBF);
+          Assert(WindowToRemove->FirstChild->Attributes & ATTRIBUTE_DRAG);
+          DeleteAttribute(Interface, WindowToRemove->FirstChild, ATTRIBUTE_DRAG);
+        }
+        
+        SplitNodeToSwapOut->NextSibling = 0;
+
+        container_node* Border = SplitNodeToSwapOut->FirstChild;
+        Assert(Border->Type == container_type::Border);
+        Assert(Border->NextSibling == 0);
+        DisconnectNode(Border);
+        DisconnectNode(SplitNodeToSwapOut);
+        DeleteContainer(Interface, Border);
+        DeleteContainer(Interface, SplitNodeToSwapOut);
+
+        menu_tree* MenuToFocus = GetMenu(Interface, WindowToRemain);
+        UpdateFocusWindow(Interface, MenuToFocus);
+      }else{
+        menu_tree* Menu = GetMenu(Interface, WindowToRemove);
+        DisconnectNode(WindowToRemove);
+        FreeMenuTree(Interface, Menu);
+      }
+    }
+  }
+}
+
+BUTTON_ATTRIBUTE_UPDATE(DropDownMenuButton)
+{
+  if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
+  {
+    Assert(Attr->Data);
+    menu_tree* Menu = (menu_tree* ) Attr->Data;
+    Menu->Root->Region.X = Node->Region.X;
+    Menu->Root->Region.Y = Node->Region.Y - Menu->Root->Region.H;
+    UpdateFocusWindow(Interface, Menu);
+  }
+}
+
+MENU_LOSING_FOCUS(DropDownLosingFocus)
+{
+  Menu->Visible = false;
+}
+
+MENU_GAINING_FOCUS(DropDownGainingFocus)
+{
+  Menu->Visible = true;
+}
+
+menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
+{
+  r32 FontSize = 16;
+  rect2f WindowsSize = GetTextSize(0.f, 0.f, Name, (u32)FontSize);
+
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 AspectRatio = WindowSize.WidthPx/WindowSize.HeightPx;
+  if(!Interface->MenuBar)
+  {
+    Interface->MenuBar = NewMenuTree(Interface);
+    Interface->MenuBar->Visible = true;
+    Interface->MenuBar->Root = NewContainer(Interface);
+    r32 MainMenuHeight = WindowsSize.H * 1.1f;
+    Interface->MenuBar->Root->Region = Rect2f(0, 1 - MainMenuHeight, AspectRatio, MainMenuHeight);
+  
+    container_node* DropDownContainer = ConnectNode(Interface->MenuBar->Root, NewContainer(GlobalGameState->MenuInterface, container_type::Grid));
+    grid_node* Grid = GetGridNode(DropDownContainer);
+    Grid->Col = 0;
+    Grid->Row = 1;
+    Grid->TotalMarginX = 0.0;
+    Grid->TotalMarginY = 0.0;
+
+    size_attribute* SizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, DropDownContainer, ATTRIBUTE_SIZE);
+    SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, WindowsSize.W+0.015f);
+    SizeAttr->Height = ContainerSizeT(menu_size_type::RELATIVE, 1);
+    SizeAttr->LeftOffset = ContainerSizeT(menu_size_type::ABSOLUTE, 0);
+    SizeAttr->TopOffset = ContainerSizeT(menu_size_type::ABSOLUTE, 0);
+    SizeAttr->XAlignment = menu_region_alignment::RIGHT;
+    SizeAttr->YAlignment = menu_region_alignment::CENTER;
+  }
+
+  container_node* DropDownContainer = Interface->MenuBar->Root->FirstChild;
+  container_node* NewMenu = ConnectNode(DropDownContainer, NewContainer(GlobalGameState->MenuInterface));
+
+  color_attribute* ColorAttr = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, NewMenu, ATTRIBUTE_COLOR);
+  ColorAttr->Color = V4(0.3,0,0.3,1);
+  
+  text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, NewMenu, ATTRIBUTE_TEXT);
+  str::CopyStringsUnchecked(Name, Text->Text);
+  Text->FontSize = (u32) FontSize;
+  Text->Color = V4(0.9,0.9,0.9,1);
+
+  menu_tree* ViewMenuRoot = NewMenuTree(GlobalGameState->MenuInterface);
+  ViewMenuRoot->Root = NewContainer(GlobalGameState->MenuInterface);
+  ViewMenuRoot->Root->Region = {};
+  ViewMenuRoot->LosingFocus = DeclareFunction(menu_losing_focus, DropDownLosingFocus);
+  ViewMenuRoot->GainingFocus = DeclareFunction(menu_losing_focus, DropDownGainingFocus);
+
+  container_node* ViewMenuItems = ConnectNode(ViewMenuRoot->Root, NewContainer(GlobalGameState->MenuInterface, container_type::Grid));
+  grid_node* Grid = GetGridNode(ViewMenuItems);
+  Grid->Col = 1;
+  Grid->Row = 0;
+  Grid->TotalMarginX = 0.0;
+  Grid->TotalMarginY = 0.0;
+
+  ColorAttr = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, ViewMenuItems, ATTRIBUTE_COLOR);
+  ColorAttr->Color = V4(1,1,1,1);
+
+  button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, NewMenu, ATTRIBUTE_BUTTON);
+  ButtonAttribute->Update = DeclareFunction(button_attribute_update, DropDownMenuButton);
+  ButtonAttribute->Data = ViewMenuRoot;
+
+  return ViewMenuRoot;
+}
+
+void RegisterWindow(menu_interface* Interface, menu_tree* DropDownMenu, container_node* MenuPage, const c8* Name)
+{
+  container_node* DropDownGrid = DropDownMenu->Root->FirstChild;
+  Assert(DropDownGrid->Type == container_type::Grid);
+  Assert(MenuPage->Type == container_type::HBF);
+
+  container_node* MenuItem = ConnectNode(DropDownGrid, NewContainer(GlobalGameState->MenuInterface));
+  text_attribute* MenuText = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, MenuItem, ATTRIBUTE_TEXT);
+  str::CopyStringsUnchecked( Name, MenuText->Text );
+  MenuText->FontSize = 12;
+  MenuText->Color = V4(0,0,0,1);
+  
+  rect2f TextSize = GetTextSize(0, 0, MenuText->Text, MenuText->FontSize);
+  DropDownMenu->Root->Region.H += TextSize.H;
+  DropDownMenu->Root->Region.W = DropDownMenu->Root->Region.W >= TextSize.W ? DropDownMenu->Root->Region.W : TextSize.W;
+ 
+  Interface->PermanentWindows[Interface->PermanentWindowCount++] = MenuPage;
+
+  button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, MenuItem, ATTRIBUTE_BUTTON);
+  ButtonAttribute->Update = DeclareFunction(button_attribute_update, ShowWindowButton);
+  ButtonAttribute->Data = MenuPage;
+}

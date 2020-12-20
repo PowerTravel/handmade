@@ -19,6 +19,8 @@ BUTTON_ATTRIBUTE_UPDATE(DebugToggleButton);
 BUTTON_ATTRIBUTE_UPDATE(DebugRecompileButton);
 BUTTON_ATTRIBUTE_UPDATE(DebugPauseCollationButton);
 BUTTON_ATTRIBUTE_UPDATE(DropDownMenuButton);
+BUTTON_ATTRIBUTE_UPDATE(ShowWindowButton);
+
 
 DRAGGABLE_ATTRIBUTE_UPDATE(UpdateFrameBorderCallback);
 DRAGGABLE_ATTRIBUTE_UPDATE(SplitWindowHeaderDrag);
@@ -54,6 +56,7 @@ void _ReinitiatePool(function_pool* Pool)
     NewFunPtr(DebugRecompileButton)
     NewFunPtr(DebugPauseCollationButton)
     NewFunPtr(DropDownMenuButton)
+    NewFunPtr(ShowWindowButton)
     NewFunPtr(UpdateFrameBorderCallback)
     NewFunPtr(SplitWindowHeaderDrag)
     NewFunPtr(UpdateHeaderPosition)

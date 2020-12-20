@@ -15,28 +15,7 @@ MENU_DRAW(DrawFunctionTimeline);
 
 internal void RefreshCollation();
 internal void RestartCollation();
-BUTTON_ATTRIBUTE_UPDATE(DropDownMenuButton)
-{
-  if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
-  {
-    Assert(Attr->Data);
-    menu_tree* Menu = (menu_tree* ) Attr->Data;
-    Menu->Root->Region.X = Node->Region.X;
-    Menu->Root->Region.Y = Node->Region.Y - Menu->Root->Region.H;
-    UpdateFocusWindow(Interface, Menu);
-  }
-}
 
-
-MENU_LOSING_FOCUS(DropDownLosingFocus)
-{
-  Menu->Visible = false;
-}
-
-MENU_GAINING_FOCUS(DropDownGainingFocus)
-{
-  Menu->Visible = true;
-}
 
 //MENU_UPDATE_CHILD_REGIONS(DropDownUpdateChildRegions)
 //{
@@ -192,6 +171,7 @@ DEBUGGetState()
       }
       HBF1 = CreateHBF(GlobalGameState->MenuInterface, "Settings", V4(0.5,0.5,0.5,1), ButtonContainer);
     }
+
     // Create graph window
     container_node* HBF2 = 0;
     {
@@ -225,10 +205,17 @@ DEBUGGetState()
       ConnectNode(SplitNode, ButtonContainer);
       ConnectNode(SplitNode, GraphContainer);
 
-
       HBF2 = CreateHBF(GlobalGameState->MenuInterface, "Profiler", V4(0.5,0.5,ContainerWidth,1), SplitNode);
-      
     }
+
+
+    #if 1
+
+    menu_tree* WindowsDropDownMenu = RegisterMenu(GlobalGameState->MenuInterface, "Windows");
+    RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, HBF1, "Settings");
+    RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, HBF2, "Profiler");
+
+    #else
 
     container_node* Split = SetSplitWindows(GlobalGameState->MenuInterface, CreateSplitWindow(GlobalGameState->MenuInterface, true, ButtonSize.W/ContainerWidth), HBF1, HBF2);
 
@@ -279,6 +266,7 @@ DEBUGGetState()
     Grid->TotalMarginX = 0.0;
     Grid->TotalMarginY = 0.0;
 
+
     {
       container_node* MenuItem = ConnectNode(ViewMenuItems, NewContainer(GlobalGameState->MenuInterface));
       text_attribute* MenuText = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, MenuItem, ATTRIBUTE_TEXT);
@@ -316,6 +304,7 @@ DEBUGGetState()
 
     UpdateRegions(ViewMenuRoot);
 
+    #endif
     
     RestartCollation();
   }
