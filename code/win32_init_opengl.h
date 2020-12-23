@@ -29,13 +29,14 @@ typedef char GLchar;
 typedef GLuint WINAPI gl_create_program (void);
 typedef void   WINAPI gl_link_program(GLuint program);
 typedef void   WINAPI gl_use_program(GLuint program);
-
+typedef void   WINAPI gl_validate_program(GLuint program);
 typedef void   WINAPI gl_get_program_iv(GLuint program, GLenum pname, GLint *params);
 typedef void   WINAPI gl_get_program_info_log(GLuint program, GLsizei maxLength, GLsizei *length, GLchar *infoLog);
 
 global_variable gl_create_program*       glCreateProgram;
 global_variable gl_link_program*         glLinkProgram;
 global_variable gl_use_program*          glUseProgram;
+global_variable gl_validate_program*     glValidateProgram;
 global_variable gl_get_program_iv*       glGetProgramiv;
 global_variable gl_get_program_info_log* glGetProgramInfoLog;
 
@@ -202,14 +203,55 @@ global_variable gl_tex_sub_image_3d* glTexSubImage3D;
 typedef void WINAPI gl_active_texture(GLenum texture);
 global_variable gl_active_texture* glActiveTexture;
 
+//void GLAPIENTRY ErrorCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void* userParam)
+/* ... */
+//glDebugMessageCallback( reinterpret_cast<GLDEBUGPROC>(&ErrorCallback), NULL);
+typedef void (APIENTRY  *GLDEBUGPROCARB)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam);
+typedef void WINAPI debug_message_callback_arb(GLDEBUGPROCARB callback, const void* userParam);
+global_variable debug_message_callback_arb* glDebugMessageCallbackARB;
+
+
+
+#if 0
+typedef void WINAPI debug_message_control_arb(enum source, enum type, enum severity, sizei count, const uint* ids, boolean enabled);
+global_variable debug_message_control_arb* DebugMessageControlARB;
+    void DebugMessageControlARB(enum source,
+                                enum type,
+                                enum severity,
+                                sizei count,
+                                const uint* ids,
+                                boolean enabled);
+
+    void DebugMessageInsertARB(enum source,
+                               enum type,
+                               uint id,
+                               enum severity,
+                               sizei length, 
+                               const char* buf);
+
+    
+    
+    uint GetDebugMessageLogARB(uint count,
+                               sizei bufSize,
+                               enum* sources,
+                               enum* types,
+                               uint* ids,
+                               enum* severities,
+                               sizei* lengths, 
+                               char* messageLog);
+    
+    void GetPointerv(enum pname,
+                     void** params);
+#endif                     
+
 void* _GetOpenGLFunction( char* name )
 {
   void* GLProgram = wglGetProcAddress(name);
   if( (GLProgram == NULL) ||
-    (GLProgram == (void*) 0x1) ||
-    (GLProgram == (void*) 0x2) ||
-    (GLProgram == (void*) 0x3) ||
-    (GLProgram == (void*)  -1) )
+     (GLProgram == (void*) 0x1) ||
+     (GLProgram == (void*) 0x2) ||
+     (GLProgram == (void*) 0x3) ||
+     (GLProgram == (void*)  -1) )
   {
     INVALID_CODE_PATH
   }
@@ -226,26 +268,27 @@ Win32RenderAlloc(umm Size)
 }
 
 internal open_gl
-Win32InitOpenGL(HWND Window)
+Win32InitOpenGL(HWND Window, HDC* ReturnWindowDC)
 {
   HDC  WindowDC = GetDC(Window);
-
+  
   PIXELFORMATDESCRIPTOR DesiredPixelFormat = {};
-    DesiredPixelFormat.nSize = sizeof(PIXELFORMATDESCRIPTOR);
-    DesiredPixelFormat.nVersion = 1;
-    DesiredPixelFormat.dwFlags  = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
-    DesiredPixelFormat.iPixelType;
-    DesiredPixelFormat.cColorBits = 32;
-    DesiredPixelFormat.cAlphaBits = 8;
-    DesiredPixelFormat.iLayerType = PFD_MAIN_PLANE;
-
-    s32 SuggestedPixelFormatIndex = ChoosePixelFormat(WindowDC, &DesiredPixelFormat);
-    PIXELFORMATDESCRIPTOR SuggestedPixelFormat;
-    DescribePixelFormat(WindowDC, SuggestedPixelFormatIndex,
-              sizeof( SuggestedPixelFormat ),   &SuggestedPixelFormat );
-    SetPixelFormat( WindowDC, SuggestedPixelFormatIndex, &SuggestedPixelFormat );
-
-
+  DesiredPixelFormat.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+  DesiredPixelFormat.nVersion = 1;
+  DesiredPixelFormat.dwFlags  = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
+  DesiredPixelFormat.iPixelType = PFD_TYPE_RGBA;
+  DesiredPixelFormat.cColorBits = 32;
+  DesiredPixelFormat.cAlphaBits = 8;
+  DesiredPixelFormat.cDepthBits = 24;
+  DesiredPixelFormat.iLayerType = PFD_MAIN_PLANE;
+  
+  s32 SuggestedPixelFormatIndex = ChoosePixelFormat(WindowDC, &DesiredPixelFormat);
+  PIXELFORMATDESCRIPTOR SuggestedPixelFormat;
+  DescribePixelFormat(WindowDC, SuggestedPixelFormatIndex,
+                      sizeof( SuggestedPixelFormat ),   &SuggestedPixelFormat );
+  SetPixelFormat( WindowDC, SuggestedPixelFormatIndex, &SuggestedPixelFormat );
+  
+  
   HGLRC OpenGLRC = wglCreateContext(WindowDC);
   if( wglMakeCurrent(WindowDC, OpenGLRC) )
   {
@@ -264,13 +307,13 @@ Win32InitOpenGL(HWND Window)
         ,
         WGL_CONTEXT_PROFILE_MASK_ARB,
         WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-          0,
-
+        0,
+        
       };
-
+      
       HGLRC SharedContext = 0;
       HGLRC ModernGLRC = wglCreateContextAttribsARB(WindowDC, SharedContext, Attribs);
-
+      
       if(ModernGLRC)
       {
         if( wglMakeCurrent(WindowDC, ModernGLRC))
@@ -283,17 +326,16 @@ Win32InitOpenGL(HWND Window)
       }else{
         INVALID_CODE_PATH
       }
-
+      
     }else{
       // Note(Jakob): This is a antiquated version of OpenGL.
       INVALID_CODE_PATH
     }
-
-
-
+    
     glBlendEquationSeparate     = GetOpenGLFunction( gl_blend_equation_separate,     "glBlendEquationSeparate");
     glCreateProgram             = GetOpenGLFunction( gl_create_program,              "glCreateProgram");
     glLinkProgram               = GetOpenGLFunction( gl_link_program,                "glLinkProgram");
+    glValidateProgram           = GetOpenGLFunction( gl_validate_program,            "glValidateProgram");
     glUseProgram                = GetOpenGLFunction( gl_use_program,                 "glUseProgram");
     glGetProgramiv              = GetOpenGLFunction( gl_get_program_iv,              "glGetProgramiv");
     glGetProgramInfoLog         = GetOpenGLFunction( gl_get_program_info_log,        "glGetProgramInfoLog");
@@ -327,7 +369,7 @@ Win32InitOpenGL(HWND Window)
     glNamedBufferData           = GetOpenGLFunction( gl_named_buffer_data,           "glNamedBufferData");
     glIsBuffer                  = GetOpenGLFunction( gl_is_buffer,                   "glIsBuffer");
     glDeleteBuffers             = GetOpenGLFunction( gl_delete_buffer,               "glDeleteBuffers");
-    glDrawElementsA             = GetOpenGLFunction( gl_draw_elements,               "glDrawElements");
+    //glDrawElementsA             = GetOpenGLFunction( gl_draw_elements,               "glDrawElements");
     glDrawElementsInstanced     = GetOpenGLFunction( gl_draw_elements_instanced,     "glDrawElementsInstanced");
     glDrawElementsBaseVertex    = GetOpenGLFunction( gl_draw_elements_base_vertex,   "glDrawElementsBaseVertex" );
     glDrawElementsInstancedBaseVertex = GetOpenGLFunction( gl_draw_elements_instanced_base_vertex,   "glDrawElementsInstancedBaseVertex" );
@@ -369,21 +411,26 @@ Win32InitOpenGL(HWND Window)
     glTexImage3D                = GetOpenGLFunction( gl_tex_image_3d,                "glTexImage3D");
     glTexSubImage3D             = GetOpenGLFunction( gl_tex_sub_image_3d,            "glTexSubImage3D");
     glActiveTexture             = GetOpenGLFunction( gl_active_texture,              "glActiveTexture");
-//    glTexStorage3D              = GetOpenGLFunction( gl_tex_storage_3d,              "glTexStorage3D");
+//  glTexStorage3D              = GetOpenGLFunction( gl_tex_storage_3d,              "glTexStorage3D");
+    glDebugMessageCallbackARB   = GetOpenGLFunction( debug_message_callback_arb,     "glDebugMessageCallbackARB");
   }else{
     INVALID_CODE_PATH
   }
-  ReleaseDC(Window, WindowDC);
+  //ReleaseDC(Window, WindowDC);
+  GLenum error = glGetError();
+
 
   wglSwapInterval = GetOpenGLFunction( wgl_swap_interval_ext, "wglSwapIntervalEXT");
   // Sets the VSync on
   if(wglSwapInterval)
   {
-    wglSwapInterval(1);
+   // wglSwapInterval(1);
   }
-
+  error = glGetError();
   open_gl OpenGL = {};
   InitOpenGL(&OpenGL);
+  *ReturnWindowDC = WindowDC;
+  error = glGetError();
   return OpenGL;
-
+  
 }

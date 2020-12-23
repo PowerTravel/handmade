@@ -7,7 +7,7 @@ REM  -wd4244 turns off warning about truncation loss of data when converting fro
 REM /Od removes compiler optimization
 REM /O2 Compiles in optimized mode
 
-set CommonCompilerFlags=-Od -nologo -fp:fast -fp:except-     -GR- -EHa- -Zo -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -wd4505 -wd4127 -wd4706 -FC -Z7 -GS- -Gs9999999 -wd4702
+set CommonCompilerFlags= /DEBUG:FULL -Od -nologo -fp:fast -fp:except-     -GR- -EHa- -Zo -Oi -WX -W4 -wd4201 -wd4100 -wd4189 -wd4505 -wd4127 -wd4706 -FC -Z7 -GS- -Gs9999999 -wd4702
 set CommonCompilerFlags=-DHANDMADE_PROFILE=1 -DHANDMADE_INTERNAL=1 -DHANDMADE_SLOW=1 -DUSING_OPENGL=1 -DHANDMADE_WIN32=1 %CommonCompilerFlags%
 
 set CommonLinkerFlags= -incremental:no -opt:ref user32.lib gdi32.lib winmm.lib opengl32.lib
@@ -30,6 +30,11 @@ REM timeout /t 4
 echo del lock file
 del lock.tmp
 cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=1 ..\handmade\code\win32_handmade.cpp -Fmwin32_handmade.map /link %CommonLinkerFlags%
+
+
+rem  gdi32.lib winmm.lib opengl32.lib
+cl /Zi -nologo  ..\handmade\code\win32_opengl_test.cpp  /link -incremental:no user32.lib gdi32.lib opengl32.lib
 popd
+
 
 ..\ctime\ctime -end handmade_hero.ctm %LastError%

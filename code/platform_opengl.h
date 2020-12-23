@@ -101,7 +101,11 @@
 #define GL_TEXTURE6                       0x84C6
 #define GL_TEXTURE7                       0x84C7
 
+#define GL_DEBUG_OUTPUT                   0x92E0
+
 #include "math/vector_math.h"
+#include "math/rect2f.h"
+
 
 typedef u32 glHandle;
 
@@ -132,7 +136,7 @@ struct opengl_info
 struct opengl_program
 {
 	u32 Program;
-
+  
   u32 ModelMat;
   u32 NormalMat;
   u32 TextureMat;
@@ -174,15 +178,14 @@ struct open_gl
   
   u32 DefaultInternalTextureFormat;
   u32 DefaultTextureFormat;
-
+  
   opengl_program PhongShadingProgram;
   opengl_program QuadOverlayProgram;
   opengl_program TextOverlayProgram;
-
   // Frame Buffers (Intermediate Render Targets)
-
+  
   // Texture Queue (Keeping all our textures?)
-
+  
   // Special Textures
   u32 SignleWhitePixelTexture;
   
@@ -193,9 +196,9 @@ struct open_gl
   u32 MaxSpecialTextureCount;
   u32 SpecialTextureCount;
   glHandle SpecialTextures[SPECIAL_TEXTURE_COUNT];
-
+  
   u32 BufferSize;
-
+  
   // Keeps Geometry (vertex, normal, uv)  
   glHandle ElementVAO;
   u32 ElementVBOOffset;
@@ -204,7 +207,7 @@ struct open_gl
   // Keeps Idexes to the ElementVAO
   u32 ElementEBOOffset;
   glHandle ElementEBO;
-
+  
   // Keeps Instance data, whatever we like that's per instance.
   glHandle InstanceVBO;
   glHandle QuadVAO;

@@ -1869,20 +1869,19 @@ WinMain(  HINSTANCE Instance,
     {
       game_render_commands RenderCommands = {};
       GlobalRenderCommands = &RenderCommands;
-      HDC DeviceContext = GetDC(WindowHandle);
-      win32_window_dimension Dimension = Win32GetWindowDimension( WindowHandle );
+      
+      HDC DeviceContext;
+      RenderCommands.OpenGL = Win32InitOpenGL(WindowHandle, &DeviceContext);
+      win32_window_dimension Dimension = Win32GetWindowDimension(WindowHandle);
       RenderCommands.ScreenWidthPixels = Dimension.Width;
       RenderCommands.ScreenHeightPixels = Dimension.Height;
-      ReleaseDC( WindowHandle, DeviceContext);
-      RenderCommands.OpenGL = Win32InitOpenGL(WindowHandle);
 
       // TODO: How do we reliably query this on windows?
-      s32 MonitorRefreshHz = 60;
-      HDC DC = GetDC(WindowHandle);
-      s32 Win32RefreshRate = GetDeviceCaps(DC,VREFRESH);
-      s32 Win32MonitorWidthPx = GetDeviceCaps(DC,HORZRES);
-      s32 Win32MonitorHeightPx = GetDeviceCaps(DC,VERTRES);
-      ReleaseDC(WindowHandle, DC);
+      s32 MonitorRefreshHz = 144;
+      s32 Win32RefreshRate = GetDeviceCaps(DeviceContext,VREFRESH);
+      s32 Win32MonitorWidthPx = GetDeviceCaps(DeviceContext,HORZRES);
+      s32 Win32MonitorHeightPx = GetDeviceCaps(DeviceContext,VERTRES);
+
       if (Win32RefreshRate > 1)
       {
         MonitorRefreshHz = Win32RefreshRate;
@@ -2307,9 +2306,7 @@ WinMain(  HINSTANCE Instance,
 
             BEGIN_BLOCK(SwapBuffers);
             // Update Window
-            DeviceContext = GetDC(WindowHandle);
             SwapBuffers(DeviceContext);
-            ReleaseDC(WindowHandle, DeviceContext);
             END_BLOCK(SwapBuffers);
 
 

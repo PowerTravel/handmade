@@ -820,7 +820,7 @@ MENU_DRAW(DrawFunctionTimeline)
 
       if(Intersects(Rect,Interface->MousePos))
       {
-        c8 StringBuffer[256] = {};
+        c8 StringBuffer[1048] = {};
         Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
         "%s : %2.2f MCy", Region->Record->BlockName, (Region->MaxT-Region->MinT)/1000000.f);
         PushTextAt(MouseX, MouseY+0.02f, StringBuffer, 24, V4(1,1,1,1));
