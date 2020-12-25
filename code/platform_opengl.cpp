@@ -878,7 +878,7 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   
   glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
   
   glEnable(GL_DEPTH_TEST);
@@ -1080,6 +1080,7 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
       
       opengl_program TextRenderProgram = Commands->OpenGL.TextOverlayProgram;
       glUseProgram(TextRenderProgram.Program);
+
       glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
       glUniformMatrix4fv(QuadOverlayProgram.ProjectionMat, 1, GL_TRUE, RenderGroup->ProjectionMatrix.E);
       

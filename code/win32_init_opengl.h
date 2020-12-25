@@ -12,7 +12,7 @@
 global_variable GLuint OpenGLDefaultInternalTextureFormat;
 
 typedef BOOL WINAPI wgl_swap_interval_ext(int interval);
-global_variable wgl_swap_interval_ext* wglSwapInterval;
+global_variable wgl_swap_interval_ext* wglSwapIntervalEXT;
 
 typedef HGLRC WINAPI wgl_create_context_attrib_arb(HDC hDC, HGLRC hSharedContext, const int *attribList);
 
@@ -420,11 +420,13 @@ Win32InitOpenGL(HWND Window, HDC* ReturnWindowDC)
   GLenum error = glGetError();
 
 
-  wglSwapInterval = GetOpenGLFunction( wgl_swap_interval_ext, "wglSwapIntervalEXT");
+  wglSwapIntervalEXT = GetOpenGLFunction( wgl_swap_interval_ext, "wglSwapIntervalEXT");
   // Sets the VSync on
-  if(wglSwapInterval)
+  if(wglSwapIntervalEXT)
   {
-   // wglSwapInterval(1);
+    // TODO: Turning Vsync off.
+    //       It seems broken, wglSwapIntervalEXT(1) slows down fps something fierce
+    wglSwapIntervalEXT(0);
   }
   error = glGetError();
   open_gl OpenGL = {};

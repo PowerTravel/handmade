@@ -19,7 +19,8 @@ enum container_attribute
   ATTRIBUTE_BUTTON = 0x8,
   ATTRIBUTE_COLOR = 0x10,
   ATTRIBUTE_TEXT = 0x20,
-  ATTRIBUTE_SIZE = 0x40
+  ATTRIBUTE_SIZE = 0x40,
+  ATTRIBUTE_ATTACHMENT_STATUS = 0x80
 };
 
 
@@ -48,6 +49,7 @@ const c8* ToString(u32 Type)
     case ATTRIBUTE_COLOR: return "Color";
     case ATTRIBUTE_TEXT: return "Text";
     case ATTRIBUTE_SIZE: return "Size";
+    case ATTRIBUTE_ATTACHMENT_STATUS: return "AttachmentStatus";
   }
   return "";
 };
@@ -112,8 +114,6 @@ struct container_node
 
   rect2f Region;
   menu_functions Functions;
-
-
 };
 
 struct root_node
@@ -153,7 +153,6 @@ struct mergable_attribute
 {
   merge_slot_attribute* Slot;
 };
-
 
 #define BUTTON_ATTRIBUTE_UPDATE(name) void name( struct  menu_interface* Interface, struct button_attribute* Attr, struct  container_node* Node)
 typedef BUTTON_ATTRIBUTE_UPDATE( button_attribute_update );
@@ -241,6 +240,14 @@ struct size_attribute
   menu_region_alignment YAlignment;
 };
 
+struct attachment_status_attribute
+{
+  container_node* Parent;
+  b32 IsPermanent;
+  b32 IsTab;
+  b32 IsSplit;
+  b32 IsLone;
+};
 
 #define MENU_LOSING_FOCUS(name) void name(struct menu_interface* Interface, struct menu_tree* Menu)
 typedef MENU_LOSING_FOCUS( menu_losing_focus );
@@ -289,6 +296,7 @@ struct menu_interface
   container_node* PermanentWindows[32];
 
   menu_tree* MenuInFocus;
+  menu_tree* SpawningWindow; // This SpawningWinow is a root window that all new windows gets attached to.
   menu_tree MenuSentinel;
 
   u32 ActiveMemory;
@@ -351,9 +359,6 @@ container_node* SetSplitWindows( menu_interface* Interface, container_node* Spli
 
 menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name);
 void RegisterWindow(menu_interface* Interface, container_node* DropdownMenu, container_node* MenuPage, const c8* Name);
-
-
-
 
 
 #if 0 
