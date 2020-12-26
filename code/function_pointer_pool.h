@@ -11,10 +11,11 @@ MENU_UPDATE_CHILD_REGIONS(RootUpdateChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateSplitChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateHBFChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateGridChildRegions);
+MENU_UPDATE_CHILD_REGIONS(UpdateTabWindowChildRegions);
 
 MENU_DRAW(DrawFunctionTimeline);
 
-BUTTON_ATTRIBUTE_UPDATE(TabButtonUpdate);
+
 BUTTON_ATTRIBUTE_UPDATE(DebugToggleButton);
 BUTTON_ATTRIBUTE_UPDATE(DebugRecompileButton);
 BUTTON_ATTRIBUTE_UPDATE(DebugPauseCollationButton);
@@ -50,8 +51,8 @@ void _ReinitiatePool(function_pool* Pool)
     NewFunPtr(UpdateSplitChildRegions)
     NewFunPtr(UpdateHBFChildRegions)
     NewFunPtr(UpdateGridChildRegions)
+    NewFunPtr(UpdateTabWindowChildRegions)
     NewFunPtr(DrawFunctionTimeline)
-    NewFunPtr(TabButtonUpdate)
     NewFunPtr(DebugToggleButton)
     NewFunPtr(DebugRecompileButton)
     NewFunPtr(DebugPauseCollationButton)

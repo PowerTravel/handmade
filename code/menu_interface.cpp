@@ -9,7 +9,10 @@ u32 GetContainerPayloadSize(container_type Type)
     case container_type::Root:    return 0;
     case container_type::Border:  return sizeof(border_leaf);
     case container_type::HBF:     return sizeof(hbf_node);
-    case container_type::Grid:     return sizeof(grid_node);
+    case container_type::Grid:    return sizeof(grid_node);
+    case container_type::TabWindow:  return sizeof(tab_window_node);
+    case container_type::Tab:        return sizeof(tab_node);
+    case container_type::Plugin:     return sizeof(plugin_node);
     default: INVALID_CODE_PATH;
   }
   return 0;
@@ -26,7 +29,6 @@ u32 GetAttributeSize(container_attribute Attribute)
     case ATTRIBUTE_COLOR:      return sizeof(color_attribute);
     case ATTRIBUTE_TEXT:      return sizeof(text_attribute);
     case ATTRIBUTE_SIZE:      return sizeof(size_attribute);
-    case ATTRIBUTE_ATTACHMENT_STATUS:      return sizeof(attachment_status_attribute);
     default: INVALID_CODE_PATH;
   }
   return 0; 
@@ -154,8 +156,6 @@ ReplaceNode(container_node* Out, container_node* In)
   Out->PreviousSibling = 0;
   Out->Parent = 0;
 }
-
-
 
 u32 GetAttributeSize(u32 Attributes)
 {
@@ -414,8 +414,9 @@ menu_tree* NewMenuTree(menu_interface* Interface)
   return Result;
 }
 
-void FreeMenuSubTree(menu_interface* Interface, container_node* Root)
+void DeleteMenuSubTree(menu_interface* Interface, container_node* Root)
 {
+  DisconnectNode(Root);
   // Free the nodes;
   // 1: Go to the bottom
   // 2: Step up Once
@@ -441,16 +442,22 @@ void FreeMenuSubTree(menu_interface* Interface, container_node* Root)
   DeleteContainer(Interface, Root);
 }
 
-void FreeMenuTree(menu_interface* Interface, menu_tree* MenuToFree)
-{
-  Assert(MenuToFree != &Interface->MenuSentinel);
+inline internal menu_tree* GetNextSpawningWindow(menu_interface* Interface)
+{ 
+  menu_tree* Result = 0;
+  menu_tree* SpawningMenu = Interface->MenuSentinel.Next;
+  while(SpawningMenu != &(Interface->MenuSentinel))
+  {
+    if(SpawningMenu->Root->Type == container_type::Root &&
+       SpawningMenu != Interface->SpawningWindow )
+    {
+      Result = SpawningMenu;
+      break;
+    }
+    SpawningMenu = SpawningMenu->Next;
+  }
 
-  ListRemove( MenuToFree );
-  container_node* Root = MenuToFree->Root;
-
-  FreeMemory(Interface, (void*)MenuToFree);
-
-  FreeMenuSubTree(Interface, Root);
+  return Result;
 }
 
 //  PostOrder (Left, Right, Root),  Depth first.
@@ -521,6 +528,23 @@ void TreeSensus( menu_tree* Menu )
  // Platform.DEBUGPrint("Tree Sensus:  Depth: %d, Count: %d\n", Pair.b, Pair.a);
 }
 
+void FreeMenuTree(menu_interface* Interface, menu_tree* MenuToFree)
+{
+  TreeSensus(MenuToFree);
+  if(MenuToFree == Interface->SpawningWindow)
+  {
+    Interface->SpawningWindow = GetNextSpawningWindow(Interface);
+  }
+  Assert(MenuToFree != &Interface->MenuSentinel);
+
+  ListRemove( MenuToFree );
+  container_node* Root = MenuToFree->Root;
+
+  FreeMemory(Interface, (void*)MenuToFree);
+
+  DeleteMenuSubTree(Interface, Root);
+}
+
 rect2f GetSizedParentRegion(size_attribute* SizeAttr, rect2f BaseRegion)
 {
   rect2f Result = {};
@@ -537,7 +561,6 @@ rect2f GetSizedParentRegion(size_attribute* SizeAttr, rect2f BaseRegion)
   }else if(SizeAttr->Height.Type == menu_size_type::ABSOLUTE){
     Result.H = SizeAttr->Height.Value;
   }
-  
   
   switch(SizeAttr->XAlignment)
   {
@@ -1048,6 +1071,7 @@ void * PushOrGetAttribute(menu_interface* Interface, container_node* Node, conta
   return Result;
 }
 
+#if 0
 void MoveAttribute(container_node* From, container_node* To, container_attribute AttributeType)
 {
   Assert(HasAttribute(From, AttributeType));
@@ -1095,7 +1119,7 @@ rect2f GetVerticalListRegion(rect2f HeaderRect, u32 TabIndex, u32 TabCount)
   Result.Y = HeaderRect.Y + HeaderRect.H - (TabIndex+1) * TabHeight;
   return Result;
 }
-
+#endif
 b32 SplitWindowSignal(menu_interface* Interface, container_node* HeaderNode)
 {
   rect2f HeaderSplitRegion = Shrink(HeaderNode->Region, -2*HeaderNode->Region.H);
@@ -1157,7 +1181,6 @@ DRAGGABLE_ATTRIBUTE_UPDATE(UpdateHeaderPosition)
     Child = Next(Child);
   }
 }
-
 
 menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* BaseWindow, rect2f Region)
 {
@@ -1231,246 +1254,195 @@ menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* Bas
   return Root;
 }
 
-void SetTabAsActive(container_node* TabbedHBF, u32 NewTabIndex)
+void SetTabAsActive(container_node* Tab)
 {
-  Assert(TabbedHBF->Type == container_type::HBF);
-  container_node* TabbedHeader = TabbedHBF->FirstChild;
-  Assert(TabbedHeader->Type == container_type::Grid);
-  Assert(NewTabIndex >= 0);
-
-  container_node* Tab = GetChildFromIndex(TabbedHeader, NewTabIndex);
-
-  button_attribute* Button = (button_attribute*) GetAttributePointer(Tab, ATTRIBUTE_BUTTON);
-  tabbed_button_data* Data = (tabbed_button_data*) Button->Data;
-  hbf_node* HostHBF = GetHBFNode(TabbedHBF);
-  hbf_node* TabHBF  = GetHBFNode(Data->ItemHBF);
-  HostHBF->FooterSize = TabHBF->FooterSize;
-  ReplaceNode(TabbedHBF->FirstChild->NextSibling, Data->ItemBody);
-  ReplaceNode(TabbedHBF->FirstChild->NextSibling->NextSibling, Data->ItemFooter);
-}
-
-container_node* ExtractHBFFromTab(menu_interface* Interface, container_node* Tab)
-{
-  button_attribute* Button = (button_attribute*) GetAttributePointer(Tab, ATTRIBUTE_BUTTON);
-  tabbed_button_data* Data = (tabbed_button_data*) Button->Data;
-  DisconnectNode(Tab);
-  Assert(Data->ItemHeader == Tab);
-
-  container_node* HBF = Data->ItemHBF;
-  container_node* Header = Data->ItemHeader;
-  container_node* Body = Data->ItemBody;
-  container_node* Footer = Data->ItemFooter;
-
-  Assert(!HBF->Parent && !HBF->NextSibling && !HBF->FirstChild);
-  Assert(!Header->Parent && !Header->NextSibling);
-  Assert(!Body->Parent && !Body->NextSibling);
-  Assert(!Footer->Parent && !Footer->NextSibling);
-
-  ConnectNode(HBF,Header);
-  ConnectNode(HBF,Body);
-  ConnectNode(HBF,Footer);
-
-  FreeMemory(Interface, Button->Data);
-  DeleteAttribute(Interface, Header, ATTRIBUTE_BUTTON);
-  DeleteAttribute(Interface, Header, ATTRIBUTE_DRAG);
-
-  return HBF;  
-}
-
-BUTTON_ATTRIBUTE_UPDATE( TabButtonUpdate )
-{
-  tabbed_button_data* Data = (tabbed_button_data*) Attr->Data;
-  container_node* TabbedHBF = Data->TabbedHBF;
-  container_node* ItemHBF = Data->ItemHBF;
-  if(Interface->MouseLeftButton.Edge && Interface->MouseLeftButton.Active)
+  tab_node* TabNode = GetTabNode(Tab);
+  
+  container_node* TabHeader = Tab->Parent;
+  Assert(TabHeader);
+  container_node* TabWindow = TabHeader->Parent;
+  Assert(TabWindow);
+  container_node* TabBody = TabWindow->FirstChild->NextSibling;
+  if(!TabBody)
   {
-    u32 NewTabIndex = GetChildIndex(Data->ItemHeader);
-    SetTabAsActive(TabbedHBF, NewTabIndex);
-  }
-};
-
-inline internal attachment_status_attribute* GetAttachmentStatusAttribute(container_node* WindowNode)
-{
-  attachment_status_attribute* AttachmentStatusAttribute = (attachment_status_attribute*) GetAttributePointer(WindowNode, ATTRIBUTE_ATTACHMENT_STATUS);
-  return AttachmentStatusAttribute;
-}
-
-void SetAttachmentStatusIsLone(attachment_status_attribute* AttachmentStatusAttribute)
-{
-  AttachmentStatusAttribute->IsTab = false;
-  AttachmentStatusAttribute->IsSplit = false;
-  AttachmentStatusAttribute->IsLone = true;
-}
-void SetAttachmentStatusIsSplit(attachment_status_attribute* AttachmentStatusAttribute)
-{
-  AttachmentStatusAttribute->IsTab = false;
-  AttachmentStatusAttribute->IsSplit = true;
-  AttachmentStatusAttribute->IsLone = false; 
-}
-void SetAttachmentStatusIsTab(attachment_status_attribute* AttachmentStatusAttribute)
-{
-  AttachmentStatusAttribute->IsTab = true;
-  AttachmentStatusAttribute->IsSplit = false;
-  AttachmentStatusAttribute->IsLone = false;
-}
-void ClearAttachmentStatusNodeType(attachment_status_attribute* AttachmentStatusAttribute)
-{
-  AttachmentStatusAttribute->IsTab = false;
-  AttachmentStatusAttribute->IsSplit = false;
-  AttachmentStatusAttribute->IsLone = false;
-}
-void SetAttachmentStatusParent(attachment_status_attribute* AttachmentStatusAttribute, container_node* Parent)
-{
-  AttachmentStatusAttribute->Parent = Parent;
-}
-void SetAttachmentStatusPermanent(attachment_status_attribute* AttachmentStatusAttribute)
-{
-  AttachmentStatusAttribute->IsPermanent = true;
-}
-
-container_node* RevertTabbedHBFBackToHBF(menu_interface* Interface, container_node* TabbedHBF)
-{
-  container_node* TabGrid = GetChildFromIndex(TabbedHBF,0);
-  DisconnectNode(TabbedHBF->FirstChild);
-  DisconnectNode(TabbedHBF->FirstChild);
-  DisconnectNode(TabbedHBF->FirstChild);
-  container_node* LastHBF = ExtractHBFFromTab(Interface, TabGrid->FirstChild);
-
-  ReplaceNode(TabbedHBF, LastHBF);
-
-  DeleteContainer(Interface, TabGrid);
-  DeleteContainer(Interface, TabbedHBF);
-
-  if(LastHBF->Parent->Parent->Type != container_type::Root)
-  {
-    draggable_attribute* HomeDrag = (draggable_attribute*) PushOrGetAttribute(Interface, LastHBF->FirstChild, ATTRIBUTE_DRAG);
-    HomeDrag->Node = 0;
-    HomeDrag->Update = DeclareFunction(draggable_attribute_update, SplitWindowHeaderDrag);
-  }
-
-  attachment_status_attribute* AttachmentStatus = GetAttachmentStatusAttribute(LastHBF);
-  SetAttachmentStatusParent(AttachmentStatus, LastHBF->Parent);
-  if(LastHBF->Parent && LastHBF->Parent->Type == container_type::Split)
-  {
-    SetAttachmentStatusIsSplit(AttachmentStatus);  
+    ConnectNode(TabWindow, TabNode->Payload);
   }else{
-    SetAttachmentStatusIsLone(AttachmentStatus);
+    ReplaceNode(TabBody, TabNode->Payload);  
+  }
+}
+
+container_node* CreateTabWindow(menu_interface* Interface)
+{
+  container_node* TabWindow = NewContainer(Interface, container_type::TabWindow);
+  GetTabWindowNode(TabWindow)->HeaderSize = 0.02f;
+
+  container_node* TabbedHeader = ConnectNode(TabWindow, NewContainer(Interface, container_type::Grid));
+  grid_node* Grid = GetGridNode(TabbedHeader);
+  Grid->Row = 1;
+  return TabWindow;
+}
+
+container_node* PushTab(container_node* TabbedWindow,  container_node* Tab)
+{
+  Assert(TabbedWindow->Type == container_type::TabWindow); // Could also be split window
+  container_node* TabHeader = TabbedWindow->FirstChild;
+  Assert(TabHeader->Type == container_type::Grid);
+  Assert(Tab->Type == container_type::Tab);
+
+  ConnectNode(TabHeader, Tab);
+
+  return Tab;
+}
+
+container_node* PopTab(container_node* Tab)
+{
+  tab_node* TabNode = GetTabNode(Tab);
+  DisconnectNode(TabNode->Payload);
+
+  container_node* TabHeader = Tab->Parent;
+  Assert(TabHeader->Type == container_type::Grid);
+  container_node* TabWindow = TabHeader->Parent;
+  Assert(TabWindow->Type == container_type::TabWindow);
+  
+  if(Next(Tab))
+  {
+    SetTabAsActive(Next(Tab));  
+  }else if(Previous(Tab)){
+    SetTabAsActive(Previous(Tab));
   }
 
-  return LastHBF;
+  DisconnectNode(Tab);
+  return Tab;
+}
+
+void ReduceSplitWindowTree(menu_interface* Interface, container_node* WindowToRemove)
+{
+  container_node* SplitNodeToSwapOut = WindowToRemove->Parent;
+  container_node* WindowToRemain = WindowToRemove->NextSibling;
+  if(!WindowToRemain)
+  {
+    WindowToRemain = WindowToRemove->Parent->FirstChild->NextSibling;
+    Assert(WindowToRemain);
+    Assert(WindowToRemain->NextSibling == WindowToRemove);
+  }
+
+  DisconnectNode(WindowToRemove);
+  DeleteMenuSubTree(Interface, WindowToRemove);
+
+  DisconnectNode(WindowToRemain);
+
+  ReplaceNode(SplitNodeToSwapOut, WindowToRemain);
+  DeleteMenuSubTree(Interface, SplitNodeToSwapOut);
+}
+
+void ReduceWindowTree(menu_interface* Interface, container_node* WindowToRemove)
+{
+  // Just to let us know if we need to handle another case
+  Assert(WindowToRemove->Type == container_type::TabWindow);
+
+  // Make sure the tab window is empty
+  Assert(GetChildCount(WindowToRemove->FirstChild) == 0);
+
+  container_node* ParentContainer = WindowToRemove->Parent;
+  switch(ParentContainer->Type)
+  {
+    case container_type::Split:
+    {
+      ReduceSplitWindowTree(Interface, WindowToRemove);
+    }break;
+    case container_type::HBF:
+    {
+      menu_tree* Menu = GetMenu(Interface, WindowToRemove);
+      FreeMenuTree(Interface,Menu);
+    }break;
+    default:
+    {
+      INVALID_CODE_PATH;
+    } break;
+  }
 }
 
 DRAGGABLE_ATTRIBUTE_UPDATE(TabDrag)
 {
-  Assert(Node->Parent->Type == container_type::Grid);
-  r32 dX = Interface->MousePos.X - Interface->PreviousMousePos.X;
+  container_node* Tab = Node;
+  Assert(Tab->Type == container_type::Tab);
+  container_node* TabHeader = Tab->Parent;
+  Assert(TabHeader->Type == container_type::Grid);
+  container_node* TabWindow = TabHeader->Parent;
+  Assert(TabWindow->Type == container_type::TabWindow);
 
-  u32 Count = GetChildCount(Node->Parent);
-  u32 Index = GetChildIndex(Node);
-  if(dX < 0 && Index > 0)
+  SetTabAsActive(Tab);
+
+  u32 Count = GetChildCount(TabHeader);
+  if(Count > 1)
   {
-    container_node* PreviousTab = Previous(Node);
-    Assert(PreviousTab);
-    if(Interface->MousePos.X < (PreviousTab->Region.X +PreviousTab->Region.W/2.f))
+    r32 dX = Interface->MousePos.X - Interface->PreviousMousePos.X;
+    u32 Index = GetChildIndex(Tab);
+    if(dX < 0 && Index > 0)
     {
-      ShiftLeft(Node);
-    }
-  }else if(dX > 0 && Index < Count-1){
-    container_node* NextTab = Next(Node);
-    Assert(NextTab);
-    if(Interface->MousePos.X > (NextTab->Region.X + NextTab->Region.W/2.f))
+      container_node* PreviousTab = Previous(Tab);
+      Assert(PreviousTab);
+      if(Interface->MousePos.X < (PreviousTab->Region.X +PreviousTab->Region.W/2.f))
+      {
+        ShiftLeft(Tab);
+      }
+    }else if(dX > 0 && Index < Count-1){
+      container_node* NextTab = Next(Tab);
+      Assert(NextTab);
+      if(Interface->MousePos.X > (NextTab->Region.X + NextTab->Region.W/2.f))
+      {
+        ShiftRight(Tab);
+      }
+    }else if(SplitWindowSignal(Interface, Tab->Parent))
     {
-      ShiftRight(Node);
+      v2 MouseDownPos = Interface->MouseLeftButtonPush;
+      v2 HeaderOrigin = V2(TabHeader->Region.X, TabHeader->Region.Y);
+      v2 WindowSize   = V2(TabWindow->Region.W, TabWindow->Region.H);
+
+      v2 MouseDownHeaderFrame = MouseDownPos - HeaderOrigin;
+      v2 NewOrigin = Interface->MousePos - MouseDownHeaderFrame - V2(0, WindowSize.Y - Interface->HeaderSize);
+      rect2f NewRegion = Rect2f(NewOrigin.X, NewOrigin.Y, WindowSize.X, WindowSize.Y);
+      NewRegion = Shrink(NewRegion, -Interface->BorderSize/2);
+
+      container_node* NewTabWindow = CreateTabWindow(Interface);
+      CreateNewRootContainer(Interface, NewTabWindow, NewRegion);
+
+      PopTab(Tab);
+      PushTab(NewTabWindow, Tab);
+      ConnectNode(NewTabWindow, GetTabNode(Tab)->Payload);
     }
-  }else if(SplitWindowSignal(Interface, Node->Parent))
+  }else if(TabWindow->Parent->Type == container_type::Split)
   {
-    v2 MouseDownPos = Interface->MouseLeftButtonPush;
-    v2 HeaderOrigin = V2(Node->Parent->Region.X, Node->Parent->Region.Y);
-    v2 WindowSize   = V2(Node->Parent->Parent->Region.W, Node->Parent->Parent->Region.H);
-
-    v2 MouseDownHeaderFrame = MouseDownPos - HeaderOrigin;
-    v2 NewOrigin = Interface->MousePos - MouseDownHeaderFrame - V2(0, WindowSize.Y - Interface->HeaderSize);
-    rect2f NewRegion = Rect2f(NewOrigin.X, NewOrigin.Y, WindowSize.X, WindowSize.Y);
-    NewRegion = Shrink(NewRegion, -Interface->BorderSize/2);
-
-    container_node* TabbedHBF = Node->Parent->Parent;
-    u32 NewTabIndex = (Index < Count-1) ? Index+1 : Index-1;
-    SetTabAsActive(TabbedHBF, NewTabIndex);
-
-    container_node* HBF = ExtractHBFFromTab(Interface, Node);
-    CreateNewRootContainer(Interface, HBF, NewRegion);
-
-    container_node* Grid = TabbedHBF->FirstChild;
-    if(GetChildCount(Grid) == 1)
+    if(SplitWindowSignal(Interface, Tab->Parent))
     {
-      RevertTabbedHBFBackToHBF(Interface, TabbedHBF);
-    }
+      v2 MouseDownPos = Interface->MouseLeftButtonPush;
+      v2 HeaderOrigin = V2(TabHeader->Region.X, TabHeader->Region.Y);
+      v2 WindowSize   = V2(TabWindow->Region.W, TabWindow->Region.H);
+
+      v2 MouseDownHeaderFrame = MouseDownPos - HeaderOrigin;
+      v2 NewOrigin = Interface->MousePos - MouseDownHeaderFrame - V2(0, WindowSize.Y - Interface->HeaderSize);
+      rect2f NewRegion = Rect2f(NewOrigin.X, NewOrigin.Y, WindowSize.X, WindowSize.Y);
+      NewRegion = Shrink(NewRegion, -Interface->BorderSize/2);
+
+      container_node* NewTabWindow = CreateTabWindow(Interface);
+      CreateNewRootContainer(Interface, NewTabWindow, NewRegion);
+
+      PopTab(Tab);
+      ReduceWindowTree(Interface, TabWindow);
+      PushTab(NewTabWindow, Tab);
+      ConnectNode(NewTabWindow, GetTabNode(Tab)->Payload);
+    }  
   }
+
+  
 }
 
-
-container_node* CreateTabbedHBFFromNormalHBF(menu_interface* Interface, container_node* HomeHBF)
-{
-  Assert(HomeHBF->Type == container_type::HBF);
-  Assert(HomeHBF->FirstChild->Type != container_type::Grid);
-  // Create a New HBF to be the tabbed window and copy HomeHBF into it
-  container_node* TabbedHBF = NewContainer(Interface, container_type::HBF);
-  *GetHBFNode(TabbedHBF) = *GetHBFNode(HomeHBF);
-
-  // Create a grid node to be the header, with 1 row so that all subsequent nodes fall in a line
-  container_node* TabbedHeader = NewContainer(Interface, container_type::Grid);
-  ConnectNode(TabbedHBF, TabbedHeader);
-  // Put the new Tabbed HBF in the place of the old HBF
-  ReplaceNode(HomeHBF, TabbedHBF);
-
-  grid_node* Grid = GetGridNode(TabbedHeader);
-  Grid->Row = 1;
-
-  // Delete drag on header, if drag exists
-  if(HasAttribute(HomeHBF->FirstChild, ATTRIBUTE_DRAG))
-  {
-    DeleteAttribute(Interface, HomeHBF->FirstChild, ATTRIBUTE_DRAG);
-  }
-
-  // Set up a this newer tab-drag!
-  draggable_attribute* Drag = (draggable_attribute*) PushAttribute(Interface, HomeHBF->FirstChild, ATTRIBUTE_DRAG);
-  Drag->Node = HomeHBF->FirstChild;
-  Drag->Update = DeclareFunction(draggable_attribute_update, TabDrag);
-
-  button_attribute* Button = (button_attribute*) PushAttribute(Interface, HomeHBF->FirstChild, ATTRIBUTE_BUTTON);
-  tabbed_button_data* ButtonData = (tabbed_button_data*) PushSize(Interface, sizeof(tabbed_button_data));
-  ButtonData->TabbedHBF  = TabbedHBF;
-  ButtonData->ItemHBF    = HomeHBF;
-  ButtonData->ItemHeader = HomeHBF->FirstChild;
-  ButtonData->ItemBody   = HomeHBF->FirstChild->NextSibling;
-  ButtonData->ItemFooter = HomeHBF->FirstChild->NextSibling->NextSibling;
-  DisconnectNode(ButtonData->ItemHBF);
-  DisconnectNode(ButtonData->ItemHeader);
-  DisconnectNode(ButtonData->ItemBody);
-  DisconnectNode(ButtonData->ItemFooter);
-
-  Button->Data = (void*) ButtonData;
-  Button->Update = DeclareFunction(button_attribute_update, TabButtonUpdate);
-
-  ConnectNode(TabbedHeader, ButtonData->ItemHeader); 
-  ConnectNode(TabbedHBF,    ButtonData->ItemBody);
-  ConnectNode(TabbedHBF,    ButtonData->ItemFooter);
-
-
-  attachment_status_attribute* AttachmentStatusAttribute = GetAttachmentStatusAttribute(ButtonData->ItemHBF);
-  SetAttachmentStatusParent(AttachmentStatusAttribute, ButtonData->ItemHeader);
-  SetAttachmentStatusIsTab(AttachmentStatusAttribute);
-
-
-  return TabbedHBF;
-}
-
-u32 FillArrayWithHBFs(u32 MaxArrSize, container_node* HBFArr[], container_node* StartNode)
+u32 FillArrayWithHBFs(u32 MaxArrSize, container_node* TabArr[], container_node* StartNode)
 {
   temporary_memory TempMem =  BeginTemporaryMemory(GlobalGameState->TransientArena);
 
   u32 StackCount = 0;
-  u32 HBFCount = 0;
+  u32 TabCount = 0;
   container_node** ContainerStack = PushArray(GlobalGameState->TransientArena, MaxArrSize, container_node*);
 
   // Push StartNode
@@ -1485,69 +1457,36 @@ u32 FillArrayWithHBFs(u32 MaxArrSize, container_node* HBFArr[], container_node* 
     // Update the region of all children and push them to the stack
     if(Parent->Type == container_type::Split)
     {
-      ContainerStack[StackCount++] = Parent->FirstChild->NextSibling;
-      ContainerStack[StackCount++] = Parent->FirstChild->NextSibling->NextSibling;
-    }else if(Parent->Type == container_type::HBF)
+      ContainerStack[StackCount++] = Next(Parent->FirstChild);
+      ContainerStack[StackCount++] = Next(Next(Parent->FirstChild));
+    }else if(Parent->Type == container_type::TabWindow)
     {
-      HBFArr[HBFCount++] = Parent;
-      Assert(HBFCount < MaxArrSize);
+      container_node* TabHeader = Parent->FirstChild;
+      container_node* Tab = TabHeader->FirstChild;
+      while(Tab)
+      {
+        container_node* TabToMove = Tab;
+        Tab = Next(Tab);
+        
+        tab_node* TabNode = GetTabNode(TabToMove);
+        if(TabNode->Payload->Type == container_type::Plugin)
+        {
+          PopTab(TabToMove);
+          TabArr[TabCount++] = TabToMove;
+        }else{
+          ContainerStack[StackCount++] = TabNode->Payload;
+        }
+      }
+      Assert(TabCount < MaxArrSize);
     }else{
       INVALID_CODE_PATH;
     }
   }
 
   EndTemporaryMemory(TempMem);
-  return HBFCount;
+  return TabCount;
 }
 
-tabbed_button_data* PushHBFToTabbedHBF(menu_interface* Interface, container_node* HomeHBF, container_node* HBFTabToAdd)
-{
-  tabbed_button_data* ButtonData = 0;
-  if(HBFTabToAdd->FirstChild->Type == container_type::Grid)
-  {
-    container_node* GridHeader = HBFTabToAdd->FirstChild;
-    while(GridHeader->FirstChild)
-    {
-      container_node* Tab = GridHeader->FirstChild;
-      DisconnectNode(Tab);
-      button_attribute* Button = (button_attribute*) GetAttributePointer(Tab, ATTRIBUTE_BUTTON);
-      ButtonData = (tabbed_button_data*) Button->Data;
-      ButtonData->TabbedHBF = HomeHBF;
-      ConnectNode(HomeHBF->FirstChild, ButtonData->ItemHeader);
-    }          
-  }else{
-
-    if(HasAttribute(HBFTabToAdd->FirstChild, ATTRIBUTE_DRAG))
-    {
-      DeleteAttribute(Interface, HBFTabToAdd->FirstChild, ATTRIBUTE_DRAG);  
-    }
-
-    draggable_attribute* Drag = (draggable_attribute*) PushAttribute(Interface, HBFTabToAdd->FirstChild, ATTRIBUTE_DRAG);
-    Drag->Node = HBFTabToAdd->FirstChild;
-    Drag->Update =  DeclareFunction(draggable_attribute_update, TabDrag); 
-    button_attribute* Button = (button_attribute*) PushAttribute(Interface, HBFTabToAdd->FirstChild, ATTRIBUTE_BUTTON);
-    ButtonData = (tabbed_button_data*) PushSize(Interface, sizeof(tabbed_button_data));
-    ButtonData->TabbedHBF  = HomeHBF;
-    ButtonData->ItemHBF    = HBFTabToAdd;
-    ButtonData->ItemHeader = HBFTabToAdd->FirstChild;
-    ButtonData->ItemBody   = HBFTabToAdd->FirstChild->NextSibling;
-    ButtonData->ItemFooter = HBFTabToAdd->FirstChild->NextSibling->NextSibling;
-    DisconnectNode(ButtonData->ItemHBF);
-    DisconnectNode(ButtonData->ItemHeader);
-    DisconnectNode(ButtonData->ItemBody);
-    DisconnectNode(ButtonData->ItemFooter);
-    ConnectNode(HomeHBF->FirstChild, ButtonData->ItemHeader);
-    Button->Data = (void*)ButtonData;
-    Button->Update = DeclareFunction(button_attribute_update, TabButtonUpdate);
-  }
-
-  attachment_status_attribute* AttachmentStatusAttribute = GetAttachmentStatusAttribute(ButtonData->ItemHBF);
-  SetAttachmentStatusParent(AttachmentStatusAttribute, ButtonData->ItemHeader);
-  SetAttachmentStatusIsTab(AttachmentStatusAttribute);
-
-  Assert(ButtonData);
-  return ButtonData;
-}
 
 void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 {
@@ -1600,39 +1539,27 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
     {
       container_node* HomeHBF = SlotNode->Parent;
       container_node* Visitor = Node->Parent;
-      Assert(HomeHBF->Type == container_type::HBF);
-      Assert(Visitor->Type == container_type::HBF);
+      Assert(HomeHBF->Type == container_type::TabWindow);
+
       if(Visitor->Parent->Type == container_type::Root)
       {
         Visitor = Next(Node);
       }
 
-      if(HomeHBF->FirstChild->Type != container_type::Grid)
-      {
-        HomeHBF = CreateTabbedHBFFromNormalHBF(Interface, HomeHBF);
-      }
+      container_node* TabArr[64] = {};
+      u32 TabCount = FillArrayWithHBFs(sizeof(TabArr), TabArr, Visitor);
 
       menu_tree* MenuToRemove = GetMenu(Interface, Visitor);
       DisconnectNode(Visitor);
-  
-        // TODO (Jakob): Make HBFArr dynamically sized;
-      container_node* HBFArr[32];
-      u32 HBFCount = FillArrayWithHBFs(sizeof(HBFArr), HBFArr, Visitor);
 
-      for (u32 HBFIndex = 0; HBFIndex < HBFCount; ++HBFIndex)
+      for(u32 Index = 0; Index < TabCount; ++Index)
       {
-        container_node* HBFTabToAdd = HBFArr[HBFIndex];
-
-        tabbed_button_data* TabbedButtonData = PushHBFToTabbedHBF(Interface, HomeHBF, HBFTabToAdd);
-        
-        if(HBFIndex == HBFCount-1)
-        {
-          u32 NewTabIndex = GetChildIndex(TabbedButtonData->ItemHeader);
-          SetTabAsActive(TabbedButtonData->TabbedHBF, NewTabIndex);
-        }
+        container_node* TabToMove = TabArr[Index];
+        PushTab(HomeHBF, TabToMove);
       }
 
-      TreeSensus(MenuToRemove);
+      SetTabAsActive(TabArr[TabCount-1]);
+      
       FreeMenuTree(Interface, MenuToRemove);
 
     }else if( ZoneIndex == 0  || ZoneIndex == 2 ||  // Vertical
@@ -1641,14 +1568,8 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
       container_node* HomeHBF = SlotNode->Parent;
       container_node* Visitor = Node->Parent;
 
-      Assert(HomeHBF->Type == container_type::HBF);
-      Assert(Visitor->Type == container_type::HBF);
+      Assert(HomeHBF->Type == container_type::TabWindow);
 
-      container_node* HomeHead = HomeHBF->FirstChild;
-      draggable_attribute* HomeDrag = (draggable_attribute*) PushOrGetAttribute(Interface, HomeHead, ATTRIBUTE_DRAG);
-      HomeDrag->Node = 0;
-      HomeDrag->Update =  DeclareFunction(draggable_attribute_update, SplitWindowHeaderDrag);
-      
       if(Visitor->Parent->Type == container_type::Root)
       {
         Visitor = Next(Node);
@@ -1656,10 +1577,7 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 
       menu_tree* MenuToRemove = GetMenu(Interface, Visitor);
       menu_tree* MenuToRemain = GetMenu(Interface, HomeHBF);
-      if(MenuToRemove == Interface->SpawningWindow)
-      {
-        Interface->SpawningWindow = MenuToRemain;
-      }
+
       DisconnectNode(Visitor);
 
       container_node* SplitNode = SplitNode = CreateSplitWindow(Interface, (ZoneIndex == 0 || ZoneIndex == 2));
@@ -1667,15 +1585,15 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 
       if( ZoneIndex == 0  || ZoneIndex == 3)
       {
-        SetSplitWindows(Interface, SplitNode, Visitor, HomeHBF);
+        ConnectNode(SplitNode, Visitor);
+        ConnectNode(SplitNode, HomeHBF);
       }else{
-        SetSplitWindows(Interface, SplitNode, HomeHBF, Visitor);
+        ConnectNode(SplitNode, HomeHBF);
+        ConnectNode(SplitNode, Visitor);
       }
 
-      TreeSensus(MenuToRemove);
       FreeMenuTree(Interface, MenuToRemove);
     }
-
   }
 }
 
@@ -1713,7 +1631,6 @@ void ActOnInput(menu_interface* Interface, menu_tree* Menu)
 
       ParentNode = ParentNode->Parent;
     }
-
   }
 }
 
@@ -1799,19 +1716,14 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
         PushNewRenderLevel(GlobalGameState->RenderCommands->OverlayGroup);
       }
       Menu = Menu->Previous;
-    }  
+    }
   }
-  
-  
 }
 
 void SplitWindow(menu_interface* Interface, container_node* WindowToRemove, rect2f Region)
-{  
+{
   Assert(WindowToRemove->Type == container_type::HBF);
-  if(WindowToRemove->Parent->Type != container_type::Split)
-  {
-    return;
-  }
+  Assert(WindowToRemove->Parent->Type == container_type::Split)
 
   container_node* WindowToRemain = WindowToRemove->NextSibling;
   if(!WindowToRemain)
@@ -1963,8 +1875,6 @@ container_node* CreateHBF(menu_interface* Interface, c8* HeaderName, v4 HeaderCo
   SizeAttr->TopOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
   SizeAttr->XAlignment = menu_region_alignment::LEFT;
   SizeAttr->YAlignment = menu_region_alignment::CENTER;
-  
- 
 
   ConnectNode(Header,HeaderText);
 
@@ -1983,6 +1893,19 @@ container_node* CreateHBF(menu_interface* Interface, c8* HeaderName, v4 HeaderCo
   return HBF;
 }
 
+container_node* CreatePlugin(menu_interface* Interface, c8* HeaderName, v4 HeaderColor, container_node* BodyNode)
+{
+  container_node* Plugin = NewContainer(Interface, container_type::Plugin);
+  PushOrGetAttribute(Interface, Plugin, ATTRIBUTE_MERGE_SLOT);
+  plugin_node* PluginNode = GetPluginNode(Plugin);
+  str::CopyStringsUnchecked(HeaderName, PluginNode->Title);
+  PluginNode->Color = HeaderColor;
+
+  ConnectNode(Plugin, BodyNode);
+
+  return Plugin;
+}
+
 container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical, r32 BorderPos)
 {
   container_node* SplitNode  = NewContainer(Interface, container_type::Split);
@@ -1995,8 +1918,8 @@ container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical, r32 
 
 container_node* SetSplitWindows( menu_interface* Interface, container_node* SplitNode, container_node* HBF1, container_node* HBF2)
 {
-  Assert( HBF1->Type == container_type::HBF);
-  Assert( HBF2->Type == container_type::HBF);
+  Assert( HBF1->Type == container_type::TabWindow);
+  Assert( HBF2->Type == container_type::TabWindow);
 
   draggable_attribute* Draggable1 = (draggable_attribute*) PushOrGetAttribute(Interface, HBF1->FirstChild, ATTRIBUTE_DRAG);
   Draggable1->Node = 0;
@@ -2008,19 +1931,6 @@ container_node* SetSplitWindows( menu_interface* Interface, container_node* Spli
 
   ConnectNode(SplitNode, HBF1);
   ConnectNode(SplitNode, HBF2);
-
-  attachment_status_attribute* HBF1AttachmentStatus = GetAttachmentStatusAttribute(HBF1);
-  if(HBF1AttachmentStatus)
-  {
-    SetAttachmentStatusParent(HBF1AttachmentStatus, SplitNode);
-    SetAttachmentStatusIsSplit(HBF1AttachmentStatus);
-  }
-  attachment_status_attribute* HBF2AttachmentStatus = GetAttachmentStatusAttribute(HBF2);
-  if(HBF2AttachmentStatus)
-  {
-    SetAttachmentStatusParent(HBF2AttachmentStatus, SplitNode);
-    SetAttachmentStatusIsSplit(HBF2AttachmentStatus);
-  }
 
   return SplitNode;
 }
@@ -2051,11 +1961,7 @@ menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
 
   ListInitiate(&Interface->Sentinel);
   ListInitiate(&Interface->MenuSentinel);
-
-  //CreateSplitRootWindow( Interface, Rect2f( 0.25, 0.25, 0.5, 0.5), true,
-  //                       V4(0.15,0.15,0.5,1), V4(0.2,0.2,0.4,1), V4(0.15,0.15,0.5,1),
-  //                       V4(0.0,0.35,0.35,1), V4(0.1,0.3,0.3,1), V4(0.0,0.35,0.35,1));
-  
+ 
   return Interface;
 }
 
@@ -2063,17 +1969,6 @@ internal inline container_node* GetRootHBF( menu_tree* Menu)
 {
   container_node* Result = Menu->Root->FirstChild->NextSibling->NextSibling->NextSibling->NextSibling;
   Assert(Result->Type == container_type::HBF);
-  return Result;
-}
-
-
-inline internal menu_tree* GetNextSpawningWindow(menu_interface* Interface)
-{ 
-  menu_tree* Result = 0;
-  if(Interface->SpawningWindow && Interface->SpawningWindow->Next != &(Interface->MenuSentinel))
-  {
-    Result = Interface->MenuSentinel.Next;
-  }
   return Result;
 }
 
@@ -2090,157 +1985,51 @@ inline internal bool DebugIsPermanentWindow(menu_interface* Interface, container
   return Result;
 }
 
+
 BUTTON_ATTRIBUTE_UPDATE(ShowWindowButton)
 {
   if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
   {
     Assert(Attr->Data);
-    container_node* PermanentWindow = (container_node*) Attr->Data;
-
-    Assert(DebugIsPermanentWindow(Interface, PermanentWindow));
-    attachment_status_attribute* AttachmentStatusAttribute = GetAttachmentStatusAttribute(PermanentWindow);
-    Assert(AttachmentStatusAttribute);
-
-    // The window is attached and we should remove it
-    if(AttachmentStatusAttribute->Parent)
+    container_node* Tab = (container_node*) Attr->Data;
+    Assert(Tab->Type == container_type::Tab);
+    container_node* TabHeader = Tab->Parent;
+    if(TabHeader)
     {
-      container_node* WindowToRemove = PermanentWindow;
-      if(AttachmentStatusAttribute->IsTab)
+      Assert(TabHeader->Type == container_type::Grid);
+      container_node* TabWindow = TabHeader->Parent;
+
+      u32 TabIndex = GetChildIndex(Tab);
+      PopTab(Tab);
+      if(GetChildCount(TabHeader) == 0)
       {
-        container_node* Tab = AttachmentStatusAttribute->Parent;
-
-        container_node* TabGrid = Tab->Parent;
-        Assert(TabGrid->Type == container_type::Grid);
-        Assert(GetAttributePointer(Tab, ATTRIBUTE_BUTTON));
-
-        container_node* TabbedHBF = TabGrid->Parent;
-        Assert(TabbedHBF->Type == container_type::HBF);
-
-        u32 TabCount = GetChildCount(TabGrid);
-        Assert(TabCount > 1);
-        u32 TabIndex = GetChildIndex(Tab);
-        button_attribute* ButtonAttribute = (button_attribute*) GetAttributePointer(Tab, ATTRIBUTE_BUTTON);
-        tabbed_button_data* ButtonData = (tabbed_button_data*) ButtonAttribute->Data;
-        
-        // If this tab is active we want to put it as inactive;
-
-        if(ButtonData->ItemBody == GetChildFromIndex(TabbedHBF, 1))
-        {
-          u32 NewTabIndex = (TabIndex < TabCount-1) ? TabIndex+1 : TabIndex-1;
-          SetTabAsActive(TabbedHBF, NewTabIndex);
-        }
-        // Reassembles the Permanent Window
-        ExtractHBFFromTab(Interface, Tab);
-
-        if(GetChildCount(TabbedHBF->FirstChild) == 1)
-        {
-          container_node* LoneHBF = RevertTabbedHBFBackToHBF(Interface, TabbedHBF);
-
-          attachment_status_attribute* LoneAttachmentStatusAttribute = GetAttachmentStatusAttribute(LoneHBF); 
-          SetAttachmentStatusParent(LoneAttachmentStatusAttribute, LoneHBF->Parent);
-          SetAttachmentStatusIsLone(LoneAttachmentStatusAttribute);
-        }
-      }else if(AttachmentStatusAttribute->IsSplit)
-      {
-        Assert(AttachmentStatusAttribute->Parent == WindowToRemove->Parent);
-        container_node* WindowToRemain = WindowToRemove->NextSibling;
-        if(!WindowToRemain)
-        {
-          WindowToRemain = WindowToRemove->Parent->FirstChild->NextSibling;
-          Assert(WindowToRemain);
-          Assert(WindowToRemain->NextSibling == WindowToRemove);
-        }
-
-        container_node* SplitNodeToSwapOut = WindowToRemain->Parent;
-
-        DisconnectNode(WindowToRemove);
-        DisconnectNode(WindowToRemain);
-
-        ReplaceNode(SplitNodeToSwapOut, WindowToRemain);
-
-        // Remove Drag attribute from windows to remain (if it's a single HBF under a RootHBF)
-        // and windows to remove
-        {
-          if(WindowToRemain->Parent->Type == container_type::HBF &&
-             WindowToRemain->Type == container_type::HBF)
-          {
-            if(HasAttribute(WindowToRemain->FirstChild, ATTRIBUTE_DRAG))
-            {
-              DeleteAttribute(Interface, WindowToRemain->FirstChild, ATTRIBUTE_DRAG);  
-            }
-          }
-
-          Assert(WindowToRemove->Type == container_type::HBF);
-          Assert(WindowToRemove->FirstChild->Attributes & ATTRIBUTE_DRAG);
-          DeleteAttribute(Interface, WindowToRemove->FirstChild, ATTRIBUTE_DRAG);
-        }
-        
-        SplitNodeToSwapOut->NextSibling = 0;
-
-        container_node* Border = SplitNodeToSwapOut->FirstChild;
-        Assert(Border->Type == container_type::Border);
-        Assert(Border->NextSibling == 0);
-        DisconnectNode(Border);
-        DisconnectNode(SplitNodeToSwapOut);
-        DeleteContainer(Interface, Border);
-        DeleteContainer(Interface, SplitNodeToSwapOut);
-
-        menu_tree* MenuToFocus = GetMenu(Interface, WindowToRemain);
-        UpdateFocusWindow(Interface, MenuToFocus);
-      }else if(AttachmentStatusAttribute->IsLone)
-      {
-        Assert(AttachmentStatusAttribute->Parent == WindowToRemove->Parent);
-        menu_tree* Menu = GetMenu(Interface, WindowToRemove);
-        if(Menu == Interface->SpawningWindow)
-        {
-          Interface->SpawningWindow = GetNextSpawningWindow(Interface);
-        }
-        Assert(Menu != Interface->SpawningWindow);
-        DisconnectNode(WindowToRemove);
-        FreeMenuTree(Interface, Menu);
-      }else{
-        // A PermanentWindow should always be eiher a lone root window, a split window or a tabbed window.
-        INVALID_CODE_PATH;
+        ReduceWindowTree(Interface, TabWindow);
       }
-
-      ClearAttachmentStatusNodeType(AttachmentStatusAttribute);
-      SetAttachmentStatusParent(AttachmentStatusAttribute, 0);
     }else{
 
-      // We should Attach the window
-      // If there is no spawning window present, attach the new window to it
+      container_node* TabWindow = 0;
       if(!Interface->SpawningWindow)
       {
-        Assert(!PermanentWindow->Parent); // If there is no spawning window, The PermanentWindow should not have a parent
-        // If there is no spwaning window, we create a new Root Window and make it the spawningWindow 
-        Interface->SpawningWindow = CreateNewRootContainer(GlobalGameState->MenuInterface, PermanentWindow, Rect2f( 0.25, 0.25, 0.7, 0.5));
-        UpdateFocusWindow(Interface, Interface->SpawningWindow);
-
-        SetAttachmentStatusParent(AttachmentStatusAttribute, PermanentWindow->Parent);
-        SetAttachmentStatusIsLone(AttachmentStatusAttribute);
-      }else{
-        // Attach it to the spawning window in the top level as a Tab
-        container_node* RootHBF = GetRootHBF(Interface->SpawningWindow);
-        container_node* HomeHBF = RootHBF->FirstChild->NextSibling;
-        if(HomeHBF->FirstChild->Type != container_type::Grid)
-        {
-          attachment_status_attribute* HomeAttachmentStatusAttribute = GetAttachmentStatusAttribute(HomeHBF);
-          HomeHBF = CreateTabbedHBFFromNormalHBF(Interface, HomeHBF);
-          SetTabAsActive(HomeHBF, 0);
-          
-          // Set the Header node button "tab" to be the parent
-          SetAttachmentStatusParent(HomeAttachmentStatusAttribute, HomeHBF->FirstChild->FirstChild);
-          SetAttachmentStatusIsTab(HomeAttachmentStatusAttribute);
-          Assert(HomeHBF->FirstChild->Type == container_type::Grid);
-        }
+        TabWindow = CreateTabWindow(Interface);
         
-        tabbed_button_data* TabbedButtonData = PushHBFToTabbedHBF(Interface, HomeHBF, PermanentWindow);
-        u32 NewTabIndex = GetChildIndex(TabbedButtonData->ItemHeader);
-        SetTabAsActive(TabbedButtonData->TabbedHBF, NewTabIndex);
-        SetAttachmentStatusParent(AttachmentStatusAttribute, TabbedButtonData->ItemHeader);
-        SetAttachmentStatusIsTab(AttachmentStatusAttribute);
+        Interface->SpawningWindow = CreateNewRootContainer(Interface, TabWindow, Rect2f( 0.25, 0.25, 0.7, 0.5));
+      }else{
+        container_node* RootHBF = GetRootHBF(Interface->SpawningWindow);
+        TabWindow = RootHBF->FirstChild->NextSibling;
+      }
+
+      PushTab(TabWindow, Tab);
+
+      container_node* Body = Next(TabWindow->FirstChild);
+      tab_node* TabNode = GetTabNode(Tab);
+      if(Body)
+      {
+        ReplaceNode(Body, TabNode->Payload);
+      }else{
+        ConnectNode(TabWindow, TabNode->Payload);
       }
     }
+    UpdateFocusWindow(Interface, Interface->SpawningWindow);
   }
 }
 
@@ -2281,14 +2070,14 @@ menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
     r32 MainMenuHeight = WindowsSize.H * 1.1f;
     Interface->MenuBar->Root->Region = Rect2f(0, 1 - MainMenuHeight, AspectRatio, MainMenuHeight);
   
-    container_node* DropDownContainer = ConnectNode(Interface->MenuBar->Root, NewContainer(GlobalGameState->MenuInterface, container_type::Grid));
+    container_node* DropDownContainer = ConnectNode(Interface->MenuBar->Root, NewContainer(Interface, container_type::Grid));
     grid_node* Grid = GetGridNode(DropDownContainer);
     Grid->Col = 0;
     Grid->Row = 1;
     Grid->TotalMarginX = 0.0;
     Grid->TotalMarginY = 0.0;
 
-    size_attribute* SizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, DropDownContainer, ATTRIBUTE_SIZE);
+    size_attribute* SizeAttr = (size_attribute*) PushAttribute(Interface, DropDownContainer, ATTRIBUTE_SIZE);
     SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, WindowsSize.W+0.015f);
     SizeAttr->Height = ContainerSizeT(menu_size_type::RELATIVE, 1);
     SizeAttr->LeftOffset = ContainerSizeT(menu_size_type::ABSOLUTE, 0);
@@ -2298,62 +2087,85 @@ menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
   }
 
   container_node* DropDownContainer = Interface->MenuBar->Root->FirstChild;
-  container_node* NewMenu = ConnectNode(DropDownContainer, NewContainer(GlobalGameState->MenuInterface));
+  container_node* NewMenu = ConnectNode(DropDownContainer, NewContainer(Interface));
 
-  color_attribute* ColorAttr = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, NewMenu, ATTRIBUTE_COLOR);
+  color_attribute* ColorAttr = (color_attribute*) PushAttribute(Interface, NewMenu, ATTRIBUTE_COLOR);
   ColorAttr->Color = V4(0.3,0,0.3,1);
   
-  text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, NewMenu, ATTRIBUTE_TEXT);
+  text_attribute* Text = (text_attribute*) PushAttribute(Interface, NewMenu, ATTRIBUTE_TEXT);
   str::CopyStringsUnchecked(Name, Text->Text);
   Text->FontSize = (u32) FontSize;
   Text->Color = V4(0.9,0.9,0.9,1);
 
-  menu_tree* ViewMenuRoot = NewMenuTree(GlobalGameState->MenuInterface);
-  ViewMenuRoot->Root = NewContainer(GlobalGameState->MenuInterface);
+  menu_tree* ViewMenuRoot = NewMenuTree(Interface);
+  ViewMenuRoot->Root = NewContainer(Interface);
   ViewMenuRoot->Root->Region = {};
   ViewMenuRoot->LosingFocus = DeclareFunction(menu_losing_focus, DropDownLosingFocus);
   ViewMenuRoot->GainingFocus = DeclareFunction(menu_losing_focus, DropDownGainingFocus);
 
-  container_node* ViewMenuItems = ConnectNode(ViewMenuRoot->Root, NewContainer(GlobalGameState->MenuInterface, container_type::Grid));
+  container_node* ViewMenuItems = ConnectNode(ViewMenuRoot->Root, NewContainer(Interface, container_type::Grid));
   grid_node* Grid = GetGridNode(ViewMenuItems);
   Grid->Col = 1;
   Grid->Row = 0;
   Grid->TotalMarginX = 0.0;
   Grid->TotalMarginY = 0.0;
 
-  ColorAttr = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, ViewMenuItems, ATTRIBUTE_COLOR);
+  ColorAttr = (color_attribute*) PushAttribute(Interface, ViewMenuItems, ATTRIBUTE_COLOR);
   ColorAttr->Color = V4(1,1,1,1);
 
-  button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, NewMenu, ATTRIBUTE_BUTTON);
+  button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(Interface, NewMenu, ATTRIBUTE_BUTTON);
   ButtonAttribute->Update = DeclareFunction(button_attribute_update, DropDownMenuButton);
   ButtonAttribute->Data = ViewMenuRoot;
 
   return ViewMenuRoot;
 }
 
-void RegisterWindow(menu_interface* Interface, menu_tree* DropDownMenu, container_node* MenuPage, const c8* Name)
+container_node* CreateTab(menu_interface* Interface, container_node* Plugin)
+{
+  container_node* Tab = NewContainer(Interface, container_type::Tab);
+
+  plugin_node* PluginNode = GetPluginNode(Plugin);
+
+  color_attribute* ColorAttr = (color_attribute*) PushAttribute(Interface, Tab, ATTRIBUTE_COLOR);
+  ColorAttr->Color = PluginNode->Color;
+
+  draggable_attribute* Drag = (draggable_attribute*) PushAttribute(Interface, Tab, ATTRIBUTE_DRAG);
+  Drag->Node = Tab;
+  Drag->Update = DeclareFunction(draggable_attribute_update, TabDrag);
+
+  text_attribute* MenuText = (text_attribute*) PushAttribute(Interface, Tab, ATTRIBUTE_TEXT);
+  str::CopyStringsUnchecked(PluginNode->Title, MenuText->Text);
+  MenuText->FontSize = 12;
+  MenuText->Color =  HexCodeToColorV4(0x000000);
+
+  GetTabNode(Tab)->Payload = Plugin;
+  GetPluginNode(Plugin)->Tab = Tab;
+  return Tab;
+}
+
+void RegisterWindow(menu_interface* Interface, menu_tree* DropDownMenu, container_node* Plugin)
 {
   container_node* DropDownGrid = DropDownMenu->Root->FirstChild;
   Assert(DropDownGrid->Type == container_type::Grid);
-  Assert(MenuPage->Type == container_type::HBF);
-  Assert(!HasAttribute(MenuPage, ATTRIBUTE_ATTACHMENT_STATUS));
+  Assert(Plugin->Type == container_type::Plugin);
 
-  attachment_status_attribute* AttachmentStatus = (attachment_status_attribute*) PushAttribute(GlobalGameState->MenuInterface, MenuPage, ATTRIBUTE_ATTACHMENT_STATUS);
-  SetAttachmentStatusPermanent(AttachmentStatus);
+  plugin_node* PluginNode = GetPluginNode(Plugin);
 
-  container_node* MenuItem = ConnectNode(DropDownGrid, NewContainer(GlobalGameState->MenuInterface));
-  text_attribute* MenuText = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, MenuItem, ATTRIBUTE_TEXT);
-  str::CopyStringsUnchecked( Name, MenuText->Text );
+  container_node* MenuItem = ConnectNode(DropDownGrid, NewContainer(Interface));
+  text_attribute* MenuText = (text_attribute*) PushAttribute(Interface, MenuItem, ATTRIBUTE_TEXT);
+  str::CopyStringsUnchecked(PluginNode->Title, MenuText->Text);
   MenuText->FontSize = 12;
   MenuText->Color = V4(0,0,0,1);
   
-  rect2f TextSize = GetTextSize(0, 0, MenuText->Text, MenuText->FontSize);
+  rect2f TextSize = GetTextSize(0, 0, PluginNode->Title, MenuText->FontSize);
   DropDownMenu->Root->Region.H += TextSize.H;
   DropDownMenu->Root->Region.W = DropDownMenu->Root->Region.W >= TextSize.W ? DropDownMenu->Root->Region.W : TextSize.W;
  
-  Interface->PermanentWindows[Interface->PermanentWindowCount++] = MenuPage;
+  container_node* Tab = CreateTab(Interface, Plugin);
 
-  button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, MenuItem, ATTRIBUTE_BUTTON);
+  Interface->PermanentWindows[Interface->PermanentWindowCount++] = Tab;
+
+  button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(Interface, MenuItem, ATTRIBUTE_BUTTON);
   ButtonAttribute->Update = DeclareFunction(button_attribute_update, ShowWindowButton);
-  ButtonAttribute->Data = MenuPage;
+  ButtonAttribute->Data = Tab;
 }

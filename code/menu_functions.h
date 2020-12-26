@@ -227,6 +227,49 @@ menu_functions GetHBFFunctions()
   return Result;
 }
 
+
+MENU_UPDATE_CHILD_REGIONS( UpdateTabWindowChildRegions)
+{
+  container_node* Child = Parent->FirstChild;
+  u32 Index = 0;
+  tab_window_node* TabWindow = GetTabWindowNode(Parent);
+  while(Child)
+  {
+    switch(Index)
+    {
+      case 0: // Header
+      {
+        Child->Region = Rect2f(
+          Parent->Region.X,
+          Parent->Region.Y + Parent->Region.H - TabWindow->HeaderSize,
+          Parent->Region.W,
+          TabWindow->HeaderSize);
+      }break;
+      case 1: // Body
+      {
+        Child->Region = Rect2f(
+          Parent->Region.X,
+          Parent->Region.Y,
+          Parent->Region.W,
+          Parent->Region.H - TabWindow->HeaderSize);
+      }break;
+      default:
+      {
+        INVALID_CODE_PATH
+      }break;
+    }
+    ++Index;
+    Child = Child->NextSibling;
+  }
+}
+
+menu_functions GetTabWindowFunctions()
+{
+  menu_functions Result = GetDefaultFunctions();
+  Result.UpdateChildRegions = DeclareFunction(menu_get_region, UpdateTabWindowChildRegions);
+  return Result; 
+}
+
 MENU_UPDATE_CHILD_REGIONS( UpdateGridChildRegions )
 {
 
@@ -300,6 +343,10 @@ menu_functions GetMenuFunction(container_type Type)
     case container_type::Split: return GetSplitFunctions();
     case container_type::HBF: return GetHBFFunctions();
     case container_type::Grid: return GetGridFunctions();
+    case container_type::TabWindow:  return GetTabWindowFunctions();
+    case container_type::Tab:        return GetDefaultFunctions();
+    case container_type::Plugin:     return GetDefaultFunctions();
+
     default: Assert(0);
   }
   return {};

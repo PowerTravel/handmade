@@ -83,6 +83,11 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 
 #define BranchlessArithmatic( Condition, ExpressionIfTrue, ExpressionIfFalse )  ((s32)(Condition)) * (ExpressionIfTrue) + ((s32) !(Condition) ) * (ExpressionIfFalse)
 
+#define HexToColorV4( Red, Green, Blue )  V4((Red)/(r32) 0xFF,(Green)/(r32) 0xFF,(Blue)/(r32)0xFF,1);
+#define HexCodeToColorV4( Code )  V4( \
+    (((Code) & 0xFF0000) >> 16)/(r32) 0xFF, \
+    (((Code) & 0x00FF00) >>  8)/(r32) 0xFF, \
+    (((Code) & 0x0000FF) >>  0)/(r32) 0xFF,1)
 
 namespace utils
 {

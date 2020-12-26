@@ -8,6 +8,9 @@ enum class container_type
   Split,
   HBF, // Header-Body-Footer
   Grid,
+  Plugin,
+  TabWindow,
+  Tab
 };
 
 enum container_attribute
@@ -19,8 +22,7 @@ enum container_attribute
   ATTRIBUTE_BUTTON = 0x8,
   ATTRIBUTE_COLOR = 0x10,
   ATTRIBUTE_TEXT = 0x20,
-  ATTRIBUTE_SIZE = 0x40,
-  ATTRIBUTE_ATTACHMENT_STATUS = 0x80
+  ATTRIBUTE_SIZE = 0x40
 };
 
 
@@ -34,6 +36,9 @@ const c8* ToString(container_type Type)
     case container_type::Split: return "Split";
     case container_type::HBF: return "HBF";
     case container_type::Grid: return "Grid";
+    case container_type::Plugin: return "Plugin";
+    case container_type::TabWindow: return "TabWindow";
+    case container_type::Tab: return "Tab";
   }
   return "";
 };
@@ -49,7 +54,6 @@ const c8* ToString(u32 Type)
     case ATTRIBUTE_COLOR: return "Color";
     case ATTRIBUTE_TEXT: return "Text";
     case ATTRIBUTE_SIZE: return "Size";
-    case ATTRIBUTE_ATTACHMENT_STATUS: return "AttachmentStatus";
   }
   return "";
 };
@@ -98,7 +102,6 @@ struct menu_attribute_header
   menu_attribute_header* Next;
 };
 
-
 struct container_node
 {
   container_type Type;
@@ -141,6 +144,23 @@ struct grid_node
   u32 Row;
   r32 TotalMarginX;
   r32 TotalMarginY;
+};
+
+struct tab_window_node
+{
+  r32 HeaderSize;
+};
+
+struct tab_node
+{
+  container_node* Payload;
+};
+
+struct plugin_node
+{
+  char Title[256];
+  container_node* Tab;
+  v4 Color;
 };
 
 struct merge_slot_attribute
@@ -240,20 +260,10 @@ struct size_attribute
   menu_region_alignment YAlignment;
 };
 
-struct attachment_status_attribute
-{
-  container_node* Parent;
-  b32 IsPermanent;
-  b32 IsTab;
-  b32 IsSplit;
-  b32 IsLone;
-};
-
 #define MENU_LOSING_FOCUS(name) void name(struct menu_interface* Interface, struct menu_tree* Menu)
 typedef MENU_LOSING_FOCUS( menu_losing_focus );
 #define MENU_GAINING_FOCUS(name) void name(struct menu_interface* Interface, struct menu_tree* Menu)
 typedef MENU_GAINING_FOCUS( menu_gaining_focus );
-
 
 struct menu_tree
 {
@@ -290,13 +300,13 @@ struct menu_interface
 {
   b32 MenuVisible;
 
-  menu_tree* MenuBar;
 
   u32 PermanentWindowCount = 0;
   container_node* PermanentWindows[32];
 
   menu_tree* MenuInFocus;
   menu_tree* SpawningWindow; // This SpawningWinow is a root window that all new windows gets attached to.
+  menu_tree* MenuBar;
   menu_tree MenuSentinel;
 
   u32 ActiveMemory;
@@ -348,17 +358,36 @@ inline grid_node* GetGridNode(container_node* Container)
   return Result;
 }
 
+inline plugin_node* GetPluginNode(container_node* Container)
+{
+  Assert(Container->Type == container_type::Plugin);
+  plugin_node* Result = (plugin_node*) GetContainerPayload(Container);
+  return Result;
+}
+inline tab_window_node* GetTabWindowNode(container_node* Container)
+{
+  Assert(Container->Type == container_type::TabWindow);
+  tab_window_node* Result = (tab_window_node*) GetContainerPayload(Container);
+  return Result;
+}
+inline tab_node* GetTabNode(container_node* Container)
+{
+  Assert(Container->Type == container_type::Tab);
+  tab_node* Result = (tab_node*) GetContainerPayload(Container);
+  return Result;
+}
 
 void SetSplitDragAttribute(container_node* SplitNode, container_node* BorderNode);
 void SplitWindowHeaderDrag( menu_interface* Interface, container_node* Node, draggable_attribute* Attr );
 menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* BaseWindow, rect2f Region);
 container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical, r32 BorderPos = 0.5);
 container_node* CreateHBF(menu_interface* Interface, v4 HeaderColor, container_node* BodyNode);
+container_node* CreatePlugin(menu_interface* Interface, c8* HeaderName, v4 HeaderColor, container_node* BodyNode);
 container_node* SetSplitWindows( menu_interface* Interface, container_node* SplitNode, container_node* HBF1, container_node* HBF2);
 
 
 menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name);
-void RegisterWindow(menu_interface* Interface, container_node* DropdownMenu, container_node* MenuPage, const c8* Name);
+void RegisterWindow(menu_interface* Interface, menu_tree* DropDownMenu, container_node* Plugin);
 
 
 #if 0 

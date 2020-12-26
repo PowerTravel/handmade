@@ -101,7 +101,7 @@ DEBUGGetState()
     ButtonSize.W+=0.02f;
     ButtonSize.H+=0.02f;
     r32 ContainerWidth = 0.7;
-    container_node* HBF1 = 0;
+    container_node* SettingsPlugin = 0;
     {
       // Create Option Window
       container_node* ButtonContainer =  NewContainer(GlobalGameState->MenuInterface, container_type::Grid);
@@ -169,11 +169,11 @@ DEBUGGetState()
         button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_BUTTON);
         ButtonAttribute->Update = DeclareFunction(button_attribute_update, DebugRecompileButton);
       }
-      HBF1 = CreateHBF(GlobalGameState->MenuInterface, "Settings", V4(0.5,0.5,0.5,1), ButtonContainer);
+      SettingsPlugin = CreatePlugin(GlobalGameState->MenuInterface, "Settings", V4(0.5,0.5,0.5,1), ButtonContainer);
     }
 
     // Create graph window
-    container_node* HBF2 = 0;
+    container_node* GraphPlugin = 0;
     {
       container_node* ButtonContainer = NewContainer(GlobalGameState->MenuInterface, container_type::Grid);
       grid_node* Grid = GetGridNode(ButtonContainer);
@@ -205,107 +205,34 @@ DEBUGGetState()
       ConnectNode(SplitNode, ButtonContainer);
       ConnectNode(SplitNode, GraphContainer);
 
-      HBF2 = CreateHBF(GlobalGameState->MenuInterface, "Profiler", V4(0.5,0.5,ContainerWidth,1), SplitNode);
+      GraphPlugin = CreatePlugin(GlobalGameState->MenuInterface, "Profiler", HexCodeToColorV4( 0xAB274F ), SplitNode);
     }
 
+   // Create graph window
+    container_node* DebugWindow1 = 0;
+    {
+      container_node* ColorNode  = NewContainer(GlobalGameState->MenuInterface, container_type::None);
+      color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, ColorNode, ATTRIBUTE_COLOR);
+      BackgroundColor->Color =  HexCodeToColorV4( 0xD187A2 );
 
-    #if 1
+      DebugWindow1 = CreatePlugin(GlobalGameState->MenuInterface, "Debug1",  HexCodeToColorV4( 0xF19CBB ), ColorNode);
+    }
+    // Create graph window
+    container_node* DebugWindow2 = 0;
+    {
+      container_node* ColorNode  = NewContainer(GlobalGameState->MenuInterface, container_type::None);
+      color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, ColorNode, ATTRIBUTE_COLOR);
+      BackgroundColor->Color = HexCodeToColorV4( 0x9971A3 );
+
+      DebugWindow2 = CreatePlugin(GlobalGameState->MenuInterface, "Debug2",  HexCodeToColorV4( 0xB284BE ), ColorNode);
+    }
 
     menu_tree* WindowsDropDownMenu = RegisterMenu(GlobalGameState->MenuInterface, "Windows");
-    RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, HBF1, "Settings");
-    RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, HBF2, "Profiler");
+    RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, SettingsPlugin);
+    RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, GraphPlugin);
+    RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, DebugWindow1);
+    RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, DebugWindow2);
 
-    #else
-
-    container_node* Split = SetSplitWindows(GlobalGameState->MenuInterface, CreateSplitWindow(GlobalGameState->MenuInterface, true, ButtonSize.W/ContainerWidth), HBF1, HBF2);
-
-    menu_tree* Root = CreateNewRootContainer(GlobalGameState->MenuInterface, Split, Rect2f( 0.85, 0.25, 0.7, 0.5));
-    container_node* RootHBF = Root->Root->FirstChild->NextSibling->NextSibling->NextSibling->NextSibling;
-    Assert(RootHBF->Type == container_type::HBF);
-    container_node* RootHeader = RootHBF->FirstChild;
-
-    container_node* DropDownContainer = ConnectNode(RootHeader, NewContainer(GlobalGameState->MenuInterface, container_type::Grid));
-    grid_node* Grid = GetGridNode(DropDownContainer);
-    Grid->Col = 0;
-    Grid->Row = 1;
-    Grid->TotalMarginX = 0.0;
-    Grid->TotalMarginY = 0.0;
-
-    container_node* ViewMenu = ConnectNode(DropDownContainer, NewContainer(GlobalGameState->MenuInterface));
-
-    
-    //ViewMenu->Functions.UpdateChildRegions = DeclareFunction(menu_get_region, DropDownUpdateChildRegions);
-
-    color_attribute* ColorAttr = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, ViewMenu, ATTRIBUTE_COLOR);
-    ColorAttr->Color = V4(0.3,0,0.3,1);
-    
-    text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, ViewMenu, ATTRIBUTE_TEXT);
-    str::CopyStringsUnchecked( "Windows", Text->Text );
-    Text->FontSize = 12;
-    Text->Color = V4(0,0,0,1);
-    rect2f WindowsSize = GetTextSize(0, 0, Text->Text, Text->FontSize);
-
-    size_attribute* SizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, DropDownContainer, ATTRIBUTE_SIZE);
-    SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, WindowsSize.W+0.015f);
-    SizeAttr->Height = ContainerSizeT(menu_size_type::RELATIVE, 1);
-    SizeAttr->LeftOffset = ContainerSizeT(menu_size_type::ABSOLUTE, 0);
-    SizeAttr->TopOffset = ContainerSizeT(menu_size_type::ABSOLUTE, 0);
-    SizeAttr->XAlignment = menu_region_alignment::LEFT;
-    SizeAttr->YAlignment = menu_region_alignment::CENTER;
-
-    menu_tree* ViewMenuRoot = NewMenuTree(GlobalGameState->MenuInterface); // Root
-    ViewMenuRoot->Root = NewContainer(GlobalGameState->MenuInterface);
-    ViewMenuRoot->Root->Region = {};
-    ViewMenuRoot->LosingFocus = DeclareFunction(menu_losing_focus, DropDownLosingFocus);
-    ViewMenuRoot->GainingFocus = DeclareFunction(menu_losing_focus, DropDownGainingFocus);
-
-    container_node* ViewMenuItems = ConnectNode(ViewMenuRoot->Root, NewContainer(GlobalGameState->MenuInterface, container_type::Grid));
-    Grid = GetGridNode(ViewMenuItems);
-    Grid->Col = 1;
-    Grid->Row = 0;
-    Grid->TotalMarginX = 0.0;
-    Grid->TotalMarginY = 0.0;
-
-
-    {
-      container_node* MenuItem = ConnectNode(ViewMenuItems, NewContainer(GlobalGameState->MenuInterface));
-      text_attribute* MenuText = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, MenuItem, ATTRIBUTE_TEXT);
-      str::CopyStringsUnchecked( "Profiler", MenuText->Text );
-      MenuText->FontSize = 12;
-      MenuText->Color = V4(0,0,0,1);
-      
-      rect2f TextSize = GetTextSize(0, 0, MenuText->Text, MenuText->FontSize);
-      ViewMenuRoot->Root->Region.H += TextSize.H;
-      ViewMenuRoot->Root->Region.W = ViewMenuRoot->Root->Region.W >= TextSize.W ? ViewMenuRoot->Root->Region.W : TextSize.W;
-    }
-
-    {
-      container_node* MenuItem = ConnectNode(ViewMenuItems, NewContainer(GlobalGameState->MenuInterface));
-      text_attribute* MenuText = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, MenuItem, ATTRIBUTE_TEXT);
-      str::CopyStringsUnchecked( "Settings", MenuText->Text );
-      MenuText->FontSize = 12;
-      MenuText->Color = V4(0,0,0,1);
-      
-      rect2f TextSize = GetTextSize(0, 0, MenuText->Text, MenuText->FontSize);
-      ViewMenuRoot->Root->Region.H += TextSize.H;
-      ViewMenuRoot->Root->Region.W = ViewMenuRoot->Root->Region.W >= TextSize.W ? ViewMenuRoot->Root->Region.W : TextSize.W;
-    }
-
-
-
-    ColorAttr = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, ViewMenuItems, ATTRIBUTE_COLOR);
-    ColorAttr->Color = V4(1,1,1,1);
-
-    button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, ViewMenu, ATTRIBUTE_BUTTON);
-    ButtonAttribute->Update = DeclareFunction(button_attribute_update, DropDownMenuButton);
-    ButtonAttribute->Data = ViewMenuRoot;
-
-    TreeSensus(ViewMenuRoot);
-
-    UpdateRegions(ViewMenuRoot);
-
-    #endif
-    
     RestartCollation();
   }
   return DebugState;
