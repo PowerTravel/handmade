@@ -1,6 +1,8 @@
 #include "menu_interface.h"
 #include "string.h"
-u32 GetContainerPayloadSize(container_type Type)
+
+internal u32
+GetContainerPayloadSize(container_type Type)
 {
   switch(Type)
   {
@@ -8,7 +10,6 @@ u32 GetContainerPayloadSize(container_type Type)
     case container_type::Split:
     case container_type::Root:    return 0;
     case container_type::Border:  return sizeof(border_leaf);
-    case container_type::HBF:     return sizeof(hbf_node);
     case container_type::Grid:    return sizeof(grid_node);
     case container_type::TabWindow:  return sizeof(tab_window_node);
     case container_type::Tab:        return sizeof(tab_node);
@@ -18,7 +19,8 @@ u32 GetContainerPayloadSize(container_type Type)
   return 0;
 }
 
-u32 GetAttributeSize(container_attribute Attribute)
+internal u32
+GetAttributeSize(container_attribute Attribute)
 {
   switch(Attribute)
   {
@@ -34,18 +36,21 @@ u32 GetAttributeSize(container_attribute Attribute)
   return 0; 
 }
 
-inline container_node* Previous(container_node* Node)
+inline container_node*
+Previous(container_node* Node)
 {
   return Node->PreviousSibling;
 }
 
-inline container_node* Next(container_node* Node)
+inline container_node*
+Next(container_node* Node)
 {
   Assert(Node);
   return Node->NextSibling;
 }
 
-u32 GetChildCount(container_node* Node)
+internal u32
+GetChildCount(container_node* Node)
 {
   container_node* Child = Node->FirstChild;
   u32 Count = 0;
@@ -57,7 +62,8 @@ u32 GetChildCount(container_node* Node)
   return Count;
 }
 
-u32 GetChildIndex(container_node* Node)
+internal u32
+GetChildIndex(container_node* Node)
 {
   Assert(Node->Parent);
   container_node* Child = Node->Parent->FirstChild;
@@ -70,7 +76,8 @@ u32 GetChildIndex(container_node* Node)
   return Count;
 }
 
-container_node* GetChildFromIndex(container_node* Parent, u32 ChildIndex)
+internal container_node*
+GetChildFromIndex(container_node* Parent, u32 ChildIndex)
 {
   u32 Idx = 0;
   container_node* Result = Parent->FirstChild;
@@ -82,7 +89,8 @@ container_node* GetChildFromIndex(container_node* Parent, u32 ChildIndex)
   return Result; 
 }
 
-void PivotNodes(container_node* ShiftLeft, container_node* ShiftRight)
+internal void
+PivotNodes(container_node* ShiftLeft, container_node* ShiftRight)
 {
   Assert(ShiftLeft->PreviousSibling == ShiftRight);
   Assert(ShiftRight->NextSibling == ShiftLeft);
@@ -110,7 +118,8 @@ void PivotNodes(container_node* ShiftLeft, container_node* ShiftRight)
   
 }
 
-void ShiftLeft(container_node* ShiftLeft)
+internal void
+ShiftLeft(container_node* ShiftLeft)
 {
   if(!ShiftLeft->PreviousSibling)
   {
@@ -119,7 +128,8 @@ void ShiftLeft(container_node* ShiftLeft)
   PivotNodes(ShiftLeft, ShiftLeft->PreviousSibling);
 }
 
-void ShiftRight(container_node* ShiftRight)
+internal void
+ShiftRight(container_node* ShiftRight)
 {
   if(!ShiftRight->NextSibling)
   {
@@ -128,7 +138,7 @@ void ShiftRight(container_node* ShiftRight)
   PivotNodes(ShiftRight->NextSibling, ShiftRight); 
 }
 
-inline void
+internal void
 ReplaceNode(container_node* Out, container_node* In)
 {  
   if(In == Out) return;
@@ -157,17 +167,20 @@ ReplaceNode(container_node* Out, container_node* In)
   Out->Parent = 0;
 }
 
-u32 GetAttributeSize(u32 Attributes)
+inline internal u32
+GetAttributeSize(u32 Attributes)
 {
   return GetAttributeSize((container_attribute)Attributes);
 }
 
-inline b32 HasAttribute(container_node* Node, container_attribute Attri)
+inline internal b32
+HasAttribute(container_node* Node, container_attribute Attri)
 {
   return Node->Attributes & ((u32) Attri);
 }
 
-u32 GetAttributeBatchSize(container_attribute Attri)
+internal u32
+GetAttributeBatchSize(container_attribute Attri)
 {
   u32 Result = 0;
   u32 Attributes = (u32) Attri;
@@ -184,7 +197,7 @@ u32 GetAttributeBatchSize(container_attribute Attri)
   return Result;
 }
 
-u8* GetAttributePointer(container_node* Node, container_attribute Attri)
+internal u8* GetAttributePointer(container_node* Node, container_attribute Attri)
 {
   Assert(Attri & Node->Attributes);
   menu_attribute_header * Attribute = Node->FirstAttribute;
@@ -225,7 +238,7 @@ void __CheckMemoryListIntegrity(menu_interface* Interface)
 
 
 // TODO (Add option to align by a certain byte?)
-void* PushSize(menu_interface* Interface, u32 RequestedSize)
+internal void* PushSize(menu_interface* Interface, u32 RequestedSize)
 {
   #if DEBUG_PRINT_MENU_MEMORY_ALLOCATION
   {
@@ -360,7 +373,7 @@ container_node* NewContainer(menu_interface* Interface, container_type Type)
 
 #define GetMemoryLinkFromPayload( Payload ) (memory_link*) (((u8*) (Payload)) - sizeof(memory_link))
 
-void FreeMemory(menu_interface* Interface, void * Payload)
+internal void FreeMemory(menu_interface* Interface, void * Payload)
 {
   memory_link* MemoryLink = GetMemoryLinkFromPayload(Payload);
   MemoryLink->Previous->Next = MemoryLink->Next;
@@ -369,7 +382,8 @@ void FreeMemory(menu_interface* Interface, void * Payload)
   CheckMemoryListIntegrity(Interface);
 }
 
-void DeleteAllAttributes(menu_interface* Interface, container_node* Node)
+internal void
+DeleteAllAttributes(menu_interface* Interface, container_node* Node)
 {
   // TODO: Free attribute data here too?
   while(Node->FirstAttribute)
@@ -381,7 +395,8 @@ void DeleteAllAttributes(menu_interface* Interface, container_node* Node)
   Node->Attributes = ATTRIBUTE_NONE;
 }
 
-void DeleteAttribute(menu_interface* Interface, container_node* Node, container_attribute AttributeType)
+internal void
+DeleteAttribute(menu_interface* Interface, container_node* Node, container_attribute AttributeType)
 {
   Assert(Node->Attributes & (u32)AttributeType);
 
@@ -414,7 +429,7 @@ menu_tree* NewMenuTree(menu_interface* Interface)
   return Result;
 }
 
-void DeleteMenuSubTree(menu_interface* Interface, container_node* Root)
+internal void DeleteMenuSubTree(menu_interface* Interface, container_node* Root)
 {
   DisconnectNode(Root);
   // Free the nodes;
@@ -1072,6 +1087,7 @@ void * PushOrGetAttribute(menu_interface* Interface, container_node* Node, conta
 }
 
 #if 0
+// Could be nice to keep these around, theyre perfectly fine utility functions
 void MoveAttribute(container_node* From, container_node* To, container_attribute AttributeType)
 {
   Assert(HasAttribute(From, AttributeType));
@@ -1182,6 +1198,25 @@ DRAGGABLE_ATTRIBUTE_UPDATE(UpdateHeaderPosition)
   }
 }
 
+container_node* CreateBorderNode(menu_interface* Interface, b32 Vertical, r32 Position, v4 Color)
+{
+  border_leaf Border = {};
+  Border.Vertical = Vertical;
+  Border.Position = Position;
+  Border.Thickness = Interface->BorderSize;
+
+  container_node* Result = NewContainer(Interface, container_type::Border);
+  PushAttribute(Interface, Result, ATTRIBUTE_DRAG);
+  border_leaf* BorderLeaf = GetBorderNode(Result);
+
+  color_attribute* ColorAttr = (color_attribute*) PushAttribute(Interface, Result, ATTRIBUTE_COLOR);
+  ColorAttr->Color = Color;
+
+  Assert(Result->Type == container_type::Border);
+  *BorderLeaf = Border;
+  return Result;
+}
+
 menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* BaseWindow, rect2f Region)
 {
   menu_tree* Root = NewMenuTree(Interface); // Root
@@ -1202,20 +1237,6 @@ menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* Bas
     PushAttribute(Interface, RootHeader, ATTRIBUTE_MERGE);
   }
 
-  // Header Body Footer
-  container_node* RHBF = 0;    
-  {
-    RHBF = NewContainer(Interface, container_type::HBF);
-    hbf_node* HBFP = GetHBFNode(RHBF);
-    HBFP->HeaderSize = 0.02;
-    HBFP->FooterSize = 0;
-
-    ConnectNode(RHBF, RootHeader); // Header
-    ConnectNode(RHBF, BaseWindow); // Body
-    ConnectNode(RHBF, NewContainer(Interface)); // Footer
-  }
-
-
   //  Root Node Complex, 4 Borders, 1 Header, 1 None
   container_node* RootBody = 0; // Output
   { 
@@ -1231,8 +1252,9 @@ menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* Bas
     container_node* Border4 = CreateBorderNode(Interface, false, Region.Y + Region.H);
     ConnectNode(Root->Root, Border4);
     SetFrameDragAttribute(Border4);
-    
-    ConnectNode(Root->Root, RHBF);
+
+    ConnectNode(Root->Root, RootHeader); // Header
+    ConnectNode(Root->Root, BaseWindow); // Body
   }
 
   TreeSensus(Root);
@@ -1349,11 +1371,6 @@ void ReduceWindowTree(menu_interface* Interface, container_node* WindowToRemove)
     case container_type::Split:
     {
       ReduceSplitWindowTree(Interface, WindowToRemove);
-    }break;
-    case container_type::HBF:
-    {
-      menu_tree* Menu = GetMenu(Interface, WindowToRemove);
-      FreeMenuTree(Interface,Menu);
     }break;
     default:
     {
@@ -1487,6 +1504,12 @@ u32 FillArrayWithHBFs(u32 MaxArrSize, container_node* TabArr[], container_node* 
   return TabCount;
 }
 
+internal inline container_node* GetRootBody(container_node* RootWindow)
+{
+  Assert(RootWindow->Type == container_type::Root);
+  container_node* Result = RootWindow->FirstChild->NextSibling->NextSibling->NextSibling->NextSibling->NextSibling;
+  return Result;
+}
 
 void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
 {
@@ -1537,13 +1560,13 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
     Merge->Slot = 0;
     if(ZoneIndex == 1)
     {
-      container_node* HomeHBF = SlotNode->Parent;
+      container_node* HomeTabWindow = SlotNode->Parent;
       container_node* Visitor = Node->Parent;
-      Assert(HomeHBF->Type == container_type::TabWindow);
+      Assert(HomeTabWindow->Type == container_type::TabWindow);
 
-      if(Visitor->Parent->Type == container_type::Root)
+      if(Visitor->Type == container_type::Root)
       {
-        Visitor = Next(Node);
+        Visitor = GetRootBody(Visitor);
       }
 
       container_node* TabArr[64] = {};
@@ -1555,7 +1578,7 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
       for(u32 Index = 0; Index < TabCount; ++Index)
       {
         container_node* TabToMove = TabArr[Index];
-        PushTab(HomeHBF, TabToMove);
+        PushTab(HomeTabWindow, TabToMove);
       }
 
       SetTabAsActive(TabArr[TabCount-1]);
@@ -1565,30 +1588,30 @@ void UpdateMergableAttribute( menu_interface* Interface, container_node* Node )
     }else if( ZoneIndex == 0  || ZoneIndex == 2 ||  // Vertical
               ZoneIndex == 3  || ZoneIndex == 4)    // Horizontal
     {
-      container_node* HomeHBF = SlotNode->Parent;
+      container_node* HomeTabWindow = SlotNode->Parent;
       container_node* Visitor = Node->Parent;
 
-      Assert(HomeHBF->Type == container_type::TabWindow);
+      Assert(HomeTabWindow->Type == container_type::TabWindow);
 
-      if(Visitor->Parent->Type == container_type::Root)
+      if(Visitor->Type == container_type::Root)
       {
-        Visitor = Next(Node);
+        Visitor = GetRootBody(Visitor);
       }
 
       menu_tree* MenuToRemove = GetMenu(Interface, Visitor);
-      menu_tree* MenuToRemain = GetMenu(Interface, HomeHBF);
+      menu_tree* MenuToRemain = GetMenu(Interface, HomeTabWindow);
 
       DisconnectNode(Visitor);
 
       container_node* SplitNode = SplitNode = CreateSplitWindow(Interface, (ZoneIndex == 0 || ZoneIndex == 2));
-      ReplaceNode(HomeHBF, SplitNode);
+      ReplaceNode(HomeTabWindow, SplitNode);
 
       if( ZoneIndex == 0  || ZoneIndex == 3)
       {
         ConnectNode(SplitNode, Visitor);
-        ConnectNode(SplitNode, HomeHBF);
+        ConnectNode(SplitNode, HomeTabWindow);
       }else{
-        ConnectNode(SplitNode, HomeHBF);
+        ConnectNode(SplitNode, HomeTabWindow);
         ConnectNode(SplitNode, Visitor);
       }
 
@@ -1720,97 +1743,6 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
   }
 }
 
-void SplitWindow(menu_interface* Interface, container_node* WindowToRemove, rect2f Region)
-{
-  Assert(WindowToRemove->Type == container_type::HBF);
-  Assert(WindowToRemove->Parent->Type == container_type::Split)
-
-  container_node* WindowToRemain = WindowToRemove->NextSibling;
-  if(!WindowToRemain)
-  {
-    WindowToRemain = WindowToRemove->Parent->FirstChild->NextSibling;
-    Assert(WindowToRemain);
-    Assert(WindowToRemain->NextSibling == WindowToRemove);
-  }
-
-  container_node* SplitNodeToSwapOut = WindowToRemain->Parent;
-
-  DisconnectNode(WindowToRemove);
-  DisconnectNode(WindowToRemain);
-
-  ReplaceNode(SplitNodeToSwapOut, WindowToRemain);
-
-  // Remove Drag attribute from windows to remain (if it's a single HBF under a RootHBF)
-  // and windows to remove
-  {
-    if(WindowToRemain->Parent->Type == container_type::HBF &&
-       WindowToRemain->Type == container_type::HBF)
-    {
-      if( HasAttribute(WindowToRemain->FirstChild, ATTRIBUTE_DRAG))
-      {
-        DeleteAttribute(Interface, WindowToRemain->FirstChild, ATTRIBUTE_DRAG);  
-      }
-    }
-
-    Assert(WindowToRemove->Type == container_type::HBF);
-    Assert(WindowToRemove->FirstChild->Attributes & ATTRIBUTE_DRAG);
-    DeleteAttribute(Interface, WindowToRemove->FirstChild, ATTRIBUTE_DRAG);  
-  }
-  
-  SplitNodeToSwapOut->NextSibling = 0;
-
-  container_node* Border = SplitNodeToSwapOut->FirstChild;
-  Assert(Border->Type == container_type::Border);
-  Assert(Border->NextSibling == 0);
-  DisconnectNode(Border);
-  DisconnectNode(SplitNodeToSwapOut);
-  DeleteContainer(Interface, Border);
-  DeleteContainer(Interface, SplitNodeToSwapOut);
-
-  CreateNewRootContainer(Interface, WindowToRemove, Region);  
-}
-
-
-DRAGGABLE_ATTRIBUTE_UPDATE(SplitWindowHeaderDrag)
-{
-  if(SplitWindowSignal(Interface, Node))
-  {
-    v2 MouseDownPos = V2(Interface->MouseLeftButtonPush.X, Interface->MouseLeftButtonPush.Y);
-    v2 HeaderOrigin = V2(Node->Region.X, Node->Region.Y);
-    v2 WindowSize = V2(Node->Parent->Region.W, Node->Parent->Region.H);
-
-    v2 MouseDownHeaderFrame = MouseDownPos - HeaderOrigin;
-    v2 NewOrigin = Interface->MousePos - MouseDownHeaderFrame - V2(0, WindowSize.Y - Interface->HeaderSize);
-    rect2f NewRegion = Rect2f(NewOrigin.X, NewOrigin.Y, WindowSize.X, WindowSize.Y);
-    NewRegion = Shrink(NewRegion, -Interface->BorderSize/2);
-
-    if(Node->Parent->Type == container_type::HBF)
-    {
-      SplitWindow(Interface, Node->Parent, NewRegion);
-    }    
-  }
-}
-
-inline container_node*
-CreateBorderNode(menu_interface* Interface, b32 Vertical, r32 Position, v4 Color)
-{
-  border_leaf Border = {};
-  Border.Vertical = Vertical;
-  Border.Position = Position;
-  Border.Thickness = Interface->BorderSize;
-
-  container_node* Result = NewContainer(Interface, container_type::Border);
-  PushAttribute(Interface, Result, ATTRIBUTE_DRAG);
-  border_leaf* BorderLeaf = GetBorderNode(Result);
-
-  color_attribute* ColorAttr = (color_attribute*) PushAttribute(Interface, Result, ATTRIBUTE_COLOR);
-  ColorAttr->Color = Color;
-
-  Assert(Result->Type == container_type::Border);
-  *BorderLeaf = Border;
-  return Result;
-}
-
 void SetSplitDragAttribute(container_node* SplitNode, container_node* BorderNode)
 {
   border_leaf* BorderLeaf = GetBorderNode(BorderNode);
@@ -1820,78 +1752,6 @@ void SetSplitDragAttribute(container_node* SplitNode, container_node* BorderNode
   Draggable->Update = DeclareFunction( draggable_attribute_update, UpdateSplitBorderCallback);
 }
 
-container_node* CreateDummyHBF(menu_interface* Interface, v4 HeaderColor, v4 BodyColor, v4 FooterColor)
-{
-  container_node* Header = NewContainer(Interface);
-
-  color_attribute* HColorAttr = (color_attribute*) PushAttribute(Interface, Header, ATTRIBUTE_COLOR);
-  HColorAttr->Color = HeaderColor;
-
-  draggable_attribute* Draggable = (draggable_attribute*) PushAttribute(Interface, Header, ATTRIBUTE_DRAG);
-  Draggable->Node = 0;
-  Draggable->Update = DeclareFunction(draggable_attribute_update, SplitWindowHeaderDrag);
-
-  container_node* Body = NewContainer(Interface);
-  color_attribute* BColorAttr = (color_attribute*) PushAttribute(Interface, Body, ATTRIBUTE_COLOR);
-  BColorAttr->Color = BodyColor;
-
-  PushAttribute(Interface, Body, ATTRIBUTE_MERGE_SLOT);
-  
-  container_node* Footer = NewContainer(Interface);
-  color_attribute* FColorAttr = (color_attribute*) PushAttribute(Interface, Footer, ATTRIBUTE_COLOR);
-  FColorAttr->Color = FooterColor;
-
-
-  container_node* HBF = NewContainer(Interface, container_type::HBF);
-  hbf_node* HBFP = GetHBFNode(HBF);
-  HBFP->HeaderSize = 0.02;
-  HBFP->FooterSize = 0.02;
-  ConnectNode(HBF, Header);
-  ConnectNode(HBF, Body);
-  ConnectNode(HBF, Footer);
-
-  return HBF;
-}
-
-container_node* CreateHBF(menu_interface* Interface, c8* HeaderName, v4 HeaderColor, container_node* BodyNode)
-{
-  container_node* Header = NewContainer(Interface);
-
-  color_attribute* HColorAttr = (color_attribute*) PushAttribute(Interface, Header, ATTRIBUTE_COLOR);
-  HColorAttr->Color = HeaderColor;
-
-  container_node* HeaderText = NewContainer(Interface);
-
-  text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, HeaderText, ATTRIBUTE_TEXT);
-  str::CopyStringsUnchecked( HeaderName, Text->Text );
-  Text->FontSize = 14;
-  Text->Color = V4(0,0,0,1);
-
-  rect2f TextSize = GetTextSize(0, 0, "Name", Text->FontSize);
-  size_attribute* SizeAttr = (size_attribute*) PushAttribute(Interface, HeaderText, ATTRIBUTE_SIZE);
-  SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, TextSize.W);
-  SizeAttr->Height = ContainerSizeT(menu_size_type::ABSOLUTE, TextSize.H);
-  SizeAttr->LeftOffset = ContainerSizeT(menu_size_type::ABSOLUTE, 0.01);
-  SizeAttr->TopOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
-  SizeAttr->XAlignment = menu_region_alignment::LEFT;
-  SizeAttr->YAlignment = menu_region_alignment::CENTER;
-
-  ConnectNode(Header,HeaderText);
-
-  PushOrGetAttribute(Interface, BodyNode, ATTRIBUTE_MERGE_SLOT);
-
-  container_node* Footer = NewContainer(Interface, container_type::None);
-
-  container_node* HBF = NewContainer(Interface, container_type::HBF);
-  hbf_node* HBFP = GetHBFNode(HBF);
-  HBFP->HeaderSize = 0.02;
-  HBFP->FooterSize = 0;
-  ConnectNode(HBF, Header);
-  ConnectNode(HBF, BodyNode);
-  ConnectNode(HBF, Footer);
-
-  return HBF;
-}
 
 container_node* CreatePlugin(menu_interface* Interface, c8* HeaderName, v4 HeaderColor, container_node* BodyNode)
 {
@@ -1916,38 +1776,6 @@ container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical, r32 
 }
 
 
-container_node* SetSplitWindows( menu_interface* Interface, container_node* SplitNode, container_node* HBF1, container_node* HBF2)
-{
-  Assert( HBF1->Type == container_type::TabWindow);
-  Assert( HBF2->Type == container_type::TabWindow);
-
-  draggable_attribute* Draggable1 = (draggable_attribute*) PushOrGetAttribute(Interface, HBF1->FirstChild, ATTRIBUTE_DRAG);
-  Draggable1->Node = 0;
-  Draggable1->Update = DeclareFunction(draggable_attribute_update, SplitWindowHeaderDrag);
-
-  draggable_attribute* Draggable2 = (draggable_attribute*) PushOrGetAttribute(Interface, HBF2->FirstChild, ATTRIBUTE_DRAG);
-  Draggable2->Node = 0;
-  Draggable2->Update = DeclareFunction(draggable_attribute_update, SplitWindowHeaderDrag);
-
-  ConnectNode(SplitNode, HBF1);
-  ConnectNode(SplitNode, HBF2);
-
-  return SplitNode;
-}
-
-void CreateSplitRootWindow( menu_interface* Interface, rect2f Region, b32 Vertical,
-                            v4 HeaderColor1, v4 BodyColor1, v4 FooterColor1,
-                            v4 HeaderColor2, v4 BodyColor2, v4 FooterColor2)
-{
-  container_node* HBF1 = CreateDummyHBF(Interface, HeaderColor1, BodyColor1, FooterColor1);
-  container_node* HBF2 = CreateDummyHBF(Interface, HeaderColor2, BodyColor2, FooterColor2);
-  container_node* SplitNode = CreateSplitWindow(Interface, Vertical);
-  SetSplitWindows(Interface, SplitNode, HBF1, HBF2);
-
-  menu_tree* Menu = CreateNewRootContainer(Interface, SplitNode, Region);
-  Menu->Visible = true;
-}
-
 menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
 {
   menu_interface* Interface = PushStruct(Arena, menu_interface);
@@ -1965,12 +1793,6 @@ menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
   return Interface;
 }
 
-internal inline container_node* GetRootHBF( menu_tree* Menu)
-{
-  container_node* Result = Menu->Root->FirstChild->NextSibling->NextSibling->NextSibling->NextSibling;
-  Assert(Result->Type == container_type::HBF);
-  return Result;
-}
 
 inline internal bool DebugIsPermanentWindow(menu_interface* Interface, container_node* WindowNode)
 {
@@ -2014,8 +1836,8 @@ BUTTON_ATTRIBUTE_UPDATE(ShowWindowButton)
         
         Interface->SpawningWindow = CreateNewRootContainer(Interface, TabWindow, Rect2f( 0.25, 0.25, 0.7, 0.5));
       }else{
-        container_node* RootHBF = GetRootHBF(Interface->SpawningWindow);
-        TabWindow = RootHBF->FirstChild->NextSibling;
+        TabWindow = GetRootBody(Interface->SpawningWindow->Root);
+        Assert(TabWindow->Type == container_type::TabWindow);
       }
 
       PushTab(TabWindow, Tab);

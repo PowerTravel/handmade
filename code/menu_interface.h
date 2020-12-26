@@ -6,7 +6,6 @@ enum class container_type
   Root,
   Border,
   Split,
-  HBF, // Header-Body-Footer
   Grid,
   Plugin,
   TabWindow,
@@ -34,7 +33,6 @@ const c8* ToString(container_type Type)
     case container_type::Root: return "Root";
     case container_type::Border: return "Border";
     case container_type::Split: return "Split";
-    case container_type::HBF: return "HBF";
     case container_type::Grid: return "Grid";
     case container_type::Plugin: return "Plugin";
     case container_type::TabWindow: return "TabWindow";
@@ -73,7 +71,6 @@ container_node* ConnectNode(container_node* Parent, container_node* NewNode);
 void DisconnectNode(container_node* Node);
 
 container_node* CreateBorderNode(menu_interface* Interface, b32 Vertical=false, r32 Position = 0.5f,  v4 Color =  V4(0,0,0.4,1));
-
 
 #define MENU_UPDATE_CHILD_REGIONS(name) void name(container_node* Parent)
 typedef MENU_UPDATE_CHILD_REGIONS( menu_get_region );
@@ -196,15 +193,6 @@ struct text_attribute
   v4 Color;
 };
 
-struct tabbed_button_data
-{
-  container_node* TabbedHBF;
-  container_node* ItemHBF;
-  container_node* ItemHeader;
-  container_node* ItemBody;
-  container_node* ItemFooter;
-};
-
 #define DRAGGABLE_ATTRIBUTE_UPDATE(name) void name( struct  menu_interface* Interface, struct  container_node* Node,  struct draggable_attribute* Attr)
 typedef DRAGGABLE_ATTRIBUTE_UPDATE( draggable_attribute_update );
 
@@ -212,12 +200,6 @@ struct draggable_attribute
 {
   container_node* Node;
   draggable_attribute_update** Update;
-};
-
-struct split_draggable_data
-{
-  container_node* SplitNode;
-  border_leaf* Border;
 };
 
 enum class menu_region_alignment
@@ -345,19 +327,12 @@ inline border_leaf* GetBorderNode(container_node* Container)
   border_leaf* Result = (border_leaf*) GetContainerPayload(Container);
   return Result;
 }
-inline hbf_node* GetHBFNode(container_node* Container)
-{
-  Assert(Container->Type == container_type::HBF);
-  hbf_node* Result = (hbf_node*) GetContainerPayload(Container);
-  return Result;
-}
 inline grid_node* GetGridNode(container_node* Container)
 {
   Assert(Container->Type == container_type::Grid);
   grid_node* Result = (grid_node*) GetContainerPayload(Container);
   return Result;
 }
-
 inline plugin_node* GetPluginNode(container_node* Container)
 {
   Assert(Container->Type == container_type::Plugin);
@@ -377,15 +352,12 @@ inline tab_node* GetTabNode(container_node* Container)
   return Result;
 }
 
-void SetSplitDragAttribute(container_node* SplitNode, container_node* BorderNode);
-void SplitWindowHeaderDrag( menu_interface* Interface, container_node* Node, draggable_attribute* Attr );
+container_node* Next( container_node* Node );
+container_node* Previous( container_node* Node );
+
 menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* BaseWindow, rect2f Region);
 container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical, r32 BorderPos = 0.5);
-container_node* CreateHBF(menu_interface* Interface, v4 HeaderColor, container_node* BodyNode);
 container_node* CreatePlugin(menu_interface* Interface, c8* HeaderName, v4 HeaderColor, container_node* BodyNode);
-container_node* SetSplitWindows( menu_interface* Interface, container_node* SplitNode, container_node* HBF1, container_node* HBF2);
-
-
 menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name);
 void RegisterWindow(menu_interface* Interface, menu_tree* DropDownMenu, container_node* Plugin);
 

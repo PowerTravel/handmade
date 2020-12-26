@@ -9,7 +9,6 @@ MENU_GAINING_FOCUS(DropDownGainingFocus);
 MENU_UPDATE_CHILD_REGIONS(UpdateChildRegions);
 MENU_UPDATE_CHILD_REGIONS(RootUpdateChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateSplitChildRegions);
-MENU_UPDATE_CHILD_REGIONS(UpdateHBFChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateGridChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateTabWindowChildRegions);
 
@@ -24,7 +23,6 @@ BUTTON_ATTRIBUTE_UPDATE(ShowWindowButton);
 
 
 DRAGGABLE_ATTRIBUTE_UPDATE(UpdateFrameBorderCallback);
-DRAGGABLE_ATTRIBUTE_UPDATE(SplitWindowHeaderDrag);
 DRAGGABLE_ATTRIBUTE_UPDATE(UpdateHeaderPosition);
 DRAGGABLE_ATTRIBUTE_UPDATE(TabDrag); 
 DRAGGABLE_ATTRIBUTE_UPDATE(UpdateSplitBorderCallback);
@@ -49,7 +47,6 @@ void _ReinitiatePool(function_pool* Pool)
     NewFunPtr(UpdateChildRegions)
     NewFunPtr(RootUpdateChildRegions)
     NewFunPtr(UpdateSplitChildRegions)
-    NewFunPtr(UpdateHBFChildRegions)
     NewFunPtr(UpdateGridChildRegions)
     NewFunPtr(UpdateTabWindowChildRegions)
     NewFunPtr(DrawFunctionTimeline)
@@ -59,7 +56,6 @@ void _ReinitiatePool(function_pool* Pool)
     NewFunPtr(DropDownMenuButton)
     NewFunPtr(ShowWindowButton)
     NewFunPtr(UpdateFrameBorderCallback)
-    NewFunPtr(SplitWindowHeaderDrag)
     NewFunPtr(UpdateHeaderPosition)
     NewFunPtr(TabDrag)
     NewFunPtr(UpdateSplitBorderCallback)

@@ -6,7 +6,7 @@ MENU_UPDATE_CHILD_REGIONS(UpdateChildRegions)
   while(Child)
   {
     Child->Region = Parent->Region;
-    Child = Child->NextSibling;
+    Child = Next(Child);
   }
 }
 
@@ -23,6 +23,7 @@ MENU_UPDATE_CHILD_REGIONS(RootUpdateChildRegions)
   container_node* Child = Parent->FirstChild;
   u32 BorderIndex = 0;
   container_node* Body = 0;
+  container_node* Header = 0;
   container_node* BorderNodes[4] = {};
   border_leaf* Borders[4] = {};
   while(Child)
@@ -34,10 +35,16 @@ MENU_UPDATE_CHILD_REGIONS(RootUpdateChildRegions)
       Borders[BorderIndex] = GetBorderNode(Child);
       BorderIndex++;
     }else{
-      Assert(!Body);
-      Body = Child; 
+      if(!Header)
+      {
+        Header = Child;
+      }else{
+        Assert(!Body);
+        Body = Child;
+      }
+      
     }
-    Child = Child->NextSibling;
+    Child = Next(Child);
   }
 
   r32 Width  = (Borders[1]->Position + 0.5f*Borders[1]->Thickness) - ( Borders[0]->Position - 0.5f*Borders[0]->Thickness);
@@ -84,13 +91,17 @@ MENU_UPDATE_CHILD_REGIONS(RootUpdateChildRegions)
   Assert(BorderIndex == 4);
   Assert(Body);
 
-  rect2f BorderedRegion = Rect2f(
+  rect2f InteralRegion = Rect2f(
     Borders[0]->Position + 0.5f*Borders[0]->Thickness,
     Borders[2]->Position + 0.5f*Borders[2]->Thickness,
     Width  - (Borders[0]->Thickness + Borders[1]->Thickness),
     Height - (Borders[2]->Thickness + Borders[3]->Thickness));
 
-  Body->Region = Rect2f(BorderedRegion.X, BorderedRegion.Y, BorderedRegion.W, BorderedRegion.H);
+  r32 HeaderHeight = 0.02f;
+  r32 BodyHeight = InteralRegion.H-HeaderHeight;
+
+  Header->Region = Rect2f(InteralRegion.X, InteralRegion.Y+BodyHeight, InteralRegion.W, HeaderHeight);
+  Body->Region   = Rect2f(InteralRegion.X, InteralRegion.Y, InteralRegion.W, BodyHeight);
 
   Parent->Region = Rect2f(
     Borders[0]->Position - 0.5f*Borders[0]->Thickness,
@@ -128,7 +139,7 @@ MENU_UPDATE_CHILD_REGIONS(UpdateSplitChildRegions)
         Body2Node = Child;
       }
     }
-    Child = Child->NextSibling;
+    Child = Next(Child);
   }
 
   Assert(Body1Node && Body2Node && BorderNode);
@@ -176,58 +187,6 @@ menu_functions GetSplitFunctions()
   return Result;
 }
 
-
-MENU_UPDATE_CHILD_REGIONS( UpdateHBFChildRegions )
-{
-  container_node* Child = Parent->FirstChild;
-  u32 Index = 0;
-  hbf_node* HBF = GetHBFNode(Parent);
-  while(Child)
-  {
-    switch(Index)
-    {
-      case 0: // Header
-      {
-        Child->Region = Rect2f(
-          Parent->Region.X,
-          Parent->Region.Y + Parent->Region.H - HBF->HeaderSize,
-          Parent->Region.W,
-          HBF->HeaderSize);
-      }break;
-      case 1: // Body
-      {
-        Child->Region = Rect2f(
-          Parent->Region.X,
-          Parent->Region.Y + HBF->FooterSize,
-          Parent->Region.W,
-          Parent->Region.H - HBF->HeaderSize - HBF->FooterSize);
-      }break;
-      case 2: // Footer
-      {
-        Child->Region = Rect2f(
-          Parent->Region.X,
-          Parent->Region.Y,
-          Parent->Region.W,
-          HBF->FooterSize);
-      }break;
-      default:
-      {
-        INVALID_CODE_PATH
-      }break;
-    }
-    ++Index;
-    Child = Child->NextSibling;
-  }
-}
-
-menu_functions GetHBFFunctions()
-{
-  menu_functions Result = GetDefaultFunctions();
-  Result.UpdateChildRegions = DeclareFunction(menu_get_region,UpdateHBFChildRegions);
-  return Result;
-}
-
-
 MENU_UPDATE_CHILD_REGIONS( UpdateTabWindowChildRegions)
 {
   container_node* Child = Parent->FirstChild;
@@ -259,7 +218,7 @@ MENU_UPDATE_CHILD_REGIONS( UpdateTabWindowChildRegions)
       }break;
     }
     ++Index;
-    Child = Child->NextSibling;
+    Child = Next(Child);
   }
 }
 
@@ -341,7 +300,6 @@ menu_functions GetMenuFunction(container_type Type)
     case container_type::Root: return GetRootMenuFunctions();
     case container_type::Border: return GetDefaultFunctions();
     case container_type::Split: return GetSplitFunctions();
-    case container_type::HBF: return GetHBFFunctions();
     case container_type::Grid: return GetGridFunctions();
     case container_type::TabWindow:  return GetTabWindowFunctions();
     case container_type::Tab:        return GetDefaultFunctions();
