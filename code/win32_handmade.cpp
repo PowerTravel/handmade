@@ -120,6 +120,7 @@ DEBUG_PLATFORM_PRINT(DEBUGPrint)
     args);
   va_end(args);
   OutputDebugStringA(Buffer);
+  OutputDebugStringA("");
 }
 
 DEBUG_PLATFORM_GET_PROCESS_STATE(DEBUGGetProcessState)

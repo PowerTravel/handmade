@@ -296,14 +296,14 @@ menu_functions GetMenuFunction(container_type Type)
 {
   switch(Type)
   {   
-    case container_type::None: return GetDefaultFunctions();
-    case container_type::Root: return GetRootMenuFunctions();
-    case container_type::Border: return GetDefaultFunctions();
-    case container_type::Split: return GetSplitFunctions();
-    case container_type::Grid: return GetGridFunctions();
-    case container_type::TabWindow:  return GetTabWindowFunctions();
-    case container_type::Tab:        return GetDefaultFunctions();
-    case container_type::Plugin:     return GetDefaultFunctions();
+    case container_type::None:      return GetDefaultFunctions();
+    case container_type::Root:      return GetRootMenuFunctions();
+    case container_type::Border:    return GetDefaultFunctions();
+    case container_type::Split:     return GetSplitFunctions();
+    case container_type::Grid:      return GetGridFunctions();
+    case container_type::TabWindow: return GetTabWindowFunctions();
+    case container_type::Tab:       return GetDefaultFunctions();
+    case container_type::Plugin:    return GetDefaultFunctions();
 
     default: Assert(0);
   }

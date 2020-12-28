@@ -16,19 +16,6 @@ MENU_DRAW(DrawFunctionTimeline);
 internal void RefreshCollation();
 internal void RestartCollation();
 
-
-//MENU_UPDATE_CHILD_REGIONS(DropDownUpdateChildRegions)
-//{
-//  container_node* Child = Parent->FirstChild;
-//  if(Child)
-//  {
-//    Assert(!Child->NextSibling);
-//    Assert(Child->Region.W > 0 && Child->Region.H > 0);
-//    Child->Region.Y = Parent->Region.Y - Parent->Region.H - Child->Region.H;
-//    Child->Region.X = Parent->Region.X;
-//  }
-//}
-
 BUTTON_ATTRIBUTE_UPDATE(DebugToggleButton)
 {
   v4 InactiveColor = V4(0.3,0.1,0.1,1);

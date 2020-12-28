@@ -21,7 +21,8 @@ enum container_attribute
   ATTRIBUTE_BUTTON = 0x8,
   ATTRIBUTE_COLOR = 0x10,
   ATTRIBUTE_TEXT = 0x20,
-  ATTRIBUTE_SIZE = 0x40
+  ATTRIBUTE_SIZE = 0x40,
+  ATTRIBUTE_INTERACTION = 0x80
 };
 
 
@@ -49,13 +50,13 @@ const c8* ToString(u32 Type)
     case ATTRIBUTE_MERGE: return "Merge";
     case ATTRIBUTE_MERGE_SLOT: return "Slot";
     case ATTRIBUTE_BUTTON: return "Button";
+    case ATTRIBUTE_INTERACTION: return "Interaction";
     case ATTRIBUTE_COLOR: return "Color";
     case ATTRIBUTE_TEXT: return "Text";
     case ATTRIBUTE_SIZE: return "Size";
   }
   return "";
 };
-
 
 struct container_node;
 struct menu_interface;
@@ -72,11 +73,30 @@ void DisconnectNode(container_node* Node);
 
 container_node* CreateBorderNode(menu_interface* Interface, b32 Vertical=false, r32 Position = 0.5f,  v4 Color =  V4(0,0,0.4,1));
 
+
+struct update_args;
+
+#define MENU_UPDATE_FUNCTION(name) b32 name(menu_interface* Interface, update_args* Args )
+typedef MENU_UPDATE_FUNCTION( update_function );
+
+
+struct update_args
+{
+  menu_interface* Interface;
+  container_node* Caller;
+  void* Data;
+  b32 InUse;
+  update_function** Function;
+};
+
 #define MENU_UPDATE_CHILD_REGIONS(name) void name(container_node* Parent)
 typedef MENU_UPDATE_CHILD_REGIONS( menu_get_region );
 
 #define MENU_DRAW(name) void name( menu_interface* Interface, container_node* Node)
 typedef MENU_DRAW( menu_draw );
+
+b32 HasAttribute(container_node* Node, container_attribute Attri);
+u8* GetAttributePointer(container_node* Node, container_attribute Attri);
 
 struct menu_functions
 {
@@ -174,6 +194,17 @@ struct mergable_attribute
 #define BUTTON_ATTRIBUTE_UPDATE(name) void name( struct  menu_interface* Interface, struct button_attribute* Attr, struct  container_node* Node)
 typedef BUTTON_ATTRIBUTE_UPDATE( button_attribute_update );
 
+#define MOUSE_INTERACTION(name) void name( menu_interface* Interface, container_node* Node)
+typedef MOUSE_INTERACTION( mouse_interaction );
+
+struct interaction_attribute
+{
+  mouse_interaction** MouseEnter;
+  mouse_interaction**  MouseExit;
+  mouse_interaction**  MouseDown;
+  mouse_interaction**    MouseUp;
+};
+
 struct button_attribute
 {
   //binary_signal_state State;
@@ -193,13 +224,9 @@ struct text_attribute
   v4 Color;
 };
 
-#define DRAGGABLE_ATTRIBUTE_UPDATE(name) void name( struct  menu_interface* Interface, struct  container_node* Node,  struct draggable_attribute* Attr)
-typedef DRAGGABLE_ATTRIBUTE_UPDATE( draggable_attribute_update );
-
 struct draggable_attribute
 {
-  container_node* Node;
-  draggable_attribute_update** Update;
+  container_node* NodeToDrag;
 };
 
 enum class menu_region_alignment
@@ -256,10 +283,10 @@ struct menu_tree
   container_node* Root;
 
   u32 HotLeafCount;
-  container_node* HotLeafs[32];
-
-  u32 ActiveLeafCount;
-  container_node* ActiveLeafs[32];
+  u32 NewLeafOffset;  
+  container_node* HotLeafs[64];
+  u32 RemovedHotLeafCount;
+  container_node* RemovedHotLeafs[64];
 
   menu_tree* Next;
   menu_tree* Previous;
@@ -272,16 +299,17 @@ struct menu_tree
 
 MENU_LOSING_FOCUS(DefaultLosingFocus)
 {
+
 }
 
 MENU_GAINING_FOCUS(DefaultGainingFocus)
 {
+
 }
 
 struct menu_interface
 {
   b32 MenuVisible;
-
 
   u32 PermanentWindowCount = 0;
   container_node* PermanentWindows[32];
@@ -307,6 +335,8 @@ struct menu_interface
   r32 BorderSize;
   r32 HeaderSize;
   r32 MinSize;
+
+  update_args UpdateQueue[64];
 };
 
 inline u8* GetContainerPayload( container_node* Container )

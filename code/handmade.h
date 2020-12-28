@@ -99,14 +99,10 @@ inline func_ptr_void* _DeclareFunction(func_ptr_void Function, const c8* Name)
     Result->Name = (c8*) PushCopy(GlobalGameState->PersistentArena, (str::StringLength(Name)+1)*sizeof(c8), (void*) Name);
     Result->Function = Function;
   }else{
-    if(Result->Function != Function)
-    {
-      int a = 10;
-    }
     Result->Function = Function;
   }
   return &Result->Function;
 }
 
-#define DeclareFunction(Type, Name) (Type**) _DeclareFunction((func_ptr_void) (&Name), #Name );
+#define DeclareFunction(Type, Name) (Type**) _DeclareFunction((func_ptr_void) (&Name), #Name )
 #define CallFunctionPointer(PtrToFunPtr, ... ) (**PtrToFunPtr)(__VA_ARGS__)

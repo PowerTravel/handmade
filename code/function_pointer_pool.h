@@ -1,5 +1,8 @@
 #pragma once
 
+
+
+
 MENU_LOSING_FOCUS(DefaultLosingFocus);
 MENU_LOSING_FOCUS(DropDownLosingFocus);
 
@@ -14,20 +17,25 @@ MENU_UPDATE_CHILD_REGIONS(UpdateTabWindowChildRegions);
 
 MENU_DRAW(DrawFunctionTimeline);
 
-
 BUTTON_ATTRIBUTE_UPDATE(DebugToggleButton);
 BUTTON_ATTRIBUTE_UPDATE(DebugRecompileButton);
 BUTTON_ATTRIBUTE_UPDATE(DebugPauseCollationButton);
 BUTTON_ATTRIBUTE_UPDATE(DropDownMenuButton);
 BUTTON_ATTRIBUTE_UPDATE(ShowWindowButton);
 
+MOUSE_INTERACTION(InitiateTabDrag);
+MOUSE_INTERACTION(InitiateWindowDrag);
+MOUSE_INTERACTION(InitiateSplitWindowBorderDrag);
+MOUSE_INTERACTION(InitiateBorderDrag);
 
-DRAGGABLE_ATTRIBUTE_UPDATE(UpdateFrameBorderCallback);
-DRAGGABLE_ATTRIBUTE_UPDATE(UpdateHeaderPosition);
-DRAGGABLE_ATTRIBUTE_UPDATE(TabDrag); 
-DRAGGABLE_ATTRIBUTE_UPDATE(UpdateSplitBorderCallback);
+MENU_UPDATE_FUNCTION(TabDragUpdate);
+MENU_UPDATE_FUNCTION(WindowDragUpdate);
+MENU_UPDATE_FUNCTION(RootBorderDragUpdate);
+MENU_UPDATE_FUNCTION(SplitWindowBorderUpdate);
 
-
+MOUSE_INTERACTION(DropDownMouseEnter);
+MOUSE_INTERACTION(DropDownMouseExit);
+MOUSE_INTERACTION(DropDownMouseUp);
 
 #ifdef HANDMADE_INTERNAL
 
@@ -55,10 +63,17 @@ void _ReinitiatePool(function_pool* Pool)
     NewFunPtr(DebugPauseCollationButton)
     NewFunPtr(DropDownMenuButton)
     NewFunPtr(ShowWindowButton)
-    NewFunPtr(UpdateFrameBorderCallback)
-    NewFunPtr(UpdateHeaderPosition)
-    NewFunPtr(TabDrag)
-    NewFunPtr(UpdateSplitBorderCallback)
+    NewFunPtr(InitiateTabDrag)
+    NewFunPtr(InitiateWindowDrag)
+    NewFunPtr(InitiateSplitWindowBorderDrag)
+    NewFunPtr(InitiateBorderDrag)
+    NewFunPtr(TabDragUpdate)
+    NewFunPtr(WindowDragUpdate)
+    NewFunPtr(RootBorderDragUpdate)
+    NewFunPtr(SplitWindowBorderUpdate)
+    NewFunPtr(DropDownMouseEnter)
+    NewFunPtr(DropDownMouseExit)
+    NewFunPtr(DropDownMouseUp)
     {
       INVALID_CODE_PATH;
     }    

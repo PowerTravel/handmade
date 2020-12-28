@@ -259,6 +259,19 @@ CheckArena( memory_arena *Arena )
   Assert( Arena->TempCount == 0 );
 }
 
+struct ScopedMemory
+{
+  temporary_memory TempMem;
+  ScopedMemory(memory_arena* Arena)
+  {
+    TempMem = BeginTemporaryMemory(Arena);
+  }
+  ~ScopedMemory()
+  {
+    EndTemporaryMemory(TempMem);
+  }
+};
+
 #define BootstrapPushStruct( type, Member, ... ) (type*) BootstrapPushSize_( sizeof( type ), OffsetOf(type, Member), ## __VA_ARGS__ )
 inline void *
 BootstrapPushSize_( uintptr_t StructSize, uintptr_t OffsetToArena,
