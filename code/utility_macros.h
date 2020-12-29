@@ -71,6 +71,8 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 #define Maximum(A, B) ((A > B) ? (A) : (B))
 #define Minimum(A, B) ((A < B) ? (A) : (B))
 
+#define EnumToIdx(Enum) ((u32) Enum)
+
 #define GetAbsoluteMax(a,b) ( Abs(a) > Abs(b) ) ? Abs(a) : Abs(b);
 #define GetAbsoluteMin(a,b) ( Abs(a) < Abs(b) ) ? Abs(a) : Abs(b);
 

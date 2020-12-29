@@ -1,5 +1,14 @@
 #pragma once
 
+// TODO: + Ta bort attribute button, styrs nu av mouse_interaction
+//       + Sätt x-knapp (stänga) till tabs
+//       + Ta bort Root header (existerar idag bara så man kan flytta runt fönster som har flera tabs).
+//         Tabs kan istället fyllas på från vänster och lämna en bit från höger där man kan flytta runt fönstret
+//       + Extrahera interface till en egen mapp där olika "logiska"-element får sin egen fil. En fil för radio-button, en för scroll window etc etc
+//       + Kolla om vi verkligen behöver "focus-window" som koncept. (Kan behövas senare så vi vet vilket fönster som tar keyboard-input). Idag anävnds
+//         den bara för att veta när vi ska anropa gaining/losing focus events
+//       + Proper event queue implementerad som lista: update_args UpdateQueue[64]; (Göras trådsäker? Interface kör på separat tråd?)
+
 enum class container_type
 {
   None,
@@ -17,12 +26,11 @@ enum container_attribute
   ATTRIBUTE_NONE = 0x0,
   ATTRIBUTE_DRAG = 0x1,
   ATTRIBUTE_MERGE = 0x2,
-  ATTRIBUTE_MERGE_SLOT = 0x4,
-  ATTRIBUTE_BUTTON = 0x8,
-  ATTRIBUTE_COLOR = 0x10,
-  ATTRIBUTE_TEXT = 0x20,
-  ATTRIBUTE_SIZE = 0x40,
-  ATTRIBUTE_INTERACTION = 0x80
+  ATTRIBUTE_BUTTON = 0x4,
+  ATTRIBUTE_COLOR = 0x8,
+  ATTRIBUTE_TEXT = 0x10,
+  ATTRIBUTE_SIZE = 0x20,
+  ATTRIBUTE_MENU_EVENT_HANDLE = 0x40
 };
 
 
@@ -48,12 +56,11 @@ const c8* ToString(u32 Type)
   {
     case ATTRIBUTE_DRAG: return "Drag";
     case ATTRIBUTE_MERGE: return "Merge";
-    case ATTRIBUTE_MERGE_SLOT: return "Slot";
     case ATTRIBUTE_BUTTON: return "Button";
-    case ATTRIBUTE_INTERACTION: return "Interaction";
     case ATTRIBUTE_COLOR: return "Color";
     case ATTRIBUTE_TEXT: return "Text";
     case ATTRIBUTE_SIZE: return "Size";
+    case ATTRIBUTE_MENU_EVENT_HANDLE: return "Event";
   }
   return "";
 };
@@ -73,12 +80,10 @@ void DisconnectNode(container_node* Node);
 
 container_node* CreateBorderNode(menu_interface* Interface, b32 Vertical=false, r32 Position = 0.5f,  v4 Color =  V4(0,0,0.4,1));
 
-
 struct update_args;
 
 #define MENU_UPDATE_FUNCTION(name) b32 name(menu_interface* Interface, update_args* Args )
 typedef MENU_UPDATE_FUNCTION( update_function );
-
 
 struct update_args
 {
@@ -180,30 +185,30 @@ struct plugin_node
   v4 Color;
 };
 
-struct merge_slot_attribute
+enum class merge_zone
 {
-  u32 HotMergeZone;
-  rect2f MergeZone[5];
+  // (0 through 4 indexes into merge_slot_attribute::MergeZone)
+  // (The rest do not)
+  CENTER,      // Tab (idx 0)
+  LEFT,        // Left Split (idx 1)
+  RIGHT,       // Left Split (idx 2)
+  TOP,         // Left Split (idx 3)
+  BOT,         // Left Split (idx 4)
+  HIGHLIGHTED, // We are mousing over a mergable window and want to draw it
+  NONE         // No mergable window present
 };
 
 struct mergable_attribute
 {
-  merge_slot_attribute* Slot;
+  merge_zone HotMergeZone;
+  rect2f MergeZone[5];
 };
 
 #define BUTTON_ATTRIBUTE_UPDATE(name) void name( struct  menu_interface* Interface, struct button_attribute* Attr, struct  container_node* Node)
 typedef BUTTON_ATTRIBUTE_UPDATE( button_attribute_update );
 
-#define MOUSE_INTERACTION(name) void name( menu_interface* Interface, container_node* Node)
-typedef MOUSE_INTERACTION( mouse_interaction );
-
-struct interaction_attribute
-{
-  mouse_interaction** MouseEnter;
-  mouse_interaction**  MouseExit;
-  mouse_interaction**  MouseDown;
-  mouse_interaction**    MouseUp;
-};
+#define MENU_EVENT_CALLBACK(name) void name( menu_interface* Interface, container_node* CallerNode, void* Data)
+typedef MENU_EVENT_CALLBACK( menu_event_callback );
 
 struct button_attribute
 {
@@ -236,6 +241,12 @@ enum class menu_region_alignment
   RIGHT,
   TOP,
   BOT
+};
+
+struct menu_event_handle_attribtue
+{
+  u32 HandleCount;
+  u32 Handles[16]; // Can atm "only" have 16 events per node
 };
 
 enum class menu_size_type
@@ -290,8 +301,6 @@ struct menu_tree
 
   menu_tree* Next;
   menu_tree* Previous;
-  // TODO:
-  // b32 ShouldDelete; <-- Implement later (Delete last in a cleanup phase)
 
   menu_losing_focus** LosingFocus;
   menu_gaining_focus** GainingFocus;
@@ -306,6 +315,27 @@ MENU_GAINING_FOCUS(DefaultGainingFocus)
 {
 
 }
+
+enum class menu_event_type
+{
+  MouseUp,
+  MouseDown,
+  MouseEnter,
+  MouseExit
+};
+
+struct menu_event
+{
+  u32 Index;
+  b32 Active;
+  container_node* CallerNode;
+  menu_event_type EventType;
+  menu_event_callback** Callback;
+  menu_event_callback** OnDelete; // Can be used to do cleanup on Data if the node requires it.
+  void* Data;
+  menu_event* Next;
+  menu_event* Previous;
+};
 
 struct menu_interface
 {
@@ -335,6 +365,10 @@ struct menu_interface
   r32 BorderSize;
   r32 HeaderSize;
   r32 MinSize;
+
+  menu_event EventSentinel;
+  u32 MenuEventCallbackCount;
+  menu_event MenuEventCallbacks[64];
 
   update_args UpdateQueue[64];
 };

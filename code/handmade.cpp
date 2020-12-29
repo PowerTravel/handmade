@@ -20,8 +20,6 @@
     - Add a tag-system. I want to get a random asset with a specific tag.
   Debug:
     * Continue w decent Debug-interface.
-      - Drop down Menu Selection of windows in root window header
-         - Add settings and profiler to the drop down menu select
     - Time-Plots
     - Item selection w mouse
     - Continue on caseys Stream, he gets rid of the __COUNT__ macro gimmic which we also use at some point. (ep 193)

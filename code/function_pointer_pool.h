@@ -23,19 +23,19 @@ BUTTON_ATTRIBUTE_UPDATE(DebugPauseCollationButton);
 BUTTON_ATTRIBUTE_UPDATE(DropDownMenuButton);
 BUTTON_ATTRIBUTE_UPDATE(ShowWindowButton);
 
-MOUSE_INTERACTION(InitiateTabDrag);
-MOUSE_INTERACTION(InitiateWindowDrag);
-MOUSE_INTERACTION(InitiateSplitWindowBorderDrag);
-MOUSE_INTERACTION(InitiateBorderDrag);
+MENU_EVENT_CALLBACK(InitiateTabDrag);
+MENU_EVENT_CALLBACK(InitiateWindowDrag);
+MENU_EVENT_CALLBACK(InitiateSplitWindowBorderDrag);
+MENU_EVENT_CALLBACK(InitiateBorderDrag);
 
 MENU_UPDATE_FUNCTION(TabDragUpdate);
 MENU_UPDATE_FUNCTION(WindowDragUpdate);
 MENU_UPDATE_FUNCTION(RootBorderDragUpdate);
 MENU_UPDATE_FUNCTION(SplitWindowBorderUpdate);
 
-MOUSE_INTERACTION(DropDownMouseEnter);
-MOUSE_INTERACTION(DropDownMouseExit);
-MOUSE_INTERACTION(DropDownMouseUp);
+MENU_EVENT_CALLBACK(DropDownMouseEnter);
+MENU_EVENT_CALLBACK(DropDownMouseExit);
+MENU_EVENT_CALLBACK(DropDownMouseUp);
 
 #ifdef HANDMADE_INTERNAL
 
