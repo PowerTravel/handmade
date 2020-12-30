@@ -24,13 +24,12 @@ enum class container_type
 enum container_attribute
 {
   ATTRIBUTE_NONE = 0x0,
-  ATTRIBUTE_DRAG = 0x1,
-  ATTRIBUTE_MERGE = 0x2,
-  ATTRIBUTE_BUTTON = 0x4,
-  ATTRIBUTE_COLOR = 0x8,
-  ATTRIBUTE_TEXT = 0x10,
-  ATTRIBUTE_SIZE = 0x20,
-  ATTRIBUTE_MENU_EVENT_HANDLE = 0x40
+  ATTRIBUTE_MERGE = 0x1,
+  ATTRIBUTE_BUTTON = 0x2,
+  ATTRIBUTE_COLOR = 0x4,
+  ATTRIBUTE_TEXT = 0x8,
+  ATTRIBUTE_SIZE = 0x10,
+  ATTRIBUTE_MENU_EVENT_HANDLE = 0x20
 };
 
 
@@ -54,7 +53,6 @@ const c8* ToString(u32 Type)
 {
   switch(Type)
   {
-    case ATTRIBUTE_DRAG: return "Drag";
     case ATTRIBUTE_MERGE: return "Merge";
     case ATTRIBUTE_BUTTON: return "Button";
     case ATTRIBUTE_COLOR: return "Color";
@@ -227,11 +225,6 @@ struct text_attribute
   c8 Text[256];
   u32 FontSize;
   v4 Color;
-};
-
-struct draggable_attribute
-{
-  container_node* NodeToDrag;
 };
 
 enum class menu_region_alignment

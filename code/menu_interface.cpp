@@ -25,7 +25,6 @@ GetAttributeSize(container_attribute Attribute)
 {
   switch(Attribute)
   {
-    case ATTRIBUTE_DRAG:        return sizeof(draggable_attribute);
     case ATTRIBUTE_MERGE:       return sizeof(mergable_attribute);
     case ATTRIBUTE_BUTTON:      return sizeof(button_attribute);
     case ATTRIBUTE_COLOR:       return sizeof(color_attribute);
@@ -1272,13 +1271,13 @@ void _RegisterMenuEvent(menu_interface* Interface, menu_event_type EventType, co
 
 MENU_UPDATE_FUNCTION(SplitWindowBorderUpdate)
 {
-  draggable_attribute* Draggable = (draggable_attribute*) Args->Data;
-  
-  container_node* SplitNode = Draggable->NodeToDrag;
+  container_node* BorderNode = Args->Caller;
+  Assert(BorderNode->Type == container_type::Border);
+  container_node* SplitNode = BorderNode->Parent;
   Assert(SplitNode->Type == container_type::Split);
 
   // The Caller is the border which we want to update
-  border_leaf* Border = GetBorderNode(Args->Caller);
+  border_leaf* Border = GetBorderNode(BorderNode);
   if(Border->Vertical)
   {
     Border->Position += (Interface->MousePos.X - Interface->PreviousMousePos.X)/SplitNode->Region.W;
@@ -1289,17 +1288,14 @@ MENU_UPDATE_FUNCTION(SplitWindowBorderUpdate)
   return Interface->MouseLeftButton.Active;
 }
 
-
 MENU_EVENT_CALLBACK(InitiateSplitWindowBorderDrag)
 {
-  draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(CallerNode, ATTRIBUTE_DRAG);
-  PushToUpdateQueue(Interface, CallerNode, SplitWindowBorderUpdate, Draggable);
+  PushToUpdateQueue(Interface, CallerNode, SplitWindowBorderUpdate, 0);
 }
 
 MENU_UPDATE_FUNCTION(RootBorderDragUpdate)
 {
-  draggable_attribute* Draggable = (draggable_attribute*) Args->Data;
-  border_leaf* Border = GetBorderNode(Draggable->NodeToDrag);
+  border_leaf* Border = GetBorderNode(Args->Caller);
   if(Border->Vertical)
   {
     Border->Position += Interface->MousePos.X - Interface->PreviousMousePos.X;
@@ -1311,8 +1307,7 @@ MENU_UPDATE_FUNCTION(RootBorderDragUpdate)
 
 MENU_EVENT_CALLBACK(InitiateBorderDrag)
 {
-  draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(CallerNode, ATTRIBUTE_DRAG);
-  PushToUpdateQueue(Interface, CallerNode, RootBorderDragUpdate, Draggable);
+  PushToUpdateQueue(Interface, CallerNode, RootBorderDragUpdate, 0);
 }
 
 container_node* CreateBorderNode(menu_interface* Interface, b32 Vertical, r32 Position, v4 Color)
@@ -1663,8 +1658,7 @@ internal void UpdateMergableAttribute( menu_interface* Interface, container_node
 
 MENU_UPDATE_FUNCTION(WindowDragUpdate)
 {
-  draggable_attribute* Draggable = (draggable_attribute*) Args->Data;
-  container_node* Root = Draggable->NodeToDrag;
+  container_node* Root = (container_node*) Args->Data;
   Assert(Root->Type == container_type::Root);
   container_node* Child = Root->FirstChild;
   while(Child->Type == container_type::Border)
@@ -1680,17 +1674,7 @@ MENU_UPDATE_FUNCTION(WindowDragUpdate)
 
 MENU_EVENT_CALLBACK(InitiateWindowDrag)
 {
-  draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(CallerNode, ATTRIBUTE_DRAG);
-  PushToUpdateQueue(Interface, CallerNode, WindowDragUpdate, Draggable);
-}
-
-inline internal void SetFrameDragAttribute(menu_interface* Interface, container_node* BorderNode)
-{
-  border_leaf* BorderLeaf = GetBorderNode(BorderNode);
-  draggable_attribute* Draggable = (draggable_attribute*) PushAttribute(Interface, BorderNode, ATTRIBUTE_DRAG);
-  Draggable->NodeToDrag = BorderNode;
-
-  RegisterMenuEvent(Interface, menu_event_type::MouseDown, BorderNode, 0, InitiateBorderDrag, 0);
+  PushToUpdateQueue(Interface, CallerNode, WindowDragUpdate, Data);
 }
 
 
@@ -1734,10 +1718,10 @@ menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* Bas
     color_attribute* Color = (color_attribute*) PushAttribute(Interface, RootHeader, ATTRIBUTE_COLOR);
     Color->Color = V4(0.4,0.2,0.2,1);
 
-    draggable_attribute* Draggable = (draggable_attribute*) PushAttribute(Interface, RootHeader, ATTRIBUTE_DRAG);
-    Draggable->NodeToDrag = Root->Root;
+    //draggable_attribute* Draggable = (draggable_attribute*) PushAttribute(Interface, RootHeader, ATTRIBUTE_DRAG);
+    //Draggable->NodeToDrag = ;
 
-    RegisterMenuEvent(Interface, menu_event_type::MouseDown, RootHeader, 0, InitiateWindowDrag, 0);
+    RegisterMenuEvent(Interface, menu_event_type::MouseDown, RootHeader, Root->Root, InitiateWindowDrag, 0);
     //RegisterMenuEvent(Interface, menu_event_type::MouseUp, RootHeader, 0, ApplyWindowMerge, 0);
 
     PushAttribute(Interface, RootHeader, ATTRIBUTE_MERGE);
@@ -1748,16 +1732,16 @@ menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* Bas
   { 
     container_node* Border1 = CreateBorderNode(Interface, true, Region.X);
     ConnectNode(Root->Root, Border1);
-    SetFrameDragAttribute(Interface, Border1);
+    RegisterMenuEvent(Interface, menu_event_type::MouseDown, Border1, 0, InitiateBorderDrag, 0);
     container_node* Border2 = CreateBorderNode(Interface, true, Region.X + Region.W);
     ConnectNode(Root->Root, Border2);
-    SetFrameDragAttribute(Interface, Border2);
+    RegisterMenuEvent(Interface, menu_event_type::MouseDown, Border2, 0, InitiateBorderDrag, 0);
     container_node* Border3 = CreateBorderNode(Interface, false,Region.Y);
     ConnectNode(Root->Root, Border3);
-    SetFrameDragAttribute(Interface, Border3);
+    RegisterMenuEvent(Interface, menu_event_type::MouseDown, Border3, 0, InitiateBorderDrag, 0);
     container_node* Border4 = CreateBorderNode(Interface, false, Region.Y + Region.H);
     ConnectNode(Root->Root, Border4);
-    SetFrameDragAttribute(Interface, Border4);
+    RegisterMenuEvent(Interface, menu_event_type::MouseDown, Border4, 0, InitiateBorderDrag, 0);
 
     ConnectNode(Root->Root, RootHeader); // Header
     ConnectNode(Root->Root, BaseWindow); // Body
@@ -1849,12 +1833,11 @@ void SplitTabToNewWindow(menu_interface* Interface, container_node* Tab, v2 Wind
   ConnectNode(NewTabWindow, GetTabNode(Tab)->Payload);
 
   // Trigger the window-drag instead of this tab-drag
-  PushToUpdateQueue(Interface, RootHeader, WindowDragUpdate, GetAttributePointer(RootHeader, ATTRIBUTE_DRAG));
+  PushToUpdateQueue(Interface, RootHeader, WindowDragUpdate, NewMenu->Root);
 }
 
-b32 TabDrag(menu_interface* Interface, container_node* Node, draggable_attribute* Attr)
+b32 TabDrag(menu_interface* Interface, container_node* Tab)
 {
-  container_node* Tab = Node;
   Assert(Tab->Type == container_type::Tab);
   container_node* TabHeader = Tab->Parent;
   Assert(TabHeader->Type == container_type::Grid);
@@ -2175,11 +2158,7 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
 
 void SetSplitDragAttribute(menu_interface* Interface, container_node* SplitNode, container_node* BorderNode)
 {
-  border_leaf* BorderLeaf = GetBorderNode(BorderNode);
-  draggable_attribute* Draggable = (draggable_attribute*) PushAttribute(Interface, BorderNode, ATTRIBUTE_DRAG);
-  Draggable->NodeToDrag = SplitNode;
 
-  RegisterMenuEvent(Interface, menu_event_type::MouseDown, SplitNode->FirstChild, 0, InitiateSplitWindowBorderDrag, 0);
 }
 
 
@@ -2200,7 +2179,7 @@ container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical, r32 
   container_node* SplitNode  = NewContainer(Interface, container_type::Split);
   container_node* BorderNode = CreateBorderNode(Interface, Vertical, BorderPos);
   ConnectNode(SplitNode, BorderNode);
-  SetSplitDragAttribute(Interface, SplitNode, BorderNode);
+  RegisterMenuEvent(Interface, menu_event_type::MouseDown, BorderNode, 0, InitiateSplitWindowBorderDrag, 0);
   return SplitNode;
 }
 
@@ -2367,15 +2346,13 @@ menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
 
 MENU_UPDATE_FUNCTION(TabDragUpdate)
 {
-  draggable_attribute* Draggable = (draggable_attribute*) Args->Data;
-  b32 Continue = TabDrag(Args->Interface, Args->Caller, Draggable);
+  b32 Continue = TabDrag(Args->Interface, Args->Caller);
   return Interface->MouseLeftButton.Active && Continue;
 }
 
 MENU_EVENT_CALLBACK(InitiateTabDrag)
 {
-  draggable_attribute* Draggable = (draggable_attribute*) GetAttributePointer(CallerNode, ATTRIBUTE_DRAG);
-  PushToUpdateQueue(Interface, CallerNode, TabDragUpdate, Draggable);
+  PushToUpdateQueue(Interface, CallerNode, TabDragUpdate, 0);
 }
 
 container_node* CreateTab(menu_interface* Interface, container_node* Plugin)
@@ -2387,10 +2364,7 @@ container_node* CreateTab(menu_interface* Interface, container_node* Plugin)
   color_attribute* ColorAttr = (color_attribute*) PushAttribute(Interface, Tab, ATTRIBUTE_COLOR);
   ColorAttr->Color = PluginNode->Color;
 
-  draggable_attribute* Drag = (draggable_attribute*) PushAttribute(Interface, Tab, ATTRIBUTE_DRAG);
-  Drag->NodeToDrag = Tab;
-
-  RegisterMenuEvent(Interface, menu_event_type::MouseDown, Tab, Tab, InitiateTabDrag, 0);
+  RegisterMenuEvent(Interface, menu_event_type::MouseDown, Tab, 0, InitiateTabDrag, 0);
 
   text_attribute* MenuText = (text_attribute*) PushAttribute(Interface, Tab, ATTRIBUTE_TEXT);
   str::CopyStringsUnchecked(PluginNode->Title, MenuText->Text);
