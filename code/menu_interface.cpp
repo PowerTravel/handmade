@@ -1263,7 +1263,7 @@ void _RegisterMenuEvent(menu_interface* Interface, menu_event_type EventType, co
 
 MENU_UPDATE_FUNCTION(SplitWindowBorderUpdate)
 {
-  container_node* BorderNode = Args->Caller;
+  container_node* BorderNode = CallerNode;
   Assert(BorderNode->Type == container_type::Border);
   container_node* SplitNode = BorderNode->Parent;
   Assert(SplitNode->Type == container_type::Split);
@@ -1287,7 +1287,7 @@ MENU_EVENT_CALLBACK(InitiateSplitWindowBorderDrag)
 
 MENU_UPDATE_FUNCTION(RootBorderDragUpdate)
 {
-  border_leaf* Border = GetBorderNode(Args->Caller);
+  border_leaf* Border = GetBorderNode(CallerNode);
   if(Border->Vertical)
   {
     Border->Position += Interface->MousePos.X - Interface->PreviousMousePos.X;
@@ -1650,7 +1650,7 @@ internal void UpdateMergableAttribute( menu_interface* Interface, container_node
 
 MENU_UPDATE_FUNCTION(WindowDragUpdate)
 {
-  container_node* Root = (container_node*) Args->Data;
+  container_node* Root = (container_node*) Data;
   Assert(Root->Type == container_type::Root);
   container_node* Child = Root->FirstChild;
   while(Child->Type == container_type::Border)
@@ -1660,7 +1660,7 @@ MENU_UPDATE_FUNCTION(WindowDragUpdate)
     Child = Next(Child);
   }
 
-  UpdateMergableAttribute(Interface, Args->Caller);
+  UpdateMergableAttribute(Interface, CallerNode);
   return Interface->MouseLeftButton.Active;
 }
 
@@ -2048,7 +2048,7 @@ internal void CallUpdateFunctions(menu_interface* Interface)
     update_args* Entry = &Interface->UpdateQueue[i];
     if(Entry->InUse)
     {
-      b32 Continue = CallFunctionPointer(Entry->Function, Interface, Entry);
+      b32 Continue = CallFunctionPointer(Entry->Function, Interface, Entry->Caller, Entry->Data);
       if(!Continue)
       {
         *Entry = {};
@@ -2322,7 +2322,7 @@ menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
 
 MENU_UPDATE_FUNCTION(TabDragUpdate)
 {
-  b32 Continue = TabDrag(Args->Interface, Args->Caller);
+  b32 Continue = TabDrag(Interface, CallerNode);
   return Interface->MouseLeftButton.Active && Continue;
 }
 

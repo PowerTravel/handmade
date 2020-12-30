@@ -1,13 +1,11 @@
 #pragma once
 
-// TODO: + Ta bort attribute button, styrs nu av mouse_interaction
-//       + Sätt x-knapp (stänga) till tabs
+// TODO: + Sätt x-knapp (stänga) till tabs
 //       + Ta bort Root header (existerar idag bara så man kan flytta runt fönster som har flera tabs).
 //         Tabs kan istället fyllas på från vänster och lämna en bit från höger där man kan flytta runt fönstret
 //       + Extrahera interface till en egen mapp där olika "logiska"-element får sin egen fil. En fil för radio-button, en för scroll window etc etc
 //       + Kolla om vi verkligen behöver "focus-window" som koncept. (Kan behövas senare så vi vet vilket fönster som tar keyboard-input). Idag anävnds
 //         den bara för att veta när vi ska anropa gaining/losing focus events
-//       + Proper event queue implementerad som lista: update_args UpdateQueue[64]; (Göras trådsäker? Interface kör på separat tråd?)
 
 enum class container_type
 {
@@ -78,7 +76,7 @@ container_node* CreateBorderNode(menu_interface* Interface, b32 Vertical=false, 
 
 struct update_args;
 
-#define MENU_UPDATE_FUNCTION(name) b32 name(menu_interface* Interface, update_args* Args )
+#define MENU_UPDATE_FUNCTION(name) b32 name( menu_interface* Interface, container_node* CallerNode, void* Data )
 typedef MENU_UPDATE_FUNCTION( update_function );
 
 struct update_args
@@ -302,7 +300,7 @@ enum class menu_event_type
   MouseUp,
   MouseDown,
   MouseEnter,
-  MouseExit
+  MouseExit,
 };
 
 struct menu_event
