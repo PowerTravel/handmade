@@ -17,11 +17,9 @@ MENU_UPDATE_CHILD_REGIONS(UpdateTabWindowChildRegions);
 
 MENU_DRAW(DrawFunctionTimeline);
 
-BUTTON_ATTRIBUTE_UPDATE(DebugToggleButton);
-BUTTON_ATTRIBUTE_UPDATE(DebugRecompileButton);
-BUTTON_ATTRIBUTE_UPDATE(DebugPauseCollationButton);
-BUTTON_ATTRIBUTE_UPDATE(DropDownMenuButton);
-BUTTON_ATTRIBUTE_UPDATE(ShowWindowButton);
+MENU_EVENT_CALLBACK(DebugToggleButton);
+MENU_EVENT_CALLBACK(DebugRecompileButton);
+MENU_EVENT_CALLBACK(DebugPauseCollationButton);
 
 MENU_EVENT_CALLBACK(InitiateTabDrag);
 MENU_EVENT_CALLBACK(InitiateWindowDrag);
@@ -36,6 +34,8 @@ MENU_UPDATE_FUNCTION(SplitWindowBorderUpdate);
 MENU_EVENT_CALLBACK(DropDownMouseEnter);
 MENU_EVENT_CALLBACK(DropDownMouseExit);
 MENU_EVENT_CALLBACK(DropDownMouseUp);
+
+MENU_EVENT_CALLBACK(DropDownMenuButton);
 
 #ifdef HANDMADE_INTERNAL
 
@@ -61,8 +61,6 @@ void _ReinitiatePool(function_pool* Pool)
     NewFunPtr(DebugToggleButton)
     NewFunPtr(DebugRecompileButton)
     NewFunPtr(DebugPauseCollationButton)
-    NewFunPtr(DropDownMenuButton)
-    NewFunPtr(ShowWindowButton)
     NewFunPtr(InitiateTabDrag)
     NewFunPtr(InitiateWindowDrag)
     NewFunPtr(InitiateSplitWindowBorderDrag)
@@ -74,6 +72,7 @@ void _ReinitiatePool(function_pool* Pool)
     NewFunPtr(DropDownMouseEnter)
     NewFunPtr(DropDownMouseExit)
     NewFunPtr(DropDownMouseUp)
+    NewFunPtr(DropDownMenuButton)
     {
       INVALID_CODE_PATH;
     }    

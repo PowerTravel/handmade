@@ -25,11 +25,10 @@ enum container_attribute
 {
   ATTRIBUTE_NONE = 0x0,
   ATTRIBUTE_MERGE = 0x1,
-  ATTRIBUTE_BUTTON = 0x2,
-  ATTRIBUTE_COLOR = 0x4,
-  ATTRIBUTE_TEXT = 0x8,
-  ATTRIBUTE_SIZE = 0x10,
-  ATTRIBUTE_MENU_EVENT_HANDLE = 0x20
+  ATTRIBUTE_COLOR = 0x2,
+  ATTRIBUTE_TEXT = 0x4,
+  ATTRIBUTE_SIZE = 0x8,
+  ATTRIBUTE_MENU_EVENT_HANDLE = 0x10
 };
 
 
@@ -54,7 +53,6 @@ const c8* ToString(u32 Type)
   switch(Type)
   {
     case ATTRIBUTE_MERGE: return "Merge";
-    case ATTRIBUTE_BUTTON: return "Button";
     case ATTRIBUTE_COLOR: return "Color";
     case ATTRIBUTE_TEXT: return "Text";
     case ATTRIBUTE_SIZE: return "Size";
@@ -202,18 +200,8 @@ struct mergable_attribute
   rect2f MergeZone[5];
 };
 
-#define BUTTON_ATTRIBUTE_UPDATE(name) void name( struct  menu_interface* Interface, struct button_attribute* Attr, struct  container_node* Node)
-typedef BUTTON_ATTRIBUTE_UPDATE( button_attribute_update );
-
 #define MENU_EVENT_CALLBACK(name) void name( menu_interface* Interface, container_node* CallerNode, void* Data)
 typedef MENU_EVENT_CALLBACK( menu_event_callback );
-
-struct button_attribute
-{
-  //binary_signal_state State;
-  void* Data;
-  button_attribute_update** Update;
-};
 
 struct color_attribute
 {
@@ -418,6 +406,11 @@ container_node* CreatePlugin(menu_interface* Interface, c8* HeaderName, v4 Heade
 menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name);
 void RegisterWindow(menu_interface* Interface, menu_tree* DropDownMenu, container_node* Plugin);
 
+
+void _RegisterMenuEvent(menu_interface* Interface, menu_event_type EventType, container_node* CallerNode, void* Data, menu_event_callback** Callback,  menu_event_callback** OnDelete);
+#define RegisterMenuEvent(Interface, EventType, CallerNode, Data, Callback, OnDeleteCallback ) \
+    _RegisterMenuEvent(Interface, EventType, CallerNode, (void*) Data,                         \
+    DeclareFunction(menu_event_callback, Callback), OnDeleteCallback)
 
 #if 0 
 

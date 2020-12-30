@@ -26,7 +26,6 @@ GetAttributeSize(container_attribute Attribute)
   switch(Attribute)
   {
     case ATTRIBUTE_MERGE:       return sizeof(mergable_attribute);
-    case ATTRIBUTE_BUTTON:      return sizeof(button_attribute);
     case ATTRIBUTE_COLOR:       return sizeof(color_attribute);
     case ATTRIBUTE_TEXT:        return sizeof(text_attribute);
     case ATTRIBUTE_SIZE:        return sizeof(size_attribute);
@@ -886,20 +885,17 @@ void FormatNodeString(container_node* Node, u32 BufferSize, c8 StringBuffer[])
       First = false;
       str::CatStrings( str::StringLength(StringBuffer), StringBuffer,
               2, ": ",
-              BufferSize, StringBuffer);  
+              BufferSize, StringBuffer);
     }else{
       str::CatStrings( str::StringLength(StringBuffer), StringBuffer,
               3, " | ",
               BufferSize, StringBuffer);  
     }
     
-
     const c8* AttributeString = ToString(Attribute);
     str::CatStrings( str::StringLength(StringBuffer), StringBuffer,
                 str::StringLength(AttributeString), AttributeString,
                 ArrayCount(StringBuffer), StringBuffer);
-
-
   }
 }
 
@@ -1264,10 +1260,6 @@ void _RegisterMenuEvent(menu_interface* Interface, menu_event_type EventType, co
   Event->Data = Data;
   RegisterEventWithNode(Interface, CallerNode, Index);
 }
-
-#define RegisterMenuEvent(Interface, EventType, CallerNode, Data, Callback, OnDeleteCallback ) \
-    _RegisterMenuEvent(Interface, EventType, CallerNode, (void*) Data,                         \
-    DeclareFunction(menu_event_callback, Callback), OnDeleteCallback)
 
 MENU_UPDATE_FUNCTION(SplitWindowBorderUpdate)
 {
@@ -1993,14 +1985,6 @@ internal b32 CallMouseDownFunctions(menu_interface* Interface, menu_tree* Menu)
         }
       }
 
-      if(HasAttribute(Node, ATTRIBUTE_BUTTON))
-      {
-        button_attribute* Button = (button_attribute*) GetAttributePointer(Node, ATTRIBUTE_BUTTON);
-        if(Button->Update)
-          CallFunctionPointer(Button->Update, Interface, Button, Node);
-        Result = true;
-      }
-
       Node = Node->Parent;
     }
   }
@@ -2202,10 +2186,8 @@ menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
   return Interface;
 }
 
-BUTTON_ATTRIBUTE_UPDATE(ShowWindowButton)
+void DisplayOrRemovePluginTab(menu_interface* Interface, container_node* Tab)
 {
-  Assert(Attr->Data);
-  container_node* Tab = (container_node*) Attr->Data;
   Assert(Tab->Type == container_type::Tab);
   container_node* TabHeader = Tab->Parent;
   if(TabHeader)
@@ -2256,16 +2238,12 @@ BUTTON_ATTRIBUTE_UPDATE(ShowWindowButton)
   SetFocusWindow(Interface, Interface->SpawningWindow);
 }
 
-BUTTON_ATTRIBUTE_UPDATE(DropDownMenuButton)
+MENU_EVENT_CALLBACK(DropDownMenuButton)
 {
-  if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
-  {
-    Assert(Attr->Data);
-    menu_tree* Menu = (menu_tree* ) Attr->Data;
-    Menu->Root->Region.X = Node->Region.X;
-    Menu->Root->Region.Y = Node->Region.Y - Menu->Root->Region.H;
-    SetFocusWindow(Interface, Menu);
-  }
+  menu_tree* Menu = (menu_tree*) Data;
+  Menu->Root->Region.X = CallerNode->Region.X;
+  Menu->Root->Region.Y = CallerNode->Region.Y - Menu->Root->Region.H;
+  SetFocusWindow(Interface, Menu);
 }
 
 MENU_LOSING_FOCUS(DropDownLosingFocus)
@@ -2336,9 +2314,7 @@ menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
   ColorAttr = (color_attribute*) PushAttribute(Interface, ViewMenuItems, ATTRIBUTE_COLOR);
   ColorAttr->Color = V4(1,1,1,1);
 
-  button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(Interface, NewMenu, ATTRIBUTE_BUTTON);
-  ButtonAttribute->Update = DeclareFunction(button_attribute_update, DropDownMenuButton);
-  ButtonAttribute->Data = ViewMenuRoot;
+  RegisterMenuEvent(Interface, menu_event_type::MouseDown, DropDownContainer, (void*) ViewMenuRoot, DropDownMenuButton, 0);
 
   return ViewMenuRoot;
 }
@@ -2381,15 +2357,16 @@ MENU_EVENT_CALLBACK(DropDownMouseEnter)
   color_attribute* MenuColor = (color_attribute*) GetAttributePointer(CallerNode, ATTRIBUTE_COLOR);
   MenuColor->Color = V4(0.3,0.2,0.5,0.5);
 }
+
 MENU_EVENT_CALLBACK(DropDownMouseExit)
 {
   color_attribute* MenuColor = (color_attribute*) GetAttributePointer(CallerNode, ATTRIBUTE_COLOR);
   MenuColor->Color = V4(1,1,1,0); 
 }
+
 MENU_EVENT_CALLBACK(DropDownMouseUp)
 { 
-  button_attribute* ButtonAttribute = (button_attribute*) GetAttributePointer(CallerNode, ATTRIBUTE_BUTTON);
-  CallFunctionPointer(&ShowWindowButton, Interface, ButtonAttribute, CallerNode);
+  DisplayOrRemovePluginTab(Interface, (container_node*) Data);
 }
 
 void RegisterWindow(menu_interface* Interface, menu_tree* DropDownMenu, container_node* Plugin)
@@ -2409,9 +2386,6 @@ void RegisterWindow(menu_interface* Interface, menu_tree* DropDownMenu, containe
   color_attribute* MenuColor = (color_attribute*) PushAttribute(Interface, MenuItem, ATTRIBUTE_COLOR);
   MenuColor->Color = V4(1,1,1,1);
 
-  RegisterMenuEvent(Interface, menu_event_type::MouseUp, MenuItem, 0, DropDownMouseUp, 0);
-  RegisterMenuEvent(Interface, menu_event_type::MouseEnter, MenuItem, 0, DropDownMouseEnter, 0);
-  RegisterMenuEvent(Interface, menu_event_type::MouseExit, MenuItem, 0, DropDownMouseExit, 0);
 
   rect2f TextSize = GetTextSize(0, 0, PluginNode->Title, MenuText->FontSize);
   DropDownMenu->Root->Region.H += TextSize.H;
@@ -2421,8 +2395,8 @@ void RegisterWindow(menu_interface* Interface, menu_tree* DropDownMenu, containe
 
   Interface->PermanentWindows[Interface->PermanentWindowCount++] = Tab;
 
-  button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(Interface, MenuItem, ATTRIBUTE_BUTTON);
-  ButtonAttribute->Update = 0;//DeclareFunction(button_attribute_update, ShowWindowButton);
-  ButtonAttribute->Data = Tab;
 
+  RegisterMenuEvent(Interface, menu_event_type::MouseUp, MenuItem, Tab, DropDownMouseUp, 0);
+  RegisterMenuEvent(Interface, menu_event_type::MouseEnter, MenuItem, Tab, DropDownMouseEnter, 0);
+  RegisterMenuEvent(Interface, menu_event_type::MouseExit, MenuItem, Tab, DropDownMouseExit, 0);
 }

@@ -16,38 +16,29 @@ MENU_DRAW(DrawFunctionTimeline);
 internal void RefreshCollation();
 internal void RestartCollation();
 
-BUTTON_ATTRIBUTE_UPDATE(DebugToggleButton)
+MENU_EVENT_CALLBACK(DebugToggleButton)
 {
   v4 InactiveColor = V4(0.3,0.1,0.1,1);
   v4 ActiveColor = V4(0.1,0.3,0.1,1);
 
-  if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
-  {
-    b32* ButtonFlag = (b32*) Attr->Data;
-    *ButtonFlag = !*ButtonFlag;
-    color_attribute* ColorAttr =  (color_attribute*) GetAttributePointer(Node, ATTRIBUTE_COLOR);
-    ColorAttr->Color = (*ButtonFlag) ?  ActiveColor : InactiveColor;
-  }
+  b32* ButtonFlag = (b32*) Data;
+  *ButtonFlag = !*ButtonFlag;
+  color_attribute* ColorAttr =  (color_attribute*) GetAttributePointer(CallerNode, ATTRIBUTE_COLOR);
+  ColorAttr->Color = (*ButtonFlag) ?  ActiveColor : InactiveColor;
 }
 
-BUTTON_ATTRIBUTE_UPDATE(DebugRecompileButton)
+MENU_EVENT_CALLBACK(DebugRecompileButton)
 {
-  if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
-  {
-    DebugRewriteConfigFile();
-  }
+  DebugRewriteConfigFile();
 }
 
-BUTTON_ATTRIBUTE_UPDATE(DebugPauseCollationButton)      
+MENU_EVENT_CALLBACK(DebugPauseCollationButton)      
 {
   debug_state* DebugState = DEBUGGetState();
-  if(Interface->MouseLeftButton.Active && Interface->MouseLeftButton.Edge)
+  DebugState->Paused = !DebugState->Paused;
+  if(!DebugState->Paused)
   {
-    DebugState->Paused = !DebugState->Paused;
-    if(!DebugState->Paused)
-    {
-      RefreshCollation();
-    }
+    RefreshCollation();
   }
 }
 
@@ -124,9 +115,7 @@ DEBUGGetState()
         color_attribute* ColorAttr = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_COLOR);
         ColorAttr->Color = *ButtonFlag ?  ActiveColor : InactiveColor;
 
-        button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_BUTTON);
-        ButtonAttribute->Data = ButtonFlag;
-        ButtonAttribute->Update = DeclareFunction(button_attribute_update, DebugToggleButton);
+        RegisterMenuEvent(GlobalGameState->MenuInterface, menu_event_type::MouseDown, ButtonNode, ButtonFlag, DebugToggleButton, 0 );
 
         return ButtonNode;
       };
@@ -153,8 +142,7 @@ DEBUGGetState()
         SizeAttr->XAlignment = menu_region_alignment::CENTER;
         SizeAttr->YAlignment = menu_region_alignment::CENTER;
 
-        button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_BUTTON);
-        ButtonAttribute->Update = DeclareFunction(button_attribute_update, DebugRecompileButton);
+        RegisterMenuEvent(GlobalGameState->MenuInterface, menu_event_type::MouseDown, RecompileButton, 0, DebugRecompileButton, 0 );
       }
       SettingsPlugin = CreatePlugin(GlobalGameState->MenuInterface, "Settings", V4(0.5,0.5,0.5,1), ButtonContainer);
     }
@@ -177,8 +165,7 @@ DEBUGGetState()
       Text->FontSize = FontSize;
       Text->Color = TextColor;
 
-      button_attribute* ButtonAttribute = (button_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_BUTTON);
-      ButtonAttribute->Update = DeclareFunction(button_attribute_update, DebugPauseCollationButton);
+      RegisterMenuEvent(GlobalGameState->MenuInterface, menu_event_type::MouseDown, Button, 0, DebugPauseCollationButton, 0 );
 
       container_node* GraphContainer = NewContainer(GlobalGameState->MenuInterface);
       GraphContainer->Functions.Draw = DeclareFunction(menu_draw, DrawFunctionTimeline);
