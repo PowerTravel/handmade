@@ -120,11 +120,11 @@ DEBUGGetState()
         return ButtonNode;
       };
 
-      ConnectNode(ButtonContainer, CreateButton(&DebugState->ConfigMultiThreaded, "Multithread"));
-      ConnectNode(ButtonContainer, CreateButton(&DebugState->ConfigCollisionPoints, "CollisionPoints"));
-      ConnectNode(ButtonContainer, CreateButton(&DebugState->ConfigCollider, "Colliders"));
-      ConnectNode(ButtonContainer, CreateButton(&DebugState->ConfigAABBTree, "AABBTree"));
-      container_node* RecompileButton = ConnectNode(ButtonContainer, NewContainer(GlobalGameState->MenuInterface));
+      ConnectNodeToBack(ButtonContainer, CreateButton(&DebugState->ConfigMultiThreaded, "Multithread"));
+      ConnectNodeToBack(ButtonContainer, CreateButton(&DebugState->ConfigCollisionPoints, "CollisionPoints"));
+      ConnectNodeToBack(ButtonContainer, CreateButton(&DebugState->ConfigCollider, "Colliders"));
+      ConnectNodeToBack(ButtonContainer, CreateButton(&DebugState->ConfigAABBTree, "AABBTree"));
+      container_node* RecompileButton = ConnectNodeToBack(ButtonContainer, NewContainer(GlobalGameState->MenuInterface));
       {
         color_attribute* Color = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_COLOR);
         Color->Color = V4(0.2,0.1,0.3,1);
@@ -156,7 +156,7 @@ DEBUGGetState()
       Grid->TotalMarginX = 0.3;
       Grid->TotalMarginY = 0.2;
 
-      container_node* Button =  ConnectNode(ButtonContainer, NewContainer(GlobalGameState->MenuInterface));
+      container_node* Button =  ConnectNodeToBack(ButtonContainer, NewContainer(GlobalGameState->MenuInterface));
       color_attribute* ButtonColor = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_COLOR);
       ButtonColor->Color = V4(0.3,0.1,0.3,1);
 
@@ -175,9 +175,9 @@ DEBUGGetState()
       BackgroundColor->Color = V4(0,0,0,0.7);
 
       container_node* BorderNode = CreateBorderNode(GlobalGameState->MenuInterface, false, 0.2);
-      ConnectNode(SplitNode, BorderNode);
-      ConnectNode(SplitNode, ButtonContainer);
-      ConnectNode(SplitNode, GraphContainer);
+      ConnectNodeToBack(SplitNode, BorderNode);
+      ConnectNodeToBack(SplitNode, ButtonContainer);
+      ConnectNodeToBack(SplitNode, GraphContainer);
 
       GraphPlugin = CreatePlugin(GlobalGameState->MenuInterface, "Profiler", HexCodeToColorV4( 0xAB274F ), SplitNode);
     }

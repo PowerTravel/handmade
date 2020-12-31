@@ -35,10 +35,8 @@ MENU_UPDATE_CHILD_REGIONS(RootUpdateChildRegions)
       Borders[BorderIndex] = GetBorderNode(Child);
       BorderIndex++;
     }else{
-      if(!Header)
+      if(!Body)
       {
-        Header = Child;
-      }else{
         Assert(!Body);
         Body = Child;
       }
@@ -98,9 +96,9 @@ MENU_UPDATE_CHILD_REGIONS(RootUpdateChildRegions)
     Height - (Borders[2]->Thickness + Borders[3]->Thickness));
 
   r32 HeaderHeight = 0.02f;
-  r32 BodyHeight = InteralRegion.H-HeaderHeight;
+  r32 BodyHeight = InteralRegion.H;//-HeaderHeight;
 
-  Header->Region = Rect2f(InteralRegion.X, InteralRegion.Y+BodyHeight, InteralRegion.W, HeaderHeight);
+ // Header->Region = Rect2f(InteralRegion.X, InteralRegion.Y+BodyHeight, InteralRegion.W, HeaderHeight);
   Body->Region   = Rect2f(InteralRegion.X, InteralRegion.Y, InteralRegion.W, BodyHeight);
 
   Parent->Region = Rect2f(
@@ -231,19 +229,17 @@ menu_functions GetTabWindowFunctions()
 
 MENU_UPDATE_CHILD_REGIONS( UpdateGridChildRegions )
 {
-
   r32 Count = (r32) GetChildCount(Parent);
   if(!Count) return;
 
-  container_node* Child = Parent->FirstChild;
   rect2f ParentRegion = Parent->Region; 
 
   grid_node* GridNode = GetGridNode(Parent);
-  Assert(GridNode->Row || GridNode->Col);
-  
   r32 Row = (r32)GridNode->Row;
   r32 Col = (r32)GridNode->Col;
 
+  Assert(GridNode->Row || GridNode->Col);
+  
   if(Row == 0)
   {
     Assert(Col != 0);
@@ -255,32 +251,96 @@ MENU_UPDATE_CHILD_REGIONS( UpdateGridChildRegions )
     Assert((Row * Col) >= Count);
   }
 
-  r32 xMargin = (GridNode->TotalMarginX / Col) * ParentRegion.W;
-  r32 yMargin = (GridNode->TotalMarginY / Row) * ParentRegion.H;
-  
-
-  r32 CellWidth  = ParentRegion.W / Col;
-  r32 CellHeight = ParentRegion.H / Row;
-  r32 X0 = ParentRegion.X;
-  r32 Y0 = ParentRegion.Y + ParentRegion.H - CellHeight;
-  for (r32 i = 0; i < Row; ++i)
+  container_node* Child = Parent->FirstChild;
+  r32 MaxHeightForRow = 0;
+  if(GridNode->Stack)
   {
-    for (r32 j = 0; j < Col; ++j)
+    r32 xMargin = (GridNode->TotalMarginX / Col) * ParentRegion.W;
+    r32 yMargin = (GridNode->TotalMarginY / Row) * ParentRegion.H;
+
+    r32 Y0 = ParentRegion.Y + ParentRegion.H;
+    r32 MaxWidth = 0;
+    r32 MaxHeight = 0;
+    for (r32 i = 0; i < Row; ++i)
     {
-      Child->Region = Rect2f(X0 + j * CellWidth, Y0 - i* CellHeight, CellWidth, CellHeight);
-      Child->Region.X += xMargin/2.f;
-      Child->Region.W -= xMargin;
-      Child->Region.Y += yMargin/2.f;
-      Child->Region.H -= yMargin;
-      Child = Next(Child);
+      r32 X0 = ParentRegion.X;
+      for (r32 j = 0; j < Col; ++j)
+      {
+        r32 CellWidth = ParentRegion.W/Col;
+        r32 CellHeight = ParentRegion.H/Row;
+        size_attribute* Size = (size_attribute*) GetAttributePointer(Child, ATTRIBUTE_SIZE);
+        if(Size->Width.Type == menu_size_type::ABSOLUTE)
+        {
+          CellWidth = Size->Width.Value;
+        }else if(Size->Height.Type == menu_size_type::ABSOLUTE)
+        {
+          CellHeight = Size->Height.Value;
+        }
+
+        Child->Region = Rect2f(X0, Y0-CellHeight, CellWidth, CellHeight);
+        Child->Region.X += xMargin/2.f;
+        Child->Region.W -= xMargin;
+        Child->Region.Y += yMargin/2.f;
+        Child->Region.H -= yMargin;
+
+        X0 += CellWidth;
+
+        if(MaxHeightForRow < CellHeight)
+        {
+          MaxHeightForRow = CellHeight;
+        }
+
+        Child = Next(Child);
+        if(!Child)
+        {
+          break;
+        }
+      }
+
+      Y0 -= MaxHeightForRow;
+      MaxHeightForRow = 0;
+      r32 WidhtOfRow = X0 - ParentRegion.X;
+      if(MaxWidth < WidhtOfRow)
+      {
+        MaxWidth = WidhtOfRow;
+      }
       if(!Child)
       {
         break;
       }
     }
-    if(!Child)
+    r32 HeightOfColumn = (ParentRegion.Y + ParentRegion.H) - Y0;
+    ParentRegion.W = MaxWidth;
+    ParentRegion.H = HeightOfColumn;
+    Parent->Region = ParentRegion;
+  }else{
+
+    r32 xMargin = (GridNode->TotalMarginX / Col) * ParentRegion.W;
+    r32 yMargin = (GridNode->TotalMarginY / Row) * ParentRegion.H;
+
+    r32 CellWidth  = ParentRegion.W / Col;
+    r32 CellHeight = ParentRegion.H / Row;
+    r32 X0 = ParentRegion.X;
+    r32 Y0 = ParentRegion.Y + ParentRegion.H - CellHeight;
+    for (r32 i = 0; i < Row; ++i)
     {
-      break;
+      for (r32 j = 0; j < Col; ++j)
+      {
+        Child->Region = Rect2f(X0 + j * CellWidth, Y0 - i* CellHeight, CellWidth, CellHeight);
+        Child->Region.X += xMargin/2.f;
+        Child->Region.W -= xMargin;
+        Child->Region.Y += yMargin/2.f;
+        Child->Region.H -= yMargin;
+        Child = Next(Child);
+        if(!Child)
+        {
+          break;
+        }
+      }
+      if(!Child)
+      {
+        break;
+      }
     }
   }
 }

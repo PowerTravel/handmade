@@ -69,7 +69,8 @@ container_node* NewContainer(menu_interface* Interface, container_type Type = co
 void DeleteContainer(menu_interface* Interface, container_node* Node);
 menu_tree* NewMenuTree(menu_interface* Interface);
 void FreeMenuTree(menu_interface* Interface,  menu_tree* MenuToFree);
-container_node* ConnectNode(container_node* Parent, container_node* NewNode);
+container_node* ConnectNodeToFront(container_node* Parent, container_node* NewNode);
+container_node* ConnectNodeToBack(container_node* Parent, container_node* NewNode);
 void DisconnectNode(container_node* Node);
 
 container_node* CreateBorderNode(menu_interface* Interface, b32 Vertical=false, r32 Position = 0.5f,  v4 Color =  V4(0,0,0.4,1));
@@ -160,6 +161,7 @@ struct grid_node
   u32 Row;
   r32 TotalMarginX;
   r32 TotalMarginY;
+  b32 Stack;
 };
 
 struct tab_window_node
