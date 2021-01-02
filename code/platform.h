@@ -187,6 +187,7 @@ struct threadid_coreindex
   u16 ThreadID;
   u16 CoreIndex;
 };
+
 struct debug_event
 {
   u64 Clock;
@@ -200,21 +201,27 @@ struct debug_event
   u8 Type;
 };
 
-#define MAX_DEBUG_EVENT_ARRAY_COUNT 8
-#define MAX_DEBUG_TRANSLATION_UNITS (3)
-#define MAX_DEBUG_EVENT_COUNT (4*65536)
+#define MAX_DEBUG_EVENT_ARRAY_COUNT 8    // How many frames we are tracking
+#define MAX_DEBUG_TRANSLATION_UNITS (2)  // How many translation units we have
+#define MAX_DEBUG_EVENT_COUNT (4*65536)  // 
 #define MAX_DEBUG_RECORD_COUNT (65536)
 
 struct debug_table
 {
   // TODO: Were never ensure that writes to the debugevents is complete
   //       before we swap them
-  u64 volatile EventArrayIndex_EventIndex;
-  u32 CurrentEventArrayIndex;
-  u32 RecordCount[MAX_DEBUG_TRANSLATION_UNITS]; // How many records exist per translation unit
-  debug_record Records[MAX_DEBUG_TRANSLATION_UNITS][MAX_DEBUG_RECORD_COUNT];
-  u32 EventCount[MAX_DEBUG_EVENT_ARRAY_COUNT];
-  debug_event Events[MAX_DEBUG_EVENT_ARRAY_COUNT][MAX_DEBUG_EVENT_COUNT];
+  u64 volatile EventArrayIndex_EventIndex;    // Two numbers stored in one u64.
+                                              // The high bits "EventArrayIndex" indexes into a frame [0, MAX_DEBUG_EVENT_ARRAY_COUNT]
+                                              // The low bits "EventIndex" says how many events were recorded in that frame, [0,MAX_DEBUG_EVENT_COUNT]
+  u32 CurrentEventArrayIndex;                 // Keep track on which event array we are writing to.
+
+  // These are tracked on a per-translation-unit basis
+  u32 RecordCount[MAX_DEBUG_TRANSLATION_UNITS];                              // How tracked functions records exist per translation unit
+  debug_record Records[MAX_DEBUG_TRANSLATION_UNITS][MAX_DEBUG_RECORD_COUNT]; // Each tracked function or block has an entry here
+
+  // These are tracked on a per-frame basis
+  u32 EventCount[MAX_DEBUG_EVENT_ARRAY_COUNT];                               // How many events exists per frame
+  debug_event Events[MAX_DEBUG_EVENT_ARRAY_COUNT][MAX_DEBUG_EVENT_COUNT];    // Here are actual instances of debug-functions.
 };
 
 extern debug_table* GlobalDebugTable;

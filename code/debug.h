@@ -17,12 +17,7 @@ struct debug_statistics
   r32 Min;
   r32 Max;
   r32 Avg;
-};
-
-struct debug_frame_timestamp
-{
-  char* Name;
-  r32 Seconds;
+  debug_record* Record;
 };
 
 struct debug_frame_region
@@ -34,6 +29,8 @@ struct debug_frame_region
   debug_record* Record;
 };
 
+
+// The information for the frame
 #define MAX_REGIONS_PER_FRAME 4096
 struct debug_frame
 {
@@ -49,16 +46,17 @@ struct open_debug_block
   u32 StartingFrameIndex;
   debug_record* Record;
   debug_event OpeningEvent;
-  open_debug_block* Parent;
-  open_debug_block* NextFree;
+  open_debug_block* Parent;    // The open block preceding this one (in order to properly count have nested functions)
+  open_debug_block* NextFree;  // The next free block in 
 };
 
 struct debug_thread
 {
   u32 ID;
   u32 LaneIndex;
-  open_debug_block* Parent;
-  open_debug_block* FirstOpenBlock;
+  open_debug_block* FirstOpenBlock; // This contains the deepest open block.
+                                    // Remember, blocks are like russian nesting dolls:
+                                    // we know that any 'DebugEvent_EndBlock' will close the current FirstOpenBlock for that thread.
   debug_thread* Next;
 };
 
@@ -94,6 +92,9 @@ struct debug_state
   b32 ConfigCollisionPoints;
   b32 ConfigCollider;
   b32 ConfigAABBTree;
+
+  u32* StatisticsCounts;
+  debug_statistics** Statistics;
 };
 
 inline void DebugRewriteConfigFile();

@@ -16,6 +16,7 @@ MENU_UPDATE_CHILD_REGIONS(UpdateGridChildRegions);
 MENU_UPDATE_CHILD_REGIONS(UpdateTabWindowChildRegions);
 
 MENU_DRAW(DrawFunctionTimeline);
+MENU_DRAW(DrawStatistics);
 
 MENU_EVENT_CALLBACK(DebugToggleButton);
 MENU_EVENT_CALLBACK(DebugRecompileButton);
@@ -58,6 +59,7 @@ void _ReinitiatePool(function_pool* Pool)
     NewFunPtr(UpdateGridChildRegions)
     NewFunPtr(UpdateTabWindowChildRegions)
     NewFunPtr(DrawFunctionTimeline)
+    NewFunPtr(DrawStatistics)
     NewFunPtr(DebugToggleButton)
     NewFunPtr(DebugRecompileButton)
     NewFunPtr(DebugPauseCollationButton)
