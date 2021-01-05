@@ -182,6 +182,7 @@ enum debug_event_type
   DebugEvent_BeginBlock,
   DebugEvent_EndBlock,
 };
+
 struct threadid_coreindex
 {
   u16 ThreadID;
@@ -236,7 +237,7 @@ extern debug_table* GlobalDebugTable;
   Event->Clock = __rdtsc(); \
   Event->DebugRecordIndex = (u16) RecordIndex; \
   Event->TranslationUnit = TRANSLATION_UNIT_INDEX; \
-  Event->Type = (u8) EventType;\
+  Event->Type = (u8) EventType;
 
 #define RecordDebugEvent( RecordIndex, EventType) \
 {\
@@ -818,6 +819,7 @@ struct game_memory
   struct game_state* GameState;
   struct debug_state* DebugState;
   platform_api PlatformAPI;
+  u32 ThreadID[4];
 };
 
 

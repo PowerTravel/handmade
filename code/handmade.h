@@ -59,6 +59,8 @@ struct game_state
   function_pool* FunctionPool;
 
   b32 IsInitialized;
+
+  u32 Threads[4];
 };
 
 /// Game Global API

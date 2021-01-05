@@ -5,10 +5,10 @@
 #include <xinput.h>
 #include <dsound.h>
 
+#include "intrinsics.h"
 #include "platform.h"
 #include "debug.h"
 #include "types.h"
-#include "intrinsics.h"
 #include "string.h"
 
 struct win32_offscreen_buffer

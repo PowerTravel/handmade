@@ -24,7 +24,7 @@ del *.pdb > NUL 2> NUL
 echo create lock file
 echo WAITING FOR PDB > lock.tmp
 REM start /WAIT
-cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=0 ..\handmade\code\handmade.cpp -Fmhandmade.map -MTd -LD /link -incremental:no -opt:ref -PDB:handmade_%random%.pdb -EXPORT:GameUpdateAndRender -EXPORT:GameGetSoundSamples -EXPORT:DEBUGGameFrameEnd
+cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=0 ..\handmade\code\handmade.cpp -Fmhandmade.map -MTd -LD /link -incremental:no -opt:ref  %CommonLinkerFlags% -PDB:handmade_%random%.pdb -EXPORT:GameUpdateAndRender -EXPORT:GameGetSoundSamples -EXPORT:DEBUGGameFrameEnd
 set LastError=%ERRORLEVEL%
 REM timeout /t 4
 echo del lock file

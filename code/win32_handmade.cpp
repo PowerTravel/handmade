@@ -1788,6 +1788,8 @@ WinMain(  HINSTANCE Instance,
   win32_thread_info Threads[3] = {};
   u32 ThreadCount = 3;
   u32 InitialCount = 0;
+  u32 ThreadIDs[4] = {};
+  ThreadIDs[0] = GetThreadID();
   platform_work_queue HighPriorityQueue = {};
   HighPriorityQueue.SemaphoreHandle = CreateSemaphoreEx(0, InitialCount, ThreadCount, 0, 0, SEMAPHORE_ALL_ACCESS);
   for (u32 ThreadIndex = 0; ThreadIndex < ArrayCount(Threads); ++ThreadIndex)
@@ -1797,8 +1799,13 @@ WinMain(  HINSTANCE Instance,
     Info->Queue = &HighPriorityQueue;
     DWORD ThreadID;
     HANDLE ThreadHandle = CreateThread( 0, 0, ThreadProc, Info, 0, &ThreadID);
+    ThreadIDs[ThreadIndex+1] = ThreadID;
+    char Buffer[256];
+    wsprintf(Buffer, "%d, ", ThreadID);
+    OutputDebugStringA(Buffer);
     CloseHandle(ThreadHandle);
   }
+  OutputDebugStringA("\n");
 
 #if 0
   Win32AddEntry(&HighPriorityQueue, DoWorkerWork, "A0");
@@ -1923,6 +1930,7 @@ WinMain(  HINSTANCE Instance,
       //GameMemory.PlatformAPI.CloseFile = Win32CloseFile;
 
       game_memory GameMemory = {};
+      CopyArray(ArrayCount(ThreadIDs), ThreadIDs, GameMemory.ThreadID);
 
       GameMemory.PlatformAPI.AllocateMemory   = Win32AllocateMemory;
       GameMemory.PlatformAPI.DeallocateMemory = Win32DeallocateMemory;
