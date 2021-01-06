@@ -16,24 +16,17 @@ struct debug_statistics
   r32 HitCount;
   r32 Min;
   r32 Max;
-  r32 Avg;
+  r32 Tot;
   debug_record* Record;
+  debug_statistics* Next;
+  debug_statistics* Previous;
 };
-
-struct debug_frame_region
-{
-  u32 LaneIndex;
-  r32 MinT;
-  r32 MaxT;
-  u16 ColorIndex;
-  debug_record* Record;
-};
-
 
 // The information for the frame
 #define MAX_BLOCKS_PER_FRAME 4096
 #define MAX_THREAD_COUNT 16
 #define MAX_DEBUG_FRAME_COUNT 60
+
 struct debug_block
 {
   debug_record* Record;
@@ -69,6 +62,8 @@ struct debug_frame
 
   debug_thread Threads[MAX_THREAD_COUNT];
 
+  debug_statistics StatisticsSentinel;
+  debug_statistics Statistics[MAX_DEBUG_RECORD_COUNT];
 };
 
 struct debug_state
@@ -78,7 +73,7 @@ struct debug_state
   b32 Paused;
 
   memory_arena Arena;
-  temporary_memory CollateTemp;
+  temporary_memory StatisticsTemp;
 
   b32 Compiling;
   debug_executing_process Compiler;
@@ -96,7 +91,7 @@ struct debug_state
   u32 SelectedThreadIndex;
   debug_frame Frames[MAX_DEBUG_FRAME_COUNT];
 
-  debug_statistics Statistics[MAX_DEBUG_RECORD_COUNT*MAX_DEBUG_TRANSLATION_UNITS];
+  //debug_statistics Statistics[MAX_DEBUG_RECORD_COUNT*MAX_DEBUG_TRANSLATION_UNITS];
 };
 
 inline void DebugRewriteConfigFile();

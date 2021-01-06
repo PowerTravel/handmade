@@ -2149,7 +2149,7 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
     Menu = Menu->Next;
   }
 
-  PrintHotLeafs(Interface);
+  //PrintHotLeafs(Interface);
 
   // Checks if a window was selected/deselected
   // * Sets or clears MenuFocusWindow

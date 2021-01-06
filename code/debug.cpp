@@ -3,7 +3,15 @@
 #include "math/utils.h"
 #include "color_table.h"
 
-MENU_DRAW(DrawStatistics);
+internal void ResetCollation()
+{
+  debug_state* DebugState = DEBUGGetState();
+  DebugState->CurrentFrameIndex = 0;
+  DebugState->SelectedFrame = 0;
+  DebugState->ThreadSelected = true;
+  DebugState->SelectedThreadIndex = 0;
+  ZeroArray(ArrayCount(DebugState->Frames), DebugState->Frames);
+}
 
 MENU_EVENT_CALLBACK(DebugToggleButton)
 {
@@ -34,9 +42,9 @@ DEBUGGetState()
   if(!DebugState->Initialized)
   {
     // Transient Memory Begin
-    DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->Arena);
     DebugState->Initialized = true;
     DebugState->Paused = false;
+    DebugState->ThreadSelected = true;
 
     // Config state
     DebugState->ConfigMultiThreaded = MULTI_THREADED;
@@ -49,8 +57,8 @@ DEBUGGetState()
     rect2f ButtonSize = GetTextSize(0, 0, "CollisionPoints", FontSize);
     v4 TextColor = V4(1,1,1,1);
 
-    ButtonSize.W+=0.02f;
-    ButtonSize.H+=0.02f;
+    ButtonSize.W += 0.02f;
+    ButtonSize.H += 0.02f;
     r32 ContainerWidth = 0.7;
     container_node* SettingsPlugin = 0;
     {
@@ -128,6 +136,8 @@ DEBUGGetState()
       FunctionContainer->Functions.Draw = DeclareFunction(menu_draw, DrawStatistics);
 
       FunctionPlugin = CreatePlugin(GlobalGameState->MenuInterface, "Functions", HexCodeToColorV4( 0xABF74F ), FunctionContainer);
+      color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, FunctionPlugin, ATTRIBUTE_COLOR);
+      BackgroundColor->Color = V4(0,0,0,0.7);
     }
 
     // Create graph window
@@ -173,11 +183,12 @@ DEBUGGetState()
     menu_tree* WindowsDropDownMenu = RegisterMenu(GlobalGameState->MenuInterface, "Windows");
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, SettingsPlugin);
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, GraphPlugin);
+    RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, FunctionPlugin);
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, DebugWindow1);
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, DebugWindow2);
-    RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, FunctionPlugin);
 
-    ToggleWindow(GlobalGameState->MenuInterface, "Profiler");
+
+    ToggleWindow(GlobalGameState->MenuInterface, "Functions");
 
   }
   return DebugState;
@@ -188,20 +199,20 @@ void BeginDebugStatistics(debug_statistics* Statistic, debug_record* Record)
   Statistic->HitCount = 0;
   Statistic->Min =  R32Max;
   Statistic->Max = -R32Max;
-  Statistic->Avg = 0;
+  Statistic->Tot = 0;
   Statistic->Record = Record;
 }
 
-void EndDebugStatistics(debug_statistics* Statistic)
-{
-  if(Statistic->HitCount != 0)
-  {
-    Statistic->Avg /= Statistic->HitCount;
-  }else{
-    Statistic->Min = 0;
-    Statistic->Max = 0;
-  }
-}
+//void EndDebugStatistics(debug_statistics* Statistic)
+//{
+//  if(Statistic->HitCount != 0)
+//  {
+//    Statistic->Avg /= Statistic->HitCount;
+//  }else{
+//    Statistic->Min = 0;
+//    Statistic->Max = 0;
+//  }
+//}
 
 void AccumulateStatistic(debug_statistics* Statistic, r32 Value)
 {
@@ -213,7 +224,7 @@ void AccumulateStatistic(debug_statistics* Statistic, r32 Value)
   {
     Statistic->Max = Value;
   }
-  Statistic->Avg += Value;
+  Statistic->Tot += Value;
   ++Statistic->HitCount;
 }
 
@@ -273,17 +284,16 @@ u32 GetBlockHashedIndex(u32 ArrayMaxCount, debug_statistics* StatisticsArray, de
   return Index;
 }
 
-debug_statistics* GetStatistics(debug_state* DebugState, debug_record* Record)
+debug_statistics* GetStatistics(debug_frame* Frame, debug_record* Record)
 {
-  u32 Index =  GetBlockHashedIndex(ArrayCount(DebugState->Statistics), DebugState->Statistics, Record);
-  debug_statistics* Result = DebugState->Statistics + Index;
-  return Result;  
+  u32 Index = GetBlockHashedIndex(ArrayCount(Frame->Statistics), Frame->Statistics, Record);
+  debug_statistics* Result = Frame->Statistics + Index;
+  return Result;
 }
 
 void CollateDebugRecords(game_memory* Memory)
 {
   debug_state* DebugState = DEBUGGetState();
-  ScopedMemory ScopedMemory(GlobalGameState->TransientArena);
 
   // Start on the frame after the one we are writing to
   u32 DebugTableFrame = GlobalDebugTable->CurrentEventArrayIndex - 1;
@@ -294,6 +304,7 @@ void CollateDebugRecords(game_memory* Memory)
 
   debug_frame* Frame = DebugState->Frames + DebugState->CurrentFrameIndex;
 
+  BEGIN_BLOCK(ProfileCollation);
   u32 EventCount = GlobalDebugTable->EventCount[DebugTableFrame];
   for(u32 EventIndex = 0;
           EventIndex < EventCount;
@@ -312,22 +323,44 @@ void CollateDebugRecords(game_memory* Memory)
           Frame->WallSecondsElapsed = Event->SecondsElapsed;
         }
 
-        if(DebugState->CurrentFrameIndex >= ArrayCount(DebugState->Frames))
+        u32 MaxFrameCount = ArrayCount(DebugState->Frames);
+        ++Frame;
+        ++DebugState->CurrentFrameIndex;
+        if(DebugState->CurrentFrameIndex >= MaxFrameCount)
         {
           DebugState->CurrentFrameIndex = 0;
           Frame = DebugState->Frames;
-        }else{
-          ++Frame;
-          ++DebugState->CurrentFrameIndex;
         }
 
-        ZeroArray(ArrayCount(Frame->Threads), Frame->Threads);
-
-        Frame->BeginClock = Event->Clock;
+        #if 0
+        u32 FrameSize = sizeof(debug_frame);
+        ZeroStruct(*Frame);
+        #else
+        Frame->BeginClock = 0;
         Frame->EndClock = 0;
-        Frame->FrameBarLaneCount = 0;
         Frame->WallSecondsElapsed = 0;
-        ZeroArray(ArrayCount(Frame->Blocks), Frame->Blocks);
+        Frame->FrameBarLaneCount = 0;
+        Frame->FirstFreeBlock = 0;
+        ZeroArray(ArrayCount(Frame->Blocks),Frame->Blocks);
+        ZeroArray(ArrayCount(Frame->Threads),Frame->Threads);
+        
+        if(Frame->StatisticsSentinel.Next)
+        {
+          debug_statistics* Statistic = Frame->StatisticsSentinel.Next;
+          while(Statistic != &Frame->StatisticsSentinel)
+          {
+            Assert(Statistic->Record);
+            debug_statistics* Tmp = Statistic->Next;
+            ListRemove(Statistic);
+            *Statistic = {};
+            Statistic = Tmp;
+          }  
+        }
+        Frame->StatisticsSentinel={};
+        ListInitiate(&Frame->StatisticsSentinel);
+        #endif
+        
+        Frame->BeginClock = Event->Clock;
         Frame->FirstFreeBlock = Frame->Blocks;
         
       }break;
@@ -365,7 +398,6 @@ void CollateDebugRecords(game_memory* Memory)
 
           Thread->OpenBlock = Block;
         }
-
       }break;
       case DebugEvent_EndBlock:
       {
@@ -384,11 +416,34 @@ void CollateDebugRecords(game_memory* Memory)
           Thread->ClosedBlock = Block;
           
           Thread->OpenBlock = Block->Parent;
+
+          debug_statistics* Statistics = GetStatistics(Frame, Block->Record);
+          if(!Statistics->Record)
+          {
+            BeginDebugStatistics(Statistics, Block->Record);
+          }
+          if(!Statistics->Next)
+          {
+            ListInsertBefore(&Frame->StatisticsSentinel, Statistics);
+          }
+          AccumulateStatistic(Statistics, (r32)(Block->EndClock - Block->BeginClock));
         }
       }break;
     }
   }
-  Platform.DEBUGPrint("\n");
+  END_BLOCK(ProfileCollation);
+  //BEGIN_BLOCK(StatisticsCollation);
+  //if(Frame->StatisticsSentinel.Next)
+  //{
+  //  debug_statistics* Statistic = Frame->StatisticsSentinel.Next;
+  //  while(Statistic != &Frame->StatisticsSentinel)
+  //  {
+  //    Assert(Statistic->Record);
+  //    EndDebugStatistics(Statistic);
+  //    Statistic = Statistic->Next;
+  //  }  
+  //}
+  //END_BLOCK(StatisticsCollation);
 }
 
 inline void
@@ -454,162 +509,6 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 
 
 
-#if 0
-internal void
-BeginRadialMenu(radial_menu* RadialMenu, v2 MouseButtonPos)
-{
-  r32 Radius = 1/8.f;
-  r32 RadiusBegin = 0.5f*Radius;
-
-  r32 AngleCenter = Tau32/4.f;
-  r32 AngleHalfSlice  = Pi32/(r32)RadialMenu->MenuRegionCount;
-  for (u32 RegionIndex = 0; RegionIndex < RadialMenu->MenuRegionCount; ++RegionIndex)
-  {
-    RadialMenu->Regions[RegionIndex] =
-      RadialMenuRegion(AngleCenter - AngleHalfSlice,
-                       AngleCenter + AngleHalfSlice,
-                       RadiusBegin, Radius);
-      AngleCenter+=2*AngleHalfSlice;
-  }
-
-  RadialMenu->MenuX = MouseButtonPos.X;
-  RadialMenu->MenuY = MouseButtonPos.Y;
-}
-
-internal void
-EndRadialMenu(radial_menu* RadialMenu)
-{
-  // Reset all-non persistant event states
-  for(u32 MenuItemIndex = 0; MenuItemIndex < RadialMenu->MenuRegionCount; ++MenuItemIndex)
-  {
-    menu_item* MenuItem = &RadialMenu->MenuItems[MenuItemIndex];
-    MenuItem->MouseOverState = {};
-    MenuItem->MenuActivationState  = {};
-  }
-
-  RadialMenu->MouseRadius = 0;
-  RadialMenu->MouseAngle  = 0;
-  RadialMenu->MenuX = 0;
-  RadialMenu->MenuY = 0;
-
-}
-
-
-void DrawMenu( radial_menu* RadialMenu )
-{
-  v4 IdleColor              = V4(0  ,0  ,0.4,1.f);
-  v4 IdleHighlightedColor   = V4(0.2,0.2,0.5,1.f);
-  v4 ActiveColor            = V4(0  ,0.4,  0,1.f);
-  v4 ActiveHighlightedColor = V4(0.2,0.5,0.2,1.f);
-
-  if(!RadialMenu)
-  {
-    return;
-  }
-
-
-  for(u32 ItemIndex = 0; ItemIndex < RadialMenu->MenuRegionCount; ++ItemIndex)
-  {
-    radial_menu_region* Region = &RadialMenu->Regions[ItemIndex];
-    menu_item* MenuItem = &RadialMenu->MenuItems[ItemIndex];
-
-
-    r32 AngleCenter = RecanonicalizeAngle(Region->AngleStart + 0.5f * GetDeltaAngle(Region->AngleStart, Region->AngleEnd));
-
-    v2 ItemLine   = V2(RadialMenu->MenuX + Region->Radius * Cos(AngleCenter),
-                     RadialMenu->MenuY + Region->Radius * Sin(AngleCenter));
-    DEBUGDrawDottedLine(V2(RadialMenu->MenuX, RadialMenu->MenuY) , ItemLine,  V4(0,0.7,0,1));
-
-    v4 Color = IdleColor;
-
-    if(MenuItem->MouseOverState.Active)
-    {
-      if(MenuItem->Active)
-      {
-        Color = ActiveHighlightedColor;
-      }else{
-        Color = IdleHighlightedColor;
-      }
-    }else{
-      if(MenuItem->Active)
-      {
-        Color = ActiveColor;
-      }else{
-        Color = IdleColor;
-      }
-    }
-
-    r32 ItemAngle = AngleCenter;
-
-    r32 TextPosX = RadialMenu->MenuX + Region->Radius*Cos(AngleCenter);
-    r32 TextPosY = RadialMenu->MenuY + Region->Radius*Sin(AngleCenter);
-
-    rect2f TextBox = GetTextSize(TextPosX, TextPosY, MenuItem->Header);
-
-    r32 Anglef0 = Tau32/8.f;
-    r32 Anglef1 = 3*Tau32/8.f;
-    r32 Anglef2 = 5*Tau32/8.f;
-    r32 Anglef3 = 7*Tau32/8.f;
-
-    v2 BottomLeft    = V2(0,0);
-    v2 BottomRight   = -1.0f * V2(TextBox.W, 0);
-    v2 TopRight      = -1.0f * V2(TextBox.W, TextBox.H);
-    v2 TopLeft       = -1.0f * V2(0, TextBox.H);
-
-    v2 Start,End;
-    r32 StartAngle, StopAngle;
-    if(IsInRegion(Anglef0, Anglef1,ItemAngle))
-    {
-      Start = BottomLeft;
-      End = BottomRight;
-      StartAngle = Anglef0;
-      StopAngle = Anglef1;
-    }else if(IsInRegion(Anglef1, Anglef2,ItemAngle)){
-      Start = BottomRight;
-      End = TopRight;
-      StartAngle = Anglef1;
-      StopAngle = Anglef2;
-    }else if(IsInRegion(Anglef2, Anglef3,ItemAngle)){
-      Start = TopRight;
-      End = TopLeft;
-      StartAngle = Anglef2;
-      StopAngle = Anglef3;
-    }else{
-      Start = TopLeft;
-      End = BottomLeft;
-      StartAngle = Anglef3;
-      StopAngle = Anglef0;
-    }
-
-    r32 AngleParameter = GetParametarizedAngle(StartAngle, StopAngle, ItemAngle);
-
-    //TextBox
-    r32 X0 = TextPosX - TextBox.W*0.5f;
-    r32 Y0 = TextPosY - TextBox.H*0.5f;
-
-    v2 Offset = Start + AngleParameter * (End - Start);
-
-    rect2f QuadRect = Rect2f(TextBox.X + Offset.X,
-                             TextBox.Y + Offset.Y,
-                             TextBox.W,TextBox.H);
-    PushOverlayQuad(QuadRect, Color);
-
-    DEBUGTextOutAt(TextPosX+Offset.X, TextPosY+Offset.Y, MenuItem->Header, V4(1,1,1,1));
-  }
-
-  v2 MouseLine  = V2(RadialMenu->MenuX + RadialMenu->MouseRadius * Cos(RadialMenu->MouseAngle),
-                     RadialMenu->MenuY + RadialMenu->MouseRadius * Sin(RadialMenu->MouseAngle));
-  DEBUGDrawDottedLine(V2(RadialMenu->MenuX, RadialMenu->MenuY) , MouseLine,  V4(0.7,0,0,1));
-}
-#endif
-
-//inline internal debug_frame*
-//GetActiveDebugFrame(debug_state* DebugState)
-//{
-//  debug_frame* Result = DebugState->Frames + DebugState->FrameCount-2;
-//  return Result;
-//}
-
 void DEBUGAddTextSTB(const c8* String, r32 LineNumber, u32 FontSize)
 {
   TIMED_FUNCTION();
@@ -620,38 +519,262 @@ void DEBUGAddTextSTB(const c8* String, r32 LineNumber, u32 FontSize)
   PushTextAt(CanPosX, CanPosY, String, FontSize, V4(1,1,1,1));
 }
 
+struct debug_chart_entry
+{
+  union{
+    void* Value;
+    char* Text;
+    u32* ValU32;
+    r32* ValR32;
+  };
+};
+
+struct debug_chart
+{
+  u32 Rows;
+  u32 Cols;
+  debug_chart_entry* Entries;
+};
+
+debug_chart BeginChart(memory_arena* Arena, u32 Rows, u32 Cols)
+{
+  debug_chart Result{};
+  Result.Rows = Rows;
+  Result.Cols = Cols;
+  Result.Entries = PushArray(Arena, Rows*Cols, debug_chart_entry);
+  return Result;
+}
+
+
+inline debug_chart_entry* GetChartEntry(debug_chart* Chart, u32 Row, u32 Col)
+{
+  Assert(Row < Chart->Rows);
+  Assert(Col < Chart->Cols);
+  debug_chart_entry* Result = Chart->Entries + Row * Chart->Cols + Col;
+  return Result;
+}
+
+void PushChartEntry(debug_chart* Chart, u32 Row, u32 Col, debug_chart_entry Entry)
+{
+  debug_chart_entry* ChartEntry = GetChartEntry(Chart, Row, Col);
+  *ChartEntry = Entry;
+}
 
 MENU_DRAW(DrawStatistics)
 {
-  #if 0
-  rect2f Chart = Node->Region;
-
+  rect2f Region = Shrink(Node->Region,0.01);
   debug_state* DebugState = DEBUGGetState();
-  r32 Line = 3;
+  if(DebugState->Compiling) return;
   TIMED_FUNCTION();
 
-  u32 FrameIndex = DebugState->CurrentFrameIndex;
-  debug_statistics* StatsArray = DebugState->Statistics + FrameIndex;
-  u32 StatsCount = DebugState->StatisticsCounts[FrameIndex];
-  for (u32 StatisticIndex = 0; StatisticIndex < StatsCount; ++StatisticIndex)
-  {
-    debug_statistics* Statistic = StatsArray + StatisticIndex;
-    if(Statistic->Count)
-    {
-      c8 StringBuffer[256] = {};
-      Platform.DEBUGFormatString(StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
-    "(%5d)%-25s:%10dCy:%25dh:%10dcy/h",
-        Statistic->Record->LineNumber, Statistic->Record->BlockName, (u32) Statistic->Avg, Statistic->Count,
-        (u32) (Statistic->Avg/(r32)Statistic->Count));
+  ScopedMemory Memory(GlobalGameState->TransientArena);
+  memory_arena* Arena = GlobalGameState->TransientArena;
+  debug_statistics StatsSentinel{}; 
+  ListInitiate(&StatsSentinel);
 
-//      rect2f TextBox = GetTextSize(0, 0, Text->Text, Text->FontSize);
-//      PushTextAt(Parent->Region.X + Parent->Region.W/2.f - TextBox.W/2.f,
-//                     Parent->Region.Y + Parent->Region.H/2.f - TextBox.H/3.f, Text->Text, Text->FontSize, Text->Color);
-//
-      DEBUGAddTextSTB(StringBuffer, Line, 18);
-      Line++;  
+  debug_statistics* StatsArray = PushArray(Arena, MAX_DEBUG_RECORD_COUNT, debug_statistics);
+  u64 AvgCycleCounts = 0;
+
+#if 1
+  u32 RowCount = 0;
+  for(u32 FrameIndex = 0; FrameIndex < ArrayCount(DebugState->Frames); ++FrameIndex)
+  {
+    TIMED_BLOCK(Loopdiloop1);
+    debug_frame* Frame = DebugState->Frames + FrameIndex;
+    u64 FrameCycleCount = Frame->EndClock - Frame->BeginClock;
+    AvgCycleCounts += FrameCycleCount;
+    if(!Frame->StatisticsSentinel.Next) continue;
+    debug_statistics* Stats = Frame->StatisticsSentinel.Next;
+    
+    while(Stats != &Frame->StatisticsSentinel)
+    {
+      Assert(Stats->HitCount);
+      u32 ArrayIndex = GetBlockHashedIndex(MAX_DEBUG_RECORD_COUNT, StatsArray, Stats->Record);
+      
+      debug_statistics* CumuStat = StatsArray + ArrayIndex;
+
+      if(!CumuStat->Record)
+      {
+        BeginDebugStatistics(CumuStat, Stats->Record);
+        ListInsertBefore(&StatsSentinel,CumuStat);
+        ++RowCount;
+      }
+
+      CumuStat->HitCount += Stats->HitCount;
+      CumuStat->Min = Minimum(CumuStat->Min, Stats->Min);
+      CumuStat->Max = Maximum(CumuStat->Max, Stats->Max);
+      CumuStat->Tot += Stats->Tot;
+
+      Stats = Stats->Next;
     }
   }
+
+  u32 Cols = 5;
+  debug_chart Chart = BeginChart(Arena, RowCount+1, Cols);
+  AvgCycleCounts = AvgCycleCounts/MAX_DEBUG_FRAME_COUNT;
+
+  u32 FontSize = 16;
+  r32 LineHeight = GetTextLineHeightSize(FontSize);
+  r32 ColWidthPercent[5] = {};
+  {
+    debug_chart_entry Entry{};
+    char Text[] = "LineNumber ";
+    Entry.Text = (char*) PushCopy(Arena, sizeof(Text), Text);
+    r32 Width = GetTextWidth(Text, FontSize);
+    ColWidthPercent[0] = Width / Region.W;
+
+    PushChartEntry(&Chart, 0, 0, Entry);
+  }
+  {
+    debug_chart_entry Entry{};
+    char Text[] = "BlockName  ";
+    Entry.Text = (char*) PushCopy(Arena, sizeof(Text), Text);
+    ColWidthPercent[1] = 0.4;
+    PushChartEntry(&Chart, 0, 1, Entry);
+  }
+  r32 RemainingWidth =1.f - (ColWidthPercent[0] + ColWidthPercent[1]);
+  {
+    debug_chart_entry Entry{};
+    char Text[] = "  CycleCount";
+    Entry.Text = (char*) PushCopy(Arena, sizeof(Text), Text);
+    r32 Width = GetTextWidth(Text, FontSize);
+
+    ColWidthPercent[2] = RemainingWidth/3.f;
+    PushChartEntry(&Chart, 0, 2, Entry);
+  }
+  {
+    debug_chart_entry Entry{};
+    char Text[] = "  HitCount";
+    Entry.Text = (char*) PushCopy(Arena, sizeof(Text), Text);
+    r32 Width = GetTextWidth(Text, FontSize);
+    ColWidthPercent[3] = RemainingWidth/3.f;
+    PushChartEntry(&Chart, 0, 3, Entry);
+  }
+  {
+    debug_chart_entry Entry{};
+    char Text[] = "Cy/Hi";
+    Entry.Text = (char*) PushCopy(Arena, sizeof(Text), Text);
+    r32 Width = GetTextWidth(Text, FontSize);
+    ColWidthPercent[4] = RemainingWidth/3.f;
+    PushChartEntry(&Chart, 0, 4, Entry);
+  }
+
+  u32 Rows = 1;
+  debug_statistics* CumuStat = StatsSentinel.Next;
+  while(CumuStat != &StatsSentinel)
+  {
+    TIMED_BLOCK(Loopdiloop2);
+    Assert(CumuStat->HitCount);
+    r32 HitCount = (CumuStat->HitCount / (r32) MAX_DEBUG_FRAME_COUNT);
+    r32 CycleCount =(CumuStat->Tot / (r32) MAX_DEBUG_FRAME_COUNT);
+    {
+      debug_chart_entry Entry{}; 
+      Entry.ValU32 = PushStruct(Arena, u32);
+      *Entry.ValU32 = CumuStat->Record->LineNumber;
+      PushChartEntry(&Chart, Rows, 0, Entry);
+    }
+    {
+      debug_chart_entry Entry{}; 
+      Entry.Text = PushArray(Arena, 256, char);
+      Platform.DEBUGFormatString(Entry.Text, 256, str::StringLength(CumuStat->Record->BlockName),
+      "%s", CumuStat->Record->BlockName);
+      PushChartEntry(&Chart, Rows, 1, Entry);
+    }
+    {
+      debug_chart_entry Entry{}; 
+      Entry.ValR32 = PushStruct(Arena, r32);
+      *Entry.ValR32 = CycleCount;
+      PushChartEntry(&Chart, Rows, 2, Entry);
+    }
+    {
+      debug_chart_entry Entry{}; 
+      Entry.ValR32 = PushStruct(Arena, r32);
+      *Entry.ValR32 = HitCount;
+      PushChartEntry(&Chart, Rows, 3, Entry);
+    }
+    {
+      debug_chart_entry Entry{}; 
+      Entry.ValR32 = PushStruct(Arena, r32);
+      *Entry.ValR32 = CycleCount/HitCount;
+      PushChartEntry(&Chart, Rows, 4, Entry);
+    }
+    Rows++;
+    CumuStat = CumuStat->Next;
+  }
+
+  r32 YPos = Region.Y + Region.H;
+  
+  for (u32 i = 0; i < Rows; ++i)
+  {
+    r32 StartXPercent = 0;
+    for (u32 j = 0; j < Cols; ++j)
+    {
+      if(YPos-LineHeight < Region.Y){
+        break;
+      }
+      debug_chart_entry* Entry = GetChartEntry(&Chart,i,j);
+      char StringBuffer[512]={};
+
+      r32 Offset = 0;
+      if(i == 0)
+      {
+        Platform.DEBUGFormatString(StringBuffer, ArrayCount(StringBuffer), ArrayCount(StringBuffer)-1,
+        "%s", Entry->Text);
+        r32 Width = GetTextWidth(StringBuffer,FontSize);
+        if(j==1)
+        {
+          Offset = 0;
+        }else{
+          Offset = ColWidthPercent[j] - Width/Region.W;  
+        }
+        
+      }else{
+        switch(j)
+        {
+          case 0:
+          {
+            Platform.DEBUGFormatString(StringBuffer, ArrayCount(StringBuffer), ArrayCount(StringBuffer)-1,
+            "%d: ", (u32)(*Entry->ValU32));
+            r32 Width = GetTextWidth(StringBuffer,FontSize);
+            Offset = ColWidthPercent[0] - Width/Region.W;
+          }break;
+          case 1:
+          {
+            Platform.DEBUGFormatString(StringBuffer, ArrayCount(StringBuffer), ArrayCount(StringBuffer)-1,
+            "%s", Entry->Text);
+          }break;
+          case 2:
+          {
+            Platform.DEBUGFormatString(StringBuffer, ArrayCount(StringBuffer), ArrayCount(StringBuffer)-1,
+            "%d", (u32) *Entry->ValR32);
+            r32 Width = GetTextWidth(StringBuffer,FontSize);
+            Offset = ColWidthPercent[2] - Width/Region.W;
+          }break;
+          case 3:
+          {
+            Platform.DEBUGFormatString(StringBuffer, ArrayCount(StringBuffer), ArrayCount(StringBuffer)-1,
+            "%d", (u32) *Entry->ValR32);
+            r32 Width = GetTextWidth(StringBuffer,FontSize);
+            Offset = ColWidthPercent[3] - Width/Region.W;
+          }break;
+          case 4:
+          {
+            Platform.DEBUGFormatString(StringBuffer, ArrayCount(StringBuffer), ArrayCount(StringBuffer)-1,
+            "%d", (u32) *Entry->ValR32);
+            r32 Width = GetTextWidth(StringBuffer,FontSize);
+            Offset = ColWidthPercent[4] - Width/Region.W;
+          }break;
+        }  
+      }
+      r32 XPos = Region.X + (StartXPercent+ Offset)*Region.W;
+      PushTextAt(XPos, YPos-LineHeight, StringBuffer, FontSize, V4(1,1,1,1));
+      StartXPercent += ColWidthPercent[j];
+    }
+
+    YPos -= LineHeight;
+    
+  }
+
   #endif
 }
 
@@ -781,12 +904,16 @@ u64 GetBlockChainCycleCount(debug_block* FirstBlock)
 
 MENU_DRAW(DrawFrameFunctions)
 {
+  TIMED_FUNCTION();
+  debug_state* DebugState = DEBUGGetState();
+  if(DebugState->Compiling) return;
+
   r32 ThreadBreak = 0.005;
 
   rect2f Chart = Node->Region;
   Chart.H -= ThreadBreak;
 
-  debug_state* DebugState = DEBUGGetState();
+  
   v2 MousePos = Interface->MousePos;
 
   debug_frame* Frame = DebugState->SelectedFrame;
@@ -813,7 +940,6 @@ MENU_DRAW(DrawFrameFunctions)
   u32 SelectedThreadIndex = 0;
 
   r32 ThreadStartY = Chart.Y;
-  
 
   debug_block* HotBlock = 0;
   debug_thread* HotThread = 0;
@@ -977,7 +1103,6 @@ MENU_DRAW(DrawFrameFunctions)
       }
       DebugState->SelectedThreadIndex = HotThread->LaneIndex;
 
-      //Frame->Threads[SelectedThreadIndex].SelectedBlock = SelectedBlock;
     }else{
       DebugState->ThreadSelected = false;
     }
@@ -987,6 +1112,10 @@ MENU_DRAW(DrawFrameFunctions)
 
 MENU_DRAW(DrawFunctionTimeline)
 {
+  TIMED_FUNCTION();
+  debug_state* DebugState = DEBUGGetState();
+  if(DebugState->Compiling) return;
+
   rect2f Chart = Node->Region;
 
   r32 dt = GlobalGameState->Input->dt;
@@ -994,7 +1123,7 @@ MENU_DRAW(DrawFunctionTimeline)
   r32 FrameTargetHeight = Chart.H * 0.7f;
   r32 HeightScaling = FrameTargetHeight/dt;
 
-  debug_state* DebugState = DEBUGGetState();
+  
   u32 MaxFramesToDisplay = ArrayCount(DebugState->Frames)-1;
 
   game_window_size WindowSize = GameGetWindowSize();
@@ -1115,6 +1244,8 @@ void PushDebugOverlay(game_input* GameInput)
     if(DebugState->Compiling)
     {
       DEBUGAddTextSTB("Compiling", LineNumber++, 24);
+    }else{
+      ResetCollation();
     }
   }
 

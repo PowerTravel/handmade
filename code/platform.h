@@ -202,7 +202,7 @@ struct debug_event
   u8 Type;
 };
 
-#define MAX_DEBUG_EVENT_ARRAY_COUNT 8    // How many frames we are tracking
+#define MAX_DEBUG_EVENT_ARRAY_COUNT 2    // How many frames we are tracking
 #define MAX_DEBUG_TRANSLATION_UNITS (2)  // How many translation units we have
 #define MAX_DEBUG_EVENT_COUNT (4*65536)  // 
 #define MAX_DEBUG_RECORD_COUNT (65536)

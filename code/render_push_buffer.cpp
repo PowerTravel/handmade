@@ -49,6 +49,33 @@ void PushOverlayText(rect2f QuadRect, rect2f TextureRect, v4 Color, bitmap_handl
   Body->Colour = Color;
 }
 
+
+r32 GetTextLineHeightSize(u32 FontSize)
+{
+  stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 Result = FontMap->FontHeightPx/ (r32) WindowSize.HeightPx;
+  return Result;
+}
+
+r32 GetTextWidth(const c8* String, u32 FontSize)
+{
+  stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
+  
+  game_window_size WindowSize = GameGetWindowSize();
+  const r32 PixelSize = 1.f / WindowSize.HeightPx;
+
+  r32 Width = 0;
+  while (*String != '\0')
+  {
+    stbtt_bakedchar* CH = &FontMap->CharData[*String-0x20];
+    Width += CH->xadvance;
+    ++String;
+  }
+  r32 Result = PixelSize*Width;
+  return Result;  
+}
+
 rect2f GetTextSize(r32 x, r32 y, const c8* String, u32 FontSize)
 {
   stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
