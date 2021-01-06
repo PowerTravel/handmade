@@ -177,6 +177,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 
   LightSpatial->Position = V3(1,1,1);
   LightSpatial->Scale    = V3( 0.3, 0.3, 0.3);
+  UpdateModelMatrix(LightSpatial);
 
   GetHandle(AssetManager, "voxel", &LightRender->Object);
   GetHandle(AssetManager, "white", &LightRender->Material);
@@ -240,6 +241,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
         CubeSpatial->Position =  V3(xzSpace*i, ySpace*j, xzSpace*k);
         CubeSpatial->Rotation = RotateQuaternion( 0, V3(0,0,0) );
         CubeSpatial->Scale = V3(1, 1, 1);
+        UpdateModelMatrix(CubeSpatial);
 
         component_collider* CubeCollider = GetColliderComponent(CubeEntity);
         CubeCollider->Object = ObjectHandle;
@@ -267,6 +269,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   component_spatial* FloorSpatial = GetSpatialComponent(FloorEntity);
   FloorSpatial->Position = V3( 0,-2, 0);
   FloorSpatial->Scale = V3( 18, 1, 18);
+  UpdateModelMatrix(FloorSpatial);
 
   component_collider* FloorCollider = GetColliderComponent(FloorEntity);
   FloorCollider->Object = FloorRender->Object;
@@ -290,6 +293,8 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   TeapotSpatial->Position = V3( -2,1,2);
   TeapotSpatial->Scale = V3( 0.1, 0.1, 0.1);
   TeapotSpatial->Rotation = RotateQuaternion( 0.5, V3(0.2,1,0) );
+  UpdateModelMatrix(TeapotSpatial);
+
 
   component_collider* TeapotCollider = GetColliderComponent(Teapot);
   TeapotCollider->Object = TeapotRender->Object;
@@ -317,6 +322,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   SpriteSpatial->Position = V3( -0,  8, 8);
   SpriteSpatial->Rotation = RotateQuaternion( Pi32, V3(0,1,0) );
   SpriteSpatial->Scale    = V3( 18, 18, 1);
+  UpdateModelMatrix(SpriteSpatial);
 
   component_sprite_animation* SpriteAnimation = GetSpriteAnimationComponent(SpriteAnimationEntity);
 

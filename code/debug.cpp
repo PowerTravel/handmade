@@ -1,9 +1,9 @@
 #include "debug.h"
 
-MENU_DRAW(DrawStatistics);
+#include "math/utils.h"
+#include "color_table.h"
 
-internal void RefreshCollation();
-internal void RestartCollation();
+MENU_DRAW(DrawStatistics);
 
 MENU_EVENT_CALLBACK(DebugToggleButton)
 {
@@ -19,16 +19,6 @@ MENU_EVENT_CALLBACK(DebugToggleButton)
 MENU_EVENT_CALLBACK(DebugRecompileButton)
 {
   DebugRewriteConfigFile();
-}
-
-MENU_EVENT_CALLBACK(DebugPauseCollationButton)      
-{
-  debug_state* DebugState = DEBUGGetState();
-  DebugState->Paused = !DebugState->Paused;
-  if(!DebugState->Paused)
-  {
-    RefreshCollation();
-  }
 }
 
 internal debug_state*
@@ -133,7 +123,6 @@ DEBUGGetState()
     // Create graph window
     container_node* FunctionPlugin = 0;
     {
-      //RegisterMenuEvent(GlobalGameState->MenuInterface, menu_event_type::MouseDown, Button, 0, DebugPauseCollationButton, 0 );
 
       container_node* FunctionContainer = NewContainer(GlobalGameState->MenuInterface);
       FunctionContainer->Functions.Draw = DeclareFunction(menu_draw, DrawStatistics);
@@ -144,67 +133,20 @@ DEBUGGetState()
     // Create graph window
     container_node* GraphPlugin = 0;
     {
-      container_node* GridContainer = NewContainer(GlobalGameState->MenuInterface, container_type::Grid);
-      grid_node* Grid = GetGridNode(GridContainer);
-      Grid->Col = 1;
-      Grid->TotalMarginX = 0;
-      Grid->TotalMarginY = 0;
-
-      container_node* ChartContainer =  ConnectNodeToBack(GridContainer, NewContainer(GlobalGameState->MenuInterface));
-      //color_attribute* ChartColor = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, ChartContainer, ATTRIBUTE_COLOR);
-      //ChartColor->Color = V4(0.3,0.1,0.3,1);
-
-      size_attribute* ChartSize = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, ChartContainer, ATTRIBUTE_SIZE);
-      ChartSize->Width = ContainerSizeT(menu_size_type::RELATIVE, 1);
-      ChartSize->Height = ContainerSizeT(menu_size_type::RELATIVE, 1);
-      ChartSize->LeftOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
-      ChartSize->TopOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
-      ChartSize->XAlignment = menu_region_alignment::CENTER;
-      ChartSize->YAlignment = menu_region_alignment::CENTER;
-
-
+      container_node* ChartContainer = NewContainer(GlobalGameState->MenuInterface);
       ChartContainer->Functions.Draw = DeclareFunction(menu_draw, DrawFunctionTimeline);
 
-      container_node* FrameContainer =  ConnectNodeToBack(GridContainer, NewContainer(GlobalGameState->MenuInterface));
+      container_node* FrameContainer = NewContainer(GlobalGameState->MenuInterface);
       FrameContainer->Functions.Draw = DeclareFunction(menu_draw, DrawFrameFunctions);
-
-      size_attribute* FrameSize = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, FrameContainer, ATTRIBUTE_SIZE);
-      FrameSize->Width = ContainerSizeT(menu_size_type::RELATIVE, 1);
-      FrameSize->Height = ContainerSizeT(menu_size_type::RELATIVE, 1);
-      FrameSize->LeftOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
-      FrameSize->TopOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
-      FrameSize->XAlignment = menu_region_alignment::CENTER;
-      FrameSize->YAlignment = menu_region_alignment::CENTER;
-
-      container_node* Button = NewContainer(GlobalGameState->MenuInterface);
-      color_attribute* ButtonColor = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_COLOR);
-      ButtonColor->Color = V4(0.3,0.1,0.3,1);
-
-      size_attribute* ButtonSizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, GridContainer, ATTRIBUTE_SIZE);
-      ButtonSizeAttr->Width = ContainerSizeT(menu_size_type::RELATIVE, 1);
-      ButtonSizeAttr->Height = ContainerSizeT(menu_size_type::RELATIVE, 1);
-      ButtonSizeAttr->LeftOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
-      ButtonSizeAttr->TopOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
-      ButtonSizeAttr->XAlignment = menu_region_alignment::CENTER;
-      ButtonSizeAttr->YAlignment = menu_region_alignment::CENTER;
-
-      text_attribute* Text = (text_attribute*) PushAttribute(GlobalGameState->MenuInterface, Button, ATTRIBUTE_TEXT);
-      str::CopyStringsUnchecked( "Pause", Text->Text );
-      Text->FontSize = FontSize;
-      Text->Color = TextColor;
-
 
       container_node* SplitNode  = NewContainer(GlobalGameState->MenuInterface, container_type::Split);
       color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, SplitNode, ATTRIBUTE_COLOR);
       BackgroundColor->Color = V4(0,0,0,0.7);
 
-      container_node* BorderNode = CreateBorderNode(GlobalGameState->MenuInterface, false, 0.2);
+      container_node* BorderNode = CreateBorderNode(GlobalGameState->MenuInterface, false, 0.7);
       ConnectNodeToBack(SplitNode, BorderNode);
-      ConnectNodeToBack(SplitNode, Button);
-      ConnectNodeToBack(SplitNode, GridContainer);
-
-      RegisterMenuEvent(GlobalGameState->MenuInterface, menu_event_type::MouseDown, Button, 0, DebugPauseCollationButton, 0 );
-
+      ConnectNodeToBack(SplitNode, FrameContainer);
+      ConnectNodeToBack(SplitNode, ChartContainer);
 
       GraphPlugin = CreatePlugin(GlobalGameState->MenuInterface, "Profiler", HexCodeToColorV4( 0xAB274F ), SplitNode);
     }
@@ -235,40 +177,10 @@ DEBUGGetState()
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, DebugWindow2);
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, FunctionPlugin);
 
-    RestartCollation();
+    ToggleWindow(GlobalGameState->MenuInterface, "Profiler");
+
   }
   return DebugState;
-}
-#define MAX_DEBUG_COLLATED_FRAMES MAX_DEBUG_EVENT_ARRAY_COUNT*4
-
-internal void
-RestartCollation()
-{
-    debug_state* DebugState = DEBUGGetState();
-    // We can store MAX_DEBUG_COLLATED_FRAMES frames of collated debug records
-    // However, when we change Scope we clear ALL the collated memory.
-    // So when we recollate we only have MAX_DEBUG_EVENT_ARRAY_COUNT frames worth of data
-    // Thus we loose the 3 * MAX_DEBUG_EVENT_ARRAY_COUNT worth of collated data.
-    // One effect of this is that we can display 10 frames, but MAX_DEBUG_EVENT_ARRAY_COUNT is atm 8;
-    // Thus when we klick a function to inspect we suddenly only display 7 frames
-    EndTemporaryMemory(DebugState->CollateTemp);
-
-    DebugState->CollateTemp = BeginTemporaryMemory(&DebugState->Arena);
-#if 0
-    //DebugState->FirstThread = 0;
-    //DebugState->FirstFreeBlock = 0;
-    // TODO: Make this into a rolling buffer. IE never clear it.
-    //DebugState->Frames = PushArray(&DebugState->Arena, MAX_DEBUG_COLLATED_FRAMES, debug_frame);
-    DebugState->FrameBarLaneCount = 0;
-    DebugState->FrameCount = 0;
-    DebugState->FrameBarRange = 0;//60000000.0f;
-    DebugState->CollationArrayIndex = GlobalDebugTable->CurrentEventArrayIndex+1;
-    DebugState->CollationFrame = 0;
-
-    // TODO: Make this into a rolling buffer. IE never clear it.
-    DebugState->StatisticsCounts = PushArray(&DebugState->Arena, MAX_DEBUG_COLLATED_FRAMES, u32);
-    DebugState->Statistics = PushArray(&DebugState->Arena, MAX_DEBUG_COLLATED_FRAMES, debug_statistics*);
-#endif
 }
 
 void BeginDebugStatistics(debug_statistics* Statistic, debug_record* Record)
@@ -317,13 +229,6 @@ debug_table* GlobalDebugTable = 0;
 internal debug_thread* GetDebugThread(game_memory* Memory, debug_frame* Frame, u16 ThreadID)
 {
   Assert(ThreadID);
-  if(Memory->ThreadID[0] != ThreadID &&
-     Memory->ThreadID[1] != ThreadID &&
-     Memory->ThreadID[2] != ThreadID &&
-     Memory->ThreadID[3] != ThreadID)
-  {
-    int a = 10;
-  }
   debug_thread* Result = 0;
   for(u32 ThreadArrayIndex = 0;
       ThreadArrayIndex < MAX_THREAD_COUNT;
@@ -336,7 +241,6 @@ internal debug_thread* GetDebugThread(game_memory* Memory, debug_frame* Frame, u
       *Result = {};
       Result->ID = ThreadID;
       Result->LaneIndex = Frame->FrameBarLaneCount++;
-      Platform.DEBUGPrint("(%d,%d) ", ThreadArrayIndex, ThreadID);
       break;
     }else if((Thread->ID == ThreadID))
     {
@@ -348,33 +252,13 @@ internal debug_thread* GetDebugThread(game_memory* Memory, debug_frame* Frame, u
   return Result;
 }
 
-#if 1
-internal debug_frame_region* AddRegion(debug_frame* CurrentFrame){return 0;}
 internal debug_record*
 GetRecordFrom(debug_block* OpenBlock)
 {
   debug_record* Result = OpenBlock ? OpenBlock->Record : 0;
   return Result;
 }
-#else
-internal debug_frame_region*
-AddRegion(debug_frame* CurrentFrame)
-{
-  debug_frame_region* Result = CurrentFrame->Regions + CurrentFrame->RegionCount;
-  if(CurrentFrame->RegionCount < MAX_REGIONS_PER_FRAME-1)
-  {
-    CurrentFrame->RegionCount++;
-  }
-  return Result;
-}
 
-internal debug_record*
-GetRecordFrom(open_debug_block* OpenBlock)
-{
-  debug_record* Result = OpenBlock ? OpenBlock->Record : 0;
-  return Result;
-}
-#endif
 u32 GetBlockHashedIndex(u32 ArrayMaxCount, debug_statistics* StatisticsArray, debug_record* Record)
 {
   u32 BlockNameHash = utils::djb2_hash(Record->BlockName);
@@ -389,14 +273,13 @@ u32 GetBlockHashedIndex(u32 ArrayMaxCount, debug_statistics* StatisticsArray, de
   return Index;
 }
 
-#if 1
-
 debug_statistics* GetStatistics(debug_state* DebugState, debug_record* Record)
 {
   u32 Index =  GetBlockHashedIndex(ArrayCount(DebugState->Statistics), DebugState->Statistics, Record);
   debug_statistics* Result = DebugState->Statistics + Index;
   return Result;  
 }
+
 void CollateDebugRecords(game_memory* Memory)
 {
   debug_state* DebugState = DEBUGGetState();
@@ -411,23 +294,14 @@ void CollateDebugRecords(game_memory* Memory)
 
   debug_frame* Frame = DebugState->Frames + DebugState->CurrentFrameIndex;
 
-  
-  // Loop through all the events of a given frame
   u32 EventCount = GlobalDebugTable->EventCount[DebugTableFrame];
-  //Platform.DEBUGPrint("Debug Table Frame %d  DebugStateFrame %d  EventCount %d: ", DebugTableFrame,   DebugState->CurrentFrameIndex, EventCount);
   for(u32 EventIndex = 0;
           EventIndex < EventCount;
           ++EventIndex)
   {
-    // A debug event has information about a specific function being run a specific time. An event so to speak.
-    // From it we can extract function-name, what thread accessed it and how long it took to execute
     debug_event* Event = GlobalDebugTable->Events[DebugTableFrame] + EventIndex;
-    // The debug record holds information about block-name (function name), Line number and translation unit. 
-    // It's the function that the event is pointing to.
     debug_record* Record = (GlobalDebugTable->Records[Event->TranslationUnit] + Event->DebugRecordIndex);
-    //debug_statistics* Statistics = GetStatistics(DebugState, Record);
 
-#if 1
     switch(Event->Type)
     {
       case DebugEvent_FrameMarker:
@@ -448,7 +322,7 @@ void CollateDebugRecords(game_memory* Memory)
         }
 
         ZeroArray(ArrayCount(Frame->Threads), Frame->Threads);
-        
+
         Frame->BeginClock = Event->Clock;
         Frame->EndClock = 0;
         Frame->FrameBarLaneCount = 0;
@@ -476,39 +350,19 @@ void CollateDebugRecords(game_memory* Memory)
           }
 
           // If we have an open block it means this event was called inside it -> we are going deeper into the stack
-          if(Thread->OpenBlock)
+          if(Thread->OpenBlock && !Thread->OpenBlock->FirstChild)
           {
-            // If the first child for this block is not set we set it
-            // (This event event is the first block going deeper into the stack) 
-            if(!Thread->OpenBlock->FirstChild)
-            {
-              Thread->OpenBlock->FirstChild = Block;
-            }
-          }
-          
-          if(str::ExactlyEquals(Block->Record->BlockName, "GameUpdateAndRender"))
-          {
-            int a = 10;
-          }
-          if(str::ExactlyEquals(Block->Record->BlockName, "GameMainLoop"))
-          {
-            int a = 10;
+            Thread->OpenBlock->FirstChild = Block;
           }
 
-          // Set the open block as a parent
-          // (It's ok for Thread->OpenBlock to be null)
-          // It means that we are on the top of the stack
           Block->Parent = Thread->OpenBlock;
 
-          if(Thread->ClosedBlock)
+
+          if(Thread->ClosedBlock && GetRecordFrom(Thread->ClosedBlock->Parent) == GetRecordFrom(Block->Parent))
           {
-            if(GetRecordFrom(Thread->ClosedBlock->Parent) == GetRecordFrom(Block->Parent))
-            {
-              Thread->ClosedBlock->Next = Block;
-            }
+            Thread->ClosedBlock->Next = Block;
           }
 
-          // This is our new open block
           Thread->OpenBlock = Block;
         }
 
@@ -521,222 +375,20 @@ void CollateDebugRecords(game_memory* Memory)
           Assert(Thread->OpenBlock);
           debug_block* Block = Thread->OpenBlock;
           Block->EndClock = Event->Clock - Frame->BeginClock;
-          
-          if(str::ExactlyEquals(Block->Record->BlockName, "GameUpdateAndRender"))
-          {
-            int a = 10;
-          }
-          if(str::ExactlyEquals(Block->Record->BlockName, "GameMainLoop"))
-          {
-            int a = 10;
-          }
 
-#if 0
           debug_event* OpeningEvent = &Block->OpeningEvent;
           Assert(OpeningEvent->TC.ThreadID      == Event->TC.ThreadID);
           Assert(OpeningEvent->DebugRecordIndex == Event->DebugRecordIndex);
           Assert(OpeningEvent->TranslationUnit  == Event->TranslationUnit);
-#endif
 
           Thread->ClosedBlock = Block;
-
           
           Thread->OpenBlock = Block->Parent;
         }
       }break;
-    } 
-    #endif
+    }
   }
   Platform.DEBUGPrint("\n");
-}
-#else
-void CollateDebugRecords()
-{
-  debug_state* DebugState = DEBUGGetState();
-  ScopedMemory Memory(GlobalGameState->TransientArena);
-
-  // Start on the frame after the one we are writing to
-  u32 FrameIndexToCollate = GlobalDebugTable->CurrentEventArrayIndex - 1;
-  if(GlobalDebugTable->CurrentEventArrayIndex == 0)
-  {
-    FrameIndexToCollate = MAX_DEBUG_EVENT_ARRAY_COUNT-1;
-  }
-
-  u32 TempStatsMaxCount = MAX_DEBUG_TRANSLATION_UNITS * MAX_DEBUG_RECORD_COUNT;
-  debug_statistics* TemporaryDebugStats = PushArray(GlobalGameState->TransientArena, TempStatsMaxCount, debug_statistics);
-  u32 RecordsInFrame = 0;
-  // The debug_frame keeps track on time spent in a current frame
-  debug_frame* CurrentFrame = DebugState->CollationFrame;
-  
-  // Loop through all the events of a given frame
-  u32 EventCount = GlobalDebugTable->EventCount[FrameIndexToCollate];
-  for(u32 EventIndex = 0;
-          EventIndex < EventCount;
-          ++EventIndex)
-  {
-    // A debug event has information about a specific function being run a specific time. An event so to speak.
-    // From it we can extract function-name, what thread accessed it and how long it took to execute
-    debug_event* Event = GlobalDebugTable->Events[FrameIndexToCollate] + EventIndex;
-    // The debug record holds information about block-name (function name), Line number and translation unit. 
-    // It's the function that the event is pointing to.
-    debug_record* Source = (GlobalDebugTable->Records[Event->TranslationUnit] + Event->DebugRecordIndex);
-
-    // Handle the event type frame marker. Keeps track of time spent on the frame as a whole.
-    // First time we enter here after a ResetCollation CurrentFrame will be null. 
-    // We basically ignore all events untill we find a frame marker and only then initiate CurrentFrame
-    if(Event->Type == DebugEvent_FrameMarker)
-    {
-      // Finish up the current frame
-      if(CurrentFrame)
-      {
-        CurrentFrame->EndClock = Event->Clock;
-        CurrentFrame->WallSecondsElapsed = Event->SecondsElapsed;
-
-        r32 ClockRange = (r32)(CurrentFrame->EndClock - CurrentFrame->BeginClock);
-        if(ClockRange > 0.0f)
-        {
-          r32 FrameBarRange = ClockRange;
-          if(DebugState->FrameBarRange < FrameBarRange)
-          {
-            DebugState->FrameBarRange = FrameBarRange;
-          }
-        }
-      }
-
-      // Start the next frame (or initiate the first frame)
-      // Each time DebugState->FrameCount reaches the max number of frames we are tracking we restart collation
-      // Has to be handled in a rolling buffer
-      DebugState->CollationFrame = DebugState->Frames + DebugState->FrameIndex++;
-      if(DebugState->FrameIndex >= MAX_DEBUG_COLLATED_FRAMES)
-      {
-        DebugState->FrameIndex = 0;
-      }
-      CurrentFrame = DebugState->CollationFrame;
-      CurrentFrame->BeginClock = Event->Clock;
-      CurrentFrame->EndClock = 0;
-      CurrentFrame->RegionCount = 0;
-      CurrentFrame->WallSecondsElapsed = 0;
-
-      // A source of memory leaks if we don't reset the collation-memory from time to time.
-      // TODO: Use a rolling buffer
-      CurrentFrame->Regions = PushArray(&DebugState->Arena, MAX_REGIONS_PER_FRAME, debug_frame_region);
-
-    }else if(CurrentFrame)
-    {
-      // If we have found a frame marker we start collation events for the frame.
-      u32 FrameIndex = DebugState->FrameIndex - 1;
-      debug_thread* Thread = GetDebugThread(DebugState, Event->TC.ThreadID);
-      u64 RelativeClock = Event->Clock - CurrentFrame->BeginClock;
-
-      if(Event->Type == DebugEvent_BeginBlock)
-      {
-        open_debug_block* DebugBlock = DebugState->FirstFreeBlock;
-        if(DebugBlock)
-        {
-          DebugState->FirstFreeBlock = DebugBlock->NextFree;
-        }else{
-          DebugBlock = PushStruct(&DebugState->Arena, open_debug_block);
-        }
-
-        DebugBlock->StartingFrameIndex = FrameIndex;
-        DebugBlock->OpeningEvent = *Event;
-        DebugBlock->Record = Source;
-
-        // Push the latest event-block onto the stack
-        DebugBlock->Parent = Thread->FirstOpenBlock;
-        Thread->FirstOpenBlock = DebugBlock;
-
-        DebugBlock->NextFree = 0;
-      }else if(Event->Type == DebugEvent_EndBlock)
-      {
-        // Since any time we encounter a 'DebugEvent_EndBlock' it should refer to the Thread->FirstOpenBlock
-        // Which means we should have gotten to a 'DebugEvent_BeginBlock' before it and thus have a valid
-        // Thread->FirstOpenBlock.
-        // Maybe this is not true for events that span 'DebugEvent_FrameMarker' boundaries, but we can handle that 
-        // if it comes up.
-        Assert(Thread->FirstOpenBlock);
-
-        Assert(CurrentFrame->Regions);
-        open_debug_block* MatchingBlock = Thread->FirstOpenBlock;
-        debug_event* OpeningEvent = &MatchingBlock->OpeningEvent;
-
-        if((OpeningEvent->TC.ThreadID      == Event->TC.ThreadID) &&
-           (OpeningEvent->DebugRecordIndex == Event->DebugRecordIndex) &&
-           (OpeningEvent->TranslationUnit  == Event->TranslationUnit))
-        {
-          if(MatchingBlock->StartingFrameIndex == FrameIndex)
-          {
-            r32 MinT = (r32)(OpeningEvent->Clock - CurrentFrame->BeginClock);
-            r32 MaxT = (r32)(Event->Clock -  CurrentFrame->BeginClock);
-            r32 Time = MaxT-MinT;
-
-            u32 StatsIndex = GetBlockHashedIndex(TempStatsMaxCount, TemporaryDebugStats, Source);
-            if(!TemporaryDebugStats[StatsIndex].Record)
-            {
-              ++RecordsInFrame;
-              BeginDebugStatistics(TemporaryDebugStats + StatsIndex, Source);
-            }
-
-            AccumulateStatistic(TemporaryDebugStats + StatsIndex, Time);
-
-            // We only collate records that has the same parent as DebugState->ScopeToRecord
-            if(GetRecordFrom(MatchingBlock->Parent) == DebugState->ScopeToRecord)
-            {
-              r32 ThresholdT = 2000;
-              if(Time > ThresholdT )
-              {
-                debug_frame_region* Region = AddRegion(CurrentFrame);
-                Region->LaneIndex = Thread->LaneIndex;
-                Region->MinT = (r32)(OpeningEvent->Clock - CurrentFrame->BeginClock);
-                Region->MaxT = (r32)(Event->Clock -  CurrentFrame->BeginClock);
-                Region->Record = Source;
-                Region->ColorIndex = (u16)OpeningEvent->DebugRecordIndex;
-              }
-            }
-          }else{
-            // Record All frames in between and begin/end spans
-            Assert(0); // Just for alerting us if this case ever showes up so we can deal with it then
-
-          }
-
-          Thread->FirstOpenBlock->NextFree = DebugState->FirstFreeBlock;
-          DebugState->FirstFreeBlock = Thread->FirstOpenBlock;
-          Thread->FirstOpenBlock = MatchingBlock->Parent;
-        }else{
-          // Record span that goes to the beginning of the frame
-          Assert(0); // Just for alerting us if this case ever showes up so we can deal with it then
-        }
-      }else{
-        Assert(!"Invalid event type");
-      }
-    }
-  }  
-  if(RecordsInFrame)
-  {
-    u32 FrameIndex = DebugState->FrameIndex - 1;
-    debug_statistics** StatisticsArray = DebugState->Statistics + FrameIndex;
-    Assert(!(*StatisticsArray));
-    *StatisticsArray = PushArray(&DebugState->Arena, RecordsInFrame, debug_statistics);
-    DebugState->StatisticsCounts[FrameIndex] = RecordsInFrame;
-    u32 Index = 0;
-    for (u32 TempIndex = 0; TempIndex < TempStatsMaxCount; ++TempIndex)
-    {
-      debug_statistics* TempStatistic = TemporaryDebugStats + TempIndex;
-      if(TempStatistic->Count)
-      {
-        EndDebugStatistics(TempStatistic);
-        debug_statistics* Statistic = (*StatisticsArray) + Index++;
-        *Statistic = *TempStatistic;
-      }
-    }
-  }
-}
-#endif
-internal void
-RefreshCollation()
-{
-  RestartCollation();
-  //CollateDebugRecords();
 }
 
 inline void
@@ -794,16 +446,6 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
   {
     if(!DebugState->Paused)
     {
-      // In our debug-local-storage we keep information of MAX_DEBUG_COLLATED_FRAMES frames
-      #if 0
-      if(DebugState->FrameCount >= MAX_DEBUG_COLLATED_FRAMES)
-      {
-        // Restart collation zeores out all our debug-local-storage and signals a restar of collation
-        // Todo: Maybe we never should zero out this memory and just keep a rolling buffer going
-        //       I don't know why we zero out every MAX_DEBUG_COLLATED_FRAMES frames
-        RestartCollation();
-      }
-      #endif
       CollateDebugRecords(Memory);
     }
   }
@@ -1013,105 +655,338 @@ MENU_DRAW(DrawStatistics)
   #endif
 }
 
-MENU_DRAW(DrawFrameFunctions)
+v4 GetColorForRecord(debug_record* Record)
 {
-  rect2f Chart = Node->Region;
-  debug_state* DebugState = DEBUGGetState();
+  umm Index = (Record - GlobalDebugTable->Records[0]) << 2;
+  v4 Result = GetColor(Index);
+  return Result;
+}
 
-  debug_frame* Frame = DebugState->SelectedFrame;
-  if(!Frame) return;
+void PushHorizontalBlockRect( debug_block* Block, rect2f Region, u32 Lane, r32 StartY, r32 BarWidth, r32 Envelope, r32 CycleScaling )
+{
+  rect2f Rect{};
+  Rect.X = Region.X+Envelope*0.5f;
+  Rect.Y = StartY + Lane * BarWidth + Envelope * 0.5f;
+  r32 CycleCount = (r32)(Block->EndClock - Block->BeginClock);
+  Rect.W = CycleScaling * CycleCount - Envelope;
+  Rect.H = BarWidth - Envelope;
 
-  u32 ThreadCount = ArrayCount(Frame->Threads);
-
-  r32 BarWidth = Chart.H/(r32)ThreadCount;
-  r32 dt = GlobalGameState->Input->dt;
-  r32 FrameTargetWidth = Chart.W;
-  r32 ChartWidthPerFrameSec = FrameTargetWidth/dt;
-
-  r32 SecPerCycle = Frame->WallSecondsElapsed / (Frame->EndClock - Frame->BeginClock);
-
-  r32 ChartWidtPerCycle = ChartWidthPerFrameSec * SecPerCycle;
+  v4 Color = GetColorForRecord(Block->Record);
+  PushOverlayQuad(Rect, Color);
+}
 
 
-  v4 ColorTable[] = {V4(1,0,0,1),
-                     V4(0,1,0,1),
-                     V4(0,0,1,1),
-                     V4(1,1,0,1),
-                     V4(1,0,1,1),
-                     V4(0,1,1,1),
-                     V4(1,1,1,1),
-                     V4(0,0,0,1)};
-
-  r32 MouseX = Interface->MousePos.X;
-  r32 MouseY = Interface->MousePos.Y;
-  debug_block* SelectedBlock = 0;
-  //for (u32 ThreadIndex = 0; ThreadIndex < ThreadCount; ++ThreadIndex)
-  for (u32 ThreadIndex = 0; ThreadIndex < 1; ++ThreadIndex)
+b32 DrawLane(u32 ArrayMaxCount, u32 BlockCount, debug_block*** BlockArray, u32* BufferCount, debug_block*** Buffer, debug_block** SelectedBlock,
+             r32 StartX, r32 StartY, u32 LaneIndex, r32 LaneWidth, r32 CycleScaling, u64 CycleOffset, r32 PixelSize, v2 MousePos)
+{
+  *BufferCount = 0;
+  *SelectedBlock = 0;
+  ZeroArray(ArrayMaxCount, *Buffer);
+  b32 BlocksDrawn = false;
+  for (u32 i = 0; i < BlockCount; ++i)
   {
-    debug_thread* Thread = Frame->Threads + ThreadIndex;
-
-    if(!Thread->FirstBlock) continue;
-
-    debug_block* BaseBlock = Thread->FirstBlock;
-    if(Thread->SelectedBlock)
+    debug_block* Block = (*BlockArray)[i];
+    while(Block)
     {
-      BaseBlock = Thread->SelectedBlock->FirstChild;
-    }
-
-    debug_block* ParentBlock = BaseBlock;
-    u32 Depth = 0;
-    while(ParentBlock)
-    {
-      ++Depth;
-      ParentBlock = ParentBlock->Parent;
-    }
-
-    u32 LaneIndex = 0;
-    while(BaseBlock)
-    {
-      debug_block* Block = BaseBlock;
-      u32 BlockIndex = 0;
-      while(Block)
+      if(Block->FirstChild)
       {
-        rect2f Rect{};
-        Rect.X = Chart.X + ChartWidtPerCycle * (r32)Block->BeginClock;
-        r32 LineHeight = (r32) (Depth - LaneIndex);
-        Rect.Y = Chart.Y + BarWidth * LineHeight;
-        r32 CycleCount = (r32)(Block->EndClock - Block->BeginClock);
-        Rect.W = ChartWidtPerCycle * CycleCount;
-        Rect.H = BarWidth;
-        
-        v4 Color = ColorTable[(u32)(BlockIndex % ArrayCount(ColorTable))];
-        BlockIndex++;
+        (*Buffer)[(*BufferCount)++] = Block->FirstChild;
+      }
 
+      rect2f Rect{};
+      Rect.X = StartX + CycleScaling * (r32)( Block->BeginClock - CycleOffset) + PixelSize*0.5f;
+      Rect.Y = StartY + LaneWidth * LaneIndex + PixelSize*0.5f;
+      r32 CycleCount = (r32)(Block->EndClock - Block->BeginClock);
+      Rect.W = CycleScaling * CycleCount - PixelSize;
+      Rect.H = LaneWidth - PixelSize;
+      
+      if(Rect.W > PixelSize)
+      {
+        v4 Color = GetColorForRecord(Block->Record);
         PushOverlayQuad(Rect, Color);
-
-        if(Intersects(Rect, V2(MouseX,MouseY)))
+        BlocksDrawn = true;
+        if(Intersects(Rect, MousePos))
         {
           c8 StringBuffer[1048] = {};
           Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
           "%s : %2.2f MCy", Block->Record->BlockName, CycleCount/1000000.f);
-          PushTextAt(MouseX, MouseY+0.02f, StringBuffer, 24, V4(1,1,1,1));
-          SelectedBlock = Block;
+          PushTextAt(MousePos.X, MousePos.Y+0.02f, StringBuffer, 24, V4(1,1,1,1));
+          *SelectedBlock = Block;
         }
-
-        Block = Block->Next;
-      }  
-      BaseBlock = BaseBlock->Parent;
-      LaneIndex++;
-    }
-    if(Interface->MouseLeftButton.Edge && Interface->MouseLeftButton.Active)
-    {
-      Thread->SelectedBlock = SelectedBlock;
+      }
+      Block = Block->Next;
     }
   }
+  return BlocksDrawn;
+}
+
+u32 PushLaneToBuffer(debug_block* Block, u32 BufferCount, debug_block** Buffer)
+{
+  while(Block)
+  {
+    if(Block->FirstChild)
+    {
+      Buffer[BufferCount++] = Block->FirstChild;  
+    }
+    Block = Block->Next;
+  }
+  return BufferCount;
+}
+
+debug_block* DrawBlockChain(debug_block* Block, r32 StartX, r32 StartY, r32 LaneWidth, r32 PixelSize, r32 CycleScaling, u64 CycleOffset, v2 MousePos)
+{
+  debug_block* Result = 0;
+  while(Block)
+  {
+    rect2f Rect{};
+    Rect.X = StartX + CycleScaling * (r32)(Block->BeginClock - CycleOffset) + PixelSize*0.5f;
+    Rect.Y = StartY + PixelSize*0.5f;
+    r32 CycleCount = (r32)(Block->EndClock - Block->BeginClock);
+    Rect.W = CycleScaling * CycleCount - PixelSize;
+    Rect.H = LaneWidth - PixelSize;
+
+    if(Rect.W > PixelSize)
+    {
+      v4 Color = GetColorForRecord(Block->Record);
+      PushOverlayQuad(Rect, Color);
+
+      if(Intersects(Rect, MousePos))
+      {
+        c8 StringBuffer[1048] = {};
+        Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
+        "%s : %2.2f MCy", Block->Record->BlockName, CycleCount/1000000.f);
+        PushTextAt(MousePos.X, MousePos.Y+0.02f, StringBuffer, 24, V4(1,1,1,1));
+        
+        Result = Block;
+      }
+    }
+
+
+    Block = Block->Next;
+  }
+
+  return Result;
+}
+
+u64 GetBlockChainCycleCount(debug_block* FirstBlock)
+{
+  debug_block* LastBlock = FirstBlock;
+  while(LastBlock->Next)
+  {
+    LastBlock = LastBlock->Next;
+  }
+  u64 Result = LastBlock->EndClock - FirstBlock->BeginClock;
+  return Result;
+}
+
+MENU_DRAW(DrawFrameFunctions)
+{
+  r32 ThreadBreak = 0.005;
+
+  rect2f Chart = Node->Region;
+  Chart.H -= ThreadBreak;
+
+  debug_state* DebugState = DEBUGGetState();
+  v2 MousePos = Interface->MousePos;
+
+  debug_frame* Frame = DebugState->SelectedFrame;
+  if(!Frame)
+  {
+    u32 FrameCount = ArrayCount(DebugState->Frames);
+    u32 FrameIndex = (DebugState->CurrentFrameIndex-1) % FrameCount;
+    Frame = DebugState->Frames + FrameIndex;
+  };
+
+  r32 ThreadCount = (r32)Frame->FrameBarLaneCount;
+  r32 MaxLaneCountPerThread = 8;
+
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 PixelSize = 1.f / WindowSize.HeightPx;
+
+  r32 LaneWidth = Chart.H/(MaxLaneCountPerThread + ThreadCount);
+  r32 dt = GlobalGameState->Input->dt;
+
+  debug_block* SelectedBlock = 0;
+  r32 ThreadHeight = 0;
+  r32 StartY = Chart.Y;
+  
+  u32 SelectedThreadIndex = 0;
+
+  r32 ThreadStartY = Chart.Y;
   
 
+  debug_block* HotBlock = 0;
+  debug_thread* HotThread = 0;
+
+  debug_block* SwapBuffer[2][1048] = {};
+  debug_block** ConsumeBuffer = SwapBuffer[0];
+  debug_block** ProduceBuffer = SwapBuffer[1];
+  u32 ConsumeCount = 0;
+  u32 ProducedCount = 0;
+  r32 LaneIndex = 0;
+  for (u32 ThreadIndex = 0; ThreadIndex < ThreadCount; ++ThreadIndex)
+  {
+    r32 CycleScaling = Chart.W / (r32) (Frame->EndClock - Frame->BeginClock);
+    u64 CycleOffset = 0;
+
+    debug_thread* Thread = Frame->Threads + ThreadIndex;
+  
+    Assert(Thread->FirstBlock);
+
+    if(Thread->SelectedBlock)
+    {
+      debug_block* BaseBlock = Thread->SelectedBlock;
+
+      CycleScaling = Chart.W / (r32) (BaseBlock->EndClock - BaseBlock->BeginClock);
+      CycleOffset = BaseBlock->BeginClock;
+
+      rect2f FirstBlockRect = {};
+      FirstBlockRect.X = Chart.X;
+      FirstBlockRect.Y = ThreadStartY+ ThreadBreak *0.5f;
+      FirstBlockRect.W = Chart.W;
+      FirstBlockRect.H = LaneWidth;
+
+      v4 Color = GetColorForRecord(BaseBlock->Record);
+      if(Intersects(FirstBlockRect, MousePos))
+      {
+        c8 StringBuffer[1048] = {};
+        Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
+        "%s : %2.2f MCy", BaseBlock->Record->BlockName, (u32)(BaseBlock->EndClock - BaseBlock->BeginClock)/1000000.f);
+        PushTextAt(MousePos.X, MousePos.Y+0.02f, StringBuffer, 24, V4(1,1,1,1));
+        HotBlock = Thread->SelectedBlock;
+      }
+      PushOverlayQuad(FirstBlockRect, Color);
+      ConsumeBuffer[ConsumeCount++] = Thread->SelectedBlock->FirstChild;
+      LaneIndex = 1;
+    }else{
+      debug_block* MousedOverBlock = DrawBlockChain(Thread->FirstBlock, Chart.X, ThreadStartY + ThreadBreak *0.5f, LaneWidth, PixelSize, CycleScaling, CycleOffset, MousePos);
+      if(!HotBlock)
+      {
+        HotBlock = MousedOverBlock;
+      }
+      LaneIndex = 1;
+      if(DebugState->ThreadSelected)
+      {
+        if(ThreadIndex == DebugState->SelectedThreadIndex)
+        {
+          ConsumeCount = PushLaneToBuffer(Thread->FirstBlock, 0, ConsumeBuffer);
+        }
+      }
+    }
+    
+    while(ConsumeCount && LaneIndex < MaxLaneCountPerThread )
+    {
+      for (u32 BlockIndex = 0; BlockIndex < ConsumeCount; ++BlockIndex)
+      {
+        debug_block* Block = ConsumeBuffer[BlockIndex];
+        r32 YOffset = LaneWidth * LaneIndex + ThreadBreak*0.5f;
+        debug_block* MousedOverBlock = DrawBlockChain(Block, Chart.X, ThreadStartY + YOffset, LaneWidth, PixelSize, CycleScaling, CycleOffset, MousePos);
+        if(MousedOverBlock)
+        {
+          HotBlock = MousedOverBlock;
+        }
+        ProducedCount = PushLaneToBuffer(Block, ProducedCount, ProduceBuffer);
+      }
+      ++LaneIndex;
+
+      ZeroArray(ConsumeCount, ConsumeBuffer);
+      ConsumeCount = ProducedCount;
+      ProducedCount = 0;
+
+      debug_block** TmpBuffer = ConsumeBuffer;
+      ConsumeBuffer = ProduceBuffer;
+      ProduceBuffer = TmpBuffer;
+    }
+
+    rect2f ThreadRegion = {};
+    ThreadRegion.X = Chart.X;
+    ThreadRegion.Y = ThreadStartY;
+    ThreadRegion.W = Chart.W;
+
+    r32 ThreadRegionHeight = LaneWidth + ThreadBreak;
+    if(DebugState->ThreadSelected && (ThreadIndex == DebugState->SelectedThreadIndex))
+    {
+      ThreadRegionHeight = LaneWidth*MaxLaneCountPerThread;
+    }
+
+    ThreadRegion.H = ThreadRegionHeight;
+    ThreadStartY += ThreadRegionHeight;
+    if(!HotThread && Intersects(ThreadRegion, MousePos))
+    {
+      HotThread = Thread;
+    }
+
+    if(ThreadIndex < ThreadCount)
+    {
+      rect2f ThreadBreakRect = {};
+      ThreadBreakRect.X = Chart.X;
+      ThreadBreakRect.Y = ThreadStartY - ThreadBreak * 0.5f;
+      ThreadBreakRect.W = Chart.W;
+      ThreadBreakRect.H = ThreadBreak;
+      PushOverlayQuad(ThreadBreakRect, V4(0,0,1,1));
+    }
+  }
+
+  // Click-logic!
+  if(Interface->MouseLeftButton.Edge && Interface->MouseLeftButton.Active && Intersects(Chart,MousePos))
+  {
+    // We clicked inside a thread-region
+    if(HotThread)
+    {
+      // We klicked inside an already active thread-region
+      if(DebugState->ThreadSelected && DebugState->SelectedThreadIndex == HotThread->LaneIndex)
+      {
+        // We klicked on a block inside an already active thread-region
+        if(HotBlock)
+        {
+          // We klicked on an already selected block inside an already active thread-region
+          if(HotThread->SelectedBlock == HotBlock)
+          {
+            // We set the selected block to it's parent
+            HotThread->SelectedBlock = HotThread->SelectedBlock->Parent;
+          }else{
+            // We set the threads selected block
+            HotThread->SelectedBlock = HotBlock;  
+          }
+
+        // We did not click on a block inside the already selected thread-region
+        // And no block was selected
+        }else if(!HotThread->SelectedBlock)
+        {
+          // Collapse the selected thread region
+          DebugState->ThreadSelected = false;
+
+        // We did not click on a block inside the already selected thread-region
+        // But a block was selected
+        }else if(HotThread->SelectedBlock)
+        {
+          // Reset the selected block
+          HotThread->SelectedBlock = 0;
+        }
+
+      // We klicked inside a thread-region but it's not an already selected region
+      }else{
+        // Another region was already selected
+        if(DebugState->ThreadSelected)
+        {
+          // Set it's selected block to 0
+          debug_thread* PreviouslySelectedThread = Frame->Threads + DebugState->SelectedThreadIndex;
+          PreviouslySelectedThread->SelectedBlock = 0;
+        }
+        DebugState->ThreadSelected = true;
+      }
+      DebugState->SelectedThreadIndex = HotThread->LaneIndex;
+
+      //Frame->Threads[SelectedThreadIndex].SelectedBlock = SelectedBlock;
+    }else{
+      DebugState->ThreadSelected = false;
+    }
+  }
 }
+
 
 MENU_DRAW(DrawFunctionTimeline)
 {
-  #if 1
   rect2f Chart = Node->Region;
 
   r32 dt = GlobalGameState->Input->dt;
@@ -1120,17 +995,17 @@ MENU_DRAW(DrawFunctionTimeline)
   r32 HeightScaling = FrameTargetHeight/dt;
 
   debug_state* DebugState = DEBUGGetState();
-  u32 MaxFramesToDisplay = ArrayCount(DebugState->Frames);
-  r32 BarWidth = Chart.W/MaxFramesToDisplay;
+  u32 MaxFramesToDisplay = ArrayCount(DebugState->Frames)-1;
 
-  v4 ColorTable[] = {V4(1,0,0,1),
-                     V4(0,1,0,1),
-                     V4(0,0,1,1),
-                     V4(1,1,0,1),
-                     V4(1,0,1,1),
-                     V4(0,1,1,1),
-                     V4(1,1,1,1),
-                     V4(0,0,0,1)};
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 PixelSize = 1.f / WindowSize.HeightPx;
+
+  r32 BarGap = PixelSize;
+
+  v4 RedColor = V4(1,0,0,1);
+  r32 FullRed = 1.2;
+  r32 FullBlue = 1;
+  v4 BlueColor =  V4(0,0,1,1);
 
   r32 MouseX = Interface->MousePos.X;
   r32 MouseY = Interface->MousePos.Y;
@@ -1139,33 +1014,68 @@ MENU_DRAW(DrawFunctionTimeline)
   u32 Count = 0;
   debug_frame* Frame = DebugState->Frames + DebugState->CurrentFrameIndex+1;
   debug_frame* SelectedFrame = 0;
-  for(u32 BarIndex = 0; BarIndex < MaxFramesToDisplay-1; ++BarIndex)
+  debug_thread* SelectedThread = 0;
+  r32 BarWidth = Chart.W/(MaxFramesToDisplay);
+  for(u32 BarIndex = 0; BarIndex < MaxFramesToDisplay; ++BarIndex)
   {
     u32 FrameIndex = (u32) (Frame-DebugState->Frames);
     if(FrameIndex >= FrameCount)
     {
       Frame = DebugState->Frames; 
     }
-    r32 FrameX = Chart.X + (r32)(BarIndex)*BarWidth;
+    
+    debug_block* Block = Frame->Threads[0].FirstBlock;
+
     r32 FrameY = Chart.Y;
 
-    rect2f Rect = {};
-    Rect.X = FrameX;
-    Rect.Y = FrameY;
-    Rect.W = BarWidth;
-    Rect.H = Frame->WallSecondsElapsed * HeightScaling;
-    v4 Color = ColorTable[(u32)(BarIndex%ArrayCount(ColorTable))];
-    PushOverlayQuad(Rect, Color);
+    r32 FrameHitRatio = Frame->WallSecondsElapsed / dt;
+    r32 FrameCycleScaling = FrameTargetHeight * FrameHitRatio/(Frame->EndClock - Frame->BeginClock);
 
-    if(Intersects(Rect, V2(MouseX,MouseY)))
+    r32 FrameX = Chart.X + (r32)BarIndex*BarWidth;
+
+    if(DebugState->SelectedFrame && DebugState->SelectedFrame == Frame)
     {
-      SelectedFrame = Frame;
-      c8 StringBuffer[1048] = {};
-      Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
-      "Frame %d:  %2.2f Sec", FrameIndex, Frame->WallSecondsElapsed);
-      PushTextAt(MouseX, MouseY+0.02f, StringBuffer, 24, V4(1,1,1,1));
+      u64 LaneCycleCount = GetBlockChainCycleCount(Block);
+      rect2f Rect = {};
+      Rect.X = FrameX - 0.5f*PixelSize;
+      Rect.Y = FrameY - 0.5f*PixelSize;
+      Rect.W = BarWidth + PixelSize;
+      Rect.H = FrameCycleScaling*LaneCycleCount + 2*PixelSize;
+      PushOverlayQuad(Rect, V4(1,1,0,1));
     }
 
+    while(Block)
+    {
+      rect2f Rect = {};
+      Rect.X = FrameX + BarGap * 0.5f;
+      Rect.Y = FrameY+FrameCycleScaling*Block->BeginClock;
+      Rect.W = BarWidth - BarGap;
+      Rect.H = FrameCycleScaling*(Block->EndClock - Block->BeginClock);
+
+      v4 Color = GetColorForRecord(Block->Record);
+      PushOverlayQuad(Rect, Color);
+      
+      if(Intersects(Rect, V2(MouseX,MouseY)))
+      {
+        c8 StringBuffer[2048] = {};
+        Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer),
+        "Frame %d: %2.2f Sec (%s)", FrameIndex, Frame->WallSecondsElapsed, Block->Record->BlockName);
+
+        PushTextAt(MouseX, MouseY+0.02f, StringBuffer, 24, V4(1,1,1,1));
+      }
+      Block = Block->Next;
+    }  
+
+    rect2f FrameRect = {};
+    FrameRect.X = FrameX;
+    FrameRect.Y = FrameY;
+    FrameRect.W = BarWidth;
+    FrameRect.H = Frame->WallSecondsElapsed * HeightScaling;
+
+    if(Intersects(FrameRect, V2(MouseX,MouseY)))
+    {
+      SelectedFrame = Frame;
+    }
     ++Frame;
   }
 
@@ -1184,12 +1094,10 @@ MENU_DRAW(DrawFunctionTimeline)
 
   rect2f Rect = {};
   Rect.X = Chart.X;
-  Rect.Y = Chart.Y + 0.7f*Chart.H;
+  Rect.Y = Chart.Y + FrameTargetHeight - 0.001f*0.5f;
   Rect.W = Chart.W;
-  Rect.H = 0.01;
+  Rect.H = 0.001;
   PushOverlayQuad(Rect, V4(0,0,0,1));
-
-  #endif
 }
 
 void PushDebugOverlay(game_input* GameInput)

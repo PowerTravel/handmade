@@ -2133,6 +2133,7 @@ internal void CallUpdateFunctions(menu_interface* Interface)
 
 void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interface)
 { 
+  TIMED_FUNCTION();
   // Sets input variables to Interface
   GetInput(GameInput, Interface);
   if(!Interface->MenuVisible)
@@ -2410,7 +2411,7 @@ MENU_EVENT_CALLBACK(InitiateTabDrag)
   }
 }
 
-container_node* CreateTab(menu_interface* Interface, container_node* Plugin)
+internal container_node* CreateTab(menu_interface* Interface, container_node* Plugin)
 {
   plugin_node* PluginNode = GetPluginNode(Plugin);
 
@@ -2421,7 +2422,6 @@ container_node* CreateTab(menu_interface* Interface, container_node* Plugin)
 
   GetTabNode(Tab)->Payload = Plugin;
   PluginNode->Tab = Tab;
-
 
   RegisterMenuEvent(Interface, menu_event_type::MouseDown, Tab, 0, InitiateTabDrag, 0);
 
@@ -2490,4 +2490,18 @@ void RegisterWindow(menu_interface* Interface, menu_tree* DropDownMenu, containe
   RegisterMenuEvent(Interface, menu_event_type::MouseUp, MenuItem, Tab, DropDownMouseUp, 0);
   RegisterMenuEvent(Interface, menu_event_type::MouseEnter, MenuItem, Tab, DropDownMouseEnter, 0);
   RegisterMenuEvent(Interface, menu_event_type::MouseExit, MenuItem, Tab, DropDownMouseExit, 0);
+}
+
+void ToggleWindow(menu_interface* Interface, char* WindowName)
+{
+  for(u32 PluginIndex = 0; PluginIndex < Interface->PermanentWindowCount; PluginIndex++)
+  {
+    container_node* PluginTab = Interface->PermanentWindows[PluginIndex];
+    container_node* Plugin = GetTabNode(PluginTab)->Payload;
+
+    if(str::ExactlyEquals(WindowName, GetPluginNode(Plugin)->Title))
+    {
+      DisplayOrRemovePluginTab(Interface,PluginTab);  
+    }
+  }
 }

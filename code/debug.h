@@ -63,12 +63,12 @@ struct debug_frame
   r32 WallSecondsElapsed;
 
   u32 FrameBarLaneCount;
- // r32 FrameBarRange;
 
   debug_block Blocks[MAX_BLOCKS_PER_FRAME];
   debug_block* FirstFreeBlock;
 
   debug_thread Threads[MAX_THREAD_COUNT];
+
 };
 
 struct debug_state
@@ -91,6 +91,9 @@ struct debug_state
   // This is a rolling buffer that holds all data for all frames
   u32 CurrentFrameIndex;
   debug_frame* SelectedFrame;
+  
+  b32 ThreadSelected;
+  u32 SelectedThreadIndex;
   debug_frame Frames[MAX_DEBUG_FRAME_COUNT];
 
   debug_statistics Statistics[MAX_DEBUG_RECORD_COUNT*MAX_DEBUG_TRANSLATION_UNITS];

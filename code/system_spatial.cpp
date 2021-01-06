@@ -681,7 +681,7 @@ SolveFrictionalConstraints( contact_manifold* FirstManifold )
       }
 
     }
-    Manifold =Manifold->Next;
+    Manifold = Manifold->Next;
   }
 }
 
@@ -771,6 +771,7 @@ IntegratePositions(r32 dtForFrame)
     TimestepVelocityRungeKutta4( dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
     S->Rotation = Normalize(S->Rotation);
     #endif
+    UpdateModelMatrix(S);
   }
 }
 

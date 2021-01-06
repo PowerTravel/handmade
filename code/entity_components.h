@@ -70,17 +70,23 @@ struct component_spatial
   //  we define the Quaternion as (xi,yj,zk, Scalar)
   //  Some resources define it as (Scalar,xi,yj,zk)
   v4 Rotation;
+  m4 ModelMatrix;
 };
+
+void UpdateModelMatrix( component_spatial* c )
+{
+  TIMED_FUNCTION();
+  const m4 Scale = GetScaleMatrix(V4(c->Scale,1));
+  const m4 Rotation = GetRotationMatrix(c->Rotation);
+  const m4 Translation = GetTranslationMatrix(c->Position);
+  c->ModelMatrix = Translation * Rotation * Scale;
+}
 
 // TODO: Optimize by doing explicit element multiplication
 m4 GetModelMatrix( const component_spatial* c )
 {
   TIMED_FUNCTION();
-  const m4 Result = M4Identity();
-  const m4 Scale = GetScaleMatrix(V4(c->Scale,1));
-  const m4 Rotation = GetRotationMatrix(c->Rotation);
-  const m4 Translation = GetTranslationMatrix(c->Position);
-  return Translation * Rotation * Scale;
+  return c->ModelMatrix;
 }
 
 struct component_collider

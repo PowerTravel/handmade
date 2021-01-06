@@ -406,7 +406,7 @@ container_node* CreateSplitWindow( menu_interface* Interface, b32 Vertical, r32 
 container_node* CreatePlugin(menu_interface* Interface, c8* HeaderName, v4 HeaderColor, container_node* BodyNode);
 menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name);
 void RegisterWindow(menu_interface* Interface, menu_tree* DropDownMenu, container_node* Plugin);
-
+void ToggleWindow(menu_interface* Interface, char* WindowName);
 
 void _RegisterMenuEvent(menu_interface* Interface, menu_event_type EventType, container_node* CallerNode, void* Data, menu_event_callback** Callback,  menu_event_callback** OnDelete);
 #define RegisterMenuEvent(Interface, EventType, CallerNode, Data, Callback, OnDeleteCallback ) \

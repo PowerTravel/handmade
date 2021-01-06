@@ -1,8 +1,5 @@
 #pragma once
 
-
-
-
 MENU_LOSING_FOCUS(DefaultLosingFocus);
 MENU_LOSING_FOCUS(DropDownLosingFocus);
 
@@ -21,7 +18,6 @@ MENU_DRAW(DrawFrameFunctions);
 
 MENU_EVENT_CALLBACK(DebugToggleButton);
 MENU_EVENT_CALLBACK(DebugRecompileButton);
-MENU_EVENT_CALLBACK(DebugPauseCollationButton);
 
 MENU_EVENT_CALLBACK(InitiateTabDrag);
 MENU_EVENT_CALLBACK(InitiateWindowDrag);
@@ -64,7 +60,6 @@ void _ReinitiatePool(function_pool* Pool)
     NewFunPtr(DrawFrameFunctions)
     NewFunPtr(DebugToggleButton)
     NewFunPtr(DebugRecompileButton)
-    NewFunPtr(DebugPauseCollationButton)
     NewFunPtr(InitiateTabDrag)
     NewFunPtr(InitiateWindowDrag)
     NewFunPtr(InitiateSplitWindowBorderDrag)
