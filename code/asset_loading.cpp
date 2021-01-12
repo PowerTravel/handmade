@@ -155,7 +155,6 @@ internal void stbtt_BakeFontBitmap(game_asset_manager* AssetManager)
 
 
   thread_context Thread;
-  //debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\arial.ttf");
   debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Users\\jh\\Documents\\dev\\handmade\\data\\Fonts\\Mx437_IBM_BIOS.ttf");
   Assert(TTFFile.Contents);
 

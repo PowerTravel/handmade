@@ -573,147 +573,96 @@ void DEBUGAddTextSTB(const c8* String, r32 LineNumber, u32 FontSize)
   PushTextAt(CanPosX, CanPosY, String, FontSize, V4(1,1,1,1));
 }
 
-list_entry Merge(
-     list_entry* SentinelA, u32* CountA,
-     list_entry* SentinelB, u32* CountB,
-     s32 (*DifferenceFun) ( void*,  void*) )
+void MergeSort(memory_arena* Arena, vector_list* List, b32 (*DifferenceFun) ( void*,  void*))
 {
-  list_entry ResultSentinel = {};
-  ListInitiate(&ResultSentinel);
-  list_entry* Position = &ResultSentinel;
+  ScopedMemory(GlobalGameState->TransientArena);
 
-  u32 TotCount = *CountA+*CountB;
-  u32 Count = 0;
-  list_entry* PositionA = SentinelA->Next;
-  list_entry* PositionB = SentinelB->Next;
-  while(Count < TotCount)
+  u32 ListCount = List->ListCount;
+  list_entry** InputArray = PushArray(Arena, ListCount, list_entry*);
+  list_entry** TempArray = PushArray(Arena, ListCount, list_entry*);
+
+  list_entry* Entry = List->Sentinel.Next;
+  u32 i = 0;
+  u32 j = 0;
+  while(Entry != &List->Sentinel)
   {
-    if( (PositionA != SentinelA) &&
-        (PositionB != SentinelB))
+    list_entry* Tmp = Entry;
+    Entry = Entry->Next;
+    InputArray[i++] = Tmp;
+    ListRemove(Tmp);
+  }
+  Assert(IsEmpty(List));
+
+  u32 TempArrayIndex = 0;
+  u32 LowerBoundIndex_1 = 0;
+  u32 HigherBoundIndex_1 = 0;
+  u32 LowerBoundIndex_2 = 0;
+  u32 HigherBoundIndex_2 = 0;
+
+  for(u32 Size = 1; Size < ListCount; Size = Size*2 )
+  {
+    u32 CycleCount = 0;
+    LowerBoundIndex_1 = 0;
+    TempArrayIndex = 0;
+    while((LowerBoundIndex_1 + Size) < ListCount)
     {
-      list_entry* EntryToInsert = 0;
-      s32 DiffVal = DifferenceFun( GetDataFromEntry(PositionA), GetDataFromEntry(PositionB));
-      if(DiffVal >= 0)
+      HigherBoundIndex_1 = LowerBoundIndex_1 + Size - 1;
+      LowerBoundIndex_2  = HigherBoundIndex_1 + 1;
+      HigherBoundIndex_2 = LowerBoundIndex_2 + Size - 1;
+      if(HigherBoundIndex_2 >= ListCount)
       {
-        EntryToInsert = PositionA;
-        PositionA = PositionA->Next;
-      }else{
-        EntryToInsert = PositionB;
-        PositionB = PositionB->Next;
+        HigherBoundIndex_2 = ListCount-1;
+        ++CycleCount;
+      }
+      
+      /*Merge the two pairs with lower limits LowerBoundIndex_1 and LowerBoundIndex_2*/
+      i = LowerBoundIndex_1;
+      j = LowerBoundIndex_2;
+      
+      while( (i <= HigherBoundIndex_1) && (j <= HigherBoundIndex_2) )
+      {
+        ++CycleCount;
+        void* DataI = (void*) (InputArray[i]+1);
+        void* DataJ = (void*) (InputArray[j]+1);
+        if( DifferenceFun(DataI, DataJ) )
+          TempArray[TempArrayIndex++]=InputArray[i++];
+        else
+          TempArray[TempArrayIndex++]=InputArray[j++];
+      }
+      
+      while(i <= HigherBoundIndex_1){
+        TempArray[TempArrayIndex++]=InputArray[i++];
+        ++CycleCount;
       }
 
-      ListRemove(EntryToInsert);
-      ListInsertAfter(Position, EntryToInsert);
-      Position = EntryToInsert;
-      ++Count;
-    }else{
-      if( (PositionA != SentinelA) )
-      {
-        ResultSentinel.Previous->Next = SentinelA->Next;
-        SentinelA->Next->Previous = ResultSentinel.Previous;
-
-        SentinelA->Previous->Next = &ResultSentinel;
-        ResultSentinel.Previous  = SentinelA->Previous;
-
-        Count = TotCount;
-        *SentinelA = {};
-      }else{
-        ResultSentinel.Previous->Next = SentinelB->Next;
-        SentinelB->Next->Previous = ResultSentinel.Previous;
-
-        SentinelB->Previous->Next = &ResultSentinel;
-        ResultSentinel.Previous  = SentinelB->Previous;
-
-        Count = TotCount;
-        *SentinelB = {};
+      while(j <= HigherBoundIndex_2){
+        TempArray[TempArrayIndex++]=InputArray[j++];
+        ++CycleCount;
       }
+
+      /**Merging completed**/
+      /*Take the next two pairs for merging */
+      LowerBoundIndex_1 = HigherBoundIndex_2 + 1;
+    }
+
+    /*any pair left */
+    for(i = LowerBoundIndex_1; TempArrayIndex < ListCount; i++)
+    {
+      TempArray[TempArrayIndex++] = InputArray[i];
+      CycleCount++;
+    }
+
+    for(i = 0; i < ListCount; i++)
+    {
+      InputArray[i] = TempArray[i];
+      CycleCount++;
     }
   }
 
-  return ResultSentinel;
-}
-
-inline void RealignSentinel( list_entry* Sentinel )
-{
-  Sentinel->Next->Previous = Sentinel;
-  Sentinel->Previous->Next = Sentinel;
-}
-
-
-void Split(list_entry* InitialSentinel, const u32 InitialCount,
-             list_entry* SentinelA, u32* CountA,
-             list_entry* SentinelB, u32* CountB)
-{
-  ListInitiate(SentinelA);
-  ListInitiate(SentinelB);
-
-  *CountA = (u32) Ciel(InitialCount/2.f);
-  *CountB = InitialCount - *CountA;
-
-  if((*CountA==0) && (*CountB==0))
+  for(i = 0; i < ListCount; i++)
   {
-    return;
+    ListInsertAfter(&List->Sentinel, InputArray[i]);
   }
-
-  list_entry* Pos = InitialSentinel;
-  for(u32 i = 0; i < *CountA; ++i)
-  {
-    Pos = Pos->Next;
-  }
-
-  list_entry* ALast  = Pos;
-  list_entry* BFirst = Pos->Next;
-
-
-  SentinelA->Next = InitialSentinel->Next;
-  SentinelA->Next->Previous = SentinelA;
-  SentinelA->Previous = ALast;
-  SentinelA->Previous->Next = SentinelA;
-
-  if(*CountB!=0)
-  {
-    SentinelB->Next = BFirst;
-    SentinelB->Next->Previous = SentinelB;
-    SentinelB->Previous = InitialSentinel->Previous;
-    SentinelB->Previous->Next = SentinelB;
-  }
-}
-
-
-list_entry MergeSort( list_entry* Sentinel, u32 Count, s32 (*DifferenceFun) ( void*,  void*)  )
-{
-  list_entry SentinelA, SentinelB;
-  u32 CountA ,CountB;
-
-  Split(  Sentinel,   Count,
-         &SentinelA, &CountA,
-         &SentinelB, &CountB);
-
-  list_entry ResultA = {};
-  if(CountA > 1)
-  {
-    ResultA = MergeSort(&SentinelA, CountA, DifferenceFun);
-  }else{
-    ResultA = SentinelA;
-  }
-
-  RealignSentinel(&ResultA);
-
-  list_entry ResultB = {};
-  if(CountB > 1)
-  {
-    ResultB = MergeSort(&SentinelB, CountB, DifferenceFun);
-  }else{
-    ResultB = SentinelB;
-  }
-  RealignSentinel(&ResultB);
-
-  list_entry Result = Merge( &ResultA, &CountA,
-                             &ResultB, &CountB,
-                             DifferenceFun);
-  RealignSentinel(&Result);
-
-  return Result;
 }
 
 MENU_DRAW(DrawStatistics)
@@ -825,67 +774,110 @@ MENU_DRAW(DrawStatistics)
   PushTextAt(TextRect[3].X + TextRect[3].W - GetTextWidth(Text[3], FontSize), TextRect[3].Y, Text[3], FontSize, V4(1,1,1,1));
   PushTextAt(TextRect[4].X + TextRect[4].W - GetTextWidth(Text[4], FontSize), TextRect[4].Y, Text[4], FontSize, V4(1,1,1,1));
 
+
+#if 0
+  vector_list* TmpList = BeginVectorList(GlobalGameState->TransientArena, 10, u32);
+  int num = 0;
+  num = 41;
+  PushBack(TmpList, 0, &num);
+  num = 57;
+  PushBack(TmpList, 1, &num);
+  num = 90;
+  PushBack(TmpList, 2, &num);
+  num = 21;
+  PushBack(TmpList, 3, &num);
+  num = 65;
+  PushBack(TmpList, 4, &num);
+  num = 19;
+  PushBack(TmpList, 5, &num);
+  num = 37;
+  PushBack(TmpList, 6, &num);
+  num = 17;
+  PushBack(TmpList, 7, &num);
+  num = 64;
+  PushBack(TmpList, 8, &num);
+  num = 75;
+  PushBack(TmpList, 9, &num);
+  int* N = (int*) First(TmpList);
+  while(!IsEnd(TmpList, N))
+  {
+    Platform.DEBUGPrint("%d\n", *N);
+    N = (int*) Next(TmpList, N);
+  }
+  //TmpList->Sentinel = MergeSort( &TmpList->Sentinel, TmpList->ListCount, [](void* A, void* B)
+  MergeSort(GlobalGameState->TransientArena, TmpList, [](void* A, void* B)
+  {
+    u32 EntryA = *((int*) A);
+    u32 EntryB = *((int*) B);
+    b32 Result = EntryA <= EntryB;
+    return Result;
+  });
+  N = (int*) First(TmpList);
+  while(!IsEnd(TmpList, N))
+  {
+    Platform.DEBUGPrint("%d\n", *N);
+    N = (int*) Next(TmpList, N);
+  }
+#endif  
+
   if(GlobalGameState->MenuInterface->MouseLeftButton.Active && GlobalGameState->MenuInterface->MouseLeftButton.Edge)
   {
     if(Intersects(TextRect[0], Interface->MousePos))
     {
-      DebugFunctions->Sentinel = MergeSort( &DebugFunctions->Sentinel, DebugFunctions->ListCount, [](void* A, void* B){
-        debug_record_entry* EntryA = (debug_record_entry*) A;
-        debug_record_entry* EntryB = (debug_record_entry*) B;
-        if(EntryA->LineNumber < EntryB->LineNumber)
-        {
-          return 1;
-        }else if(EntryA->LineNumber > EntryB->LineNumber){
-          return -1;
-        }
-        return 0;
-      });
-    }else if(Intersects(TextRect[1], Interface->MousePos)){
-      DebugFunctions->Sentinel = MergeSort( &DebugFunctions->Sentinel, DebugFunctions->ListCount, [](void* A, void* B)
+      MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
       {
         debug_record_entry* EntryA = (debug_record_entry*) A;
         debug_record_entry* EntryB = (debug_record_entry*) B;
-        s32 Result = str::Compare(EntryA->BlockName,EntryB->BlockName);
+        b32 Result = false;
+        if(EntryA->LineNumber <= EntryB->LineNumber)
+        {
+          Result = true;
+        }
+        return Result;
+      });
+    }else if(Intersects(TextRect[1], Interface->MousePos)){
+      MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+      {
+        debug_record_entry* EntryA = (debug_record_entry*) A;
+        debug_record_entry* EntryB = (debug_record_entry*) B;
+        b32 Result = str::Compare(EntryA->BlockName,EntryB->BlockName) <= 0;
         return Result;
       });
     }else if(Intersects(TextRect[2], Interface->MousePos)){
-      DebugFunctions->Sentinel = MergeSort( &DebugFunctions->Sentinel, DebugFunctions->ListCount, [](void* A, void* B)
+      MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
       {
         debug_record_entry* EntryA = (debug_record_entry*) A;
         debug_record_entry* EntryB = (debug_record_entry*) B;
-        if(EntryA->CycleCount < EntryB->CycleCount)
+        b32 Result = false;
+        if(EntryA->CycleCount <= EntryB->CycleCount)
         {
-          return -1;
-        }else if(EntryA->CycleCount > EntryB->CycleCount){
-          return 1;
+          Result = true;
         }
-        return 0;
+        return Result;
       });
     }else if(Intersects(TextRect[3], Interface->MousePos)){
-      DebugFunctions->Sentinel = MergeSort( &DebugFunctions->Sentinel, DebugFunctions->ListCount, [](void* A, void* B)
+      MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
       {
         debug_record_entry* EntryA = (debug_record_entry*) A;
         debug_record_entry* EntryB = (debug_record_entry*) B;
-        if(EntryA->HitCount < EntryB->HitCount)
+        b32 Result = false;
+        if(EntryA->HitCount <= EntryB->HitCount)
         {
-          return 1;
-        }else if(EntryA->HitCount > EntryB->HitCount){
-          return -1;
+          Result = true;
         }
-        return 0;
+        return Result;
       });
     }else if(Intersects(TextRect[4], Interface->MousePos)){
-      DebugFunctions->Sentinel = MergeSort( &DebugFunctions->Sentinel, DebugFunctions->ListCount, [](void* A, void* B)
+      MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
       {
         debug_record_entry* EntryA = (debug_record_entry*) A;
         debug_record_entry* EntryB = (debug_record_entry*) B;
-        if(EntryA->HCCount < EntryB->HCCount)
+        b32 Result = false;
+        if(EntryA->HCCount <= EntryB->HCCount)
         {
-          return 1;
-        }else if(EntryA->HCCount > EntryB->HCCount){
-          return -1;
+          Result = true;
         }
-        return 0;
+        return Result;
       });
     }
   }
@@ -937,7 +929,7 @@ MENU_DRAW(DrawStatistics)
       break;
     }
 
-    YPos -= LineHeight;
+    YPos -= LineHeight*1.5f;
 
     Entry = (debug_record_entry*) Next(DebugFunctions, (void*) Entry);
     
