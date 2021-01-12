@@ -713,7 +713,6 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
     container_node* Parent = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
 
-
     if(HasAttribute(Parent, ATTRIBUTE_COLOR))
     {
       color_attribute* Color = (color_attribute*) GetAttributePointer(Parent, ATTRIBUTE_COLOR);

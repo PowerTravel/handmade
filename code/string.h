@@ -91,6 +91,23 @@ b32 Equals( const char* StringA, const char* StringB )
   return true;
 }
 
+s32 Compare( const char* StringA, const char* StringB )
+{
+  while( *StringA && *StringB )
+  {
+    s32 A = (s32)(*StringA++);
+    s32 B = (s32)(*StringB++);
+    if( A > B )
+    {
+      return 1;
+    }else if(B > A){
+      return -1;
+    }
+  }
+
+  return 0;
+}
+
 b32 ExactlyEquals( const char* StringA, const char* StringB )
 {
   b32 Result = Equals(StringA, StringB)  && (str::StringLength(StringA) == str::StringLength(StringB));

@@ -140,8 +140,8 @@ GetSTBGlyphRect(r32 xPosPx, r32 yPosPx, stbtt_bakedchar* CH )
 void PushTextAt(r32 CanPosX, r32 CanPosY, const c8* String, u32 FontSize, v4 Color)
 {
   game_window_size WindowSize = GameGetWindowSize();
-  r32 PixelPosX = CanPosX*WindowSize.HeightPx;
-  r32 PixelPosY = CanPosY*WindowSize.HeightPx;
+  r32 PixelPosX = Floor(CanPosX*WindowSize.HeightPx);
+  r32 PixelPosY = Floor(CanPosY*WindowSize.HeightPx);
   game_asset_manager* AssetManager =  GlobalGameState->AssetManager;
   stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
 

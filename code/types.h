@@ -38,6 +38,7 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
+typedef uint8_t* bptr;
 typedef size_t memory_index;
 typedef size_t midx;
 

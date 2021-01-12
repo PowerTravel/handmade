@@ -508,6 +508,7 @@ class hash_map
   // djb2 from http://www.cse.yorku.ca/~oz/hash.html
   u32 djb2_hash(const char* str)
   {
+    TIMED_FUNCTION();
     u32 hash = 5381;
     u32 c;
 

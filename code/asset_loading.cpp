@@ -137,6 +137,10 @@ internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
 
 }
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "externals/stb_image_write.h"
+
+
 internal void stbtt_BakeFontBitmap(game_asset_manager* AssetManager)
 {
   const s32 Ranges[] =
@@ -151,7 +155,8 @@ internal void stbtt_BakeFontBitmap(game_asset_manager* AssetManager)
 
 
   thread_context Thread;
-  debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\arial.ttf");
+  //debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Windows\\Fonts\\arial.ttf");
+  debug_read_file_result TTFFile = Platform.DEBUGPlatformReadEntireFile(&Thread, "C:\\Users\\jh\\Documents\\dev\\handmade\\data\\Fonts\\Mx437_IBM_BIOS.ttf");
   Assert(TTFFile.Contents);
 
   auto push_font = [&Ranges, &AssetManager, &TTFFile](stb_font_map* FontMap, c8* Name, r32 FontHeightPx)
@@ -196,12 +201,14 @@ internal void stbtt_BakeFontBitmap(game_asset_manager* AssetManager)
       *Pixels++ = PixelData;
       SrcPixel++;
     }
+
     PushBitmapData(AssetManager, Name, Width, Height, BPP, BasePixel, false);
     GetHandle(AssetManager, Name, &FontMap->BitmapHandle);
   };
 
-  push_font(&AssetManager->FontMap[0], "debug_font_12", 12);
-  push_font(&AssetManager->FontMap[1], "debug_font_14", 14);
+
+  push_font(&AssetManager->FontMap[0], "debug_font_12", 8);
+  push_font(&AssetManager->FontMap[1], "debug_font_14", 12);
   push_font(&AssetManager->FontMap[2], "debug_font_16", 16);
   push_font(&AssetManager->FontMap[3], "debug_font_18", 18);
   push_font(&AssetManager->FontMap[4], "debug_font_20", 20);

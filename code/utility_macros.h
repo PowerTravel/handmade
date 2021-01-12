@@ -85,6 +85,11 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 
 #define BranchlessArithmatic( Condition, ExpressionIfTrue, ExpressionIfFalse )  ((s32)(Condition)) * (ExpressionIfTrue) + ((s32) !(Condition) ) * (ExpressionIfFalse)
 
+#define ToArrayIndex(Row, Col, Stride) (Row)  * (Stride) + (Col)
+
+#define NextElement(Base, Stride, Type) (Type*)(((bptr)Base) + ByteStride);
+
+
 #define HexToColorV4( Red, Green, Blue )  V4((Red)/(r32) 0xFF,(Green)/(r32) 0xFF,(Blue)/(r32)0xFF,1);
 #define HexCodeToColorV4( Code )  V4( \
     (((Code) & 0xFF0000) >> 16)/(r32) 0xFF, \
