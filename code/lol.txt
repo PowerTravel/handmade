@@ -1,5 +1,0 @@
-menu_interface.h:70:#define MENU_HANDLE_INPUT(name) void name( menu_interface* Interface, container_node* Node)
-menu_interface.h:73:#define MENU_UPDATE_CHILD_REGIONS(name) void name(container_node* Parent)
-menu_interface.h:76:#define MENU_DRAW(name) void name( menu_interface* Interface, container_node* Node)
-menu_interface.h:158:#define BUTTON_ATTRIBUTE_UPDATE(name) void name( struct  menu_interface* Interface, struct button_attribute* Attr, struct  container_node* Node)
-menu_interface.h:187:#define DRAGGABLE_ATTRIBUTE_UPDATE(name) void name( struct  menu_interface* Interface, struct  container_node* Node,  struct draggable_attribute* Attr)

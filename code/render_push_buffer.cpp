@@ -292,7 +292,7 @@ void FillRenderPushBuffer(world* World)
       push_buffer_header* Header = PushNewHeader( LightGroup, render_buffer_entry_type::LIGHT, 0 );
       entry_type_light* Body = PushStruct(&LightGroup->Arena, entry_type_light);
       Body->Color  = Light->Color;
-      Body->M      = GetModelMatrix(Spatial);
+      Body->M      = Spatial->ModelMatrix;
     }
   }
 
@@ -309,7 +309,7 @@ void FillRenderPushBuffer(world* World)
       Body->Object = Render->Object;
       Body->Bitmap = Render->Bitmap;
       Body->Material = Render->Material;
-      Body->M  = GetModelMatrix(Spatial);
+      Body->M  = Spatial->ModelMatrix;
       Body->NM = Transpose(RigidInverse(Body->M));
       Body->TM = M4Identity();
 
@@ -329,7 +329,7 @@ void FillRenderPushBuffer(world* World)
     {
       component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
       component_collider* Collider = (component_collider*) GetComponent(EM, ComponentList, COMPONENT_FLAG_COLLIDER);
-      m4 M = GetModelMatrix(Spatial);
+      m4 M = Spatial->ModelMatrix;
       aabb3f AABB = Collider->AABB;
       r32 LineThickness = 0.03;
 

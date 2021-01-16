@@ -158,8 +158,8 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
   component_collider* ColliderB = (component_collider*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_COLLIDER);
   component_dynamics* DynamicsA = (component_dynamics*) GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_DYNAMICS);
   component_dynamics* DynamicsB = (component_dynamics*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_DYNAMICS);
-  m4 ModelMatrixA = GetModelMatrix(SpatialA);
-  m4 ModelMatrixB = GetModelMatrix(SpatialB);
+  m4 ModelMatrixA = SpatialA->ModelMatrix;
+  m4 ModelMatrixB = SpatialB->ModelMatrix;
   collider_mesh MeshA = GetColliderMesh(GlobalGameState->AssetManager, ColliderA->Object);
   collider_mesh MeshB = GetColliderMesh(GlobalGameState->AssetManager, ColliderB->Object);
 
@@ -389,8 +389,8 @@ internal void RemoveInvalidContactPoints( contact_manifold* FirstManifold )
   {
     component_spatial* SpatialA = (component_spatial*) GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_SPATIAL);
     component_spatial* SpatialB = (component_spatial*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_SPATIAL);
-    m4 ModelMatrixA = GetModelMatrix(SpatialA);
-    m4 ModelMatrixB = GetModelMatrix(SpatialB);
+    m4 ModelMatrixA = SpatialA->ModelMatrix;
+    m4 ModelMatrixB = SpatialB->ModelMatrix;
 
     u32 DstIndex = 0;
     for (u32 SrcIndex = 0;
@@ -592,8 +592,8 @@ SolveNonPenetrationConstraints(r32 dtForFrame, contact_manifold* FirstManifold)
       contact_data_cache* CachedData = &Manifold->CachedData[k];
 
       v3 ContactNormal     = Contact->ContactNormal;
-      v3 ContactPointDiff  = V3(GetModelMatrix(SpatialA) * V4(Contact->A_ContactModelSpace,1)) -
-                             V3(GetModelMatrix(SpatialB) * V4(Contact->B_ContactModelSpace,1));
+      v3 ContactPointDiff  = V3(SpatialA->ModelMatrix * V4(Contact->A_ContactModelSpace,1)) -
+                             V3(SpatialB->ModelMatrix * V4(Contact->B_ContactModelSpace,1));
       r32 PenetrationDepth = ContactPointDiff * ContactNormal;
 
       r32 Restitution       = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, ContactNormal, SLOP);

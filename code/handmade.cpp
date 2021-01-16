@@ -19,8 +19,6 @@
     - Separately built Asset file with multithreaded stream-loading. (Maybe using ASSIMP)
     - Add a tag-system. I want to get a random asset with a specific tag.
   Debug:
-    * Continue w decent Debug-interface.
-    - Time-Plots
     - Item selection w mouse
     - Continue on caseys Stream, he gets rid of the __COUNT__ macro gimmic which we also use at some point. (ep 193)
   Physics:
@@ -54,6 +52,7 @@ game_memory* DebugGlobalMemory = 0;
 #endif
 
 
+#include "containers/vector_list.cpp"
 #include "math/aabb.cpp"
 #include "handmade_tile.cpp"
 #include "obj_loader.cpp"

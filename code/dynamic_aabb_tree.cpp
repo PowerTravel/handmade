@@ -269,7 +269,7 @@ aabb_tree BuildBroadPhaseTree()
   {
     component_spatial* Spatial = (component_spatial*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_SPATIAL);
     component_collider* Collider = (component_collider*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_COLLIDER);
-    aabb3f AABBWorldSpace = TransformAABB( Collider->AABB, GetModelMatrix(Spatial) );
+    aabb3f AABBWorldSpace = TransformAABB( Collider->AABB, Spatial->ModelMatrix );
     // TODO: Don't do a insert every timestep. Update an existing tree
     AABBTreeInsert( TransientArena, &Result, GetEntity((u8*) Spatial), AABBWorldSpace );
   }

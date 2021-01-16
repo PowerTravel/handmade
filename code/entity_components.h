@@ -82,13 +82,6 @@ void UpdateModelMatrix( component_spatial* c )
   c->ModelMatrix = Translation * Rotation * Scale;
 }
 
-// TODO: Optimize by doing explicit element multiplication
-m4 GetModelMatrix( const component_spatial* c )
-{
-  TIMED_FUNCTION();
-  return c->ModelMatrix;
-}
-
 struct component_collider
 {
   // Always in Model Space

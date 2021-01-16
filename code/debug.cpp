@@ -241,17 +241,6 @@ void BeginDebugStatistics(debug_statistics* Statistic, debug_record_entry* Recor
   Statistic->Record = Record;
 }
 
-//void EndDebugStatistics(debug_statistics* Statistic)
-//{
-//  if(Statistic->HitCount != 0)
-//  {
-//    Statistic->Avg /= Statistic->HitCount;
-//  }else{
-//    Statistic->Min = 0;
-//    Statistic->Max = 0;
-//  }
-//}
-
 void AccumulateStatistic(debug_statistics* Statistic, r32 Value)
 {
   if(Statistic->Min > Value)
@@ -480,20 +469,6 @@ void CollateDebugRecords(game_memory* Memory)
     }
   }
   END_BLOCK(ProfileCollation);
-//  BEGIN_BLOCK(StatisticsCollation);
-//  if(!IsEmpty(FrameStatistics))
-//  {
-//    list_entry* Entry = FrameStatistics->Sentinel.Next;
-//    while(IsEnd(FrameStatistics, Entry))
-//    {
-//      Assert(Entry->Active);
-//      debug_statistics* Statistic = (debug_statistics* ) GetEntryData(Entry);
-//      
-//      EndDebugStatistics(Statistic);
-//      Entry = Entry->Next;
-//    }  
-//  }
-//  END_BLOCK(StatisticsCollation);
 }
 
 inline void
@@ -573,101 +548,10 @@ void DEBUGAddTextSTB(const c8* String, r32 LineNumber, u32 FontSize)
   PushTextAt(CanPosX, CanPosY, String, FontSize, V4(1,1,1,1));
 }
 
-void MergeSort(memory_arena* Arena, vector_list* List, b32 (*DifferenceFun) ( void*,  void*))
-{
-  ScopedMemory(GlobalGameState->TransientArena);
-
-  u32 ListCount = List->ListCount;
-  list_entry** InputArray = PushArray(Arena, ListCount, list_entry*);
-  list_entry** TempArray = PushArray(Arena, ListCount, list_entry*);
-
-  list_entry* Entry = List->Sentinel.Next;
-  u32 i = 0;
-  u32 j = 0;
-  while(Entry != &List->Sentinel)
-  {
-    list_entry* Tmp = Entry;
-    Entry = Entry->Next;
-    InputArray[i++] = Tmp;
-    ListRemove(Tmp);
-  }
-  Assert(IsEmpty(List));
-
-  u32 TempArrayIndex = 0;
-  u32 LowerBoundIndex_1 = 0;
-  u32 HigherBoundIndex_1 = 0;
-  u32 LowerBoundIndex_2 = 0;
-  u32 HigherBoundIndex_2 = 0;
-
-  for(u32 Size = 1; Size < ListCount; Size = Size*2 )
-  {
-    u32 CycleCount = 0;
-    LowerBoundIndex_1 = 0;
-    TempArrayIndex = 0;
-    while((LowerBoundIndex_1 + Size) < ListCount)
-    {
-      HigherBoundIndex_1 = LowerBoundIndex_1 + Size - 1;
-      LowerBoundIndex_2  = HigherBoundIndex_1 + 1;
-      HigherBoundIndex_2 = LowerBoundIndex_2 + Size - 1;
-      if(HigherBoundIndex_2 >= ListCount)
-      {
-        HigherBoundIndex_2 = ListCount-1;
-        ++CycleCount;
-      }
-      
-      /*Merge the two pairs with lower limits LowerBoundIndex_1 and LowerBoundIndex_2*/
-      i = LowerBoundIndex_1;
-      j = LowerBoundIndex_2;
-      
-      while( (i <= HigherBoundIndex_1) && (j <= HigherBoundIndex_2) )
-      {
-        ++CycleCount;
-        void* DataI = (void*) (InputArray[i]+1);
-        void* DataJ = (void*) (InputArray[j]+1);
-        if( DifferenceFun(DataI, DataJ) )
-          TempArray[TempArrayIndex++]=InputArray[i++];
-        else
-          TempArray[TempArrayIndex++]=InputArray[j++];
-      }
-      
-      while(i <= HigherBoundIndex_1){
-        TempArray[TempArrayIndex++]=InputArray[i++];
-        ++CycleCount;
-      }
-
-      while(j <= HigherBoundIndex_2){
-        TempArray[TempArrayIndex++]=InputArray[j++];
-        ++CycleCount;
-      }
-
-      /**Merging completed**/
-      /*Take the next two pairs for merging */
-      LowerBoundIndex_1 = HigherBoundIndex_2 + 1;
-    }
-
-    /*any pair left */
-    for(i = LowerBoundIndex_1; TempArrayIndex < ListCount; i++)
-    {
-      TempArray[TempArrayIndex++] = InputArray[i];
-      CycleCount++;
-    }
-
-    for(i = 0; i < ListCount; i++)
-    {
-      InputArray[i] = TempArray[i];
-      CycleCount++;
-    }
-  }
-
-  for(i = 0; i < ListCount; i++)
-  {
-    ListInsertAfter(&List->Sentinel, InputArray[i]);
-  }
-}
 
 MENU_DRAW(DrawStatistics)
 {
-  #if 1
+
   rect2f Region = Shrink(Node->Region,0.01);
   debug_state* DebugState = DEBUGGetState();
   TIMED_FUNCTION();
@@ -679,7 +563,6 @@ MENU_DRAW(DrawStatistics)
 
   vector_list* DebugFunctions = DebugState->FunctionList;
 
-#if 1
   // For each frame and for each debug-record: 
   u32 RowCount = 0;
   for(u32 FrameIndex = 0; FrameIndex < ArrayCount(DebugState->Frames); ++FrameIndex)
@@ -774,120 +657,171 @@ MENU_DRAW(DrawStatistics)
   PushTextAt(TextRect[3].X + TextRect[3].W - GetTextWidth(Text[3], FontSize), TextRect[3].Y, Text[3], FontSize, V4(1,1,1,1));
   PushTextAt(TextRect[4].X + TextRect[4].W - GetTextWidth(Text[4], FontSize), TextRect[4].Y, Text[4], FontSize, V4(1,1,1,1));
 
-
-#if 0
-  vector_list* TmpList = BeginVectorList(GlobalGameState->TransientArena, 10, u32);
-  int num = 0;
-  num = 41;
-  PushBack(TmpList, 0, &num);
-  num = 57;
-  PushBack(TmpList, 1, &num);
-  num = 90;
-  PushBack(TmpList, 2, &num);
-  num = 21;
-  PushBack(TmpList, 3, &num);
-  num = 65;
-  PushBack(TmpList, 4, &num);
-  num = 19;
-  PushBack(TmpList, 5, &num);
-  num = 37;
-  PushBack(TmpList, 6, &num);
-  num = 17;
-  PushBack(TmpList, 7, &num);
-  num = 64;
-  PushBack(TmpList, 8, &num);
-  num = 75;
-  PushBack(TmpList, 9, &num);
-  int* N = (int*) First(TmpList);
-  while(!IsEnd(TmpList, N))
+  if(GlobalGameState->MenuInterface->MouseLeftButton.Active)
   {
-    Platform.DEBUGPrint("%d\n", *N);
-    N = (int*) Next(TmpList, N);
-  }
-  //TmpList->Sentinel = MergeSort( &TmpList->Sentinel, TmpList->ListCount, [](void* A, void* B)
-  MergeSort(GlobalGameState->TransientArena, TmpList, [](void* A, void* B)
-  {
-    u32 EntryA = *((int*) A);
-    u32 EntryB = *((int*) B);
-    b32 Result = EntryA <= EntryB;
-    return Result;
-  });
-  N = (int*) First(TmpList);
-  while(!IsEnd(TmpList, N))
-  {
-    Platform.DEBUGPrint("%d\n", *N);
-    N = (int*) Next(TmpList, N);
-  }
-#endif  
-
-  if(GlobalGameState->MenuInterface->MouseLeftButton.Active && GlobalGameState->MenuInterface->MouseLeftButton.Edge)
-  {
-    if(Intersects(TextRect[0], Interface->MousePos))
+    v2 DeltaMouse = Interface->PreviousMousePos - Interface->MousePos;
+    if(Interface->MouseLeftButton.Edge)
     {
-      MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+      if(Intersects(TextRect[0], Interface->MousePos))
       {
-        debug_record_entry* EntryA = (debug_record_entry*) A;
-        debug_record_entry* EntryB = (debug_record_entry*) B;
-        b32 Result = false;
-        if(EntryA->LineNumber <= EntryB->LineNumber)
+        if(DebugState->LineSorted == function_sorting::Ascending || DebugState->LineSorted == function_sorting::None){
+          DebugState->LineSorted = function_sorting::Descending;
+          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          {
+            debug_record_entry* EntryA = (debug_record_entry*) A;
+            debug_record_entry* EntryB = (debug_record_entry*) B;
+            b32 Result = false;
+
+            if(EntryA->LineNumber <= EntryB->LineNumber)
+            {
+              Result = true;
+            }
+            return Result;
+          });
+        }else if(DebugState->LineSorted == function_sorting::Descending)
         {
-          Result = true;
+          DebugState->LineSorted = function_sorting::Ascending;
+          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          {
+            debug_record_entry* EntryA = (debug_record_entry*) A;
+            debug_record_entry* EntryB = (debug_record_entry*) B;
+            b32 Result = false;
+
+            if(EntryA->LineNumber >= EntryB->LineNumber)
+            {
+              Result = true;
+            }
+            return Result;
+          });
         }
-        return Result;
-      });
-    }else if(Intersects(TextRect[1], Interface->MousePos)){
-      MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
-      {
-        debug_record_entry* EntryA = (debug_record_entry*) A;
-        debug_record_entry* EntryB = (debug_record_entry*) B;
-        b32 Result = str::Compare(EntryA->BlockName,EntryB->BlockName) <= 0;
-        return Result;
-      });
-    }else if(Intersects(TextRect[2], Interface->MousePos)){
-      MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
-      {
-        debug_record_entry* EntryA = (debug_record_entry*) A;
-        debug_record_entry* EntryB = (debug_record_entry*) B;
-        b32 Result = false;
-        if(EntryA->CycleCount <= EntryB->CycleCount)
+      }else if(Intersects(TextRect[1], Interface->MousePos)){
+
+        if(DebugState->BlockNameSorted == function_sorting::Ascending || DebugState->BlockNameSorted == function_sorting::None){
+          DebugState->BlockNameSorted = function_sorting::Descending;
+          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          {
+            debug_record_entry* EntryA = (debug_record_entry*) A;
+            debug_record_entry* EntryB = (debug_record_entry*) B;
+            b32 Result = str::Compare(EntryA->BlockName, EntryB->BlockName) >= 0;
+            return Result;
+          });
+        }else if(DebugState->BlockNameSorted == function_sorting::Descending)
         {
-          Result = true;
+          DebugState->BlockNameSorted = function_sorting::Ascending;
+          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          {
+            debug_record_entry* EntryA = (debug_record_entry*) A;
+            debug_record_entry* EntryB = (debug_record_entry*) B;
+            b32 Result = str::Compare(EntryA->BlockName,EntryB->BlockName) <= 0;
+            return Result;
+          });
         }
-        return Result;
-      });
-    }else if(Intersects(TextRect[3], Interface->MousePos)){
-      MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
-      {
-        debug_record_entry* EntryA = (debug_record_entry*) A;
-        debug_record_entry* EntryB = (debug_record_entry*) B;
-        b32 Result = false;
-        if(EntryA->HitCount <= EntryB->HitCount)
+      }else if(Intersects(TextRect[2], Interface->MousePos)){
+        if(DebugState->CycleCountSorted == function_sorting::Descending || DebugState->CycleCountSorted == function_sorting::None)
         {
-          Result = true;
+          DebugState->CycleCountSorted = function_sorting::Ascending;
+          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          {
+            debug_record_entry* EntryA = (debug_record_entry*) A;
+            debug_record_entry* EntryB = (debug_record_entry*) B;
+            b32 Result = false;
+            if(EntryA->CycleCount <= EntryB->CycleCount)
+            {
+              Result = true;
+            }
+            return Result;
+          });
+        }else if(DebugState->CycleCountSorted == function_sorting::Ascending){
+          DebugState->CycleCountSorted = function_sorting::Descending;
+          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          {
+            debug_record_entry* EntryA = (debug_record_entry*) A;
+            debug_record_entry* EntryB = (debug_record_entry*) B;
+            b32 Result = false;
+            if(EntryA->CycleCount >= EntryB->CycleCount)
+            {
+              Result = true;
+            }
+            return Result;
+          });
         }
-        return Result;
-      });
-    }else if(Intersects(TextRect[4], Interface->MousePos)){
-      MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
-      {
-        debug_record_entry* EntryA = (debug_record_entry*) A;
-        debug_record_entry* EntryB = (debug_record_entry*) B;
-        b32 Result = false;
-        if(EntryA->HCCount <= EntryB->HCCount)
+      }else if(Intersects(TextRect[3], Interface->MousePos)){
+        if(DebugState->HitCountSorted == function_sorting::Descending || DebugState->HitCountSorted == function_sorting::None)
         {
-          Result = true;
+          DebugState->HitCountSorted = function_sorting::Ascending;
+          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          {
+            debug_record_entry* EntryA = (debug_record_entry*) A;
+            debug_record_entry* EntryB = (debug_record_entry*) B;
+            b32 Result = false;
+            if(EntryA->HitCount <= EntryB->HitCount)
+            {
+              Result = true;
+            }
+            return Result;
+          });
+        }else if(DebugState->HitCountSorted == function_sorting::Ascending){
+          DebugState->HitCountSorted = function_sorting::Descending;
+          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          {
+            debug_record_entry* EntryA = (debug_record_entry*) A;
+            debug_record_entry* EntryB = (debug_record_entry*) B;
+            b32 Result = false;
+            if(EntryA->HitCount >= EntryB->HitCount)
+            {
+              Result = true;
+            }
+            return Result;
+          });
         }
-        return Result;
-      });
+      }else if(Intersects(TextRect[4], Interface->MousePos)){
+        if(DebugState->CyclePerHitSorted == function_sorting::Descending || DebugState->CyclePerHitSorted == function_sorting::None)
+        {
+          DebugState->CyclePerHitSorted = function_sorting::Ascending;
+          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          {
+            debug_record_entry* EntryA = (debug_record_entry*) A;
+            debug_record_entry* EntryB = (debug_record_entry*) B;
+            b32 Result = false;
+            if(EntryA->HCCount <= EntryB->HCCount)
+            {
+              Result = true;
+            }
+            return Result;
+          });
+        }else if(DebugState->CyclePerHitSorted == function_sorting::Ascending){
+          DebugState->CyclePerHitSorted = function_sorting::Descending;
+          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          {
+            debug_record_entry* EntryA = (debug_record_entry*) A;
+            debug_record_entry* EntryB = (debug_record_entry*) B;
+            b32 Result = false;
+            if(EntryA->HCCount >= EntryB->HCCount)
+            {
+              Result = true;
+            }
+            return Result;
+          });
+        }
+
+      }
     }
   }
 
   r32 YPos = Region.Y + Region.H - 2.5f * LineHeight;
 
-#if 1
+  v4 EventColor =  HexCodeToColorV4(0x00008B);
+  EventColor.W = 0.5;
+  v4 OddColor = HexCodeToColorV4(0x9400D3);
+  OddColor.W = 0.5;
+  b32 EvenRow = false;
   debug_record_entry* Entry = (debug_record_entry*) First(DebugFunctions);
   while(!IsEnd(DebugFunctions, Entry))
   { 
+    rect2f RowRect = Rect2f(Node->Region.X, YPos-LineHeight*0.5f, Node->Region.W, LineHeight*1.5f);
+    PushOverlayQuad(RowRect, EvenRow ? EventColor : OddColor );
+    EvenRow = !EvenRow;
+
     char StringBuffer[512]={};
 
     Platform.DEBUGFormatString(StringBuffer, ArrayCount(StringBuffer), ArrayCount(StringBuffer)-1,
@@ -934,33 +868,15 @@ MENU_DRAW(DrawStatistics)
     Entry = (debug_record_entry*) Next(DebugFunctions, (void*) Entry);
     
   }
-#endif
-  #endif
-  #endif
 }
 
 v4 GetColorForRecord(debug_record_entry* Record)
 {
   debug_state* DebugState = DEBUGGetState();
-  //list_entry* Entry = GetHashedEntry(&DebugState->FunctionList, utils::djb2_hash(Record->BlockName), CompareDebugRecordEntry);
-  //midx Index = GetIndexOfEntry(&DebugState->FunctionList, Entry);
   u32 NameHash = utils::djb2_hash(Record->BlockName);
   v4 Result = GetColor(NameHash);
   return Result;
 }
-
-//void PushHorizontalBlockRect( debug_block* Block, rect2f Region, u32 Lane, r32 StartY, r32 BarWidth, r32 Envelope, r32 CycleScaling )
-//{
-//  rect2f Rect{};
-//  Rect.X = Region.X+Envelope*0.5f;
-//  Rect.Y = StartY + Lane * BarWidth + Envelope * 0.5f;
-//  r32 CycleCount = (r32)(Block->EndClock - Block->BeginClock);
-//  Rect.W = CycleScaling * CycleCount - Envelope;
-//  Rect.H = BarWidth - Envelope;
-//
-//  v4 Color = GetColorForRecord(Block->Record);
-//  PushOverlayQuad(Rect, Color);
-//}
 
 
 b32 DrawLane(u32 ArrayMaxCount, u32 BlockCount, debug_block*** BlockArray, u32* BufferCount, debug_block*** Buffer, debug_block** SelectedBlock,
@@ -1407,75 +1323,6 @@ void PushDebugOverlay(game_input* GameInput)
     }
   }
 }
-
-
-#if 0
-void DrawFunctionCount(){
-  Assert(DebugState->SnapShotIndex < SNAPSHOT_COUNT);
-
-  v4 Yellow = V4(1,1,0,1);
-  v4 Green  = V4(0,1,0,1);
-  debug_state* DebugState = DEBUGGetState();
-  u32 TotalCounterStateCount = ArrayCount(DebugState->CounterStates);
-  for(u32 i = 0; i<TotalCounterStateCount; ++i)
-  {
-    debug_counter_state* CounterState = &DebugState->CounterStates[i];
-    if(!CounterState->FileName) continue;
-
-    stb_font_map* FontMap = &GlobalDebugRenderGroup->Assets->STBFontMap;
-
-    r32 ChartLeft = 1/4.f;
-    r32 ChartRight = 4/8.f;
-    r32 BarSegmentWidth = (ChartRight - ChartLeft)/SNAPSHOT_COUNT;
-
-    r32 BaselinePixels = GlobalDebugRenderGroup->ScreenHeight - (Line+1) * FontMap->FontHeightPx;
-    r32 ChartBot = Ky*BaselinePixels;
-    r32 ChartTop = ChartBot + Ky*FontMap->Ascent;
-
-    debug_frame_snapshot* SnapShotStat = &CounterState->Snapshots[DebugState->SnapShotIndex];
-    debug_statistics* HitCount   = &SnapShotStat->HitCountStat;
-    debug_statistics* CycleCount = &SnapShotStat->CycleCountStat;
-    BeginDebugStatistics(HitCount);
-    BeginDebugStatistics(CycleCount);
-    for(u32 j = 0; j<SNAPSHOT_COUNT; ++j)
-    {
-      debug_frame_snapshot* SnapShot = &CounterState->Snapshots[j];
-      AccumulateStatistic(HitCount, (r32) SnapShot->HitCount);
-      AccumulateStatistic(CycleCount, (r32) SnapShot->CycleCount);
-    }
-    EndDebugStatistics(HitCount);
-    EndDebugStatistics(CycleCount);
-
-    r32 xMin = ChartLeft;
-    for(u32 j = 0; j<SNAPSHOT_COUNT; ++j)
-    {
-      debug_frame_snapshot* SnapShot = &CounterState->Snapshots[j];
-      r32 xMax = xMin + BarSegmentWidth;
-
-      if(HitCount->Avg)
-      {
-        r32 BarScale = (ChartTop - ChartBot)/(2.f*SnapShot->CycleCountStat.Avg);
-        r32 yMax = ChartBot + BarScale*SnapShot->CycleCount;
-        aabb2f Rect = AABB2f( V2(xMin,ChartBot), V2(xMax,yMax));
-        v4 Color = Green + ((SnapShot->CycleCountStat.Avg) / (SnapShot->CycleCountStat.Max) ) * (Yellow - Green);
-        PushOverlayQuad(GlobalDebugRenderGroup, Rect,Color);
-      }
-
-      xMin = ChartLeft + j * BarSegmentWidth;
-    }
-
-    s32 CyPerHit = (HitCount->Avg == 0) ? 0 : (s32) (CycleCount->Avg / HitCount->Avg);
-    c8 StringBuffer[256] = {};
-    _snprintf_s( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
-  "(%5d)%-25s:%10dCy:%5dh:%10dcy/h",
-      CounterState->LineNumber, CounterState->FunctionName, (u32) CycleCount->Avg, (u32) HitCount->Avg,
-      (u32) CyPerHit);
-
-    DEBUGAddTextSTB(GlobalDebugRenderGroup, StringBuffer, CornerPaddingPx, Line);
-    Line++;
-  }
-}
-#endif
 
 
 #include "menu_functions.h"
