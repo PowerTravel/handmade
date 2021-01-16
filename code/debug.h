@@ -38,9 +38,6 @@ struct debug_statistics
   debug_record_entry* Record;
 };
 
-
-
-
 // The information for the frame
 #define MAX_BLOCKS_PER_FRAME 4096
 #define MAX_THREAD_COUNT 16

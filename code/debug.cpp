@@ -199,31 +199,10 @@ DEBUGGetState()
       GraphPlugin = CreatePlugin(GlobalGameState->MenuInterface, "Profiler", HexCodeToColorV4( 0xAB274F ), SplitNode);
     }
 
-   // Create empty debug window
-    container_node* DebugWindow1 = 0;
-    {
-      container_node* ColorNode  = NewContainer(GlobalGameState->MenuInterface, container_type::None);
-      color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, ColorNode, ATTRIBUTE_COLOR);
-      BackgroundColor->Color =  HexCodeToColorV4( 0xD187A2 );
-
-      DebugWindow1 = CreatePlugin(GlobalGameState->MenuInterface, "Debug1",  HexCodeToColorV4( 0xF19CBB ), ColorNode);
-    }
-    // Create empty debug window
-    container_node* DebugWindow2 = 0;
-    {
-      container_node* ColorNode  = NewContainer(GlobalGameState->MenuInterface, container_type::None);
-      color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, ColorNode, ATTRIBUTE_COLOR);
-      BackgroundColor->Color = HexCodeToColorV4( 0x9971A3 );
-
-      DebugWindow2 = CreatePlugin(GlobalGameState->MenuInterface, "Debug2",  HexCodeToColorV4( 0xB284BE ), ColorNode);
-    }
-
     menu_tree* WindowsDropDownMenu = RegisterMenu(GlobalGameState->MenuInterface, "Windows");
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, SettingsPlugin);
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, GraphPlugin);
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, FunctionPlugin);
-    RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, DebugWindow1);
-    RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, DebugWindow2);
 
 
     ToggleWindow(GlobalGameState->MenuInterface, "Functions");
@@ -572,11 +551,7 @@ MENU_DRAW(DrawStatistics)
   u32 CurrentFrameIndex = DebugState->CurrentFrameIndex == 0 ? MAX_DEBUG_FRAME_COUNT-1 : DebugState->CurrentFrameIndex-1;
   u32 FrameCount = 0;
   BEGIN_BLOCK(SummingStats);
-  #if 0
   for(u32 FrameIndex = 0; FrameIndex < ArrayCount(DebugState->Frames); ++FrameIndex)
-  #else
-  for(u32 FrameIndex = CurrentFrameIndex; FrameIndex < CurrentFrameIndex+1; ++FrameIndex)
-  #endif
   {
     FrameCount++;
     debug_frame* Frame = DebugState->Frames + FrameIndex;
