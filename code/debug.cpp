@@ -72,7 +72,7 @@ DEBUGGetState()
       debug_frame* Frame = DebugGlobalMemory->DebugState->Frames+FrameIndex;
       Frame->MaxBlockCount = MAX_BLOCKS_PER_FRAME;
       Frame->Blocks = PushArray( &DebugGlobalMemory->DebugState->Arena, Frame->MaxBlockCount, debug_block);
-      Frame->Statistics = BeginVectorList(&DebugGlobalMemory->DebugState->Arena, MAX_DEBUG_RECORD_COUNT*MAX_DEBUG_TRANSLATION_UNITS, debug_statistics);
+      Frame->Statistics = BeginVectorList(&DebugGlobalMemory->DebugState->Arena, MAX_DEBUG_FUNCTION_COUNT, debug_statistics);
     }
     DebugState = DebugGlobalMemory->DebugState;
   }
@@ -551,23 +551,34 @@ void DEBUGAddTextSTB(const c8* String, r32 LineNumber, u32 FontSize)
 
 MENU_DRAW(DrawStatistics)
 {
-
+  TIMED_FUNCTION();
+  BEGIN_BLOCK(AllocatingMemory);
   rect2f Region = Shrink(Node->Region,0.01);
   debug_state* DebugState = DEBUGGetState();
-  TIMED_FUNCTION();
 
   ScopedMemory Memory(GlobalGameState->TransientArena);
   memory_arena* Arena = GlobalGameState->TransientArena;
   
-  vector_list* CumulativeStats = BeginVectorList(GlobalGameState->TransientArena, MAX_DEBUG_RECORD_COUNT*MAX_DEBUG_TRANSLATION_UNITS, debug_statistics);
+  vector_list* CumulativeStats = BeginVectorList(GlobalGameState->TransientArena, MAX_DEBUG_FUNCTION_COUNT, debug_statistics);
 
   vector_list* DebugFunctions = DebugState->FunctionList;
+  END_BLOCK(AllocatingMemory);
+  // TODO: This loop is super slow and it's unecessary to loop through it all every frame.
+  //       Instead we can store the sum of CycleCount and HitCount for all previous farmes
+  //       in each frame and calculate the average by just going through the latest frame
 
   // For each frame and for each debug-record: 
   u32 RowCount = 0;
+  u32 CurrentFrameIndex = DebugState->CurrentFrameIndex == 0 ? MAX_DEBUG_FRAME_COUNT-1 : DebugState->CurrentFrameIndex-1;
+  u32 FrameCount = 0;
+  BEGIN_BLOCK(SummingStats);
+  #if 0
   for(u32 FrameIndex = 0; FrameIndex < ArrayCount(DebugState->Frames); ++FrameIndex)
+  #else
+  for(u32 FrameIndex = CurrentFrameIndex; FrameIndex < CurrentFrameIndex+1; ++FrameIndex)
+  #endif
   {
-    TIMED_BLOCK(Loopdiloop1);
+    FrameCount++;
     debug_frame* Frame = DebugState->Frames + FrameIndex;
     u64 FrameCycleCount = Frame->EndClock - Frame->BeginClock;
 
@@ -578,7 +589,7 @@ MENU_DRAW(DrawStatistics)
     {
       Assert(Stat->HitCount);
 
-      u32 ArrayIndex = GetIndexOfEntry(DebugFunctions, Stat->Record);
+      u32 ArrayIndex = GetIndexOfEntry(FrameStatistics, Stat);
 
       debug_statistics* CumulativeStat = 0;
 
@@ -603,8 +614,8 @@ MENU_DRAW(DrawStatistics)
   {
     Assert(Stat->HitCount);
 
-    r32 HitCount = (Stat->HitCount / (r32) MAX_DEBUG_FRAME_COUNT);
-    r32 CycleCount = (Stat->Tot / (r32) MAX_DEBUG_FRAME_COUNT);
+    r32 HitCount = (Stat->HitCount / (r32) FrameCount);
+    r32 CycleCount = (Stat->Tot / (r32) FrameCount);
 
     debug_record_entry* Record = Stat->Record;
     u32 ArrayIndex = GetIndexOfEntry(DebugFunctions, (void*)Record);
@@ -616,6 +627,8 @@ MENU_DRAW(DrawStatistics)
 
     Stat = (debug_statistics*) Next(CumulativeStats, Stat);
   }
+
+  END_BLOCK(SummingStats);
 
 
   u32 Cols = 5;
@@ -808,6 +821,9 @@ MENU_DRAW(DrawStatistics)
     }
   }
 
+
+
+  BEGIN_BLOCK(PaintingStats);
   r32 YPos = Region.Y + Region.H - 2.5f * LineHeight;
 
   v4 EventColor =  HexCodeToColorV4(0x00008B);
@@ -868,6 +884,8 @@ MENU_DRAW(DrawStatistics)
     Entry = (debug_record_entry*) Next(DebugFunctions, (void*) Entry);
     
   }
+
+  END_BLOCK(PaintingStats);
 }
 
 v4 GetColorForRecord(debug_record_entry* Record)
