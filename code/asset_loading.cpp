@@ -53,7 +53,6 @@ internal void LoadPredefinedMaterials(game_asset_manager* AssetManager)
 
 internal void LoadPredefinedMeshes(game_asset_manager* AssetManager)
 {
-
   {
     v3 v[] =
     {

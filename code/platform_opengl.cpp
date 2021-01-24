@@ -264,7 +264,7 @@ void main()
   //fragColor = Kd*(AmbientProduct + Ks*SpecularProduct);
   fragColor = Kd*(Sample + Ks*SpecularProduct);
   fragColor.w = Sample.w;
-  //fragColor = Sample;
+  fragColor = Sample;
 }
 )FOO";
   
@@ -814,6 +814,29 @@ void PushObjectToGPU(open_gl* OpenGL, game_asset_manager* AssetManager, object_h
   EndTemporaryMemory(TempMem);
 }
 
+void CopyBitmapSubregion( u32 X, u32 Y, u32 Width, u32 Height, u32 Stride, u32* SrcPixels, u32* DstPixels )
+{
+  u32 PixelCount = Width*Height;
+  u32 Xp = X;
+  u32 Xf = X+Width;
+  u32 Yp = Y;
+
+  u32* DstEndPixel = DstPixels + PixelCount;
+  u32* DstPixel = DstPixels;
+  while(DstPixel < DstEndPixel)
+  {
+    u32 SrcPixelIndex = Yp * Stride + Xp++;
+    u32* SrcPixel = SrcPixels + SrcPixelIndex;
+    if(Xp >= Xf)
+    {
+      Xp = X;
+      Yp++;
+    }
+    u32 SrcPixelValue = *SrcPixel;
+    *DstPixel++ = SrcPixelValue;
+  }
+}
+
 void PushBitmapToGPU(open_gl* OpenGL, game_asset_manager* AssetManager, bitmap_handle BitmapHandle)
 {
   bitmap_keeper* BitmapKeeper = 0;
@@ -835,15 +858,50 @@ void PushBitmapToGPU(open_gl* OpenGL, game_asset_manager* AssetManager, bitmap_h
                     RenderTarget->Width, RenderTarget->Height, 1,
                     OpenGL->DefaultTextureFormat, GL_UNSIGNED_BYTE, RenderTarget->Pixels);
   }else{
-    
-    BitmapKeeper->TextureSlot = OpenGL->SpecialTextureCount++;
     BitmapKeeper->Special = true;
-    Assert(OpenGL->SpecialTextureCount < OpenGL->MaxSpecialTextureCount);
-    glBindTexture( GL_TEXTURE_2D, OpenGL->SpecialTextures[BitmapKeeper->TextureSlot] );
-    glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
-                 RenderTarget->Width,  RenderTarget->Height,
-                 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
-                 RenderTarget->Pixels);
+    if(!BitmapKeeper->TextureSlot)
+    {
+      BitmapKeeper->TextureSlot = OpenGL->SpecialTextureCount++;
+      Assert(OpenGL->SpecialTextureCount < OpenGL->MaxSpecialTextureCount);
+      glBindTexture( GL_TEXTURE_2D, OpenGL->SpecialTextures[BitmapKeeper->TextureSlot] );
+      glTexImage2D( GL_TEXTURE_2D,  0, GL_RGBA8,
+                   RenderTarget->Width,  RenderTarget->Height,
+                   0, GL_BGRA_EXT, GL_UNSIGNED_BYTE,
+                   RenderTarget->Pixels);
+    }else{
+      Assert(OpenGL->SpecialTextureCount < OpenGL->MaxSpecialTextureCount);
+      glBindTexture( GL_TEXTURE_2D, OpenGL->SpecialTextures[BitmapKeeper->TextureSlot] );
+
+
+      if(BitmapKeeper->UseSubRegion)
+      {
+        ScopedMemory M = ScopedMemory(&AssetManager->AssetArena);
+        u32 X = (u32) BitmapKeeper->SubRegion.X;
+        u32 Y = (u32) BitmapKeeper->SubRegion.Y;
+        u32 W = (u32) BitmapKeeper->SubRegion.W;
+        u32 H = (u32) BitmapKeeper->SubRegion.H;
+        midx PixelCount = W * H;
+        u32* Pixels = PushArray(&AssetManager->AssetArena, PixelCount, u32);
+
+        CopyBitmapSubregion(X, Y, W, H, RenderTarget->Width, (u32*) RenderTarget->Pixels, Pixels);
+
+        glTexSubImage2D ( GL_TEXTURE_2D,  0,
+                   X,Y,W,H,
+                   GL_RGBA, GL_UNSIGNED_BYTE,
+                   Pixels);
+      }else{
+        glTexSubImage2D ( GL_TEXTURE_2D,  0, 
+                   0,
+                   0,
+                   RenderTarget->Width,
+                   RenderTarget->Height,
+                   GL_RGBA, GL_UNSIGNED_BYTE,
+                   RenderTarget->Pixels);
+      }
+
+    }
+    
+    
   }
   
 }

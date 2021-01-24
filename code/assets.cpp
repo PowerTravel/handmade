@@ -88,7 +88,12 @@ PushBitmapData(game_asset_manager* AssetManager, c8* Key, u32 Width, u32 Height,
   Bitmap->Width = Width;
   Bitmap->Height = Height;
   midx MemorySize = Width * Height * BPP / 8;
-  Bitmap->Pixels = PushCopy(&AssetManager->AssetArena, MemorySize, PixelData);
+  if(PixelData)
+  {
+    Bitmap->Pixels = PushCopy(&AssetManager->AssetArena, MemorySize, PixelData);  
+  }else{
+    Bitmap->Pixels = PushSize(&AssetManager->AssetArena, MemorySize);
+  }
   return Handle;
 }
 
@@ -154,6 +159,24 @@ void GetHandle(game_asset_manager* AssetManager, char* Key, bitmap_handle* Handl
     AssetManager->BitmapPendingLoad[AssetManager->BitmapPendingLoadCount++] = *Handle;
   }
 }
+
+void Reupload(game_asset_manager* AssetManager, bitmap_handle Handle, rect2f SubRegion)
+{
+  bitmap_keeper* BitmapKeeper =  AssetManager->BitmapKeeper + Handle.Value;
+  BitmapKeeper->Referenced = true;
+  BitmapKeeper->UseSubRegion = true;
+  BitmapKeeper->SubRegion = SubRegion;
+  AssetManager->BitmapPendingLoad[AssetManager->BitmapPendingLoadCount++] = Handle;
+}
+
+void Reupload(game_asset_manager* AssetManager, bitmap_handle Handle)
+{
+  bitmap_keeper* BitmapKeeper = AssetManager->BitmapKeeper + Handle.Value;
+  BitmapKeeper->Referenced = true;
+  BitmapKeeper->UseSubRegion = false;
+  AssetManager->BitmapPendingLoad[AssetManager->BitmapPendingLoadCount++] = Handle;
+}
+
 void GetHandle(game_asset_manager* AssetManager, char* Key, object_handle* Handle)
 {
   Assert(Key && Handle);

@@ -7,6 +7,7 @@
       to have been like this for a long long time. Before debug-system.
     - Collision detection breaks when we have several boxes
   Rendering:
+    - Use TriangleStrips
     - Nice Lines (https://blog.mapbox.com/drawing-antialiased-lines-with-opengl-8766f34192dc)
     - Proper Diffuse Textures, BumpMapping
     - MipMapping
@@ -19,8 +20,11 @@
     - Separately built Asset file with multithreaded stream-loading. (Maybe using ASSIMP)
     - Add a tag-system. I want to get a random asset with a specific tag.
   Debug:
-    - Item selection w mouse
+    - Add Memory usage window
     - Continue on caseys Stream, he gets rid of the __COUNT__ macro gimmic which we also use at some point. (ep 193)
+  User Interface
+    - Item selection w mouse
+    - Convert the debug-function function list into a native scrollable list window
   Physics:
     - Persistent AABB-tree
     - Ray intersection test in AABB-tree
@@ -183,7 +187,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   GetHandle(AssetManager, "null",  &LightRender->Bitmap);
 
 
-#define State1
+#define State0
 #if defined(State1)
   // BUG: Bug-producing state. Rotation bleeds over into scaling
   r32 ySpace = 1;
@@ -203,14 +207,25 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   s32 iarr[] = {-2,2};
   s32 jarr[] = {-0,3};
   s32 karr[] = {-2,2};
-#else
+#elif defined(state4)
   r32 ySpace = 1;
   r32 xzSpace = 1.2;
   s32 iarr[] = {-0,1};
   s32 jarr[] = {-0,1};
   s32 karr[] = {-0,1};
+#elif defined (state5)
+  r32 ySpace = 20;
+  r32 xzSpace = 1.2;
+  s32 iarr[] = {-2,1};
+  s32 jarr[] = {-0,1};
+  s32 karr[] = {-2,1};
+#else
+  r32 ySpace = 6;
+  r32 xzSpace = 1.2;
+  s32 iarr[] = {-0,1};
+  s32 jarr[] = {-0,1};
+  s32 karr[] = {-0,1};
 #endif
-
 
   bitmap_handle BitmapHandle;
   object_handle ObjectHandle;
@@ -218,6 +233,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   GetHandle( AssetManager, "cube1",   &ObjectHandle );
   GetHandle( AssetManager, "cube",    &MaterialHandle );
   GetHandle( AssetManager, "cube_kd", &BitmapHandle );
+  r32 mass = 100;
   for (s32 i = iarr[0]; i < iarr[1]; ++i)
   {
     for (s32 j = jarr[0]; j < jarr[1]; ++j)
@@ -237,8 +253,9 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
         CubeRender->Material = MaterialHandle;
 
         component_spatial* CubeSpatial = GetSpatialComponent(CubeEntity);
-        CubeSpatial->Position =  V3(xzSpace*i, ySpace*j, xzSpace*k);
+        CubeSpatial->Position =  V3(xzSpace*i, ySpace*(j+1), xzSpace*k);
         CubeSpatial->Rotation = RotateQuaternion( 0, V3(0,0,0) );
+        //CubeSpatial->Scale = V3(0.95, 0.95, 0.95);
         CubeSpatial->Scale = V3(1, 1, 1);
         UpdateModelMatrix(CubeSpatial);
 
@@ -249,7 +266,8 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
         component_dynamics* CubeDynamics = GetDynamicsComponent(CubeEntity);
         CubeDynamics->LinearVelocity  = V3(0,0,0);
         CubeDynamics->AngularVelocity = V3(0,0,0);
-        CubeDynamics->Mass = 1;
+        CubeDynamics->Mass = mass;
+        mass /=2.f;
       }
     }
   }
@@ -274,7 +292,23 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   FloorCollider->Object = FloorRender->Object;
   FloorCollider->AABB = GetMeshAABB( AssetManager, FloorRender->Object);
 
-#if 1
+  PushBitmapData(AssetManager, "energy_plot", 512, 512, 32, 0, true);
+
+  bitmap_handle Plot;
+  GetHandle(GlobalGameState->AssetManager, "energy_plot", &Plot);
+  bitmap* Bitmap = GetAsset(GlobalGameState->AssetManager,Plot);
+  u32* Pixels = (u32*) Bitmap->Pixels;
+  u32* EndPixel = Pixels + Bitmap->Width*Bitmap->Height;
+  u8 Blue = 0;
+  u8 Green = 0;
+  u8 Red = 0;
+  u8 Alpha = 255;
+  while(Pixels < EndPixel)
+  {
+    u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
+    *Pixels++ = PixelData;
+  }
+#if 0
   u32 Teapot = NewEntity( EM );
   NewComponents( EM, Teapot,
     COMPONENT_FLAG_RENDER   |
@@ -302,7 +336,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   component_dynamics* TeapotDynamics = GetDynamicsComponent(Teapot);
   TeapotDynamics->LinearVelocity  = V3(0,0,0);
   TeapotDynamics->AngularVelocity = V3(0,0,0);
-  TeapotDynamics->Mass = 2;
+  TeapotDynamics->Mass = 20;
 #endif
 
   u32 SpriteAnimationEntity = NewEntity( EM );
@@ -327,7 +361,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 
   hash_map<bitmap_coordinate> HeroCoordinates = LoadAdventurerSpriteSheetCoordinates( GameState->TransientArena );
 
-  bitmap* HeroSpriteSheet =  GetAsset(GameState->AssetManager, AnimationRender->Bitmap);
+  bitmap* HeroSpriteSheet = GetAsset(GameState->AssetManager, AnimationRender->Bitmap);
   SpriteAnimation->Animation = hash_map< list<m4> >(&GameState->AssetManager->AssetArena,6);
 
   list<m4> Idle1(&GameState->AssetManager->AssetArena);
@@ -485,12 +519,60 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
 */
 
 
+rect2f PlotToBitmap( bitmap* Bitmap, r32 ChartXMin, r32 ChartXMax, r32 ChartYMin, r32 ChartYMax, r32 XValue, r32 YValue, s32 LineSize, v4 Color)
+{
+  if(XValue < ChartXMin || XValue >= ChartXMax || 
+     YValue < ChartYMin || YValue >= ChartYMax)
+  {
+    return {};
+  }
+
+  r32 XPercent = XValue / (ChartXMax - ChartXMin);
+  r32 YPercent = YValue / (ChartYMax - ChartYMin);
+  s32 PixelXValue = (s32) Round(XPercent*Bitmap->Width);
+  s32 PixelYValue = (s32) Round(YPercent*Bitmap->Height);
+
+  u8 Alpha = (u8) (Color.W * 255.f);
+  u8 Blue = (u8) (Color.X * 255.f);
+  u8 Green = (u8) (Color.Y * 255.f);
+  u8 Red = (u8) (Color.Z * 255.f);
+
+  u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
+
+  r32 X = (r32) Maximum(0, PixelXValue - LineSize);
+  r32 Y = (r32) Maximum(0, PixelYValue - LineSize);
+  r32 W = (r32) Minimum(PixelXValue + LineSize, 2*LineSize);
+  r32 H = (r32) Minimum(PixelYValue + LineSize, 2*LineSize);
+
+  W = (r32) Minimum(Bitmap->Width-X, W);
+  H = (r32) Minimum(Bitmap->Height-Y, H);
+
+  rect2f Result = Rect2f(X,Y,W,H);
+  u32* Pixels = (u32*) Bitmap->Pixels;
+  for( s32 YPixel = (s32) Y; 
+           YPixel < (s32)(Y+H); 
+         ++YPixel )
+  {
+    for( s32 XPixel = (s32)X;
+             XPixel < (s32)(X+W);
+           ++XPixel )
+    {
+      u32 PixelIndex = YPixel * Bitmap->Width + XPixel;
+      u32* Pixel = Pixels + PixelIndex;
+      *Pixel = PixelData;
+    }
+  }
+
+  return Result;
+}
+
 
 // Signature is
 //void game_update_and_render (thread_context* Thread,
 //                game_memory* Memory,
 //                render_commands* RenderCommands,
 //                game_input* Input )
+
 
 extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
@@ -506,6 +588,37 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   SpatialSystemUpdate(World);
   CameraSystemUpdate(World);
   SpriteAnimationSystemUpdate(World);
+  
+  
+#if 1
+  bitmap_handle Plot;
+  GetHandle(GlobalGameState->AssetManager, "energy_plot", &Plot);
+  bitmap* PlotBitMap = GetAsset(GlobalGameState->AssetManager, Plot);
+
+  entity_manager* EM = GlobalGameState->EntityManager;
+
+  ScopedTransaction(EM);
+  component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_DYNAMICS);
+  rect2f UpdatedRegion{};
+  while(Next(EM, ComponentList))
+  {
+    component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
+    component_dynamics* Dynamics = (component_dynamics*) GetComponent(EM, ComponentList, COMPONENT_FLAG_DYNAMICS);
+
+    r32 Ek = Dynamics->Mass *(Dynamics->LinearVelocity * Dynamics->LinearVelocity) * 0.5f;
+    r32 Ep = Dynamics->Mass * 9.82f * (Spatial->Position.Y+1); 
+
+    v2 Cursor = V2(0,0);
+
+    rect2f TmpRegion1 = PlotToBitmap( PlotBitMap, 0, 20, -1000, 7000,  World->GlobalTimeSec, Ek, 2, HexCodeToColorV4(0x9ACD32));
+    rect2f TmpRegion2 = PlotToBitmap( PlotBitMap, 0, 20, -1000, 7000,  World->GlobalTimeSec, Ep, 2, HexCodeToColorV4(0x9932CC));
+    rect2f MergedTmpRegion = MergeRect(TmpRegion1, TmpRegion2);
+    UpdatedRegion = MergeRect(MergedTmpRegion, UpdatedRegion);
+  }
+  Reupload(GlobalGameState->AssetManager, Plot, UpdatedRegion);
+#endif
+
+
   FillRenderPushBuffer(World);
 
   if(Memory->DebugState)

@@ -62,7 +62,7 @@ internal inline entity* GetEntityFromID(entity_manager* EM, u32 EntityID)
   {
     Assert(EntityChunk->Next);
     Assert(ChunkStartIdx>0);
-    ChunkStartIdx-=EM->EntitiesPerChunk;
+    ChunkStartIdx -= EM->EntitiesPerChunk;
     EntityChunk = EntityChunk->Next;
   }
 
@@ -385,6 +385,7 @@ entity_manager* CreateEntityManager( )
   u32 ControllerChunkCount = 4;
   u32 EntityChunkCount = 128;
 
+  // Test to see if chunksizes work
   CameraChunkCount = 4;
   LightChunkCount = 4;
   ControllerChunkCount = 4;

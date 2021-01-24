@@ -36,6 +36,9 @@ struct bitmap_keeper
   u32 TextureSlot;
   b32 Special;
   b32 Referenced;
+
+  b32 UseSubRegion;
+  rect2f SubRegion;
 };
 
 struct buffer_keeper

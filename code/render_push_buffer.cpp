@@ -389,4 +389,20 @@ void FillRenderPushBuffer(world* World)
   }
 #endif
 
+  {
+    push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL );
+    entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
+    //bitmap* PlotBitMap = GetAsset(AssetManager, World->PlotTextureHandle);
+
+    GetHandle(AM, "quad", &Body->Object);
+    GetHandle(AM, "energy_plot", &Body->Bitmap);
+    GetHandle(AM, "white", &Body->Material);
+
+    game_window_size WindowSize = GameGetWindowSize();
+    r32 PizelSize = 1/WindowSize.HeightPx;
+    Body->M =GetTranslationMatrix(V4(0,3,0,1)) * GetScaleMatrix(V4( -8*512 * PizelSize, 8*512*PizelSize,1,1));
+    Body->NM = Transpose(RigidInverse(Body->M));
+    Body->TM = M4Identity();
+  }
+
 }

@@ -108,6 +108,8 @@ broad_phase_result_stack* GetCollisionPairs( aabb_tree* Tree, u32* ResultStackSi
   RightHead = Push2(RightHead, Tree->Root->Right);
   while( Size(LeftBase,LeftHead) > 0 )
   {
+    Assert(LeftHead - Base < 2*Tree->Size);
+    Assert(RightHead - Base < 2*Tree->Size);
     aabb_tree_node* Left  = Get(LeftHead);
     aabb_tree_node* Right = Get(RightHead);
 

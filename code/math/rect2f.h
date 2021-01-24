@@ -1,5 +1,6 @@
 
 #include "math/vector_math.h"
+#include "utility_macros.h"
 
 struct u32_pair
 {
@@ -31,6 +32,25 @@ rect2f Rect2f( v2 Pos, v2 Size )
   Result.H = Size.Y;
   return Result;
 };
+
+
+inline rect2f MergeRect( const rect2f& A, const rect2f& B, const v2& Envelope = {})
+{
+  rect2f Result = {};
+
+  Result.X = Minimum( A.X, B.X) - Envelope.X;
+  Result.Y = Minimum( A.Y, B.Y) - Envelope.Y;
+
+  r32 AXEnd = A.X+A.W;
+  r32 BXEnd = B.X+B.W;
+  Result.W = BranchlessArithmatic( AXEnd >= BXEnd, AXEnd - Result.X, BXEnd - Result.X) + Envelope.X;
+
+  r32 AYEnd = A.Y+A.H;
+  r32 BYEnd = B.Y+B.H;
+  Result.H = BranchlessArithmatic( AYEnd >= BYEnd, AYEnd - Result.Y, BYEnd - Result.Y) + Envelope.Y;
+
+  return Result;
+}
 
 inline rect2f
 Shrink(rect2f Rect, r32 dx)

@@ -68,8 +68,8 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
   (Element)->Next->Previous = (Element)->Previous; \
 }
 
-#define Maximum(A, B) ((A > B) ? (A) : (B))
-#define Minimum(A, B) ((A < B) ? (A) : (B))
+#define Maximum(A, B) (((A) > (B)) ? (A) : (B))
+#define Minimum(A, B) (((A) < (B)) ? (A) : (B))
 
 #define EnumToIdx(Enum) ((u32) Enum)
 

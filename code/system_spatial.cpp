@@ -6,48 +6,16 @@
 #include "gjk_narrow_phase.h"
 #include "epa_collision_data.h"
 
-#define NEW_CONTACT_THRESHOLD 0.15f
+#define NEW_CONTACT_THRESHOLD 0.05f
 #define PERSISTENT_CONTACT_THRESHOLD 0.15f
 #define WARM_STARTING_FRACTION 0.31f
 
-#define FRICTIONAL_COEFFICIENT 0.15f
-#define BAUMGARTE_COEFFICIENT  0.25f
+#define FRICTIONAL_COEFFICIENT 0.25f
+#define BAUMGARTE_COEFFICIENT  0.35f
 #define RESTITUTION_COEFFICIENT 0.0f
-#define SLOP 0.012f
+#define SLOP 0.001f
 
 #define SLOVER_ITERATIONS 24
-
-list< aabb3f > GetOverlappingWallTiles(memory_arena* Arena, tile_map* TileMap, aabb3f* BoundingBox, v3 CollisionEnvelope = {} )
-{
-  aabb3f EnvelopedBoundingBox = *BoundingBox;
-  EnvelopedBoundingBox.P0 -= CollisionEnvelope;
-  EnvelopedBoundingBox.P1 += CollisionEnvelope;
-
-  list< tile_map_position > TilesToTest = list< tile_map_position >( Arena );
-  GetIntersectingTiles(TileMap, &TilesToTest, &EnvelopedBoundingBox);
-
-  list< aabb3f > IntersectingWallTiles = list< aabb3f >( Arena );
-  for(TilesToTest.First();
-     !TilesToTest.IsEnd();
-      TilesToTest.Next() )
-  {
-    tile_map_position TilePosition = TilesToTest.Get();
-    tile_contents Content = GetTileContents(TileMap, TilePosition);
-    if( (Content.Type == TILE_TYPE_WALL) ||
-        (Content.Type == TILE_TYPE_FLOOR) )
-    {
-      aabb3f WallTile = GetTileAABB( TileMap, TilePosition );
-      IntersectingWallTiles.InsertAfter(WallTile);
-    }
-  }
-
-  return IntersectingWallTiles;
-}
-
-v3 GravityForceEquation(v3& a,v3& b,v3& c)
-{
-  return V3(0,-00,0);
-}
 
 internal void GetAABBInverseMassMatrix(aabb3f* AABB, r32 Mass, m3* InverseMass, m3* InverseInertia)
 {
@@ -101,7 +69,7 @@ internal inline r32 DotProductV12xV12( v3* A, v3* B)
 internal inline r32
 getBaumgarteCoefficient(r32 dt, r32 Scalar, r32 PenetrationDepth, r32 Slop)
 {
-  r32 k = (PenetrationDepth  - Slop) > 0 ? (PenetrationDepth  - Slop) : 0;
+  r32 k = BranchlessArithmatic((PenetrationDepth - Slop) > 0, (PenetrationDepth  - Slop) , 0);
   r32 Baumgarte = - (Scalar / dt) * k;
   return Baumgarte;
 }
@@ -110,13 +78,12 @@ internal inline r32
 getRestitutionCoefficient(v3 V[], r32 Scalar, v3 Normal, r32 Slop)
 {
   r32 ClosingSpeed = ((V[0] + V[1] + V[2] + V[3]) * Normal);
-  ClosingSpeed = (ClosingSpeed - Slop) > 0 ? (ClosingSpeed - Slop) : 0;
+  ClosingSpeed = BranchlessArithmatic((ClosingSpeed - Slop) > 0, (ClosingSpeed - Slop) , 0);
   r32 Restitution = Scalar * ClosingSpeed;
   return Restitution;
 }
 
-internal r32 GetLambda(  v3 V[], v3 J[], v3 InvMJ[],
-                               r32 BaumgarteCoefficient, r32 RestitutionCoefficient)
+internal r32 GetLambda(  v3 V[], v3 J[], v3 InvMJ[], r32 BaumgarteCoefficient, r32 RestitutionCoefficient)
 {
   r32 Bias = BaumgarteCoefficient + RestitutionCoefficient;
   r32 Numerator   = -(DotProductV12xV12( J, V) + Bias);
@@ -497,9 +464,9 @@ inline void IntegrateVelocities( r32 dt )
 
     // Forward euler
     // TODO: Investigate other more stable integration methods
-    v3 Gravity = V3(0,-10,0);
-    v3 LinearAcceleration = Gravity * D->Mass;
-    D->LinearVelocity     += dt * LinearAcceleration;
+    v3 Gravity = V3(0,-9.92,0);
+    v3 LinearAcceleration = Gravity;
+    D->LinearVelocity += dt * LinearAcceleration;
 
     v3 AngularAcceleration = {};
     D->AngularVelocity += dt * AngularAcceleration;
@@ -744,7 +711,6 @@ TimestepVelocityRungeKutta4(const r32 DeltaTime, const v3 LinearVelocity, const 
  inline void
  TimestepVelocityForwardEuler(const r32 DeltaTime, const v3 LinearVelocity, const v3 AngularVelocity, component_spatial* c )
  {
-
   const v4 q0 = c->Rotation;
   const v4 r = V4(AngularVelocity.X, AngularVelocity.Y, AngularVelocity.Z,0);
   const v4 q1 = 0.5f*QuaternionMultiplication(r, q0);
