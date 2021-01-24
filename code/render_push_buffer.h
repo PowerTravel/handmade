@@ -10,8 +10,9 @@ enum class render_buffer_entry_type
   LIGHT,
   RENDER_ASSET,
   OVERLAY_QUAD,
-  LINE,
+  LINE, 
   TEXT,
+  OVERLAY_TEXTURED_QUAD,
   NEW_LEVEL,
   COUNT
 };
@@ -51,6 +52,13 @@ struct entry_type_overlay_line
 struct entry_type_overlay_quad
 {
   v4 Colour;
+  rect2f QuadRect;
+};
+
+struct entry_type_overlay_textured_quad
+{
+  bitmap_handle Handle;
+  rect2f TextureRect;
   rect2f QuadRect;
 };
 

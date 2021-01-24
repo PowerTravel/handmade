@@ -1624,8 +1624,8 @@ PLATFORM_DEALLOCATE_MEMORY(Win32DeallocateMemory)
   }
 }
 
-global_variable debug_table GlobalDebugTable_;
-debug_table* GlobalDebugTable = &GlobalDebugTable_;
+debug_table* GlobalDebugTable_;
+debug_table* GlobalDebugTable;
 
 
 struct platform_work_queue_entry
@@ -1920,6 +1920,8 @@ WinMain(  HINSTANCE Instance,
                       MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
       Assert(SoundSamples);
 
+      GlobalDebugTable_ = (debug_table*) VirtualAlloc(0, sizeof(debug_table), MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+      GlobalDebugTable = GlobalDebugTable_;
       ///////// Init Platform API
 
       // TODO: Implement these functions
@@ -2013,8 +2015,6 @@ WinMain(  HINSTANCE Instance,
 
       }
 
-
-
       game_input* NewInput = &GlobalInput[0];
       game_input* OldInput = &GlobalInput[1];
 
@@ -2046,7 +2046,7 @@ WinMain(  HINSTANCE Instance,
         if (CompareFileTime(&NewDLLWriteTime, &Game.LastDLLWriteTime))
         {
           Win32UnloadGameCode(&Game);
-          GlobalDebugTable = &GlobalDebugTable_;
+          GlobalDebugTable = GlobalDebugTable_;
           Game = Win32LoadGameCode(SourceGameCodeDLLFullPath,
                         TempGameCodeDLLFullPath,
                         TempGameCodeLockFullPath);
@@ -2358,7 +2358,7 @@ WinMain(  HINSTANCE Instance,
           {
             GlobalDebugTable = Game.DEBUGGameFrameEnd(&GameMemory);
           }
-          GlobalDebugTable_.EventArrayIndex_EventIndex = 0;
+          GlobalDebugTable_->EventArrayIndex_EventIndex = 0;
           END_BLOCK(DebugCollation);
 #endif
           LARGE_INTEGER EndCounter = Win32GetWallClock();

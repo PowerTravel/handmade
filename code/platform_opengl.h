@@ -166,6 +166,12 @@ struct overlay_quad_data
   v4 Color;
 };
 
+struct textured_overlay_quad_data
+{
+  rect2f QuadRect;
+  rect2f UVRect;
+  u32 TextureSlot;
+};
 
 #define TEXTURE_ARRAY_DIM 512
 #define NORMAL_TEXTURE_COUNT 32
@@ -214,6 +220,9 @@ struct open_gl
   u32 QuadBaseOffset;
   glHandle TextVAO;
   u32 TextBaseOffset;
+  
+  glHandle TexQuadVAO;
+  u32 OverlayTexQuadBaseOffset;
 };
 
 void InitOpenGL(open_gl* OpenGL);

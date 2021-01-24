@@ -33,7 +33,7 @@ cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=1 ..\handmade\code\win32_handm
 
 
 rem  gdi32.lib winmm.lib opengl32.lib
-cl /Zi -nologo  ..\handmade\code\win32_opengl_test.cpp  /link -incremental:no user32.lib gdi32.lib opengl32.lib
+rem cl /Zi -nologo  ..\handmade\code\win32_opengl_test.cpp  /link -incremental:no user32.lib gdi32.lib opengl32.lib
 popd
 
 

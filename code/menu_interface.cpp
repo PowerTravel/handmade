@@ -733,11 +733,11 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
                      Parent->Region.Y + Parent->Region.H/2.f - TextBox.H/3.f, Text->Text, Text->FontSize, Text->Color);
     }
 
-    //if(HasAttribute(Parent, ATTRIBUTE_TEXTURE))
-    //{
-    //  texture_attribute* Texture = (texture_attribute*) GetAttributePointer(Parent, ATTRIBUTE_TEXTURE);
-    //  PushTexturedOverlayQuad(Parent->Region, Rect2f(0,0,1,1), Texture->Handle);
-    //}
+    if(HasAttribute(Parent, ATTRIBUTE_TEXTURE))
+    {
+      texture_attribute* Texture = (texture_attribute*) GetAttributePointer(Parent, ATTRIBUTE_TEXTURE);
+      PushTexturedOverlayQuad(Parent->Region, Rect2f(0,0,1,1), Texture->Handle);
+    }
 
     if(HasAttribute(Parent,ATTRIBUTE_MERGE))
     {

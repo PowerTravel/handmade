@@ -29,8 +29,18 @@ void PushNewRenderLevel(render_group* RenderGroup)
   push_buffer_header* Header = PushNewHeader(RenderGroup, render_buffer_entry_type::NEW_LEVEL, RENDER_STATE_NONE);
 }
 
+void PushTexturedOverlayQuad(rect2f QuadRect, rect2f TextureRect, bitmap_handle Handle)
+{
+  render_group* RenderGroup = GlobalGameState->RenderCommands->OverlayGroup;
+  push_buffer_header* Header = PushNewHeader(RenderGroup, render_buffer_entry_type::OVERLAY_TEXTURED_QUAD, RENDER_STATE_FILL);
+  entry_type_overlay_textured_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_textured_quad);
+  Body->TextureRect = TextureRect;
+  Body->QuadRect = QuadRect;
+  Body->Handle = Handle;
+}
+
 void PushOverlayQuad(rect2f QuadRect, v4 Color)
-{ 
+{
   render_group* RenderGroup = GlobalGameState->RenderCommands->OverlayGroup;
   push_buffer_header* Header = PushNewHeader(RenderGroup, render_buffer_entry_type::OVERLAY_QUAD, RENDER_STATE_FILL);
   entry_type_overlay_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_quad);

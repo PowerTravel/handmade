@@ -205,8 +205,8 @@ DEBUGGetState()
       color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, ChartContainer, ATTRIBUTE_COLOR);
       BackgroundColor->Color = V4(0,0,0,0.7);      
       EnergyChart = CreatePlugin(GlobalGameState->MenuInterface, "EnergyChart", HexCodeToColorV4( 0xA1272F ), ChartContainer);
-//      texture_attribute* Texture = (texture_attribute*) PushAttribute(GlobalGameState->MenuInterface, ChartContainer, ATTRIBUTE_TEXTURE);
-//      GetHandle(GlobalGameState->AssetManager, "energy_plot", &Texture->Handle);
+      texture_attribute* Texture = (texture_attribute*) PushAttribute(GlobalGameState->MenuInterface, ChartContainer, ATTRIBUTE_TEXTURE);
+      GetHandle(GlobalGameState->AssetManager, "energy_plot", &Texture->Handle);
     }
 
     menu_tree* WindowsDropDownMenu = RegisterMenu(GlobalGameState->MenuInterface, "Windows");

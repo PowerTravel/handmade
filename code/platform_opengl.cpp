@@ -501,10 +501,11 @@ void InitOpenGL(open_gl* OpenGL)
   glBindBuffer( GL_ARRAY_BUFFER, 0); // Does NOT affect the VAO
   
   glBindVertexArray(0);
-  
-  
+
   OpenGL->QuadBaseOffset = 0;
-  OpenGL->TextBaseOffset = OpenGL->BufferSize/2;
+  OpenGL->TextBaseOffset = OpenGL->BufferSize/3;
+  OpenGL->OverlayTexQuadBaseOffset = (2*OpenGL->BufferSize)/3;
+
   glGenVertexArrays(1, &OpenGL->QuadVAO);
   glBindVertexArray(OpenGL->QuadVAO);
   
@@ -530,9 +531,9 @@ void InitOpenGL(open_gl* OpenGL)
   glVertexAttribDivisor(4, 1);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
-  
+
   ////
-  
+
   glGenVertexArrays(1, &OpenGL->TextVAO);
   glBindVertexArray(OpenGL->TextVAO);
   
@@ -565,7 +566,37 @@ void InitOpenGL(open_gl* OpenGL)
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   
   glBindVertexArray(0);
+
+#if 1
+  glGenVertexArrays(1, &OpenGL->TexQuadVAO);
+  glBindVertexArray(OpenGL->TexQuadVAO);
   
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, OpenGL->ElementEBO);
+  
+  // The quadVAO now implicitly binds these parameters to whatever VBO is currently bound (ObjectKeeper->VBO)
+  glBindBuffer(GL_ARRAY_BUFFER, OpenGL->ElementVBO);
+  glEnableVertexAttribArray(0);
+  glEnableVertexAttribArray(1);
+  glEnableVertexAttribArray(2);
+  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, v));
+  glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, vn));
+  glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(opengl_vertex), (GLvoid*) OffsetOf(opengl_vertex, vt));
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  
+  glBindBuffer(GL_ARRAY_BUFFER, OpenGL->InstanceVBO);
+  // The quadVAO now implicitly binds these parameters to whatever VBO is currently bound (quadInstanceVBO)
+  glEnableVertexAttribArray(3);
+  glEnableVertexAttribArray(4);
+  glEnableVertexAttribArray(5);
+  glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(textured_overlay_quad_data), (void *)(OpenGL->OverlayTexQuadBaseOffset + OffsetOf(textured_overlay_quad_data, TextureSlot)));
+  glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(textured_overlay_quad_data), (void *)(OpenGL->OverlayTexQuadBaseOffset + OffsetOf(textured_overlay_quad_data, QuadRect)));
+  glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(textured_overlay_quad_data), (void *)(OpenGL->OverlayTexQuadBaseOffset + OffsetOf(textured_overlay_quad_data, UVRect)));
+  glVertexAttribDivisor(3, 1);
+  glVertexAttribDivisor(4, 1);
+  glVertexAttribDivisor(5, 1);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindVertexArray(0);
+#endif
 
 #if HANDMADE_INTERNAL
   glEnable(GL_DEBUG_OUTPUT);
@@ -1043,12 +1074,14 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
     {
       u32 TextEntryCount = 0;
       u32 OverlayQuadEntryCount = 0;
+      u32 OverlayTexturedQuadEntryCount = 0;
       for( push_buffer_header* Entry = StartEntry;
           Entry != 0;
           Entry = Entry->Next )
       {
-        TextEntryCount        += ((Entry->Type == render_buffer_entry_type::TEXT)         ? 1 : 0);
-        OverlayQuadEntryCount += ((Entry->Type == render_buffer_entry_type::OVERLAY_QUAD) ? 1 : 0);
+        TextEntryCount                += ((Entry->Type == render_buffer_entry_type::TEXT)                  ? 1 : 0);
+        OverlayQuadEntryCount         += ((Entry->Type == render_buffer_entry_type::OVERLAY_QUAD)          ? 1 : 0);
+        OverlayTexturedQuadEntryCount += ((Entry->Type == render_buffer_entry_type::OVERLAY_TEXTURED_QUAD) ? 1 : 0);
         
         if(Entry->Type == render_buffer_entry_type::NEW_LEVEL)
         {
@@ -1060,8 +1093,10 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
       { // Send data to VBO
         text_data* TextBuffer = PushArray(&RenderGroup->Arena, TextEntryCount, text_data);
         overlay_quad_data* QuadBuffer = PushArray(&RenderGroup->Arena, OverlayQuadEntryCount, overlay_quad_data);
+        textured_overlay_quad_data* TexQuadBuffer = PushArray(&RenderGroup->Arena, OverlayTexturedQuadEntryCount, textured_overlay_quad_data);
         u32 QuadInstnceIndex = 0;
         u32 TextInstnceIndex = 0;
+        u32 TexQuadInstnceIndex = 0;
         for( push_buffer_header* Entry = StartEntry; Entry != BreakEntry; Entry = Entry->Next )
         {
           u8* Head = (u8*) Entry;
@@ -1091,6 +1126,19 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
               TexData.Color = Text->Colour;
               TextBuffer[TextInstnceIndex++] = TexData;
             }break;
+            case render_buffer_entry_type::OVERLAY_TEXTURED_QUAD:
+            {
+              textured_overlay_quad_data TexQuadData = {};
+              entry_type_overlay_textured_quad* TexQ = (entry_type_overlay_textured_quad*) Body;
+
+              bitmap_keeper* FontKeeper;
+              GetAsset(AssetManager, TexQ->Handle, &FontKeeper);
+
+              TexQuadData.QuadRect = TexQ->QuadRect;
+              TexQuadData.UVRect = TexQ->TextureRect;
+              TexQuadData.TextureSlot = FontKeeper->TextureSlot;
+              TexQuadBuffer[TexQuadInstnceIndex++] = TexQuadData;
+            }
           }
         }
         
@@ -1099,15 +1147,18 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
         
         glBindBuffer(GL_ARRAY_BUFFER, OpenGL->InstanceVBO);
         glBufferSubData( GL_ARRAY_BUFFER,        // Target
-                        OpenGL->QuadBaseOffset, // Offset
-                        QuadBufferSize,         // Size
-                        (GLvoid*) QuadBuffer);  // Data
+                        OpenGL->QuadBaseOffset,  // Offset
+                        QuadBufferSize,          // Size
+                        (GLvoid*) QuadBuffer);   // Data
         glBufferSubData( GL_ARRAY_BUFFER,        // Target
-                        OpenGL->TextBaseOffset, // Offset
-                        TextBufferSize,         // Size
-                        (GLvoid*) TextBuffer);  // Data
+                        OpenGL->TextBaseOffset,  // Offset
+                        TextBufferSize,          // Size
+                        (GLvoid*) TextBuffer);   // Data
+        glBufferSubData( GL_ARRAY_BUFFER,        // Target
+                        OpenGL->OverlayTexQuadBaseOffset,  // Offset
+                        OverlayTexturedQuadEntryCount,     // Size
+                        (GLvoid*) TextBuffer);             // Data
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-        
       }
       
       opengl_program QuadOverlayProgram = Commands->OpenGL.QuadOverlayProgram;
@@ -1127,8 +1178,7 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
       GetAsset(AssetManager, ObjectHandle, &ElementObjectKeeper);
       
       glBindVertexArray( OpenGL->QuadVAO );
-      glDrawElementsInstancedBaseVertex(
-                                        GL_TRIANGLES,                           // Mode,
+      glDrawElementsInstancedBaseVertex(GL_TRIANGLES,                           // Mode,
                                         ElementObjectKeeper->Count,             // Nr of Elements (Triangles*3)
                                         GL_UNSIGNED_INT,                        // Index Data Type  
                                         (GLvoid*)(ElementObjectKeeper->Index),  // Pointer somewhere in the index buffer
@@ -1143,8 +1193,7 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
       glUniformMatrix4fv(QuadOverlayProgram.ProjectionMat, 1, GL_TRUE, RenderGroup->ProjectionMatrix.E);
       
       glBindVertexArray(OpenGL->TextVAO);
-      glDrawElementsInstancedBaseVertex(
-                                        GL_TRIANGLES,                           // Mode,
+      glDrawElementsInstancedBaseVertex(GL_TRIANGLES,                           // Mode,
                                         ElementObjectKeeper->Count,             // Nr of Elements (Triangles*3)
                                         GL_UNSIGNED_INT,                        // Index Data Type  
                                         (GLvoid*)(ElementObjectKeeper->Index),  // Pointer somewhere in the index buffer
