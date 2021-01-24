@@ -199,13 +199,29 @@ DEBUGGetState()
       GraphPlugin = CreatePlugin(GlobalGameState->MenuInterface, "Profiler", HexCodeToColorV4( 0xAB274F ), SplitNode);
     }
 
+    container_node* EnergyChart = 0;
+    {
+      container_node* ChartContainer = NewContainer(GlobalGameState->MenuInterface);
+      color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, ChartContainer, ATTRIBUTE_COLOR);
+      BackgroundColor->Color = V4(0,0,0,0.7);      
+      EnergyChart = CreatePlugin(GlobalGameState->MenuInterface, "EnergyChart", HexCodeToColorV4( 0xA1272F ), ChartContainer);
+//      texture_attribute* Texture = (texture_attribute*) PushAttribute(GlobalGameState->MenuInterface, ChartContainer, ATTRIBUTE_TEXTURE);
+//      GetHandle(GlobalGameState->AssetManager, "energy_plot", &Texture->Handle);
+    }
+
     menu_tree* WindowsDropDownMenu = RegisterMenu(GlobalGameState->MenuInterface, "Windows");
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, SettingsPlugin);
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, GraphPlugin);
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, FunctionPlugin);
 
+    menu_tree* ChartsDropDownMenu = RegisterMenu(GlobalGameState->MenuInterface, "Charts");
+    RegisterWindow(GlobalGameState->MenuInterface, ChartsDropDownMenu, EnergyChart);
 
-    ToggleWindow(GlobalGameState->MenuInterface, "Functions");
+    //ToggleWindow(GlobalGameState->MenuInterface, "Functions");
+    //ToggleWindow(GlobalGameState->MenuInterface, "Settings");
+    //ToggleWindow(GlobalGameState->MenuInterface, "Profiler");
+
+    ToggleWindow(GlobalGameState->MenuInterface, "EnergyChart");
 
   }
   return DebugState;
