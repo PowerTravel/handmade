@@ -2334,8 +2334,9 @@ MENU_GAINING_FOCUS(DropDownGainingFocus)
 
 menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
 {
-  r32 FontSize = 16;
-  rect2f WindowsSize = GetTextSize(0.f, 0.f, Name, (u32)FontSize);
+  u32 FontSize = 14;
+  r32 FontHeight = GetTextLineHeightSize(FontSize);
+  r32 TextWidth = GetTextWidth(Name, FontSize);
 
   game_window_size WindowSize = GameGetWindowSize();
   r32 AspectRatio = WindowSize.WidthPx/WindowSize.HeightPx;
@@ -2344,7 +2345,7 @@ menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
     Interface->MenuBar = NewMenuTree(Interface);
     Interface->MenuBar->Visible = true;
     Interface->MenuBar->Root = NewContainer(Interface);
-    r32 MainMenuHeight = WindowsSize.H * 1.1f;
+    r32 MainMenuHeight = FontHeight * 1.1f;
     Interface->MenuBar->Root->Region = Rect2f(0, 1 - MainMenuHeight, AspectRatio, MainMenuHeight);
   
     container_node* DropDownContainer = ConnectNodeToBack(Interface->MenuBar->Root, NewContainer(Interface, container_type::Grid));
@@ -2353,25 +2354,27 @@ menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
     Grid->Row = 1;
     Grid->TotalMarginX = 0.0;
     Grid->TotalMarginY = 0.0;
-
-    size_attribute* SizeAttr = (size_attribute*) PushAttribute(Interface, DropDownContainer, ATTRIBUTE_SIZE);
-    SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, WindowsSize.W+0.015f);
-    SizeAttr->Height = ContainerSizeT(menu_size_type::RELATIVE, 1);
-    SizeAttr->LeftOffset = ContainerSizeT(menu_size_type::ABSOLUTE, 0);
-    SizeAttr->TopOffset = ContainerSizeT(menu_size_type::ABSOLUTE, 0);
-    SizeAttr->XAlignment = menu_region_alignment::RIGHT;
-    SizeAttr->YAlignment = menu_region_alignment::CENTER;
+    Grid->Stack = true;
   }
 
   container_node* DropDownContainer = Interface->MenuBar->Root->FirstChild;
+
   container_node* NewMenu = ConnectNodeToBack(DropDownContainer, NewContainer(Interface));
 
   color_attribute* ColorAttr = (color_attribute*) PushAttribute(Interface, NewMenu, ATTRIBUTE_COLOR);
   ColorAttr->Color = V4(0.3,0,0.3,1);
+
+  size_attribute* SizeAttr = (size_attribute*) PushAttribute(Interface, NewMenu, ATTRIBUTE_SIZE);
+  SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, TextWidth + 0.05f);
+  SizeAttr->Height = ContainerSizeT(menu_size_type::ABSOLUTE, FontHeight);
+  SizeAttr->LeftOffset = ContainerSizeT(menu_size_type::ABSOLUTE, 0);
+  SizeAttr->TopOffset = ContainerSizeT(menu_size_type::ABSOLUTE, 0);
+  SizeAttr->XAlignment = menu_region_alignment::CENTER;
+  SizeAttr->YAlignment = menu_region_alignment::CENTER;
   
   text_attribute* Text = (text_attribute*) PushAttribute(Interface, NewMenu, ATTRIBUTE_TEXT);
   str::CopyStringsUnchecked(Name, Text->Text);
-  Text->FontSize = (u32) FontSize;
+  Text->FontSize = FontSize;
   Text->Color = V4(0.9,0.9,0.9,1);
 
   menu_tree* ViewMenuRoot = NewMenuTree(Interface);
@@ -2390,7 +2393,7 @@ menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
   ColorAttr = (color_attribute*) PushAttribute(Interface, ViewMenuItems, ATTRIBUTE_COLOR);
   ColorAttr->Color = V4(1,1,1,1);
 
-  RegisterMenuEvent(Interface, menu_event_type::MouseDown, DropDownContainer, (void*) ViewMenuRoot, DropDownMenuButton, 0);
+  RegisterMenuEvent(Interface, menu_event_type::MouseDown, NewMenu, (void*) ViewMenuRoot, DropDownMenuButton, 0);
 
   return ViewMenuRoot;
 }
