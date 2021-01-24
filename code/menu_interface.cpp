@@ -1006,7 +1006,7 @@ r32 PrintTree(u32 Count, container_node** HotLeafs, r32 YStart, u32 FontSize, r3
 
 void PrintHotLeafs(menu_interface* Interface)
 {
-  u32 FontSize = 24;
+  u32 FontSize = 8;
   stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
   game_window_size WindowSize = GameGetWindowSize();
   r32 HeightStep = (FontMap->Ascent - FontMap->Descent)/WindowSize.HeightPx;
@@ -2148,7 +2148,7 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
     Menu = Menu->Next;
   }
 
-  //PrintHotLeafs(Interface);
+  PrintHotLeafs(Interface);
 
   // Checks if a window was selected/deselected
   // * Sets or clears MenuFocusWindow

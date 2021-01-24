@@ -205,14 +205,16 @@ internal void stbtt_BakeFontBitmap(game_asset_manager* AssetManager)
   };
 
 
-  push_font(&AssetManager->FontMap[0], "debug_font_12", 8);
-  push_font(&AssetManager->FontMap[1], "debug_font_14", 12);
-  push_font(&AssetManager->FontMap[2], "debug_font_16", 16);
-  push_font(&AssetManager->FontMap[3], "debug_font_18", 18);
-  push_font(&AssetManager->FontMap[4], "debug_font_20", 20);
-  push_font(&AssetManager->FontMap[5], "debug_font_22", 22);
-  push_font(&AssetManager->FontMap[6], "debug_font_24", 24);
-  push_font(&AssetManager->FontMap[7], "debug_font_26", 26);
+  push_font(&AssetManager->FontMap[0], "debug_font_08", 8);
+  push_font(&AssetManager->FontMap[1], "debug_font_10", 10);
+  push_font(&AssetManager->FontMap[2], "debug_font_12", 12);
+  push_font(&AssetManager->FontMap[3], "debug_font_14", 14);
+  push_font(&AssetManager->FontMap[4], "debug_font_16", 16);
+  push_font(&AssetManager->FontMap[5], "debug_font_18", 18);
+  push_font(&AssetManager->FontMap[6], "debug_font_20", 20);
+  push_font(&AssetManager->FontMap[7], "debug_font_22", 22);
+  push_font(&AssetManager->FontMap[8], "debug_font_24", 24);
+  push_font(&AssetManager->FontMap[9], "debug_font_26", 26);
 
   Platform.DEBUGPlatformFreeFileMemory(&Thread, TTFFile.Contents);
 }
