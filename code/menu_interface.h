@@ -27,7 +27,8 @@ enum container_attribute
   ATTRIBUTE_COLOR = 0x2,
   ATTRIBUTE_TEXT = 0x4,
   ATTRIBUTE_SIZE = 0x8,
-  ATTRIBUTE_MENU_EVENT_HANDLE = 0x10
+  ATTRIBUTE_MENU_EVENT_HANDLE = 0x10,
+  ATTRIBUTE_TEXTURE = 0x20
 };
 
 
@@ -56,6 +57,7 @@ const c8* ToString(u32 Type)
     case ATTRIBUTE_TEXT: return "Text";
     case ATTRIBUTE_SIZE: return "Size";
     case ATTRIBUTE_MENU_EVENT_HANDLE: return "Event";
+    case ATTRIBUTE_TEXTURE: return "Texture";
   }
   return "";
 };
@@ -215,6 +217,13 @@ struct text_attribute
   u32 FontSize;
   v4 Color;
 };
+
+
+struct texture_attribute
+{
+  bitmap_handle Handle;
+};
+
 
 enum class menu_region_alignment
 {

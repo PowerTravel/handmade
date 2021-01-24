@@ -30,6 +30,7 @@ GetAttributeSize(container_attribute Attribute)
     case ATTRIBUTE_TEXT:        return sizeof(text_attribute);
     case ATTRIBUTE_SIZE:        return sizeof(size_attribute);
     case ATTRIBUTE_MENU_EVENT_HANDLE: return sizeof(menu_event_handle_attribtue);
+    case ATTRIBUTE_TEXTURE:     return sizeof(texture_attribute);
     default: INVALID_CODE_PATH;
   }
   return 0; 
@@ -731,6 +732,12 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
       PushTextAt(Parent->Region.X + Parent->Region.W/2.f - TextBox.W/2.f,
                      Parent->Region.Y + Parent->Region.H/2.f - TextBox.H/3.f, Text->Text, Text->FontSize, Text->Color);
     }
+
+    //if(HasAttribute(Parent, ATTRIBUTE_TEXTURE))
+    //{
+    //  texture_attribute* Texture = (texture_attribute*) GetAttributePointer(Parent, ATTRIBUTE_TEXTURE);
+    //  PushTexturedOverlayQuad(Parent->Region, Rect2f(0,0,1,1), Texture->Handle);
+    //}
 
     if(HasAttribute(Parent,ATTRIBUTE_MERGE))
     {
