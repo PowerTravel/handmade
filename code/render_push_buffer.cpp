@@ -21,6 +21,7 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup, render_buffer_entry
   NewEntryHeader->Type = Type;
   NewEntryHeader->RenderState = RenderState;
   RenderGroup->BufferCounts[(u32) Type]++;
+
   return NewEntryHeader;
 }
 
@@ -35,6 +36,8 @@ void PushTexturedOverlayQuad(rect2f QuadRect, rect2f TextureRect, bitmap_handle 
   push_buffer_header* Header = PushNewHeader(RenderGroup, render_buffer_entry_type::OVERLAY_TEXTURED_QUAD, RENDER_STATE_FILL);
   entry_type_overlay_textured_quad* Body = PushStruct(&RenderGroup->Arena, entry_type_overlay_textured_quad);
   Body->TextureRect = TextureRect;
+  QuadRect.X += QuadRect.W/2.f;
+  QuadRect.Y += QuadRect.H/2.f;
   Body->QuadRect = QuadRect;
   Body->Handle = Handle;
 }
@@ -398,21 +401,5 @@ void FillRenderPushBuffer(world* World)
     PushBoxFrame(RenderGroup, M4Identity(), *AABBTree++, CameraPosition, LineThickness, "ruby");
   }
 #endif
-
-  {
-    push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL );
-    entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-    //bitmap* PlotBitMap = GetAsset(AssetManager, World->PlotTextureHandle);
-
-    GetHandle(AM, "quad", &Body->Object);
-    GetHandle(AM, "energy_plot", &Body->Bitmap);
-    GetHandle(AM, "white", &Body->Material);
-
-    game_window_size WindowSize = GameGetWindowSize();
-    r32 PizelSize = 1/WindowSize.HeightPx;
-    Body->M =GetTranslationMatrix(V4(0,3,0,1)) * GetScaleMatrix(V4( -8*512 * PizelSize, 8*512*PizelSize,1,1));
-    Body->NM = Transpose(RigidInverse(Body->M));
-    Body->TM = M4Identity();
-  }
 
 }

@@ -149,6 +149,64 @@ void main()
 }
 
 
+opengl_program OpenGLCreateTexturedQuadProgram()
+{
+  char VertexShaderCode[] = R"FOO(
+#version  330 core
+uniform mat4 P;  // Projection Matrix - Transforms points from ScreenSpace to UnitQube.
+layout (location = 0) in vec3 vertice;
+layout (location = 2) in vec2 uv;
+layout (location = 3) in int TexSlot;
+layout (location = 4) in vec4 QuadRect;
+layout (location = 5) in vec4 UVRect;
+out vec3 ArrayUV;
+void main()
+{
+  mat3 projection;
+  projection[0] = vec3(P[0].x,0,0);
+  projection[1] = vec3(0,P[1].y,0);
+  projection[2] = vec3(P[3].x,P[3].y,1);
+
+  mat3 QuadTransform;
+  QuadTransform[0] = vec3(QuadRect.z, 0, 0); // z=Width
+  QuadTransform[1] = vec3(0, QuadRect.w, 0); // w=Height
+  QuadTransform[2] = vec3(QuadRect.xy, 1);   // x,y = x,y
+
+  mat3 TextureTransform;
+  TextureTransform[0] = vec3(UVRect.z, 0, 0);
+  TextureTransform[1] = vec3(0, UVRect.w, 0);
+  TextureTransform[2] = vec3(UVRect.xy, 1);
+
+  gl_Position = vec4((projection*QuadTransform*vec3(vertice.xy,1)).xy,0,1);
+  vec2 TextureCoordinate = (TextureTransform*vec3(uv.xy,1)).xy;
+  ArrayUV = vec3(TextureCoordinate.x, TextureCoordinate.y, TexSlot);
+}
+)FOO";
+  
+  char* FragmentShaderCode = R"FOO(
+#version 330 core
+out vec4 fragColor;
+in vec3 ArrayUV;
+uniform sampler2D ourTexture;
+uniform sampler2DArray TextureSampler;
+void main() 
+{
+  
+  vec4 Sample = texture(TextureSampler, ArrayUV);
+  fragColor = Sample;
+}
+)FOO";
+  
+  opengl_program Result = {};
+  Result.Program = OpenGLCreateProgram( VertexShaderCode, FragmentShaderCode );
+  glUseProgram(Result.Program);
+  Result.ProjectionMat = glGetUniformLocation(Result.Program, "ProjectionMat");
+  glUseProgram(0);
+  
+  return Result;
+}
+
+
 opengl_program OpenGLCreateUntexturedQuadOverlayQuadProgram()
 {
   char VertexShaderCode[] = R"FOO(
@@ -255,16 +313,20 @@ uniform vec4 AmbientProduct, DiffuseProduct, SpecularProduct;
 out vec4 fragColor;
 
 uniform sampler2D ourTexture;
+uniform sampler2DArray TextureSampler;
 
 void main() 
 {
-  vec4 Sample = texture(ourTexture, TextureCoordinate);
-  if(Sample.a < 0.1)
+  
+  vec4 SpecialSample = texture(ourTexture, TextureCoordinate);
+  if(SpecialSample.a < 0.1)
     discard;
-  //fragColor = Kd*(AmbientProduct + Ks*SpecularProduct);
-  fragColor = Kd*(Sample + Ks*SpecularProduct);
-  fragColor.w = Sample.w;
-  fragColor = Sample;
+
+  //fragColor = Kd*(DiffuseProduct + Ks*SpecularProduct);
+  fragColor = SpecialSample * Kd*(DiffuseProduct + Ks*SpecularProduct);
+  fragColor.w = SpecialSample.w;
+
+  //fragColor = SpecialSample;
 }
 )FOO";
   
@@ -392,6 +454,7 @@ void InitOpenGL(open_gl* OpenGL)
   OpenGL->PhongShadingProgram = OpenGLCreateProgram3D();
   OpenGL->QuadOverlayProgram = OpenGLCreateUntexturedQuadOverlayQuadProgram();
   OpenGL->TextOverlayProgram = OpenGLCreateTextProgram();
+  OpenGL->TexturedQuadOverlayProgram = OpenGLCreateTexturedQuadProgram();
   
   OpenGL->BufferSize = Megabytes(1);
   
@@ -877,17 +940,49 @@ void PushBitmapToGPU(open_gl* OpenGL, game_asset_manager* AssetManager, bitmap_h
   
   if(!RenderTarget->Special)
   {
-    glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray );
-    u32 MipLevel = 0;
     BitmapKeeper->Special = false;
-    BitmapKeeper->TextureSlot = OpenGL->TextureCount++;
-    Assert(OpenGL->TextureCount < OpenGL->MaxTextureCount);
-    
-    glTexSubImage3D(GL_TEXTURE_2D_ARRAY,
-                    MipLevel,
-                    0, 0, BitmapKeeper->TextureSlot, // x0,y0,TextureSlot
-                    RenderTarget->Width, RenderTarget->Height, 1,
-                    OpenGL->DefaultTextureFormat, GL_UNSIGNED_BYTE, RenderTarget->Pixels);
+    if(!BitmapKeeper->TextureSlot)
+    {
+      glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
+      u32 MipLevel = 0;
+      BitmapKeeper->TextureSlot = OpenGL->TextureCount++;
+      Assert(OpenGL->TextureCount < OpenGL->MaxTextureCount);
+      
+      glTexSubImage3D(GL_TEXTURE_2D_ARRAY,
+                      MipLevel,
+                      0, 0, BitmapKeeper->TextureSlot, // x0,y0,TextureSlot
+                      RenderTarget->Width, RenderTarget->Height, 1,
+                      OpenGL->DefaultTextureFormat, GL_UNSIGNED_BYTE, RenderTarget->Pixels);
+    }else{
+      glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
+      u32 MipLevel = 0;
+
+      if(BitmapKeeper->UseSubRegion)
+      {
+        ScopedMemory M = ScopedMemory(&AssetManager->AssetArena);
+        u32 X = (u32) BitmapKeeper->SubRegion.X;
+        u32 Y = (u32) BitmapKeeper->SubRegion.Y;
+        u32 W = (u32) BitmapKeeper->SubRegion.W;
+        u32 H = (u32) BitmapKeeper->SubRegion.H;
+        midx PixelCount = W * H;
+        u32* Pixels = PushArray(&AssetManager->AssetArena, PixelCount, u32);
+
+        CopyBitmapSubregion(X, Y, W, H, RenderTarget->Width, (u32*) RenderTarget->Pixels, Pixels);
+
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY,
+                        MipLevel,
+                        X, Y, BitmapKeeper->TextureSlot, // x0,y0,TextureSlot
+                        W, H, 1,
+                        OpenGL->DefaultTextureFormat, GL_UNSIGNED_BYTE, Pixels);
+      }else{
+
+        glTexSubImage3D(GL_TEXTURE_2D_ARRAY,
+                        MipLevel,
+                        0, 0, BitmapKeeper->TextureSlot, // x0,y0,TextureSlot
+                        RenderTarget->Width, RenderTarget->Height, 1,
+                        OpenGL->DefaultTextureFormat, GL_UNSIGNED_BYTE, RenderTarget->Pixels);
+      }
+    }
   }else{
     BitmapKeeper->Special = true;
     if(!BitmapKeeper->TextureSlot)
@@ -1031,8 +1126,7 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
         DiffuseColor.W = 1;
         v4 SpecularColor = Blend(&LightColor, &Material->SpecularColor) * ( SurfaceSmoothness + 8.f ) / (8.f*3.1415f);
         SpecularColor.W = 1;
-        
-        
+
         glUniform4fv(PhongShadingProgram.AmbientProduct,  1, AmbientColor.E);
         glUniform4fv(PhongShadingProgram.DiffuseProduct,  1, DiffuseColor.E);
         glUniform4fv(PhongShadingProgram.SpecularProduct, 1, SpecularColor.E);
@@ -1144,7 +1238,8 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
         
         u32 QuadBufferSize = sizeof(overlay_quad_data)*OverlayQuadEntryCount;
         u32 TextBufferSize = sizeof(text_data)*TextEntryCount;
-        
+        u32 TexQuadBufferSize = sizeof(textured_overlay_quad_data)*OverlayTexturedQuadEntryCount;
+
         glBindBuffer(GL_ARRAY_BUFFER, OpenGL->InstanceVBO);
         glBufferSubData( GL_ARRAY_BUFFER,        // Target
                         OpenGL->QuadBaseOffset,  // Offset
@@ -1156,8 +1251,8 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
                         (GLvoid*) TextBuffer);   // Data
         glBufferSubData( GL_ARRAY_BUFFER,        // Target
                         OpenGL->OverlayTexQuadBaseOffset,  // Offset
-                        OverlayTexturedQuadEntryCount,     // Size
-                        (GLvoid*) TextBuffer);             // Data
+                        TexQuadBufferSize,                 // Size
+                        (GLvoid*) TexQuadBuffer);          // Data
         glBindBuffer(GL_ARRAY_BUFFER, 0);
       }
       
@@ -1189,7 +1284,7 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
       opengl_program TextRenderProgram = Commands->OpenGL.TextOverlayProgram;
       glUseProgram(TextRenderProgram.Program);
 
-      glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
+      //glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
       glUniformMatrix4fv(QuadOverlayProgram.ProjectionMat, 1, GL_TRUE, RenderGroup->ProjectionMatrix.E);
       
       glBindVertexArray(OpenGL->TextVAO);
@@ -1198,6 +1293,22 @@ void OpenGLRenderGroupToOutput(game_render_commands* Commands)
                                         GL_UNSIGNED_INT,                        // Index Data Type  
                                         (GLvoid*)(ElementObjectKeeper->Index),  // Pointer somewhere in the index buffer
                                         TextEntryCount,                         // How many Instances to draw
+                                        ElementObjectKeeper->VertexOffset);     // Base Offset into the geometry vbo
+      glBindVertexArray(0);
+
+
+      opengl_program TexturedQuadOverlayProgram = Commands->OpenGL.TexturedQuadOverlayProgram;
+      glUseProgram(TexturedQuadOverlayProgram.Program);
+
+      //glBindTexture( GL_TEXTURE_2D_ARRAY, OpenGL->TextureArray);
+      glUniformMatrix4fv(QuadOverlayProgram.ProjectionMat, 1, GL_TRUE, RenderGroup->ProjectionMatrix.E);
+      
+      glBindVertexArray(OpenGL->TexQuadVAO);
+      glDrawElementsInstancedBaseVertex(GL_TRIANGLES,                           // Mode,
+                                        ElementObjectKeeper->Count,             // Nr of Elements (Triangles*3)
+                                        GL_UNSIGNED_INT,                        // Index Data Type  
+                                        (GLvoid*)(ElementObjectKeeper->Index),  // Pointer somewhere in the index buffer
+                                        OverlayTexturedQuadEntryCount,                    // How many Instances to draw
                                         ElementObjectKeeper->VertexOffset);     // Base Offset into the geometry vbo
       glBindVertexArray(0);
       

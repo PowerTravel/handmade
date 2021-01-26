@@ -292,7 +292,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   FloorCollider->Object = FloorRender->Object;
   FloorCollider->AABB = GetMeshAABB( AssetManager, FloorRender->Object);
 
-  PushBitmapData(AssetManager, "energy_plot", 512, 512, 32, 0, true);
+  PushBitmapData(AssetManager, "energy_plot", 512, 512, 32, 0, false);
 
   bitmap_handle Plot;
   GetHandle(GlobalGameState->AssetManager, "energy_plot", &Plot);
@@ -527,8 +527,8 @@ rect2f PlotToBitmap( bitmap* Bitmap, r32 ChartXMin, r32 ChartXMax, r32 ChartYMin
     return {};
   }
 
-  r32 XPercent = XValue / (ChartXMax - ChartXMin);
-  r32 YPercent = YValue / (ChartYMax - ChartYMin);
+  r32 XPercent = (XValue-ChartXMin) / (ChartXMax - ChartXMin);
+  r32 YPercent = (YValue-ChartYMin) / (ChartYMax - ChartYMin);
   s32 PixelXValue = (s32) Round(XPercent*Bitmap->Width);
   s32 PixelYValue = (s32) Round(YPercent*Bitmap->Height);
 
@@ -599,22 +599,32 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
   ScopedTransaction(EM);
   component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_DYNAMICS);
-  rect2f UpdatedRegion{};
+  rect2f UpdatedRegion {};
+  u32 PointSize = 1;
   while(Next(EM, ComponentList))
   {
     component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
     component_dynamics* Dynamics = (component_dynamics*) GetComponent(EM, ComponentList, COMPONENT_FLAG_DYNAMICS);
 
     r32 Ek = Dynamics->Mass *(Dynamics->LinearVelocity * Dynamics->LinearVelocity) * 0.5f;
+    r32 Er = Dynamics->Mass * (Dynamics->AngularVelocity * Dynamics->AngularVelocity) * 0.5f;
     r32 Ep = Dynamics->Mass * 9.82f * (Spatial->Position.Y+1); 
 
     v2 Cursor = V2(0,0);
 
-    rect2f TmpRegion1 = PlotToBitmap( PlotBitMap, 0, 20, -1000, 7000,  World->GlobalTimeSec, Ek, 2, HexCodeToColorV4(0x9ACD32));
-    rect2f TmpRegion2 = PlotToBitmap( PlotBitMap, 0, 20, -1000, 7000,  World->GlobalTimeSec, Ep, 2, HexCodeToColorV4(0x9932CC));
-    rect2f MergedTmpRegion = MergeRect(TmpRegion1, TmpRegion2);
-    UpdatedRegion = MergeRect(MergedTmpRegion, UpdatedRegion);
+    rect2f TmpRegion1 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  World->GlobalTimeSec, Er, PointSize, HexCodeToColorV4(0xff0000));
+    UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion1);
+    rect2f TmpRegion2 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  World->GlobalTimeSec, Ek, PointSize, HexCodeToColorV4(0x00ff00));
+    UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion2);
+    rect2f TmpRegion3 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  World->GlobalTimeSec, Ek+Er, PointSize, HexCodeToColorV4(0xffffff));
+    UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion3);
+    rect2f TmpRegion4 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  World->GlobalTimeSec, Ep, PointSize, HexCodeToColorV4(0x0000ff));
+    UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion4);
+    rect2f TmpRegion5 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  World->GlobalTimeSec, Ep+Ek+Er, PointSize, HexCodeToColorV4(0xff00FF));
+    UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion5);
+
   }
+
   Reupload(GlobalGameState->AssetManager, Plot, UpdatedRegion);
 #endif
 

@@ -188,6 +188,7 @@ struct open_gl
   opengl_program PhongShadingProgram;
   opengl_program QuadOverlayProgram;
   opengl_program TextOverlayProgram;
+  opengl_program TexturedQuadOverlayProgram;
   // Frame Buffers (Intermediate Render Targets)
   
   // Texture Queue (Keeping all our textures?)
