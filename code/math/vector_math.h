@@ -687,6 +687,15 @@ M3( const v3& R0, const v3& R1, const v3& R2 )
 };
 
 inline m3
+M3( const m4 M)
+{
+  m3 Result = {V3(M.r0), V3(M.r1), V3(M.r2)};
+
+  return(Result);
+};
+
+
+inline m3
 operator*( const r32 a, const m3& M )
 {
   m3 Result =  M3( M.r0 * a,
