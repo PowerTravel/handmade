@@ -1,4 +1,9 @@
 /* 
+
+  Random stuff
+
+    Record video with ffmpg: ffmpg -f gdigrab -r 30 -i title="handmade" -y kekbur.gif
+
   TODO:
   BUGS:
     - Make things work with arbitrary screensize (we have desired aspect ratio hardcoded evertwhere, (Add as global variable?))
@@ -6,6 +11,11 @@
       Pressing L activates game-looping. When the loop reloads win32-memory-allocation fails. No idea why, It seems
       to have been like this for a long long time. Before debug-system.
     - Collision detection breaks when we have several boxes
+    - Keyboard Pushed/Released doesn't reliably trigger.
+    - Having alot of boxes causes the debug collation to grow to big.
+      Either filter out functions that are too numerous or make the block-thing grow dynamically.
+      Making it super big also breaks rendering as the render buffer grows suspiciously big.
+      We throw away frame-blocks in the profiler that are smaller than one pixel, so it should not grow too big
   Rendering:
     - Use TriangleStrips
     - Nice Lines (https://blog.mapbox.com/drawing-antialiased-lines-with-opengl-8766f34192dc)

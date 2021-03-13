@@ -5,8 +5,7 @@
 //       + Highlighta den aktiva tabben
 //       + Möjlighet att spara/ladda fönster-layout (behöver serialiseras på något vis)
 //       + Extrahera interface till en egen mapp där olika "logiska"-element får sin egen fil. En fil för radio-button, en för scroll window etc etc
-//       + Kolla om vi verkligen behöver "focus-window" som koncept. (Kan behövas senare så vi vet vilket fönster som tar keyboard-input). Idag anävnds
-//         den bara för att veta när vi ska anropa gaining/losing focus events
+//       + ListWidget behöver en scrollfunktion
 
 enum class container_type
 {
