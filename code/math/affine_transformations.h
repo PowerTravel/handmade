@@ -133,6 +133,18 @@ RotateQuaternion( const r32 Angle, const v4& Axis )
 }
 
 inline v4
+GetRotation( const v3 & From, const v3 & To )
+{
+  v3 FromDir = Normalize(From);
+  v3 ToDir = Normalize(To);
+  r32 CosAngle = FromDir*ToDir;
+  r32 Angle = ACos(CosAngle);
+  v3 RotationAxis = CrossProduct(FromDir, ToDir);
+  v4 Quaternion = RotateQuaternion( Angle, V4(RotationAxis,0) );
+  return Quaternion;
+}
+
+inline v4
 RotateQuaternion( const r32 Angle, const v3& Axis )
 {
   return RotateQuaternion( Angle, V4(Axis,0) );
