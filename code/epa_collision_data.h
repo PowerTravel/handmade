@@ -6,19 +6,6 @@ struct gjk_simplex;
 struct entity;
 struct memory_arena;
 
-struct contact_data
-{
-  v3 A_ContactWorldSpace;
-  v3 B_ContactWorldSpace;
-  v3 A_ContactModelSpace;
-  v3 B_ContactModelSpace;
-  v3 ContactNormal;
-  v3 TangentNormalOne;
-  v3 TangentNormalTwo;
-  r32 PenetrationDepth;
-  b32 Persistent;
-};
-
 struct contact_data_cache
 {
   v3 J[4];
@@ -32,22 +19,35 @@ struct contact_data_cache
   r32 AccumulatedLambdaN2;
 };
 
+struct contact_data
+{
+  v3 A_ContactWorldSpace;
+  v3 B_ContactWorldSpace;
+  v3 A_ContactModelSpace;
+  v3 B_ContactModelSpace;
+  v3 ContactNormal;
+  v3 TangentNormalOne;
+  v3 TangentNormalTwo;
+  r32 PenetrationDepth;
+  b32 Persistent;
+  contact_data_cache Cache;
+};
+
+template class vector_list<contact_data>;
+
 struct contact_manifold
 {
   u32 EntityIDA;
   u32 EntityIDB;
   u32 WorldArrayIndex;
-  u32 ContactCount;
   u32 MaxContactCount;
-  contact_data Contacts[4];
-  contact_data_cache CachedData[4];
+  vector_list<contact_data> Contacts;
   contact_manifold* Next;
 };
 
 struct world_contact_chunk
 {
   u32 MaxCount;
-  u32 Count;
   contact_manifold* ManifoldVector;
   contact_manifold* FirstManifold;
 };
@@ -56,8 +56,12 @@ world_contact_chunk* CreateWorldContactChunk(memory_arena* Arena, u32 MaxCount)
 {
   world_contact_chunk* Result = PushStruct(Arena, world_contact_chunk);
   Result->MaxCount = MaxCount;
-  Result->Count = 0;
   Result->ManifoldVector = PushArray(Arena, MaxCount, contact_manifold);
+  for (u32 i = 0; i < MaxCount; ++i)
+  {
+    contact_manifold* Manifold = Result->ManifoldVector + i;
+    Manifold->Contacts = vector_list<contact_data>(Arena,5);
+  }
   Result->FirstManifold = 0;
   return Result;
 }

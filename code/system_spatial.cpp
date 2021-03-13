@@ -17,32 +17,6 @@
 
 #define SLOVER_ITERATIONS 24
 
-internal void GetAABBInverseMassMatrix(aabb3f* AABB, r32 Mass, m3* InverseMass, m3* InverseInertia)
-{
-  v3 Dim = AABB->P1 - AABB->P0;
-
-  r32 Ix = (1/12.f) * Mass * (Dim.Y*Dim.Y + Dim.Z*Dim.Z);
-  r32 Iy = (1/12.f) * Mass * (Dim.X*Dim.X + Dim.Z*Dim.Z);
-  r32 Iz = (1/12.f) * Mass * (Dim.X*Dim.X + Dim.Y*Dim.Y);
-
-/*
-  m3 Ma = M3(MassA, 0, 0,
-              0,MassA, 0,
-              0, 0,MassA);
-
-  m3 Mb = M3(MassB, 0, 0,
-              0,MassB, 0,
-              0, 0,MassB);
-*/
-
-  *InverseMass = M3(1/Mass,0,0,
-                    0,1/Mass,0,
-                    0,0,1/Mass);
-
-  *InverseInertia = M3(1/Ix,0,0,
-                       0,1/Iy,0,
-                       0,0,1/Iz);
-}
 
 internal inline void ScaleV12( r32 Scal, v3* V, v3* Result )
 {
@@ -113,6 +87,243 @@ v3 ClosestPointOnEdge(const v3& EdgeStart, const v3& EdgeEnd, const v3& Point)
   return ClosestPointOnEdge;
 }
 
+
+contact_data_cache CreateDataCashe( contact_data Contact, component_spatial* SpatialA, component_spatial* SpatialB,
+  component_dynamics* DynamicsA, component_dynamics* DynamicsB, component_collider* ColliderA, component_collider* ColliderB)
+{
+  contact_data_cache CachedData = {};
+  const v3& ra = Contact.A_ContactWorldSpace - SpatialA->Position;
+  const v3& rb = Contact.B_ContactWorldSpace - SpatialB->Position;
+  const v3& n  = Contact.ContactNormal;
+  const v3& n1 = Contact.TangentNormalOne;
+  const v3& n2 = Contact.TangentNormalTwo;
+  const v3 cross = CrossProduct(n1,n2);
+  // Todo: Solve stationary objects with stationary constraint?
+  r32 ma = R32Max;
+  r32 mb = R32Max;
+  m3 InvA = {};
+  if (DynamicsA)
+  {
+    ma = DynamicsA->Mass;
+    m3 RotMat = M3(QuaternionAsMatrix(SpatialA->Rotation));
+    InvA = DynamicsA->I_inv;
+  }
+
+  m3 InvB = {};
+  if (DynamicsB)
+  {
+    mb = DynamicsB->Mass;
+    m3 RotMat = M3(QuaternionAsMatrix(SpatialB->Rotation));
+    InvB = DynamicsB->I_inv;
+  }
+
+  m3 InvM[4] = {};
+  InvM[0] =  M3(1/ma,0,0,
+                0,1/ma,0,
+                0,0,1/ma);
+  InvM[1] = InvA;
+  InvM[2] =  M3(1/mb,0,0,
+                0,1/mb,0,
+                0,0,1/mb);
+  InvM[3] = InvB;
+
+  CachedData.J[0] = -n;
+  CachedData.J[1] = -CrossProduct(ra, n);
+  CachedData.J[2] = n;
+  CachedData.J[3] = CrossProduct(rb, n);
+  MultiplyDiagonalM12V12(InvM, CachedData.J, CachedData.InvMJ);
+
+  CachedData.Jn1[0] = -n1;
+  CachedData.Jn1[1] = -CrossProduct(ra, n1);
+  CachedData.Jn1[2] = n1;
+  CachedData.Jn1[3] = CrossProduct(rb, n1);
+  MultiplyDiagonalM12V12(InvM, CachedData.Jn1, CachedData.InvMJn1);
+
+  CachedData.Jn2[0] = -n2;
+  CachedData.Jn2[1] = -CrossProduct(ra, n2);
+  CachedData.Jn2[2] = n2;
+  CachedData.Jn2[3] = CrossProduct(rb, n2);
+  MultiplyDiagonalM12V12(InvM, CachedData.Jn2, CachedData.InvMJn2);
+
+  return CachedData;
+}
+
+contact_data* IsExistingContact(contact_manifold* Manifold, contact_data* NewContact)
+{
+  contact_data* Result = 0;
+  vector_list<contact_data>& OldContactList = Manifold->Contacts;
+  contact_data* OldContact = OldContactList.First();
+  while (OldContact)
+  {
+    const v3 rALocal  = NewContact->A_ContactModelSpace - OldContact->A_ContactModelSpace;
+    const v3 rBLocal  = NewContact->B_ContactModelSpace - OldContact->B_ContactModelSpace;
+    const v3 rAGlobal = NewContact->A_ContactWorldSpace - OldContact->A_ContactWorldSpace;
+    const v3 rBGlobal = NewContact->B_ContactWorldSpace - OldContact->B_ContactWorldSpace;
+    r32 nsrla = Norm(rALocal);
+    r32 nsrlb = Norm(rBLocal);
+    r32 nsrga = Norm(rAGlobal);
+    r32 nsrgb = Norm(rBGlobal);
+
+    const b32 MatchesLocalA  = Norm(rALocal)  < NEW_CONTACT_THRESHOLD;
+    const b32 MatchesLocalB  = Norm(rBLocal)  < NEW_CONTACT_THRESHOLD;
+    const b32 MatchesGlobalA = Norm(rAGlobal) < NEW_CONTACT_THRESHOLD;
+    const b32 MatchesGlobalB = Norm(rBGlobal) < NEW_CONTACT_THRESHOLD;
+
+    if (MatchesLocalA && MatchesLocalB)
+    {
+      Result = OldContact;
+      break;
+    }
+    OldContact = OldContactList.Next(OldContact);
+  }
+
+  return Result;
+}
+
+void PutDeepestContactFirst(vector_list<contact_data>* Contacts, m4 const & ModelMatrixA, m4 const & ModelMatrixB)
+{
+  contact_data* First = Contacts->First();
+
+  contact_data* Contact = First;
+  r32 Depth = 0;
+  contact_data* Deepest = 0;
+  while (Contact)
+  {
+    const v3 PossiblePointA = V3( ModelMatrixA * V4(Contact->A_ContactModelSpace,1));
+    const v3 PossiblePointB = V3( ModelMatrixB * V4(Contact->B_ContactModelSpace,1));
+    const r32 PenetrationDepth = (PossiblePointB - PossiblePointA)*Contact->ContactNormal;
+    if(Depth >= PenetrationDepth)
+    {
+      Deepest = Contact;
+      Depth = PenetrationDepth;
+    }
+    Contact = Contacts->Next(Contact);
+  }
+  Assert(Deepest);
+  if (Deepest != First)
+  {
+    Contacts->Swap(Deepest, First);
+  }
+}
+
+void FormLongestLine(vector_list<contact_data>* Contacts, m4 const & ModelMatrixA)
+{
+  contact_data* First = Contacts->First();
+  const v3 FirstPoint = V3( ModelMatrixA * V4(First->A_ContactModelSpace,1));
+
+  contact_data* Second = Contacts->Next(First);
+  
+  contact_data* Contact = Second;
+  r32 Length = 0;
+  contact_data* Furthest = 0;
+  while (Contact)
+  {
+    const v3 PossiblePointA = V3( ModelMatrixA * V4(Contact->A_ContactModelSpace,1));
+
+    r32 TestLength = Norm(PossiblePointA - FirstPoint);
+    if(TestLength >= Length)
+    {
+      Furthest = Contact;
+      Length = TestLength;
+    }
+    Contact = Contacts->Next(Contact);
+  }
+  if (Furthest != Second)
+  {
+    Contacts->Swap(Furthest, Second);
+  }
+}
+
+void FormWidestTriangle(vector_list<contact_data>* Contacts, m4 const & ModelMatrixA)
+{
+
+  contact_data* First = Contacts->First();
+  const v3 FirstPoint = V3( ModelMatrixA * V4(First->A_ContactModelSpace,1));
+
+  contact_data* Second = Contacts->Next(First);
+  const v3 SecondPoint = V3( ModelMatrixA * V4(Second->A_ContactModelSpace,1));
+
+  contact_data* Third = Contacts->Next(Second);
+
+  contact_data* Contact = Third;
+
+  r32 Length = 0;
+  contact_data* Furthest = 0;
+  while (Contact)
+  {
+    const v3 PossiblePoint = V3( ModelMatrixA * V4(Contact->A_ContactModelSpace,1));
+    const v3 ClosestPoint = ClosestPointOnEdge(FirstPoint, SecondPoint, PossiblePoint);
+
+    const r32 TestLength = Norm(PossiblePoint - ClosestPoint);
+    if(TestLength >= Length)
+    {
+      Furthest = Contact;
+      Length = TestLength;
+    }
+    Contact = Contacts->Next(Contact);
+  }
+  Assert(Furthest);
+  if (Furthest != Third)
+  {
+    Contacts->Swap(Furthest, Third);
+  }
+}
+
+
+void FurthestFromTriangle(vector_list<contact_data>* Contacts, m4 const & ModelMatrixA)
+{
+  contact_data* Result = 0;
+  
+  contact_data* First = Contacts->First();
+  const v3 FirstPoint = V3( ModelMatrixA * V4(First->A_ContactModelSpace,1));
+
+  contact_data* Second = Contacts->Next(First);
+  const v3 SecondPoint = V3( ModelMatrixA * V4(Second->A_ContactModelSpace,1));
+
+  contact_data* Third = Contacts->Next(Second);
+  const v3 ThirdPoint = V3( ModelMatrixA * V4(Third->A_ContactModelSpace,1));
+
+  contact_data* Fourth = Contacts->Next(Third);
+
+  contact_data* Contact = Fourth;
+
+  r32 Length = 0;
+  contact_data* Furthest = 0;
+  while (Contact)
+  {
+    const v3 PossiblePoint = V3( ModelMatrixA * V4(Contact->A_ContactModelSpace,1));;
+    const v3 Normal = GetPlaneNormal(FirstPoint,SecondPoint,ThirdPoint);
+    const v3 ProjectedPoint = ProjectPointOntoPlane(PossiblePoint, FirstPoint, Normal);
+    const v3 Coords = GetBaryocentricCoordinates(FirstPoint, SecondPoint, ThirdPoint, Normal, ProjectedPoint);
+    const b32 InsideTriangle = (Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
+                               (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
+                               (Coords.E[2] >= 0) && (Coords.E[2] <= 1);
+    if(!InsideTriangle)
+    {
+      r32 CumuLength = Norm(PossiblePoint - FirstPoint) + Norm(PossiblePoint - SecondPoint) + Norm(PossiblePoint - ThirdPoint);
+      if(CumuLength >= Length)
+      {
+        Length = CumuLength;
+        Furthest = Contact;
+      }
+    }
+    Contact = Contacts->Next(Contact);
+  }
+
+  if(Furthest)
+  {
+    if(Furthest != Fourth)
+    {
+      Contacts->Swap(Furthest, Fourth);  
+    }
+    Contacts->PopBack();
+  }else{
+    Contacts->PopBack();
+    Contacts->PopBack();
+  }
+}
+
+
 internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
 {
   TIMED_FUNCTION();
@@ -146,204 +357,27 @@ internal PLATFORM_WORK_QUEUE_CALLBACK(DoCollisionDetectionWork)
                                                      &ModelMatrixB, &MeshB,
                                                      &NarrowPhaseResult.Simplex);
 
-    b32 FarEnough = true;
-    for (u32 ContactIndex = 0; ContactIndex < Manifold->ContactCount; ++ContactIndex)
+    u32 MatchingContactIndex = 0;
+    contact_data* MatchingContact = IsExistingContact(Manifold, &NewContact);
+    if (MatchingContact)
     {
-      const contact_data* OldContact = Manifold->Contacts + ContactIndex;
-      const contact_data_cache* OldContactCache = Manifold->CachedData + ContactIndex;
-      const v3 rALocal = NewContact.A_ContactModelSpace - OldContact->A_ContactModelSpace;
-      const v3 rBLocal = NewContact.B_ContactModelSpace - OldContact->B_ContactModelSpace;
-      const v3 rAGlobal = NewContact.A_ContactWorldSpace - OldContact->A_ContactWorldSpace;
-      const v3 rBGlobal = NewContact.B_ContactWorldSpace - OldContact->B_ContactWorldSpace;
-      r32 nsrla = Norm(rALocal);
-      r32 nsrlb = Norm(rBLocal);
-      r32 nsrga = Norm(rAGlobal);
-      r32 nsrgb = Norm(rBGlobal);
-
-      const b32 NotFarEnoughAL = Norm(rALocal)  < NEW_CONTACT_THRESHOLD;
-      const b32 NotFarEnoughBL = Norm(rBLocal)  < NEW_CONTACT_THRESHOLD;
-      const b32 NotFarEnoughAG = Norm(rAGlobal) < NEW_CONTACT_THRESHOLD;
-      const b32 NotFarEnoughBG = Norm(rBGlobal) < NEW_CONTACT_THRESHOLD;
-
-      if (NotFarEnoughAG || NotFarEnoughBG)
+      // If the found point is an existing contact, we update the old contact
+      *MatchingContact = NewContact;
+      MatchingContact->Cache = CreateDataCashe(NewContact, SpatialA, SpatialB, DynamicsA, DynamicsB, ColliderA, ColliderB);
+    }else{
+      NewContact.Cache = CreateDataCashe(NewContact, SpatialA, SpatialB, DynamicsA, DynamicsB, ColliderA, ColliderB);
+      Manifold->Contacts.PushBack(NewContact);
+      if (Manifold->Contacts.Size() == Manifold->MaxContactCount+1)
       {
-        FarEnough = false;
-        break;
-      }
-    }
-
-    if (FarEnough)
-    {
-      contact_data_cache CachedData = {};
-      const v3& ra = NewContact.A_ContactModelSpace;
-      const v3& rb = NewContact.B_ContactModelSpace;
-      const v3& n   = NewContact.ContactNormal;
-      const v3& n1  = NewContact.TangentNormalOne;
-      const v3& n2  = NewContact.TangentNormalTwo;
-
-      // Todo: Solve stationary objects with stationary constraint?
-      r32 ma = R32Max;
-      r32 mb = R32Max;
-      if (DynamicsA)
-      {
-        ma = DynamicsA->Mass;
-      }
-
-      if (DynamicsB)
-      {
-        mb = DynamicsB->Mass;
-      }
-
-      m3 InvM[4] = {};
-      GetAABBInverseMassMatrix( &ColliderA->AABB, ma, &InvM[0], &InvM[1]);
-      GetAABBInverseMassMatrix( &ColliderB->AABB, mb, &InvM[2], &InvM[3]);
-
-      CachedData.J[0] = -n;
-      CachedData.J[1] = -CrossProduct(ra, n);
-      CachedData.J[2] = n;
-      CachedData.J[3] = CrossProduct(rb, n);
-      MultiplyDiagonalM12V12(InvM, CachedData.J, CachedData.InvMJ);
-
-      CachedData.Jn1[0] = -n1;
-      CachedData.Jn1[1] = -CrossProduct(ra, n1);
-      CachedData.Jn1[2] = n1;
-      CachedData.Jn1[3] = CrossProduct(rb, n1);
-      MultiplyDiagonalM12V12(InvM, CachedData.Jn1, CachedData.InvMJn1);
-
-      CachedData.Jn2[0] = -n2;
-      CachedData.Jn2[1] = -CrossProduct(ra, n2);
-      CachedData.Jn2[2] = n2;
-      CachedData.Jn2[3] = CrossProduct(rb, n2);
-      MultiplyDiagonalM12V12(InvM, CachedData.Jn2, CachedData.InvMJn2);
-
-      if (Manifold->ContactCount < Manifold->MaxContactCount)
-      {
-        Manifold->Contacts[Manifold->ContactCount] = NewContact;
-        Manifold->CachedData[Manifold->ContactCount] = CachedData;
-        Manifold->ContactCount++;
-      }else{
-        #if 0
-        local_persist u32 idx = 0;
-        Manifold->Contacts[idx % Manifold->MaxContactCount] = NewContact;
-        Manifold->CachedData[idx++ % Manifold->MaxContactCount] = CachedData;
-        #else
-        Assert(Manifold->MaxContactCount == 4);
-        Assert(Manifold->ContactCount == Manifold->MaxContactCount);
-
-        contact_data PossibleContacts[5] = {};
-        contact_data_cache PossibleContactCaches[5] = {};
-        v3  ContactPoints[4] = {};
-        u32 AddedContacts[4] = {};
-        utils::Copy(sizeof(PossibleContacts), Manifold->Contacts, PossibleContacts);
-        utils::Copy(sizeof(PossibleContactCaches), Manifold->CachedData, PossibleContactCaches);
-        PossibleContacts[4] = NewContact;
-        PossibleContactCaches[4] = CachedData;
-
-        r32 Depth = 0;
-        u32 nrAddedContacts = 0;
-        for (u32 i = 0; i < ArrayCount(PossibleContacts); ++i)
-        {
-          const v3 PossiblePointA = V3( ModelMatrixA * V4(PossibleContacts[i].A_ContactModelSpace,1));
-          const v3 PossiblePointB = V3( ModelMatrixB * V4(PossibleContacts[i].B_ContactModelSpace,1));
-          const r32 PenetrationDepth = (PossiblePointA - PossiblePointB)*PossibleContacts[i].ContactNormal;
-          if(Depth < PenetrationDepth)
-          {
-            AddedContacts[0] = i;
-            Manifold->Contacts[0] = PossibleContacts[i];
-            Manifold->CachedData[0] = PossibleContactCaches[i];
-            Depth = PenetrationDepth;
-            ContactPoints[0] = PossiblePointA;
-          }
-        }
-
-        r32 Length = 0;
-        for (u32 i = 0; i < ArrayCount(PossibleContacts); ++i)
-        {
-          if(i == AddedContacts[0])
-          {
-            continue;
-          }
-
-          const v3 PossiblePointA = V3( ModelMatrixA * V4(PossibleContacts[i].A_ContactModelSpace,1));
-
-          r32 TestLength = Norm(PossiblePointA - ContactPoints[0]);
-          if(Length < TestLength)
-          {
-            AddedContacts[1] = i;
-            ContactPoints[1] = PossiblePointA;
-            Manifold->Contacts[1] = PossibleContacts[i];
-            Manifold->CachedData[1] = PossibleContactCaches[i];
-            Length = TestLength;
-          }
-        }
-
-        Length = 0;
-        for (u32 i = 0; i < ArrayCount(PossibleContacts); ++i)
-        {
-          if(i == AddedContacts[0] || i == AddedContacts[1])
-          {
-            continue;
-          }
-          const v3 PossiblePoint = V3( ModelMatrixA * V4(PossibleContacts[i].A_ContactModelSpace,1));
-          const v3 ClosestPoint = ClosestPointOnEdge(ContactPoints[0], ContactPoints[1], PossiblePoint);
-
-          const r32 TestLength = Norm(PossiblePoint - ClosestPoint);
-          if(Length < TestLength)
-          {
-            AddedContacts[2] = i;
-            ContactPoints[2] = PossiblePoint;
-            Manifold->Contacts[2] = PossibleContacts[i];
-            Manifold->CachedData[2] = PossibleContactCaches[i];
-            Length = TestLength;
-          }
-        }
-
-        Length = 0;
-        b32 FinalPointAdded = false;
-        for (u32 i = 0; i < ArrayCount(PossibleContacts); ++i)
-        {
-          if(i == AddedContacts[0] || i == AddedContacts[1] || i == AddedContacts[2])
-          {
-            continue;
-          }
-
-          const v3 PossiblePoint = V3( ModelMatrixA * V4(PossibleContacts[i].A_ContactModelSpace,1));
-          const v3 a = ContactPoints[0];
-          const v3 b = ContactPoints[1];
-          const v3 c = ContactPoints[2];
-          const v3 v = PossiblePoint;
-          const v3 Normal = GetPlaneNormal(a,b,c);
-          const v3 ProjectedPoint = ProjectPointOntoPlane(v, a, Normal);
-          const v3 Coords = GetBaryocentricCoordinates( a, b, c, Normal, ProjectedPoint);
-          const b32 InsideTriangle = (Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
-                                     (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
-                                     (Coords.E[2] >= 0) && (Coords.E[2] <= 1);
-          if(InsideTriangle)
-          {
-            continue;
-          }
-
-          r32 CumuLength = Norm(v-a) + Norm(v-b) + Norm(v-c);
-          if(CumuLength > Length)
-          {
-            FinalPointAdded = true;
-            AddedContacts[3] = i;
-            Manifold->Contacts[3] = PossibleContacts[i];
-            Manifold->CachedData[3] = PossibleContactCaches[i];
-          }
-        }
-
-        if(!FinalPointAdded)
-        {
-          Manifold->ContactCount = 3;
-          Manifold->Contacts[3] = {};
-          Manifold->CachedData[3] = {};
-        }
-        #endif
+        PutDeepestContactFirst(&Manifold->Contacts, ModelMatrixA, ModelMatrixB);
+        FormLongestLine(&Manifold->Contacts, ModelMatrixA);
+        FormWidestTriangle(&Manifold->Contacts, ModelMatrixA);
+        FurthestFromTriangle(&Manifold->Contacts, ModelMatrixA);
+        Assert(Manifold->Contacts.Size() < (Manifold->MaxContactCount+1));
       }
     }
   }
-
+    
   EndTemporaryMemory(TempMem);
 }
 
@@ -359,23 +393,19 @@ internal void RemoveInvalidContactPoints( contact_manifold* FirstManifold )
     m4 ModelMatrixA = SpatialA->ModelMatrix;
     m4 ModelMatrixB = SpatialB->ModelMatrix;
 
-    u32 DstIndex = 0;
-    for (u32 SrcIndex = 0;
-         SrcIndex < Manifold->ContactCount;
-         ++SrcIndex)
+    vector_list<contact_data>* Contacts = &Manifold->Contacts;
+    contact_data* Contact = Contacts->First();
+    while (Contact)
     {
-      contact_data* SrcContact = Manifold->Contacts + SrcIndex;
-      contact_data_cache* SrcCache = Manifold->CachedData + SrcIndex;
-
-      const v3 LocalToGlobalA = V3( ModelMatrixA * V4(SrcContact->A_ContactModelSpace,1));
-      const v3 LocalToGlobalB = V3( ModelMatrixB * V4(SrcContact->B_ContactModelSpace,1));
+      const v3 LocalToGlobalA = V3( ModelMatrixA * V4(Contact->A_ContactModelSpace,1));
+      const v3 LocalToGlobalB = V3( ModelMatrixB * V4(Contact->B_ContactModelSpace,1));
 
       const v3 rAB = LocalToGlobalB - LocalToGlobalA;
 
-      const v3 rA  = SrcContact->A_ContactWorldSpace - LocalToGlobalA;
-      const v3 rB  = SrcContact->B_ContactWorldSpace - LocalToGlobalB;
+      const v3 rA  = Contact->A_ContactWorldSpace - LocalToGlobalA;
+      const v3 rB  = Contact->B_ContactWorldSpace - LocalToGlobalB;
 
-      const r32 normDot = SrcContact->ContactNormal * rAB;
+      const r32 normDot = Contact->ContactNormal * rAB;
       const b32 stillPenetrating = normDot <= 0.0f;
 
       const r32 lenDiffA = NormSq(rA);
@@ -386,24 +416,15 @@ internal void RemoveInvalidContactPoints( contact_manifold* FirstManifold )
       // positions original acquired from collision detection
       if (stillPenetrating && ((lenDiffA < PERSISTENT_CONTACT_THRESHOLD) && (lenDiffB < PERSISTENT_CONTACT_THRESHOLD)) )
       {
-        Assert(SrcIndex>=0);
-        Assert(SrcIndex>=DstIndex);
-
-        SrcContact->Persistent = true;
-        if(SrcIndex!=DstIndex)
-        {
-          contact_data* DstContact = Manifold->Contacts + DstIndex;
-          contact_data_cache* DstCache = Manifold->CachedData + DstIndex;
-          *DstContact = Manifold->Contacts[SrcIndex];
-          *DstCache = Manifold->CachedData[SrcIndex];
-        }
-        ++DstIndex;
+        Contact->Persistent = true;
+        Contact = Contacts->Next(Contact);
       }else{
-        SrcContact->Persistent = false;
+        contact_data* ContactToRemove = Contact;       
+        Contact = Contacts->Next(Contact);
+        ContactToRemove->Persistent = false;
+        Contacts->Pop(ContactToRemove);
       }
     }
-    Assert(DstIndex <= Manifold->ContactCount);
-    Manifold->ContactCount = DstIndex;
     Manifold = Manifold->Next;
   }
 }
@@ -414,37 +435,41 @@ internal void DoWarmStarting( contact_manifold* FirstManifold  )
   contact_manifold* Manifold = FirstManifold;
   while (Manifold)
   {
-   // Warm starting
-    for(u32 k = 0; k < Manifold->ContactCount; ++k)
+    vector_list<contact_data>* Contacts = &Manifold->Contacts;
+    contact_data* Contact = Contacts->First();
+
+    // Warm starting
+    while(Contact)
     {
-      contact_data* Contact = &Manifold->Contacts[k];
-      contact_data_cache* CachedData = &Manifold->CachedData[k];
       r32 WarmStartingFraction = WARM_STARTING_FRACTION;
-      if(!Contact->Persistent) continue;
-
-      v3 DeltaV[4] = {};
-      v3 DeltaV1[4] = {};
-      v3 DeltaV2[4] = {};
-
-      ScaleV12(WarmStartingFraction * CachedData->AccumulatedLambda,   CachedData->InvMJ, DeltaV);
-      ScaleV12(WarmStartingFraction * CachedData->AccumulatedLambdaN1, CachedData->InvMJn1, DeltaV);
-      ScaleV12(WarmStartingFraction * CachedData->AccumulatedLambdaN2, CachedData->InvMJn2, DeltaV);
-      CachedData->AccumulatedLambda = 0;
-      CachedData->AccumulatedLambdaN1 = 0;
-      CachedData->AccumulatedLambdaN2 = 0;
-
-      component_dynamics* DynamicsA = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->EntityIDA, COMPONENT_FLAG_DYNAMICS);
-      component_dynamics* DynamicsB = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->EntityIDB, COMPONENT_FLAG_DYNAMICS);
-      if(DynamicsA)
+      if(Contact->Persistent)
       {
-        DynamicsA->LinearVelocity  += (DeltaV[0] + DeltaV1[0] + DeltaV[0]);
-        DynamicsA->AngularVelocity += (DeltaV[1] + DeltaV1[1] + DeltaV[1]);
+        v3 DeltaV[4] = {};
+        v3 DeltaV1[4] = {};
+        v3 DeltaV2[4] = {};
+
+        contact_data_cache* Cache = &Contact->Cache;
+        ScaleV12(WarmStartingFraction * Cache->AccumulatedLambda,   Cache->InvMJ,   DeltaV);
+        ScaleV12(WarmStartingFraction * Cache->AccumulatedLambdaN1, Cache->InvMJn1, DeltaV);
+        ScaleV12(WarmStartingFraction * Cache->AccumulatedLambdaN2, Cache->InvMJn2, DeltaV);
+        Cache->AccumulatedLambda = 0;
+        Cache->AccumulatedLambdaN1 = 0;
+        Cache->AccumulatedLambdaN2 = 0;
+
+        component_dynamics* DynamicsA = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->EntityIDA, COMPONENT_FLAG_DYNAMICS);
+        component_dynamics* DynamicsB = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->EntityIDB, COMPONENT_FLAG_DYNAMICS);
+        if(DynamicsA)
+        {
+          DynamicsA->LinearVelocity  += (DeltaV[0] + DeltaV1[0] + DeltaV[0]);
+          DynamicsA->AngularVelocity += (DeltaV[1] + DeltaV1[1] + DeltaV[1]);
+        }
+        if(DynamicsB)
+        {
+          DynamicsB->LinearVelocity  += (DeltaV[2] + DeltaV1[2] + DeltaV[2]);
+          DynamicsB->AngularVelocity += (DeltaV[3] + DeltaV1[3] + DeltaV[3]);
+        }
       }
-      if(DynamicsB)
-      {
-        DynamicsB->LinearVelocity  += (DeltaV[2] + DeltaV1[2] + DeltaV[2]);
-        DynamicsB->AngularVelocity += (DeltaV[3] + DeltaV1[3] + DeltaV[3]);
-      }
+      Contact = Contacts->Next(Contact);
     }
     Manifold = Manifold->Next;
   }
@@ -517,7 +542,7 @@ internal void RemoveNonIntersectingManifolds(world_contact_chunk* ContactChunk)
   while(*ManifoldPtr)
   {
     contact_manifold* Manifold = *ManifoldPtr;
-    if(Manifold->ContactCount == 0)
+    if(Manifold->Contacts.IsEmpty())
     {
       // Remove manifolds that are not colliding
       *ManifoldPtr = Manifold->Next;
@@ -536,14 +561,17 @@ SolveNonPenetrationConstraints(r32 dtForFrame, contact_manifold* FirstManifold)
   contact_manifold* Manifold = FirstManifold;
   while(Manifold)
   {
-    Assert(Manifold->ContactCount>0);
-    for(u32 k = 0; k < Manifold->ContactCount; ++k)
+    Assert(!Manifold->Contacts.IsEmpty());
+    component_spatial* SpatialA = GetSpatialComponent(Manifold->EntityIDA);
+    component_spatial* SpatialB = GetSpatialComponent(Manifold->EntityIDB);
+    component_dynamics* DynamicsA = GetDynamicsComponent(Manifold->EntityIDA);
+    component_dynamics* DynamicsB = GetDynamicsComponent(Manifold->EntityIDB);
+
+    vector_list<contact_data>* Contacts = &Manifold->Contacts;
+    contact_data* Contact = Contacts->First();
+    while(Contact)
     {
       v3 V[4] = {};
-      component_spatial* SpatialA = GetSpatialComponent(Manifold->EntityIDA);
-      component_spatial* SpatialB = GetSpatialComponent(Manifold->EntityIDB);
-      component_dynamics* DynamicsA = GetDynamicsComponent(Manifold->EntityIDA);
-      component_dynamics* DynamicsB = GetDynamicsComponent(Manifold->EntityIDB);
       if(DynamicsA)
       {
         V[0] = DynamicsA->LinearVelocity;
@@ -555,8 +583,7 @@ SolveNonPenetrationConstraints(r32 dtForFrame, contact_manifold* FirstManifold)
         V[3] = DynamicsB->AngularVelocity;
       }
 
-      contact_data* Contact = &Manifold->Contacts[k];
-      contact_data_cache* CachedData = &Manifold->CachedData[k];
+      contact_data_cache* Cache = &Contact->Cache;
 
       v3 ContactNormal     = Contact->ContactNormal;
       v3 ContactPointDiff  = V3(SpatialA->ModelMatrix * V4(Contact->A_ContactModelSpace,1)) -
@@ -565,14 +592,14 @@ SolveNonPenetrationConstraints(r32 dtForFrame, contact_manifold* FirstManifold)
 
       r32 Restitution       = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, ContactNormal, SLOP);
       r32 Baumgarte         = getBaumgarteCoefficient(dtForFrame, BAUMGARTE_COEFFICIENT,  PenetrationDepth, SLOP);
-      r32 Lambda            = GetLambda( V, CachedData->J, CachedData->InvMJ, Baumgarte, Restitution);
-      r32 OldCumulativeLambda = CachedData->AccumulatedLambda;
-      CachedData->AccumulatedLambda += Lambda;
-      CachedData->AccumulatedLambda = Maximum(0, CachedData->AccumulatedLambda);
-      r32 LambdaDiff = CachedData->AccumulatedLambda - OldCumulativeLambda;
+      r32 Lambda            = GetLambda( V, Cache->J, Cache->InvMJ, Baumgarte, Restitution);
+      r32 OldCumulativeLambda = Cache->AccumulatedLambda;
+      Cache->AccumulatedLambda += Lambda;
+      Cache->AccumulatedLambda = Maximum(0, Cache->AccumulatedLambda);
+      r32 LambdaDiff = Cache->AccumulatedLambda - OldCumulativeLambda;
 
       v3 DeltaV[4] = {};
-      ScaleV12(LambdaDiff, CachedData->InvMJ, DeltaV);
+      ScaleV12(LambdaDiff, Cache->InvMJ, DeltaV);
 
       if(DynamicsA)
       {
@@ -583,7 +610,9 @@ SolveNonPenetrationConstraints(r32 dtForFrame, contact_manifold* FirstManifold)
       {
         DynamicsB->LinearVelocity  += DeltaV[2];
         DynamicsB->AngularVelocity += DeltaV[3];
-      }
+      }  
+
+      Contact = Contacts->Next(Contact);
     }
     Manifold = Manifold->Next;
   }
@@ -596,10 +625,12 @@ SolveFrictionalConstraints( contact_manifold* FirstManifold )
   contact_manifold* Manifold = FirstManifold;
   while(Manifold)
   {
-    Assert(Manifold->ContactCount>0);
+    Assert(!Manifold->Contacts.IsEmpty());
     component_dynamics* DynamicsA = GetDynamicsComponent(Manifold->EntityIDA);
     component_dynamics* DynamicsB = GetDynamicsComponent(Manifold->EntityIDB);
-    for(u32 k = 0; k < Manifold->ContactCount; ++k)
+    vector_list<contact_data>* Contacts = &Manifold->Contacts;
+    contact_data* Contact = Contacts->First();
+    while(Contact)
     {
       v3 V[4] = {};
       if(DynamicsA)
@@ -613,28 +644,27 @@ SolveFrictionalConstraints( contact_manifold* FirstManifold )
         V[3] = DynamicsB->AngularVelocity;
       }
 
-      contact_data* Contact = &Manifold->Contacts[k];
-      contact_data_cache* CachedData = &Manifold->CachedData[k];
+      contact_data_cache* Cache = &Contact->Cache;
 
       r32 Kf = FRICTIONAL_COEFFICIENT;
-      r32 ClampRange = Kf * CachedData->AccumulatedLambda;
+      r32 ClampRange = Kf * Cache->AccumulatedLambda;
 
-      r32 LambdaN1 = GetLambda( V, CachedData->Jn1, CachedData->InvMJn1, 0, 0);
-      r32 LambdaN2 = GetLambda( V, CachedData->Jn2, CachedData->InvMJn2, 0, 0);
+      r32 LambdaN1 = GetLambda( V, Cache->Jn1, Cache->InvMJn1, 0, 0);
+      r32 LambdaN2 = GetLambda( V, Cache->Jn2, Cache->InvMJn2, 0, 0);
 
-      r32 OldCumulativeLambdaN1 = CachedData->AccumulatedLambdaN1;
-      r32 OldCumulativeLambdaN2 = CachedData->AccumulatedLambdaN2;
+      r32 OldCumulativeLambdaN1 = Cache->AccumulatedLambdaN1;
+      r32 OldCumulativeLambdaN2 = Cache->AccumulatedLambdaN2;
+      Cache->AccumulatedLambdaN1 = Clamp(Cache->AccumulatedLambdaN1 + LambdaN1, -ClampRange, ClampRange);
+      Cache->AccumulatedLambdaN2 = Clamp(Cache->AccumulatedLambdaN2 + LambdaN2, -ClampRange, ClampRange);
 
-      CachedData->AccumulatedLambdaN1 = Clamp(CachedData->AccumulatedLambdaN1 + LambdaN1, -ClampRange, ClampRange);
-      CachedData->AccumulatedLambdaN2 = Clamp(CachedData->AccumulatedLambdaN2 + LambdaN2, -ClampRange, ClampRange);
+      r32 LambdaDiffN1 = Cache->AccumulatedLambdaN1 - OldCumulativeLambdaN1;
+      r32 LambdaDiffN2 = Cache->AccumulatedLambdaN2 - OldCumulativeLambdaN2;
 
-      r32 LambdaDiffN1 = CachedData->AccumulatedLambdaN1 - OldCumulativeLambdaN1;
-      r32 LambdaDiffN2 = CachedData->AccumulatedLambdaN2 - OldCumulativeLambdaN2;
       v3 DeltaV1[4] = {};
       v3 DeltaV2[4] = {};
 
-      ScaleV12(LambdaDiffN1, CachedData->InvMJn1, DeltaV1);
-      ScaleV12(LambdaDiffN2, CachedData->InvMJn2, DeltaV2);
+      ScaleV12(LambdaDiffN1, Cache->InvMJn1, DeltaV1);
+      ScaleV12(LambdaDiffN2, Cache->InvMJn2, DeltaV2);
 
       if(DynamicsA)
       {
@@ -647,6 +677,7 @@ SolveFrictionalConstraints( contact_manifold* FirstManifold )
         DynamicsB->AngularVelocity += (DeltaV1[3] + DeltaV2[3]);
       }
 
+      Contact = Contacts->Next(Contact);
     }
     Manifold = Manifold->Next;
   }
