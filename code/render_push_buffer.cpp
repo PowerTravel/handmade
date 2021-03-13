@@ -193,32 +193,15 @@ render_group* InitiateRenderGroup()
   return Result;
 }
 
-
 internal inline void
 PushLine(render_group* RenderGroup, v3 Start, v3 End, v3 CameraPosition, r32 LineThickness, c8* MaterialName)
 {
-  v3 xAxis = Normalize(End-Start);
-  v3 cameraDir = Normalize(CameraPosition - Start);
+  v3 xAxis = End-Start;
+  v3 cameraDir = CameraPosition - Start;
 
-  // Make sure cameraDir and xAxis are not parallel
-  if( Abs( (cameraDir * xAxis) - 1.0f ) <  0.0001f )
-  {
-    return;
-  }
+  m4 RotMat = GetRotationMatrix_X_ZHint(xAxis, cameraDir);
 
-  v3 yAxis = Normalize(CrossProduct(cameraDir, xAxis));
-  v3 zAxis = Normalize(CrossProduct(xAxis, yAxis));
-
-  // Rotates from WorldCoordinateSystem to NewCoordinateSystem
-  // RotMat * V3(1,0,0) = xp
-  // RotMat * V3(0,1,0) = yp
-  // RotMat * V3(0,0,1) = zp
-  m4 RotMat = M4( xAxis.X, yAxis.X, zAxis.X, 0,
-                  xAxis.Y, yAxis.Y, zAxis.Y, 0,
-                  xAxis.Z, yAxis.Z, zAxis.Z, 0,
-                  0,   0,   0, 1);
-
-  r32 Length  = Norm(End-Start);
+  r32 Length = Norm(End-Start);
 
   m4 ScaleMat = M4Identity();
   ScaleMat.E[0] = Length;
