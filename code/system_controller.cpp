@@ -73,7 +73,7 @@ void CameraController( entity* CameraEntity )
   }
 }
 */
-void FlyingCameraController( component_controller* Controller, component_camera* Camera )
+void FlyingCameraController( world* World, component_controller* Controller, component_camera* Camera )
 {
   Assert(Camera);
   Assert(Controller);
@@ -145,7 +145,19 @@ void FlyingCameraController( component_controller* Controller, component_camera*
         hasMoved = true;
       }  
     }
-    
+ 
+    if(Keyboard->Key_N.EndedDown)
+    {
+      World->AdvanceOneFrame = true;
+    }
+    local_persist b32 spaceToggle = false;
+    if(Keyboard->Key_SPACE.EndedDown && ! spaceToggle)
+    {
+      World->AdvanceOneFrame = true;
+    }
+    spaceToggle = Keyboard->Key_SPACE.EndedDown;
+
+
     
     if(Input->RightTrigger.EndedDown || Keyboard->Key_W.EndedDown)
     {
@@ -249,8 +261,9 @@ void ControllerSystemUpdate( world* World )
     {
       case ControllerType_FlyingCamera:
       {
+        World->AdvanceOneFrame = false;
         component_camera* Camera   = (component_camera*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CAMERA);
-        FlyingCameraController(Controller, Camera);
+        FlyingCameraController(World, Controller, Camera);
       }break;
       case ControllerType_Hero:
       {

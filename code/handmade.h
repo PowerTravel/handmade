@@ -16,6 +16,7 @@ struct world
 {
   r32 GlobalTimeSec;
   r32 dtForFrame;
+  b32 AdvanceOneFrame;
 
   memory_arena* Arena;
 

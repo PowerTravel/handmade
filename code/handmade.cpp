@@ -581,14 +581,18 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
   world* World = GlobalGameState->World;
   World->dtForFrame = Input->dt;
-  World->GlobalTimeSec += Input->dt;
 
   ControllerSystemUpdate(World);
-  SpatialSystemUpdate(World);
+  if(World->AdvanceOneFrame)
+  {
+    SpatialSystemUpdate(World);
+  }
   CameraSystemUpdate(World);
   SpriteAnimationSystemUpdate(World);
-  
-  
+  if(World->AdvanceOneFrame)
+  {
+    World->GlobalTimeSec += Input->dt;  
+  }
 #if 1
   bitmap_handle Plot;
   GetHandle(GlobalGameState->AssetManager, "energy_plot", &Plot);
