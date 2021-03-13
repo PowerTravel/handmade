@@ -569,9 +569,24 @@ rect2f PlotToBitmap( bitmap* Bitmap, r32 ChartXMin, r32 ChartXMax, r32 ChartYMin
 
   rect2f Result = Rect2f(X,Y,W,H);
   u32* Pixels = (u32*) Bitmap->Pixels;
-  for( s32 YPixel = (s32) Y; 
-           YPixel < (s32)(Y+H); 
-         ++YPixel )
+
+  for( s32 YPixel = (s32) Y;
+           YPixel < (s32)(Y+H);
+         ++YPixel)
+  {
+    for( s32 XPixel = (s32)X;
+             XPixel < (s32)(X+W);
+           ++XPixel)
+    {
+      u32 PixelIndex = YPixel * Bitmap->Width + XPixel;
+      u32* Pixel = Pixels + PixelIndex;
+      *Pixel = 0;
+    }
+  }
+
+  for( s32 YPixel = (s32) Y;
+           YPixel < (s32)(Y+H);
+         ++YPixel)
   {
     for( s32 XPixel = (s32)X;
              XPixel < (s32)(X+W);
@@ -625,30 +640,33 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_DYNAMICS);
   rect2f UpdatedRegion {};
   u32 PointSize = 1;
-
+  
+  r32 Ek = 0;
+  r32 Er = 0;
+  r32 Ep = 0;
   while(Next(EM, ComponentList))
   {
     component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
     component_dynamics* Dynamics = (component_dynamics*) GetComponent(EM, ComponentList, COMPONENT_FLAG_DYNAMICS);
 
-    r32 Ek = Dynamics->Mass *(Dynamics->LinearVelocity * Dynamics->LinearVelocity) * 0.5f;
-    r32 Er = Dynamics->Mass * (Dynamics->AngularVelocity * Dynamics->AngularVelocity) * 0.5f;
-    r32 Ep = Dynamics->Mass * 9.82f * (Spatial->Position.Y+1); 
-
-    v2 Cursor = V2(0,0);
-
-    rect2f TmpRegion1 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  World->GlobalTimeSec, Er, PointSize, HexCodeToColorV4(0xff0000));
-    UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion1);
-    rect2f TmpRegion2 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  World->GlobalTimeSec, Ek, PointSize, HexCodeToColorV4(0x00ff00));
-    UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion2);
-    rect2f TmpRegion3 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  World->GlobalTimeSec, Ek+Er, PointSize, HexCodeToColorV4(0xffffff));
-    UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion3);
-    rect2f TmpRegion4 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  World->GlobalTimeSec, Ep, PointSize, HexCodeToColorV4(0x0000ff));
-    UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion4);
-    rect2f TmpRegion5 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  World->GlobalTimeSec, Ep+Ek+Er, PointSize, HexCodeToColorV4(0xff00FF));
-    UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion5);
-
+    Ek += Dynamics->Mass *(Dynamics->LinearVelocity * Dynamics->LinearVelocity) * 0.5f;
+    Er += Dynamics->Mass *(Dynamics->AngularVelocity * Dynamics->AngularVelocity) * 0.5f;
+    Ep += Dynamics->Mass * 9.82f * (Spatial->Position.Y+1); 
   }
+
+  v2 Cursor = V2(0,0);
+
+  r32 Cycles = Floor(World->GlobalTimeSec/20.f);
+  r32 Remainder = World->GlobalTimeSec - 20*Cycles;
+
+  rect2f TmpRegion1 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  Remainder, Er, PointSize, HexCodeToColorV4(0xff0000));
+  UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion1);
+  rect2f TmpRegion2 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  Remainder, Ek, PointSize, HexCodeToColorV4(0x00ff00));
+  UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion2);
+  rect2f TmpRegion4 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  Remainder, Ep, PointSize, HexCodeToColorV4(0x0000ff));
+  UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion4);
+  rect2f TmpRegion5 = PlotToBitmap( PlotBitMap, 0, 20, -500, 7000,  Remainder, Ep+Ek+Er, PointSize, HexCodeToColorV4(0xff00FF));
+  UpdatedRegion = MergeRect(UpdatedRegion, TmpRegion5);
 
   Reupload(GlobalGameState->AssetManager, Plot, UpdatedRegion);
 #endif
