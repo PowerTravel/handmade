@@ -562,6 +562,7 @@ internal void RemoveNonIntersectingManifolds(world_contact_chunk* ContactChunk)
     {
       // Remove manifolds that are not colliding
       *ManifoldPtr = Manifold->Next;
+      Manifold->Next = 0;
     }else{
       //DoWarmStarting( World );
       Assert(Manifold != Manifold->Next);
