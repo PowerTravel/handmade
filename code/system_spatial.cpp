@@ -485,16 +485,32 @@ inline void IntegrateVelocities( r32 dt )
   while(Next(GlobalGameState->EntityManager, ComponentList))
   {
     component_spatial*   S = (component_spatial*) GetComponent(GlobalGameState->EntityManager,  ComponentList, COMPONENT_FLAG_SPATIAL);
+    component_collider*  C = (component_collider*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_COLLIDER);
     component_dynamics*  D = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_DYNAMICS);
 
     // Forward euler
     // TODO: Investigate other more stable integration methods
-    v3 Gravity = V3(0,-9.92,0);
-    v3 LinearAcceleration = Gravity;
-    D->LinearVelocity += dt * LinearAcceleration;
+    v3 Gravity = V3(0,-9.82,0);
+    v3 ExternalForce = Gravity*D->Mass;
+    v3 LinearImpulse = dt * ExternalForce;
+    v3 DeltaV_Linear = LinearImpulse/D->Mass;
+    D->LinearVelocity += DeltaV_Linear;
 
-    v3 AngularAcceleration = {};
-    D->AngularVelocity += dt * AngularAcceleration;
+    m3 RotMat = M3(QuaternionAsMatrix( S->Rotation ));
+    m3 RotMat_Inv = Transpose(RotMat);
+
+    v3 ExternalTorqueWorldCoord = V3(0,0,0);
+    v3 AngularImpulseWorldCoord = dt * ExternalTorqueWorldCoord;
+
+    #if USE_ANGULAR_VEL_OBJECT_SPACE
+    // If objects angular velocity vector is given in object-coordinates
+    v3 DeltaV_Angular = D->I_inv * RotMat_Inv * AngularImpulseWorldCoord;
+    #else
+    // If objects angular velocity vector is given in world-coordinates
+    v3 DeltaV_Angular = RotMat * D->I_inv * RotMat_Inv * AngularImpulseWorldCoord;
+    #endif
+
+    D->AngularVelocity += DeltaV_Angular;
   }
 }
 
@@ -742,12 +758,19 @@ TimestepVelocityRungeKutta4(const r32 DeltaTime, const v3 LinearVelocity, const 
  inline void
  TimestepVelocityForwardEuler(const r32 DeltaTime, const v3 LinearVelocity, const v3 AngularVelocity, component_spatial* c )
  {
-  const v4 q0 = c->Rotation;
-  const v4 r = V4(AngularVelocity.X, AngularVelocity.Y, AngularVelocity.Z,0);
-  const v4 q1 = 0.5f*QuaternionMultiplication(r, q0);
-
   c->Position += DeltaTime*LinearVelocity;
-  c->Rotation += DeltaTime*q1;
+
+  const v4 q0 = c->Rotation;
+  r32 Angle = DeltaTime * Norm(AngularVelocity);
+  v3 Axis = Normalize(AngularVelocity);
+
+  #if USE_ANGULAR_VEL_OBJECT_SPACE
+  v4 DeltaQ = RotateQuaternion( Angle , Axis );
+  #else
+  v4 DeltaQ = QuaternionMultiplication( c->Rotation, QuaternionMultiplication( RotateQuaternion( Angle , Axis ) , QuaternionInverse(c->Rotation)));
+  #endif
+
+  c->Rotation = QuaternionMultiplication(DeltaQ, c->Rotation);
  }
 
 inline internal void

@@ -1,6 +1,6 @@
 #pragma once
 
-
+#define USE_ANGULAR_VEL_OBJECT_SPACE 0
 #include "platform.h"
 #include "debug.h"
 #include "memory.h"
