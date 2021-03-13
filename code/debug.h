@@ -80,7 +80,7 @@ struct debug_frame
 
   debug_thread Threads[MAX_THREAD_COUNT];
 
-  vector_list* Statistics;
+  vector_list<debug_statistics> Statistics;
 };
 
 
@@ -110,7 +110,7 @@ struct debug_state
   debug_frame Frames[MAX_DEBUG_FRAME_COUNT];
 
   // Keeps a global record of all seen functions and their execution time and hit cout.
-  vector_list* FunctionList;
+  vector_list<debug_record_entry> FunctionList;
 
   function_sorting LineSorted;
   function_sorting BlockNameSorted;

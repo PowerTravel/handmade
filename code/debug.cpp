@@ -18,7 +18,7 @@ void ClearFrame(debug_frame* Frame)
   Frame->FirstFreeBlock = 0;
   {
     TIMED_BLOCK(ClearingFrameStatistics);
-    ClearVectorList(Frame->Statistics);
+    Frame->Statistics.Clear();
   }
 }
 
@@ -29,7 +29,7 @@ internal void ResetCollation()
   DebugState->SelectedFrame = 0;
   DebugState->ThreadSelected = true;
   DebugState->SelectedThreadIndex = 0;
-  ClearVectorList(DebugState->FunctionList);
+  DebugState->FunctionList.Clear();
   for(u32 FrameIndex = 0;
           FrameIndex < ArrayCount(DebugState->Frames);
           ++FrameIndex)
@@ -63,7 +63,7 @@ DEBUGGetState()
   {
     DebugGlobalMemory->DebugState = BootstrapPushStruct(debug_state, Arena);
 
-    DebugGlobalMemory->DebugState->FunctionList = BeginVectorList( &DebugGlobalMemory->DebugState->Arena, MAX_DEBUG_RECORD_COUNT*MAX_DEBUG_TRANSLATION_UNITS, debug_record_entry);
+    DebugGlobalMemory->DebugState->FunctionList = vector_list<debug_record_entry>(&DebugGlobalMemory->DebugState->Arena, MAX_DEBUG_RECORD_COUNT*MAX_DEBUG_TRANSLATION_UNITS);
 
     for(u32 FrameIndex = 0;
         FrameIndex < ArrayCount(DebugGlobalMemory->DebugState->Frames);
@@ -72,7 +72,7 @@ DEBUGGetState()
       debug_frame* Frame = DebugGlobalMemory->DebugState->Frames+FrameIndex;
       Frame->MaxBlockCount = MAX_BLOCKS_PER_FRAME;
       Frame->Blocks = PushArray( &DebugGlobalMemory->DebugState->Arena, Frame->MaxBlockCount, debug_block);
-      Frame->Statistics = BeginVectorList(&DebugGlobalMemory->DebugState->Arena, MAX_DEBUG_FUNCTION_COUNT, debug_statistics);
+      Frame->Statistics = vector_list<debug_statistics>(&DebugGlobalMemory->DebugState->Arena, MAX_DEBUG_FUNCTION_COUNT);
     }
     DebugState = DebugGlobalMemory->DebugState;
   }
@@ -328,10 +328,10 @@ void CollateDebugRecords(game_memory* Memory)
   debug_frame* Frame = DebugState->Frames + DebugState->CurrentFrameIndex;
 
   // Get the  statistics list for the current frame;
-  vector_list* FrameStatistics = Frame->Statistics;
+  vector_list<debug_statistics>* FrameStatistics = &Frame->Statistics;
 
   // Get the persistent function list from the debug state
-  vector_list* FunctionList = DebugState->FunctionList;
+  vector_list<debug_record_entry>* FunctionList = &DebugState->FunctionList;
 
   BEGIN_BLOCK(ProfileCollation);
   u32 EventCount = GlobalDebugTable->EventCount[DebugTableFrame];
@@ -375,14 +375,14 @@ void CollateDebugRecords(game_memory* Memory)
         if(Frame->FirstFreeBlock)
         {
           debug_record_entry* RecordEntry = 0;
-          if(!Exists(FunctionList, RecordIndex))
+          if(!FunctionList->Exists(RecordIndex))
           {
             debug_record_entry Entry{};
             str::CopyStringsUnchecked(DebugRecord->BlockName, Entry.BlockName); 
             Entry.LineNumber = DebugRecord->LineNumber;
-            RecordEntry = (debug_record_entry*) PushBack(FunctionList, RecordIndex, (void*) &Entry);
+            RecordEntry = FunctionList->PushBack(Entry, RecordIndex);
           }else{
-            RecordEntry = (debug_record_entry*) GetEntryData(FunctionList, RecordIndex);
+            RecordEntry = FunctionList->GetFromVector(RecordIndex);
           }
 
           debug_thread* Thread = GetDebugThread(Memory, Frame, Event->TC.ThreadID);
@@ -420,8 +420,8 @@ void CollateDebugRecords(game_memory* Memory)
       {
         if(Frame->FirstFreeBlock)
         {
-          debug_record_entry* RecordEntry = (debug_record_entry*) GetEntryData(FunctionList, RecordIndex);
-          Assert(Exists(FunctionList, RecordIndex));
+          debug_record_entry* RecordEntry = FunctionList->GetFromVector(RecordIndex);
+          Assert(FunctionList->Exists(RecordIndex));
 
           debug_thread* Thread = GetDebugThread(Memory, Frame, Event->TC.ThreadID);
           Assert(Thread->OpenBlock);
@@ -438,11 +438,12 @@ void CollateDebugRecords(game_memory* Memory)
           Thread->OpenBlock = Block->Parent;
 
           u32 Hash = utils::djb2_hash(RecordEntry->BlockName);
-          u32 HashedIndex = Hash % FrameStatistics->VectorMaxCount;
+          u32 HashedIndex = Hash % FrameStatistics->maxSize();
           debug_statistics* Statistic = 0;
           b32 EntryFound = false;
-          while(Exists(FrameStatistics, HashedIndex, (void**)&Statistic))
+          while(FrameStatistics->Exists(HashedIndex))
           {
+            Statistic = FrameStatistics->GetFromVector(HashedIndex);
             if(str::ExactlyEquals(Statistic->Record->BlockName, RecordEntry->BlockName))
             {
               EntryFound = true;
@@ -455,7 +456,7 @@ void CollateDebugRecords(game_memory* Memory)
           {
             debug_statistics Stats = {};
             BeginDebugStatistics(&Stats, RecordEntry);
-            Statistic = (debug_statistics*) PushBack(FrameStatistics, HashedIndex, (void*) &Stats);
+            Statistic = FrameStatistics->PushBack(Stats, HashedIndex);
           }
 
           AccumulateStatistic(Statistic, (r32)(Block->EndClock - Block->BeginClock));
@@ -554,9 +555,8 @@ MENU_DRAW(DrawStatistics)
   ScopedMemory Memory(GlobalGameState->TransientArena);
   memory_arena* Arena = GlobalGameState->TransientArena;
   
-  vector_list* CumulativeStats = BeginVectorList(GlobalGameState->TransientArena, MAX_DEBUG_FUNCTION_COUNT, debug_statistics);
-
-  vector_list* DebugFunctions = DebugState->FunctionList;
+  vector_list<debug_statistics> CumulativeStats = vector_list<debug_statistics>(GlobalGameState->TransientArena, MAX_DEBUG_FUNCTION_COUNT);
+  vector_list<debug_record_entry>* DebugFunctions = &DebugState->FunctionList;
   END_BLOCK(AllocatingMemory);
   // TODO: This loop is super slow and it's unecessary to loop through it all every frame.
   //       Instead we can store the sum of CycleCount and HitCount for all previous farmes
@@ -573,22 +573,22 @@ MENU_DRAW(DrawStatistics)
     debug_frame* Frame = DebugState->Frames + FrameIndex;
     u64 FrameCycleCount = Frame->EndClock - Frame->BeginClock;
 
-    vector_list* FrameStatistics = Frame->Statistics;
-    debug_statistics* Stat = (debug_statistics*)First(FrameStatistics);
+    vector_list<debug_statistics>* FrameStatistics = &Frame->Statistics;
+    debug_statistics*  Stat = FrameStatistics->First();
     
-    while(!IsEnd(FrameStatistics, (void*) Stat))
+    while(Stat)
     {
       Assert(Stat->HitCount);
 
-      u32 ArrayIndex = GetIndexOfEntry(FrameStatistics, Stat);
+      u32 ArrayIndex = FrameStatistics->GetIndexOfEntry(Stat);
 
-      debug_statistics* CumulativeStat = 0;
+      debug_statistics* CumulativeStat = CumulativeStats.GetFromVector(ArrayIndex);
 
-      if(!Exists(CumulativeStats, ArrayIndex, (void**) &CumulativeStat))
+      if(!CumulativeStats.Exists(ArrayIndex))
       {
         debug_statistics NewStatisticEntry{};
         BeginDebugStatistics(&NewStatisticEntry, Stat->Record);
-        CumulativeStat = (debug_statistics*) PushBack(CumulativeStats, ArrayIndex,  &NewStatisticEntry);
+        CumulativeStat = CumulativeStats.PushBack(NewStatisticEntry, ArrayIndex);
       }
 
       CumulativeStat->HitCount += Stat->HitCount;
@@ -596,12 +596,12 @@ MENU_DRAW(DrawStatistics)
       CumulativeStat->Max = Maximum(CumulativeStat->Max, Stat->Max);
       CumulativeStat->Tot += Stat->Tot;
 
-      Stat = (debug_statistics*) Next(FrameStatistics, Stat);
+      Stat = FrameStatistics->Next(Stat);
     }
   }
 
-  debug_statistics* Stat = (debug_statistics*) First(CumulativeStats);
-  while(!IsEnd(CumulativeStats, Stat))
+  debug_statistics* Stat = CumulativeStats.First();
+  while(Stat)
   {
     Assert(Stat->HitCount);
 
@@ -609,14 +609,14 @@ MENU_DRAW(DrawStatistics)
     r32 CycleCount = (Stat->Tot / (r32) FrameCount);
 
     debug_record_entry* Record = Stat->Record;
-    u32 ArrayIndex = GetIndexOfEntry(DebugFunctions, (void*)Record);
-    Assert(Exists(DebugFunctions, ArrayIndex));
+    u32 ArrayIndex = DebugFunctions->GetIndexOfEntry(Record);
+    Assert(DebugFunctions->Exists(ArrayIndex));
 
     Record->CycleCount = (u32) CycleCount;
     Record->HitCount = Ciel(HitCount);
     Record->HCCount = Ciel(CycleCount/HitCount);
 
-    Stat = (debug_statistics*) Next(CumulativeStats, Stat);
+    Stat = CumulativeStats.Next(Stat);
   }
 
   END_BLOCK(SummingStats);
@@ -670,13 +670,11 @@ MENU_DRAW(DrawStatistics)
       {
         if(DebugState->LineSorted == function_sorting::Ascending || DebugState->LineSorted == function_sorting::None){
           DebugState->LineSorted = function_sorting::Descending;
-          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
           {
-            debug_record_entry* EntryA = (debug_record_entry*) A;
-            debug_record_entry* EntryB = (debug_record_entry*) B;
             b32 Result = false;
 
-            if(EntryA->LineNumber <= EntryB->LineNumber)
+            if(A->LineNumber <= B->LineNumber)
             {
               Result = true;
             }
@@ -685,13 +683,11 @@ MENU_DRAW(DrawStatistics)
         }else if(DebugState->LineSorted == function_sorting::Descending)
         {
           DebugState->LineSorted = function_sorting::Ascending;
-          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
           {
-            debug_record_entry* EntryA = (debug_record_entry*) A;
-            debug_record_entry* EntryB = (debug_record_entry*) B;
             b32 Result = false;
 
-            if(EntryA->LineNumber >= EntryB->LineNumber)
+            if(A->LineNumber >= B->LineNumber)
             {
               Result = true;
             }
@@ -702,21 +698,17 @@ MENU_DRAW(DrawStatistics)
 
         if(DebugState->BlockNameSorted == function_sorting::Ascending || DebugState->BlockNameSorted == function_sorting::None){
           DebugState->BlockNameSorted = function_sorting::Descending;
-          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
           {
-            debug_record_entry* EntryA = (debug_record_entry*) A;
-            debug_record_entry* EntryB = (debug_record_entry*) B;
-            b32 Result = str::Compare(EntryA->BlockName, EntryB->BlockName) >= 0;
+            b32 Result = str::Compare(A->BlockName, B->BlockName) >= 0;
             return Result;
           });
         }else if(DebugState->BlockNameSorted == function_sorting::Descending)
         {
           DebugState->BlockNameSorted = function_sorting::Ascending;
-          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
           {
-            debug_record_entry* EntryA = (debug_record_entry*) A;
-            debug_record_entry* EntryB = (debug_record_entry*) B;
-            b32 Result = str::Compare(EntryA->BlockName,EntryB->BlockName) <= 0;
+            b32 Result = str::Compare(A->BlockName,B->BlockName) <= 0;
             return Result;
           });
         }
@@ -724,12 +716,10 @@ MENU_DRAW(DrawStatistics)
         if(DebugState->CycleCountSorted == function_sorting::Descending || DebugState->CycleCountSorted == function_sorting::None)
         {
           DebugState->CycleCountSorted = function_sorting::Ascending;
-          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
           {
-            debug_record_entry* EntryA = (debug_record_entry*) A;
-            debug_record_entry* EntryB = (debug_record_entry*) B;
             b32 Result = false;
-            if(EntryA->CycleCount <= EntryB->CycleCount)
+            if(A->CycleCount <= B->CycleCount)
             {
               Result = true;
             }
@@ -737,12 +727,10 @@ MENU_DRAW(DrawStatistics)
           });
         }else if(DebugState->CycleCountSorted == function_sorting::Ascending){
           DebugState->CycleCountSorted = function_sorting::Descending;
-          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
           {
-            debug_record_entry* EntryA = (debug_record_entry*) A;
-            debug_record_entry* EntryB = (debug_record_entry*) B;
             b32 Result = false;
-            if(EntryA->CycleCount >= EntryB->CycleCount)
+            if(A->CycleCount >= B->CycleCount)
             {
               Result = true;
             }
@@ -753,12 +741,10 @@ MENU_DRAW(DrawStatistics)
         if(DebugState->HitCountSorted == function_sorting::Descending || DebugState->HitCountSorted == function_sorting::None)
         {
           DebugState->HitCountSorted = function_sorting::Ascending;
-          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
           {
-            debug_record_entry* EntryA = (debug_record_entry*) A;
-            debug_record_entry* EntryB = (debug_record_entry*) B;
             b32 Result = false;
-            if(EntryA->HitCount <= EntryB->HitCount)
+            if(A->HitCount <= B->HitCount)
             {
               Result = true;
             }
@@ -766,12 +752,10 @@ MENU_DRAW(DrawStatistics)
           });
         }else if(DebugState->HitCountSorted == function_sorting::Ascending){
           DebugState->HitCountSorted = function_sorting::Descending;
-          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
           {
-            debug_record_entry* EntryA = (debug_record_entry*) A;
-            debug_record_entry* EntryB = (debug_record_entry*) B;
             b32 Result = false;
-            if(EntryA->HitCount >= EntryB->HitCount)
+            if(A->HitCount >= B->HitCount)
             {
               Result = true;
             }
@@ -782,12 +766,10 @@ MENU_DRAW(DrawStatistics)
         if(DebugState->CyclePerHitSorted == function_sorting::Descending || DebugState->CyclePerHitSorted == function_sorting::None)
         {
           DebugState->CyclePerHitSorted = function_sorting::Ascending;
-          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
           {
-            debug_record_entry* EntryA = (debug_record_entry*) A;
-            debug_record_entry* EntryB = (debug_record_entry*) B;
             b32 Result = false;
-            if(EntryA->HCCount <= EntryB->HCCount)
+            if(A->HCCount <= B->HCCount)
             {
               Result = true;
             }
@@ -795,12 +777,10 @@ MENU_DRAW(DrawStatistics)
           });
         }else if(DebugState->CyclePerHitSorted == function_sorting::Ascending){
           DebugState->CyclePerHitSorted = function_sorting::Descending;
-          MergeSort(GlobalGameState->TransientArena, DebugFunctions, [](void* A, void* B)
+          DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
           {
-            debug_record_entry* EntryA = (debug_record_entry*) A;
-            debug_record_entry* EntryB = (debug_record_entry*) B;
             b32 Result = false;
-            if(EntryA->HCCount >= EntryB->HCCount)
+            if(A->HCCount >= B->HCCount)
             {
               Result = true;
             }
@@ -822,8 +802,8 @@ MENU_DRAW(DrawStatistics)
   v4 OddColor = HexCodeToColorV4(0x9400D3);
   OddColor.W = 0.5;
   b32 EvenRow = false;
-  debug_record_entry* Entry = (debug_record_entry*) First(DebugFunctions);
-  while(!IsEnd(DebugFunctions, Entry))
+  debug_record_entry* Entry = DebugFunctions->First();
+  while(Entry)
   { 
     rect2f RowRect = Rect2f(Node->Region.X, YPos-LineHeight*0.5f, Node->Region.W, LineHeight*1.5f);
     PushOverlayQuad(RowRect, EvenRow ? EventColor : OddColor );
@@ -872,7 +852,7 @@ MENU_DRAW(DrawStatistics)
 
     YPos -= LineHeight*1.5f;
 
-    Entry = (debug_record_entry*) Next(DebugFunctions, (void*) Entry);
+    Entry = DebugFunctions->Next(Entry);
     
   }
 
