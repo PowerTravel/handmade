@@ -198,7 +198,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   UpdateModelMatrix(LightSpatial);
 
   GetHandle(AssetManager, "voxel", &LightRender->Object);
-  GetHandle(AssetManager, "white", &LightRender->Material);
+  GetHandle(AssetManager, "red_plastic", &LightRender->Material);
   GetHandle(AssetManager, "null",  &LightRender->Bitmap);
 
 
@@ -296,8 +296,8 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 
   component_render* FloorRender = GetRenderComponent(FloorEntity);
   GetHandle( AssetManager, "voxel",   &FloorRender->Object);
-  GetHandle( AssetManager, "checker_board", &FloorRender->Material);
-  GetHandle( AssetManager, "checker_board", &FloorRender->Bitmap );
+  GetHandle( AssetManager, "red_plastic", &FloorRender->Material);
+  GetHandle( AssetManager, "null", &FloorRender->Bitmap );
 
   component_spatial* FloorSpatial = GetSpatialComponent(FloorEntity);
   FloorSpatial->Position = V3( 0,-2, 0);
@@ -363,7 +363,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 
   component_render* AnimationRender = GetRenderComponent(SpriteAnimationEntity);
   GetHandle( AssetManager, "quad",   &AnimationRender->Object);
-  GetHandle( AssetManager, "white", &AnimationRender->Material);
+  GetHandle( AssetManager, "red_rubber", &AnimationRender->Material);
   GetHandle( AssetManager, "hero_sprite_sheet", &AnimationRender->Bitmap );
 
 
