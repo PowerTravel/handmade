@@ -55,8 +55,6 @@
 game_memory* DebugGlobalMemory = 0;
 #endif
 
-
-#include "containers/vector_list.cpp"
 #include "math/aabb.cpp"
 #include "handmade_tile.cpp"
 #include "obj_loader.cpp"
