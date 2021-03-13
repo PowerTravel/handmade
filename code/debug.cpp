@@ -387,7 +387,14 @@ void CollateDebugRecords(game_memory* Memory)
 
           debug_thread* Thread = GetDebugThread(Memory, Frame, Event->TC.ThreadID);
           debug_block* Block = Frame->FirstFreeBlock++;
-          Assert((Block - Frame->Blocks) < MAX_BLOCKS_PER_FRAME);
+          midx BlockCount = Block - Frame->Blocks;
+          if(BlockCount >= MAX_BLOCKS_PER_FRAME)
+          {
+            // TODO: Handle this case somehow by growing the Block-vector by chunks
+            //       For now just change the MAX_BLOCKS_PER_FRAME if we hit this assert
+            Assert(0);
+          }
+
           Block->Record = RecordEntry;
           Block->ThreadIndex = Thread->ID;
           Block->BeginClock = Event->Clock - Frame->BeginClock;

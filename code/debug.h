@@ -39,7 +39,7 @@ struct debug_statistics
 };
 
 // The information for the frame
-#define MAX_BLOCKS_PER_FRAME 4096
+#define MAX_BLOCKS_PER_FRAME 16384
 #define MAX_THREAD_COUNT 16
 #define MAX_DEBUG_FRAME_COUNT 60
 #define MAX_DEBUG_FUNCTION_COUNT 256
