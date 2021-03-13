@@ -111,7 +111,24 @@ GameOutputSound(game_sound_output_buffer* SoundBuffer, int ToneHz)
   }
 }
 
+void CalculateInertialTensor(component_spatial* S, component_collider* C, component_dynamics* D)
+{
+  collider_mesh Mesh = GetColliderMesh(GlobalGameState->AssetManager, C->Object);
 
+  // For now all objects are just cubes
+  v3 Dim = C->AABB.P1 - C->AABB.P0;
+  r32 Ix = (1/12.f) * D->Mass * (Dim.Y*Dim.Y + Dim.Z*Dim.Z);
+  r32 Iy = (1/12.f) * D->Mass * (Dim.X*Dim.X + Dim.Z*Dim.Z);
+  r32 Iz = (1/12.f) * D->Mass * (Dim.X*Dim.X + Dim.Y*Dim.Y);
+
+  D->I =  M3(Ix, 0, 0,
+           0, Iy, 0,
+           0, 0, Iz);
+
+  D->I_inv = M3(1/Ix,0,0,
+                 0,1/Iy,0,
+                 0,0,1/Iz);
+}
 
 world* CreateWorld( u32 MaxNrManifolds )
 {
@@ -267,6 +284,8 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
         CubeDynamics->AngularVelocity = V3(0,0,0);
         CubeDynamics->Mass = mass;
         mass /=2.f;
+
+        CalculateInertialTensor(CubeSpatial, CubeCollider, CubeDynamics);
       }
     }
   }
