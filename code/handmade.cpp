@@ -178,7 +178,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   r32 AspectRatio = WindowSize.WidthPx / WindowSize.HeightPx;
   r32 FieldOfView =  90;
   SetCameraComponent(Camera, FieldOfView, AspectRatio );
-  LookAt(Camera, 1*V3(0,3,-8), V3(0,3,0));
+  LookAt(Camera, 1*V3(0,3,8), V3(0,3,0));
 
   component_controller* Controller = GetControllerComponent(ControllableCamera);
   Controller->Controller = GetController(Input, 0);
