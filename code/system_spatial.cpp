@@ -812,8 +812,6 @@ void SpatialSystemUpdate( world* World )
 
   DoWarmStarting( WorldContacts->FirstManifold );
 
-  IntegrateVelocities( World->dtForFrame );
-
   World->BroadPhaseTree = BuildBroadPhaseTree( );
 
   u32 BroadPhaseResultCount = 0;
@@ -835,6 +833,7 @@ void SpatialSystemUpdate( world* World )
   }
   END_BLOCK(SolveConstraints);
 
+  IntegrateVelocities(World->dtForFrame);
   IntegratePositions(World->dtForFrame);
 
 }
