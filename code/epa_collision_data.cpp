@@ -150,6 +150,19 @@ contact_data EPACollisionResolution(memory_arena* Arena,
 
 }
 
+void ResetManifoldSlot(contact_manifold* ManifoldSlot, u32 ManifoldIndex, u32 EntityIDA, u32 EntityIDB)
+{
+  Assert(ManifoldSlot);
+  Assert(!ManifoldSlot->EntityIDA);
+  Assert(!ManifoldSlot->EntityIDB);
+  Assert(ManifoldSlot->Contacts.Valid());
+
+  ManifoldSlot->EntityIDA = EntityIDA;
+  ManifoldSlot->EntityIDB = EntityIDB;
+  ManifoldSlot->MaxContactCount = 4;
+  ManifoldSlot->WorldArrayIndex = ManifoldIndex;
+}
+
 contact_manifold* FindManifoldSlot(world_contact_chunk* Manifolds, u32 EntityIDA, u32 EntityIDB)
 {
   u32 CantorPair = GetCantorPair(EntityIDA, EntityIDB);
@@ -161,14 +174,8 @@ contact_manifold* FindManifoldSlot(world_contact_chunk* Manifolds, u32 EntityIDA
     contact_manifold* ManifoldArraySlot = Manifolds->ManifoldVector + ManifoldIndex;
     if(!ManifoldArraySlot->EntityIDA)
     {
-      Assert(!ManifoldArraySlot->EntityIDB)
-      // Slot was empty
       ManifoldSlot = ManifoldArraySlot;
-      ZeroStruct( *ManifoldSlot );
-      ManifoldSlot->EntityIDA = EntityIDA;
-      ManifoldSlot->EntityIDB = EntityIDB;
-      ManifoldSlot->MaxContactCount = 4;
-      ManifoldSlot->WorldArrayIndex = ManifoldIndex;
+      ResetManifoldSlot(ManifoldSlot, ManifoldIndex, EntityIDA, EntityIDB);
       break;
     }
     else if(((EntityIDA == ManifoldArraySlot->EntityIDA) && (EntityIDB == ManifoldArraySlot->EntityIDB)) ||
