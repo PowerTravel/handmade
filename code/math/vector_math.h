@@ -1072,3 +1072,65 @@ QuaternionToEuler(const v4 q)
   v3 Result = V3(roll, pitch, yaw);
   return Result;
 }
+
+internal inline m4
+GetRotationMatrix_X_ZHint(v3 ObjWorld_X, v3 ObjWorld_Z_Hint)
+{
+  ObjWorld_X = Normalize(ObjWorld_X);
+  // ObjWorld_X is the x-axis (left) of the obeject in the worlds coordinate system
+  // ObjWorld_Z_Hint is a hint of the z-axis (front facing) of the obeject in the worlds coordinate system
+  // These will be used to find the up-direction of the object in world-coordinate system
+
+  // Make sure ObjWorld_Z_Hint and ObjWorld_X are not parallel
+  if( Abs( (ObjWorld_Z_Hint * ObjWorld_X) - 1.0f ) <  0.0001f )
+  {
+    return M4Identity();
+  }
+
+  // Z cross X = Y
+  v3 ObjWorld_Y = Normalize(CrossProduct(ObjWorld_Z_Hint, ObjWorld_X));
+  // X cross Y = Z
+  v3 ObjWorld_Z = Normalize(CrossProduct(ObjWorld_X, ObjWorld_Y));
+
+  // Rotates from WorldCoordinateSystem to NewCoordinateSystem
+  // RotMat * V3(1,0,0) = xp
+  // RotMat * V3(0,1,0) = yp
+  // RotMat * V3(0,0,1) = zp
+  m4 RotMat = M4( ObjWorld_X.X, ObjWorld_Y.X, ObjWorld_Z.X, 0,
+                  ObjWorld_X.Y, ObjWorld_Y.Y, ObjWorld_Z.Y, 0,
+                  ObjWorld_X.Z, ObjWorld_Y.Z, ObjWorld_Z.Z, 0,
+                  0,   0,   0, 1);
+
+  return RotMat;
+}
+
+internal inline m4
+GetRotationMatrix_X_YHint(v3 ObjWorld_X, v3 ObjWorld_Y_Hint)
+{
+  ObjWorld_X = Normalize(ObjWorld_X);
+  // ObjWorld_X is the x-axis (left) of the obeject in the worlds coordinate system
+  // ObjWorld_Y_Hint is a hint of the y-axis (up) of the obeject in the worlds coordinate system
+  // These will be used to find the up-direction of the object in world-coordinate system
+
+  // Make sure ObjWorld_Y_Hint and ObjWorld_X are not parallel
+  if( Abs( (ObjWorld_X * ObjWorld_Y_Hint) - 1.0f ) <  0.0001f )
+  {
+    return M4Identity();
+  }
+
+  // X cross Y = Z
+  v3 ObjWorld_Z = Normalize(CrossProduct(ObjWorld_X, ObjWorld_Y_Hint));
+  // Z cross X = Y
+  v3 ObjWorld_Y = Normalize(CrossProduct(ObjWorld_Z, ObjWorld_X));
+
+  // Rotates from WorldCoordinateSystem to NewCoordinateSystem
+  // RotMat * V3(1,0,0) = xp
+  // RotMat * V3(0,1,0) = yp
+  // RotMat * V3(0,0,1) = zp
+  m4 RotMat = M4( ObjWorld_X.X, ObjWorld_Y.X, ObjWorld_Z.X, 0,
+                  ObjWorld_X.Y, ObjWorld_Y.Y, ObjWorld_Z.Y, 0,
+                  ObjWorld_X.Z, ObjWorld_Y.Z, ObjWorld_Z.Z, 0,
+                  0,   0,   0, 1);
+
+  return RotMat;
+}
