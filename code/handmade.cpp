@@ -202,21 +202,20 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   GetHandle(AssetManager, "null",  &LightRender->Bitmap);
 
 
-#define State0
-#if defined(State1)
-  // BUG: Bug-producing state. Rotation bleeds over into scaling
-  r32 ySpace = 1;
-  r32 xzSpace = 1;
+#define state7
+#if defined(state1)
+  r32 ySpace = 1.1;
+  r32 xzSpace = 1.1;
   s32 iarr[] = {-0,1};
-  s32 jarr[] = {-1,6};
+  s32 jarr[] = {-1,14};
   s32 karr[] = {-0,1};
-#elif defined(State2)
+#elif defined(state2)
   r32 ySpace = 1;
   r32 xzSpace = 1;
   s32 iarr[] = {-2,2};
   s32 jarr[] = {-1,5};
   s32 karr[] = {-2,2};
-#elif defined(State3)
+#elif defined(state3)
   r32 ySpace = 1;
   r32 xzSpace = 1.2;
   s32 iarr[] = {-2,2};
@@ -232,14 +231,20 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   r32 ySpace = 20;
   r32 xzSpace = 1.2;
   s32 iarr[] = {-2,1};
-  s32 jarr[] = {-0,1};
+  s32 jarr[] = {-0,2};
   s32 karr[] = {-2,1};
-#else
+#elif defined (state6)
   r32 ySpace = 6;
   r32 xzSpace = 1.2;
   s32 iarr[] = {-0,1};
   s32 jarr[] = {-0,1};
   s32 karr[] = {-0,1};
+#else
+  r32 ySpace = 1;
+  r32 xzSpace = 1;
+  s32 iarr[] = {-1,3};
+  s32 jarr[] = {-1,3};
+  s32 karr[] = {-1,3};
 #endif
 
   bitmap_handle BitmapHandle;
