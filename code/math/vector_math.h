@@ -1047,3 +1047,28 @@ QuaternionMultiplication(const v4 r, const v4 q)
   Result.Z = r.W*q.Z - r.X*q.Y + r.Y*q.X + r.Z*q.W;  // z-part (k)
   return Result;
 }
+
+inline v3
+QuaternionToEuler(const v4 q)
+{
+  // roll (x-axis rotation)
+  r32 sinr_cosp = 2 * (q.W * q.X + q.Y * q.Z);
+  r32 cosr_cosp = 1 - 2 * (q.X * q.X + q.Y * q.Y);
+  r32 roll = ATan2(sinr_cosp, cosr_cosp);
+
+  // pitch (y-axis rotation)
+  r32 sinp = 2 * (q.W * q.Y - q.Z * q.X);
+  r32 pitch = 0;
+  if (Abs(sinp) >= 1)
+    pitch = sinp > 0 ? Pi32 / 2.f : -Pi32 / 2.f;
+  else
+    pitch = ASin(sinp);
+
+  // yaw (z-axis rotation)
+  r32 siny_cosp = 2 * (q.W * q.Z + q.X * q.Y);
+  r32 cosy_cosp = 1 - 2 * (q.Y * q.Y + q.Z * q.Z);
+  r32 yaw = ATan2(siny_cosp, cosy_cosp);
+
+  v3 Result = V3(roll, pitch, yaw);
+  return Result;
+}
