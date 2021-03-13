@@ -474,7 +474,7 @@ inline void IntegrateVelocities( r32 dt )
 }
 
 internal void
-CreateAndDoWork( world_contact_chunk* ContactChunk, u32 BroadPhaseResultCount, broad_phase_result_stack* const BroadPhaseResultStack )
+GenerateContactPoints( world_contact_chunk* ContactChunk, u32 BroadPhaseResultCount, broad_phase_result_stack* const BroadPhaseResultStack )
 {
   TIMED_FUNCTION();
   broad_phase_result_stack* ColliderPair = BroadPhaseResultStack;
@@ -758,7 +758,7 @@ void SpatialSystemUpdate( world* World )
   u32 BroadPhaseResultCount = 0;
   broad_phase_result_stack* const BroadPhaseResultStack = GetCollisionPairs( &World->BroadPhaseTree, &BroadPhaseResultCount );
 
-  CreateAndDoWork( WorldContacts, BroadPhaseResultCount, BroadPhaseResultStack );
+  GenerateContactPoints( WorldContacts, BroadPhaseResultCount, BroadPhaseResultStack );
 
   RemoveNonIntersectingManifolds(WorldContacts);
 
