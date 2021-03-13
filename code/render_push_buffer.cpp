@@ -339,8 +339,8 @@ void FillRenderPushBuffer(world* World)
   while(Manifold)
   {
     //TODO: Turn manifold into an entity
-    Assert(Manifold->ContactCount);
-    for( u32 j = 0; j <Manifold->ContactCount; ++j)
+    contact_data* Contact = Manifold->Contacts.First();
+    while(Contact)
     {
       {
         push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK );
@@ -353,7 +353,7 @@ void FillRenderPushBuffer(world* World)
         const m4 Rotation = GetRotationMatrix(Spatial->Rotation);
         const m4 Translation = GetTranslationMatrix(Spatial->Position);
         const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
-        Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].A_ContactWorldSpace,1))*Scale;
+        Body->M = GetTranslationMatrix( V4(Contact->A_ContactWorldSpace,1))*Scale;
         Body->NM = Transpose(RigidInverse(Body->M));
       }
       {
@@ -367,9 +367,10 @@ void FillRenderPushBuffer(world* World)
         const m4 Rotation = GetRotationMatrix(Spatial->Rotation);
         const m4 Translation = GetTranslationMatrix(Spatial->Position);
         const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
-        Body->M = GetTranslationMatrix( V4(Manifold->Contacts[j].B_ContactWorldSpace,1))*Scale;
+        Body->M = GetTranslationMatrix( V4(Contact->B_ContactWorldSpace,1))*Scale;
         Body->NM = Transpose(RigidInverse(Body->M));
       }
+      Contact = Manifold->Contacts.Next(Contact);
     }
     Manifold = Manifold->Next;
   }
