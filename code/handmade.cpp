@@ -372,8 +372,8 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 
 
   component_spatial* SpriteSpatial = GetSpatialComponent(SpriteAnimationEntity);
-  SpriteSpatial->Position = V3( -0,  8, 8);
-  SpriteSpatial->Rotation = RotateQuaternion( Pi32, V3(0,1,0) );
+  SpriteSpatial->Position = V3( 0,  8, -8);
+  SpriteSpatial->Rotation = RotateQuaternion( 0, V3(0,1,0) );
   SpriteSpatial->Scale    = V3( 18, 18, 1);
   UpdateModelMatrix(SpriteSpatial);
 
