@@ -317,6 +317,58 @@ void FillRenderPushBuffer(world* World)
     }
   }
 
+  {
+    ScopedTransaction(EM);
+    component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_DYNAMICS);
+    while(Next(EM, ComponentList))
+    {
+      component_spatial* VelSpatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
+      component_dynamics* VelDynamics = (component_dynamics*) GetComponent(EM, ComponentList, COMPONENT_FLAG_DYNAMICS);
+      {
+        v4 Q = GetRotation( V3(1,0,0), VelDynamics->LinearVelocity);
+        const m4 ObjRotation = GetRotationMatrix(Q);
+        r32 Speed = Norm(VelDynamics->LinearVelocity);
+        
+        m4 M  = GetScaleMatrix(V4(Speed, 0.05, 0.05, 1));
+        Translate(V4(Speed/2,0,0,1), M);
+        M = ObjRotation * M;
+        Translate(V4(VelSpatial->Position) + V4(0,2,0,1), M);
+
+        push_buffer_header* VelocityHeader = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK);
+        entry_type_render_asset* VelocityBody = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
+        GetHandle(AM,"voxel", &VelocityBody->Object);
+        GetHandle(AM, "red", &VelocityBody->Material);
+
+        VelocityBody->M = M;
+        VelocityBody->NM = Transpose(RigidInverse(VelocityBody->M));
+      }
+
+      {
+        r32 Speed = Norm(VelDynamics->AngularVelocity);
+        v4 Q = GetRotation( V3(1,0,0), VelDynamics->AngularVelocity);
+        #if USE_ANGULAR_VEL_OBJECT_SPACE
+        const m4 ObjRotation =  GetRotationMatrix(QuaternionMultiplication(Q,VelSpatial->Rotation));
+        #else
+        const m4 ObjRotation = GetRotationMatrix(Q);
+        #endif
+
+        m4 M  = GetScaleMatrix(V4(Speed, 0.05, 0.05, 1));
+        Translate(V4(Speed/2,0,0,1), M);
+        M = ObjRotation * M;
+        Translate(V4(VelSpatial->Position) + V4(0,2,0,1), M);
+
+        push_buffer_header* WorldArrowHeader = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK);
+        entry_type_render_asset* WoldArrowBody = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
+        GetHandle(AM,"voxel", &WoldArrowBody->Object);
+        GetHandle(AM, "blue", &WoldArrowBody->Material);
+        WoldArrowBody->M = M;
+        WoldArrowBody->NM = Transpose(RigidInverse(WoldArrowBody->M));
+      }
+
+    }
+  }
+
+
 #if SHOW_COLLIDER
   {
     ScopedTransaction(EM);
