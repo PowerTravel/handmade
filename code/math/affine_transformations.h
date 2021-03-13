@@ -53,11 +53,18 @@ RigidInverse( const m4& A )
 }
 
 inline v4
+QuaternionConjugate( const v4 Q )
+{
+  v4 Result = V4( -Q.X, -Q.Y, -Q.Z, Q.W );
+  return Result;
+}
+
+inline v4
 QuaternionInverse( const v4 Q )
 {
   r32 QNormSquared = Q.X*Q.X + Q.Y*Q.Y + Q.Z*Q.Z + Q.W*Q.W;
   Assert(QNormSquared > 10E-10);
-  v4  QConjugate = V4( -Q.X, -Q.Y, -Q.Z, Q.W );
+  v4 QConjugate = QuaternionConjugate(Q);
   return (QConjugate/QNormSquared);
 }
 
