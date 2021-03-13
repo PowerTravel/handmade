@@ -305,7 +305,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 
   component_spatial* FloorSpatial = GetSpatialComponent(FloorEntity);
   FloorSpatial->Position = V3( 0,-2, 0);
-  FloorSpatial->Scale = V3( 18, 1, 18);
+  FloorSpatial->Scale = V3( 118, 1, 118);
   UpdateModelMatrix(FloorSpatial);
 
   component_collider* FloorCollider = GetColliderComponent(FloorEntity);
