@@ -1,7 +1,7 @@
 #pragma once
 
 // TODO: Replace math.h with cpu specific instructions
-#include <math.h>
+#include <cmath>
 #include "types.h"
 
 inline u32 GetThreadID()
@@ -12,6 +12,12 @@ inline u32 GetThreadID()
   return ThreadID;
 }
 
+inline b32
+IsNan(float Value)
+{
+  bool Result = std::isnan(Value);
+  return Result;
+}
 
 inline u32
 SafeTruncateToU32( u64 Value )
@@ -61,11 +67,26 @@ Sin( r32 Angle )
 }
 
 inline r32
+ASin( r32 Angle )
+{
+  r32 Result = asinf( Angle );
+  return Result;
+}
+
+inline r32
 Cos( r32 Angle )
 {
   r32 Result = cosf( Angle );
   return Result;
 }
+
+inline r32
+ACos( r32 Angle )
+{
+  r32 Result = acosf( Angle );
+  return Result;
+}
+
 
 inline r32
 ATan2( r32 Y, r32 X )
