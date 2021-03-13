@@ -618,16 +618,19 @@ SolveNonPenetrationConstraints(r32 dtForFrame, contact_manifold* FirstManifold)
       v3 DeltaV[4] = {};
       ScaleV12(LambdaDiff, Cache->InvMJ, DeltaV);
 
-      if(DynamicsA)
+      if(LambdaDiff > 0)
       {
-        DynamicsA->LinearVelocity  += DeltaV[0];
-        DynamicsA->AngularVelocity += DeltaV[1];
+        if(DynamicsA)
+        {
+          DynamicsA->LinearVelocity  += DeltaV[0];
+          DynamicsA->AngularVelocity += DeltaV[1];
+        }
+        if(DynamicsB)
+        {
+          DynamicsB->LinearVelocity  += DeltaV[2];
+          DynamicsB->AngularVelocity += DeltaV[3];
+        }
       }
-      if(DynamicsB)
-      {
-        DynamicsB->LinearVelocity  += DeltaV[2];
-        DynamicsB->AngularVelocity += DeltaV[3];
-      }  
 
       Contact = Contacts->Next(Contact);
     }
@@ -683,15 +686,18 @@ SolveFrictionalConstraints( contact_manifold* FirstManifold )
       ScaleV12(LambdaDiffN1, Cache->InvMJn1, DeltaV1);
       ScaleV12(LambdaDiffN2, Cache->InvMJn2, DeltaV2);
 
-      if(DynamicsA)
+      if (!(Equals(Abs(LambdaDiffN1),0) && Equals(Abs(LambdaDiffN2),0)))
       {
-        DynamicsA->LinearVelocity  += (DeltaV1[0] + DeltaV2[0]);
-        DynamicsA->AngularVelocity += (DeltaV1[1] + DeltaV2[1]);
-      }
-      if(DynamicsB)
-      {
-        DynamicsB->LinearVelocity  += (DeltaV1[2] + DeltaV2[2]);
-        DynamicsB->AngularVelocity += (DeltaV1[3] + DeltaV2[3]);
+        if(DynamicsA)
+        {
+          DynamicsA->LinearVelocity  += (DeltaV1[0] + DeltaV2[0]);
+          DynamicsA->AngularVelocity += (DeltaV1[1] + DeltaV2[1]);
+        }
+        if(DynamicsB)
+        {
+          DynamicsB->LinearVelocity  += (DeltaV1[2] + DeltaV2[2]);
+          DynamicsB->AngularVelocity += (DeltaV1[3] + DeltaV2[3]);
+        }
       }
 
       Contact = Contacts->Next(Contact);
