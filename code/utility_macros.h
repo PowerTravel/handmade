@@ -37,6 +37,8 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 }
 #endif
 
+#define Print(string, ... ) Platform.DEBUGPrint(string, ## __VA_ARGS__ )
+
 #define GetCantorPair(a,b) ((u32) ( (1/2.f) * ((a) + (b)) * ((a) + (b) + 1) + (b) ))
 #define Clamp(Val, Min, Max) ((Val) < (Min)) ? (Min) : (((Val) > (Max)) ? (Max) : (Val))
 
