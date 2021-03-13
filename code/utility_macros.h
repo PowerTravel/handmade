@@ -40,14 +40,14 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 #define GetCantorPair(a,b) ((u32) ( (1/2.f) * ((a) + (b)) * ((a) + (b) + 1) + (b) ))
 #define Clamp(Val, Min, Max) ((Val) < (Min)) ? (Min) : (((Val) > (Max)) ? (Max) : (Val))
 
-#define ListInitiate( Sentinel ) \
-{                                          \
+#define ListInitiate( Sentinel )               \
+{                                              \
   (Sentinel)->Previous = (Sentinel);           \
   (Sentinel)->Next = (Sentinel);               \
 }
 
 #define ListInsertAfter( Sentinel, Element ) \
-{                                        \
+{                                            \
   (Element)->Previous = (Sentinel);          \
   (Element)->Next = (Sentinel)->Next;        \
   (Element)->Previous->Next = (Element);     \
@@ -55,15 +55,15 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 }
 
 #define ListInsertBefore( Sentinel, Element ) \
-{                                         \
+{                                             \
   (Element)->Previous = (Sentinel)->Previous; \
   (Element)->Next = (Sentinel);               \
   (Element)->Previous->Next = (Element);      \
   (Element)->Next->Previous = (Element);      \
 }
 
-#define ListRemove( Element )        \
-{                                              \
+#define ListRemove( Element )                      \
+{                                                  \
   (Element)->Previous->Next = (Element)->Next;     \
   (Element)->Next->Previous = (Element)->Previous; \
 }

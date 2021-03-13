@@ -255,7 +255,6 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
         component_spatial* CubeSpatial = GetSpatialComponent(CubeEntity);
         CubeSpatial->Position =  V3(xzSpace*i, ySpace*(j+1), xzSpace*k);
         CubeSpatial->Rotation = RotateQuaternion( 0, V3(0,0,0) );
-        //CubeSpatial->Scale = V3(0.95, 0.95, 0.95);
         CubeSpatial->Scale = V3(1, 1, 1);
         UpdateModelMatrix(CubeSpatial);
 
@@ -555,7 +554,7 @@ rect2f PlotToBitmap( bitmap* Bitmap, r32 ChartXMin, r32 ChartXMax, r32 ChartYMin
   {
     for( s32 XPixel = (s32)X;
              XPixel < (s32)(X+W);
-           ++XPixel )
+           ++XPixel)
     {
       u32 PixelIndex = YPixel * Bitmap->Width + XPixel;
       u32* Pixel = Pixels + PixelIndex;
@@ -601,6 +600,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_DYNAMICS);
   rect2f UpdatedRegion {};
   u32 PointSize = 1;
+
   while(Next(EM, ComponentList))
   {
     component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);

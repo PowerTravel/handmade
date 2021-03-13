@@ -696,7 +696,7 @@ TimestepVelocityRungeKutta4(const r32 DeltaTime, const v3 LinearVelocity, const 
     auto dfdt_Rot = [&AngularVelocity]( const v4& Rotation )
     {
       const v4 q0 = Rotation;
-      const v4 r = V4(AngularVelocity.X, AngularVelocity.Y, AngularVelocity.Z,0);
+      const v4 r = V4(AngularVelocity.X, AngularVelocity.Y, AngularVelocity.Z, 0);
       const v4 q1 = 0.5f*QuaternionMultiplication(r, q0);
       return q1;
     };

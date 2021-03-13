@@ -958,7 +958,7 @@ debug_block* DrawBlockChain(debug_block* Block, r32 StartX, r32 StartY, r32 Lane
     Rect.W = CycleScaling * CycleCount - PixelSize;
     Rect.H = LaneWidth - PixelSize;
 
-    if(Rect.W > PixelSize)
+    if(Rect.W >= PixelSize)
     {
       v4 Color = GetColorForRecord(Block->Record);
       PushOverlayQuad(Rect, Color);

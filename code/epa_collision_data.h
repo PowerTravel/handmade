@@ -54,7 +54,7 @@ struct world_contact_chunk
 
 world_contact_chunk* CreateWorldContactChunk(memory_arena* Arena, u32 MaxCount)
 {
-  world_contact_chunk* Result = PushStruct(Arena,world_contact_chunk);
+  world_contact_chunk* Result = PushStruct(Arena, world_contact_chunk);
   Result->MaxCount = MaxCount;
   Result->Count = 0;
   Result->ManifoldVector = PushArray(Arena, MaxCount, contact_manifold);

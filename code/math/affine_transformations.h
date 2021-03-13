@@ -99,6 +99,7 @@ QuaternionAsMatrix( const v4& Quaternion )
   return M4(r_1,r_2,r_3,r_4);
 }
 
+
 inline v4
 RotateQuaternion( const r32 Angle, const v4& Axis )
 {
@@ -129,6 +130,7 @@ RotateQuaternion( const r32 Angle, const v3& Axis )
 {
   return RotateQuaternion( Angle, V4(Axis,0) );
 }
+
 inline m4
 GetRotationMatrix( const v4& Quaternion )
 {

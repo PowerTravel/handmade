@@ -912,7 +912,7 @@ Win32ProcessKeyboard(win32_state* aState,  keyboard_input*  OldKeyboardControlle
     ++ButtonIndex)
   {
     NewKeyboardController->Keys[ButtonIndex].EndedDown =
-      OldKeyboardController->Keys[ButtonIndex].EndedDown;
+    OldKeyboardController->Keys[ButtonIndex].EndedDown;
   }
 
   MSG Message;
@@ -954,7 +954,7 @@ Win32ProcessKeyboard(win32_state* aState,  keyboard_input*  OldKeyboardControlle
             case 0x10:          { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_SHIFT, IsDown); }break; // 0x10 SHIFT
             case 0x11:          { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_CTRL, IsDown); }break; // 0x011 CTRL
             case 0x12:          { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_ALT, IsDown); }break; // 0x012 ALT
-            case VK_CLEAR:      {Win32ProcessKeyboardMessage(&NewKeyboardController->Key_CLR, IsDown);}break; // 0x0C Clear
+            case VK_CLEAR:      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_CLR, IsDown);}break; // 0x0C Clear
             case VK_RETURN:     { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_ENTER, IsDown); }break; // 0x0D Enter
             case VK_PAUSE:      { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_PAUSE, IsDown); }break; // 0x13 Pause
             case VK_CAPITAL:    { Win32ProcessKeyboardMessage(&NewKeyboardController->Key_CPSLCK, IsDown); }break; // 0x14 Caps Lock
