@@ -95,6 +95,8 @@ void PopulateContactData(const m4* AModelMat, const m4* BModelMat, epa_face* Fac
   ContactData->TangentNormalOne    = Tangent1;
   ContactData->TangentNormalTwo    = CrossProduct(FaceNormal, Tangent1);
   ContactData->PenetrationDepth    = DistanceToClosestFace;
+
+  Assert(Norm(FaceNormal)>0.5f);
 }
 
 contact_data EPACollisionResolution(memory_arena* Arena,
