@@ -1,7 +1,7 @@
 #pragma once
 
 #include "math/aabb.h"
-
+#include "containers/vector_list.h"
 struct entity;
 struct memory_arena;
 
@@ -31,4 +31,5 @@ struct broad_phase_result_stack
 u32 GetAABBList(aabb_tree* Tree, aabb3f** Result);
 broad_phase_result_stack* GetCollisionPairs( aabb_tree* Tree,  u32* ResultStackSize);
 void AABBTreeInsert( memory_arena* Arena, aabb_tree* Tree, u32 EntityID, aabb3f& AABBWorldSpace );
+void PointPick( memory_arena* Arena, aabb_tree* Tree, v3* point, v3 direction, vector_list<u32> & Result);
 aabb_tree BuildBroadPhaseTree( );

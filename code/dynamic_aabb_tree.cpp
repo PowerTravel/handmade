@@ -260,6 +260,34 @@ void AABBTreeInsert( memory_arena* Arena, aabb_tree* Tree, u32 EntityID , aabb3f
   Tree->Size+=2;
 }
 
+void PointPick( memory_arena* Arena, aabb_tree* Tree, v3* point, v3 direction, vector_list<u32> & Result)
+{
+  vector_list<aabb_tree_node*> queue = vector_list<aabb_tree_node*>(Arena, Tree->Size);
+
+  if (Tree->Root)
+  {
+    queue.PushBack(Tree->Root);
+  }
+
+  while (!queue.IsEmpty())
+  {
+    aabb_tree_node* Node = queue.PopFront();
+
+    if (IsLeaf(Node))
+    {
+      if (AABBIntersects(point, &Node->AABB))
+      {
+        Result.PushBack(Node->EntityID);
+      }
+    }
+    else
+    {
+      queue.PushBack(Node->Left);
+      queue.PushBack(Node->Right);
+    }
+  }
+}
+
 aabb_tree BuildBroadPhaseTree()
 {
   TIMED_FUNCTION();
