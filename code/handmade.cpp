@@ -253,7 +253,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   GetHandle( AssetManager, "cube1",   &ObjectHandle );
   GetHandle( AssetManager, "cube",    &MaterialHandle );
   GetHandle( AssetManager, "cube_kd", &BitmapHandle );
-  r32 mass = 100;
+  r32 mass = 10;
   for (s32 i = iarr[0]; i < iarr[1]; ++i)
   {
     for (s32 j = jarr[0]; j < jarr[1]; ++j)
@@ -286,7 +286,6 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
         CubeDynamics->LinearVelocity  = V3(0,0,0);
         CubeDynamics->AngularVelocity = V3(0,0,0);
         CubeDynamics->Mass = mass;
-        mass /=2.f;
 
         CalculateInertialTensor(CubeSpatial, CubeCollider, CubeDynamics);
       }
