@@ -317,6 +317,18 @@ void FillRenderPushBuffer(world* World)
     }
   }
 
+  { 
+    if( World->CastedRay.Hit)
+    {
+      PushLine(RenderGroup, World->CastedRay.RayOrigin, World->CastedRay.Intersection, CameraPosition, 0.2, "green");
+      PushLine(RenderGroup, World->CastedRay.Intersection, World->CastedRay.Intersection + World->CastedRay.HitNormal * 100.f , CameraPosition, 0.2, "yellow_plastic");
+    }else{
+      v3 O = World->CastedRay.RayOrigin;
+      v3 E = World->CastedRay.RayOrigin + 100.f * World->CastedRay.RayDirection;
+      PushLine(RenderGroup, O, E, CameraPosition, 0.1, "red");
+    }
+  }
+
   {
     ScopedTransaction(EM);
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_DYNAMICS);

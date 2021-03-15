@@ -22,6 +22,8 @@ struct world
 
   tile_map     TileMap;
 
+  raycast_result CastedRay;
+
   aabb_tree BroadPhaseTree;
   world_contact_chunk* ContactManifolds;
 };
