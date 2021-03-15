@@ -19,6 +19,27 @@ void LookAt( component_camera* Camera, v3 aFrom,  v3 aTo,  v3 aTmp = V3(0,1,0) )
   AssertIdentity(Camera->V * CamToWorld, 0.001 );
 }
 
+struct ray
+{
+  v3 Origin;
+  v3 Direction;
+};
+
+ray GetRayFromCamera(component_camera* Camera, v2 MousePos)
+{
+  ray Result{};
+  v2 ScreenSpace = CanonicalToScreenSpace(MousePos);
+  r32 HalfAngleOfView = 0.5f * (Pi32/180.f)*Camera->AngleOfView;
+  r32 TanHalfAngle = Tan(HalfAngleOfView);
+  v2 DirectionOfPixel = V2((ScreenSpace.X * Camera->AspectRatio * TanHalfAngle),
+                           (ScreenSpace.Y * TanHalfAngle));
+  m4 InvView = RigidInverse(Camera->V);
+  Result.Origin = V3(InvView * V4(0,0,0,1));
+  Result.Direction = Normalize(V3(InvView * V4(DirectionOfPixel,-1,0)));
+  return Result;
+}
+
+
 void TranslateCamera( component_camera* Camera, const v3& DeltaP  )
 {
   Camera->DeltaPos += DeltaP;
@@ -140,7 +161,7 @@ void SetCameraComponent(component_camera* Camera, r32 AngleOfView, r32 AspectRat
   Camera->DeltaPos = V3(0,0,0);
   Camera->V = M4Identity();
   Camera->P = M4Identity();
-  SetPerspectiveProj( Camera, 0.1, 1000 );
+  SetPerspectiveProj( Camera, 1, 1000 );
 }
 
 void gluPerspective(
