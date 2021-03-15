@@ -212,7 +212,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   GetHandle(AssetManager, "null",  &LightRender->Bitmap);
 
 
-#define state7
+#define state6
 #if defined(state1)
   r32 ySpace = 1.1;
   r32 xzSpace = 1.1;
@@ -247,9 +247,15 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   r32 ySpace = 6;
   r32 xzSpace = 1.2;
   s32 iarr[] = {-0,1};
-  s32 jarr[] = {-0,1};
+  s32 jarr[] = {-1,-0};
   s32 karr[] = {-0,1};
 #else
+  // BUG: If qubes are sliiightly rotated the contact-generation spazzes out (contact normals are zero)
+  //      which kind of makes sense since they are tightly packed to begin with
+  //      However: Would like the gjk-algorithm to be a bit more stable
+  //      The real bug however is, given cubes being perfectly aligned, this setup spazzes out
+  //      if we run time as normal, but if we time-step or wait 0.1 sec before initiating spatial-system
+  //      it works
   r32 ySpace = 1;
   r32 xzSpace = 1;
   s32 iarr[] = {-1,3};
@@ -338,7 +344,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
     *Pixels++ = PixelData;
   }
-#if 0
+#if 1
   u32 Teapot = NewEntity( EM );
   NewComponents( EM, Teapot,
     COMPONENT_FLAG_RENDER   |
