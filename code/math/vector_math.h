@@ -1028,6 +1028,17 @@ v3 GetBaryocentricCoordinates(const v3& p0, const v3& p1, const v3& p2, const v3
   return Result;
 }
 
+// Checks if the Vertex can be projected onto the Triangle.
+inline b32
+IsVertexInsideTriangle(const v3& VertexOnPlane, const v3& Normal, const v3& p0, const v3& p1, const v3& p2)
+{
+  const v3 Coords = GetBaryocentricCoordinates( p0, p1, p2, Normal, VertexOnPlane);
+  const b32 InsideTriangle = (Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
+                             (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
+                             (Coords.E[2] >= 0) && (Coords.E[2] <= 1);
+  return InsideTriangle;
+}
+
 inline r32
 LinearTransform(const r32 OutputMin, const r32 OutputMax, const r32 InputMin, const r32 InputMax, const r32 Input)
 {

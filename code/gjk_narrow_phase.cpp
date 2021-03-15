@@ -196,18 +196,6 @@ VertexEdge(const v3& Vertex, gjk_simplex& Simplex, u32 Index0 = 0, u32 Index1 = 
   return Result;
 }
 
-// Checks if the Vertex can be projected onto the Triangle.
-internal inline b32
-IsVertexInsideTriangle(const v3& VertexOnPlane, const v3& Normal, const v3 Triangle[])
-{
-  TIMED_FUNCTION();;
-  const v3 Coords = GetBaryocentricCoordinates( Triangle[0], Triangle[1], Triangle[2], Normal, VertexOnPlane);
-  const b32 InsideTriangle = (Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
-                             (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
-                             (Coords.E[2] >= 0) && (Coords.E[2] <= 1);
-  return InsideTriangle;
-}
-
 // See if the Vertex (Origin) can be projected onto a triangle. Otherwise reduce to a line (or point).
 internal gjk_partial_result
 VertexTriangle( const v3& Vertex, gjk_simplex& Simplex, const u32 Index0 = 0, const u32 Index1 = 1, const u32 Index2 = 2)
@@ -219,7 +207,7 @@ VertexTriangle( const v3& Vertex, gjk_simplex& Simplex, const u32 Index0 = 0, co
   const v3 Normal         = GetPlaneNormal(Triangle[0],Triangle[1],Triangle[2]);
   const v3 ProjectedPoint = ProjectPointOntoPlane( Vertex, Triangle[0], Normal );
 
-  if( IsVertexInsideTriangle( ProjectedPoint, Normal, Triangle) )
+  if( IsVertexInsideTriangle( ProjectedPoint, Normal, Triangle[0], Triangle[1], Triangle[2]) )
   {
     Result.ClosestPoint = ProjectedPoint;
     Result.Distance = Norm(ProjectedPoint);
