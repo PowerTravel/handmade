@@ -84,6 +84,63 @@ inline game_window_size GameGetWindowSize()
   return Result;
 }
 
+/* Types of screen coordinate systems,
+ *   AR = AspectRatio = Width/Height
+ *   W_px = Width in pixels
+ *   H_px = Height in pixels
+ *   NDC = Normalized Device Coordinates
+ * Canonical Space:                      RasterSpace:
+ * (1,0)                     (AR,1)      (0,0)                  (W_px,0)
+ * ______________________________        ______________________________
+ * |                            |        |                            |
+ * |                            |        |                            |
+ * |                            |        |                            |
+ * |                            |        |                            |
+ * |                            |        |                            |
+ * |____________________________|        |____________________________|
+ * (0,0)                     (AR, 0)     (0,H_px)             (W_px, H_px)
+ *
+ *  NDC Space                            Screen Space (The world seen from the Camera view matrix)
+ * (0,0)                     (1,0)      (-1,1)                     (1,1)
+ *  ______________________________        ______________________________
+ *  |                            |        |                            |
+ *  |                            |        |                            |
+ *  |                            |        |                            |
+ *  |                            |        |                            |
+ *  |                            |        |                            |
+ *  |____________________________|        |____________________________|
+ *  (0,1)                     (1,1)     (-1,-1)                     (-1, 1)
+ */
+
+inline v2 CanonicalToScreenSpace(v2 MousePos)
+{
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 OneOverAspectRatio = WindowSize.HeightPx/WindowSize.WidthPx;
+  v2 Result{};
+  Result.X = (2*MousePos.X*OneOverAspectRatio - 1);
+  Result.Y = (2*MousePos.Y - 1);
+  return Result;
+}
+inline v2 CanonicalToNDCSpace(v2 MousePos)
+{
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 OneOverAspectRatio = WindowSize.HeightPx/WindowSize.WidthPx;
+  v2 Result{};
+  Result.X = MousePos.X*OneOverAspectRatio;
+  Result.Y = 1-MousePos.Y;
+  return Result;
+}
+inline v2 CanonicalToRasterSpace(v2 MousePos)
+{
+  game_window_size WindowSize = GameGetWindowSize();
+  r32 OneOverAspectRatio = WindowSize.HeightPx/WindowSize.WidthPx;
+  v2 Result{};
+  Result.X = MousePos.X*OneOverAspectRatio*WindowSize.WidthPx;
+  Result.Y = (1-MousePos.Y)*WindowSize.HeightPx;
+  return Result;
+}
+
+
 inline func_ptr_void* _DeclareFunction(func_ptr_void Function, const c8* Name)
 {
   Assert(GlobalGameState);
