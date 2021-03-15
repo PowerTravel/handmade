@@ -50,3 +50,4 @@ b32 AABBIntersects( const aabb3f* A, const aabb3f* B);
 b32 SweeptAABB2D( const aabb2f& a, const aabb2f& b, const v2& aStep, r32& HitPercentage, v2& HitNormal );
 b32 SweeptAABB( aabb3f& a, aabb3f& b, v3& Step, r32& HitPercentage, v3& HitNormal );
 aabb3f TransformAABB( const aabb3f& AABB, const m4& TransMat );
+b32 AABBRay( v3 const & RayOrigin, v3 const & Direction, aabb3f const & AABB, r32* tMin, r32* tMax);

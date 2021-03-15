@@ -165,6 +165,48 @@ b32 AABBIntersects( const aabb3f* A, const aabb3f* B)
   return true;
 }
 
+b32 AABBRay( v3 const & RayOrigin, v3 const & Direction, aabb3f const & AABB, r32* tMin, r32* tMax)
+{
+  // IEEE x/0 is defined to be:
+  //    +inf if x > 0,
+  //    -inf if x < 0,
+  //    undefined if x == 0;
+  r32 DirFracX = 1.0f/Direction.X;
+  r32 DirFracY = 1.0f/Direction.Y;
+  r32 DirFracZ = 1.0f/Direction.Z;
+
+  r32 t1 = (AABB.P0.X - RayOrigin.X) * DirFracX;
+  r32 t2 = (AABB.P1.X - RayOrigin.X) * DirFracX;
+  r32 t3 = (AABB.P0.Y - RayOrigin.Y) * DirFracY;
+  r32 t4 = (AABB.P1.Y - RayOrigin.Y) * DirFracY;
+  r32 t5 = (AABB.P0.Z - RayOrigin.Z) * DirFracZ;
+  r32 t6 = (AABB.P1.Z - RayOrigin.Z) * DirFracZ;
+
+  *tMin = Maximum(Maximum( Minimum(t1, t2), Minimum(t3,t4) ), Minimum(t5,t6));
+  *tMax = Minimum(Minimum( Maximum(t1, t2), Maximum(t3,t4) ), Maximum(t5,t6));
+
+#if 0
+  if (tMax < 0)
+  {
+    t = tMax;
+    return false;
+  }
+
+  if (tMin > tMax)
+  {
+    t = tMax;
+    return false;
+  }
+
+  t = tMin;
+  return true;
+#else
+
+  b32 Result = (*tMax >= 0) && (*tMin <= *tMax);
+  return Result;
+#endif
+}
+
 // Sweep a in the direction of v against b, returns true & info if there was a hit
 // ===================================================================
 b32 SweeptAABB2D( const aabb2f& a, const aabb2f& b, const v2& aStep, r32& HitPercentage, v2& HitNormal )
