@@ -288,6 +288,120 @@ void PointPick( memory_arena* Arena, aabb_tree* Tree, v3* point, v3 direction, v
   }
 }
 
+b32 ColliderRaycast( v3 const & RayOrigin, v3 const & RayDirection, component_spatial* Spatial, component_collider* Collider, r32* Distance, v3* HitNormal)
+{
+  Assert(Equals(Norm(RayDirection),1, 10E-3));
+  collider_mesh Mesh = GetColliderMesh( GlobalGameState->AssetManager, Collider->Object);
+
+  m4 const & ModelMatrix = Spatial->ModelMatrix;
+  v3 RayDirectionModelSpace = Normalize( V3(AffineInverse(ModelMatrix) * V4(RayDirection,0)));
+  v3 RayOriginModelSpace = V3(AffineInverse(ModelMatrix) * V4(RayOrigin,1));
+
+  u32 VerticeIndexCount = 0;
+  r32 ResultDistance = R32Max;
+  v3 ResultHitNormal{};
+  b32 ResultHit = false;
+  while (VerticeIndexCount < Mesh.nvi)
+  {
+    u32 Index0 = Mesh.vi[VerticeIndexCount++];
+    u32 Index1 = Mesh.vi[VerticeIndexCount++];
+    u32 Index2 = Mesh.vi[VerticeIndexCount++];
+    v3 p0 = Mesh.v[Index0];
+    v3 p1 = Mesh.v[Index1];
+    v3 p2 = Mesh.v[Index2];
+    v3 PlaneNormal = GetPlaneNormal(p0, p1, p2);
+    r32 t = RaycastPlane(RayOriginModelSpace, RayDirectionModelSpace, p0, PlaneNormal);
+    if (t < 0)
+    {
+      continue;
+    }
+    v3 ProjectedPoint = RayOriginModelSpace + t*RayDirectionModelSpace;
+    if (IsVertexInsideTriangle( ProjectedPoint, PlaneNormal, p0, p1, p2))
+    {
+      v3 ProjectedPointWorldSpace = V3(ModelMatrix * V4(ProjectedPoint,1));
+      r32 WorldDistance = Norm(ProjectedPointWorldSpace - RayOrigin);
+      if (WorldDistance < ResultDistance)
+      {
+        ResultDistance = WorldDistance;
+        ResultHitNormal = V3(Transpose(RigidInverse(ModelMatrix)) * V4(PlaneNormal,0));
+        ResultHit = true;
+      }
+    }
+  }
+
+  *Distance = ResultDistance;
+  *HitNormal = ResultHitNormal;
+  return ResultHit;
+}
+
+raycast_result RayCast( memory_arena* Arena, aabb_tree* Tree, v3 const & RayOrigin, v3 const & RayDirection )
+{
+  Assert(Equals(Norm(RayDirection), 1, 10E-3));
+  raycast_result Result{};
+  Result.RayOrigin = RayOrigin;
+  Result.RayDirection = RayDirection;
+
+  vector_list<aabb_tree_node*> queue = vector_list<aabb_tree_node*>(Arena, Tree->Size);
+  if (Tree->Root)
+  {
+    queue.PushBack(Tree->Root);
+  }
+
+  while (!queue.IsEmpty())
+  {
+    aabb_tree_node* Node = queue.PopFront();
+    aabb3f AABB = Node->AABB;
+    r32 MaxDistance{};
+    r32 MinDistance{};
+    if (AABBRay(RayOrigin, RayDirection, AABB, &MinDistance, &MaxDistance))
+    {
+      if(Result.Hit && Result.Distance < MinDistance)
+      {
+        continue;
+      }
+
+      if (IsLeaf(Node))
+      {
+        r32 Distance = 0;
+        v3 Normal{};
+
+        component_spatial* Spatial = (component_spatial*) GetComponent(GlobalGameState->EntityManager, Node->EntityID, COMPONENT_FLAG_SPATIAL);
+        component_collider* Collider = (component_collider*) GetComponent(GlobalGameState->EntityManager, Node->EntityID, COMPONENT_FLAG_COLLIDER);
+
+        Assert(Collider);
+        if(ColliderRaycast(RayOrigin, RayDirection, Spatial, Collider, &Distance, &Normal))
+        {
+          if (Result.Hit)
+          {
+            if (Distance < Result.Distance)
+            {
+              Result.EntityID = Node->EntityID;
+              Result.Distance = Distance;
+              Result.HitNormal = Normal;
+              Result.Intersection = RayOrigin + RayDirection * Distance;
+            }
+          }
+          else
+          {
+            // First Hit
+            Result.EntityID = Node->EntityID;
+            Result.Distance = Distance;
+            Result.HitNormal = Normal;
+            Result.Intersection = RayOrigin + RayDirection * Distance;
+            Result.Hit = true;
+          }
+        }
+      }
+      else
+      {
+        queue.PushBack(Node->Left);
+        queue.PushBack(Node->Right);
+      }
+    }
+  }
+  return Result;
+}
+
 aabb_tree BuildBroadPhaseTree()
 {
   TIMED_FUNCTION();
