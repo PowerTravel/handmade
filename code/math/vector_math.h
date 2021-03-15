@@ -969,6 +969,30 @@ ProjectPointOntoPlane( const v3& PointToProject, const v3& PointOnPlane, const v
   return ProjectedPoint;
 }
 
+inline r32
+RaycastPlane( const v3& RayOrigin, const v3& RayDirection, const v3& PointOnPlane, const v3& PlaneNormal)
+{
+  // Ray:   P = RayOrigin + t * RayDirection
+  // Plane: (P - PointOnPlane) * PlaneNormal = 0
+  // (RayOrigin + t*RayDirection - PointOnPlane) * PlaneNormal = 0;
+  // RayOrigin * PlaneNormal + t*RayDirection * PlaneNormal - PointOnPlane* PlaneNormal = 0;
+  // t * RayDirection * PlaneNormal = PointOnPlane * PlaneNormal - RayOrigin * PlaneNormal;
+  // t = (PointOnPlane * PlaneNormal - RayOrigin * PlaneNormal) / (RayDirection * PlaneNormal)
+  
+  v3 RayToPlanePoint = PointOnPlane - RayOrigin;
+  r32 Numerator = RayToPlanePoint * PlaneNormal;
+  r32 Denominator = PlaneNormal * RayDirection;
+
+  // The RayOrigin is on the plane and the ray goes parallel to the plane
+  // Can probably be handled in some way, but cant be arsed to do it untill it becomes
+  // a problem. This assert should notify me when it does become a problem.
+  Assert(!(Equals(Numerator,0) && Equals(Denominator,0)));
+
+  // P = RayOrigin + t * RayDirection;
+  r32 t = Numerator / Denominator;
+  return t;
+}
+
 inline b32
 IsPointOnLinesegment(const v3& o, const v3& d, const v3& p)
 {
