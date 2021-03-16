@@ -12,6 +12,14 @@
 #include "epa_collision_data.h"
 #include "menu_interface.h"
 
+struct picked_entity
+{
+  b32 Active;
+  u32 EntityID;
+  v3 Point;
+  v3 PointObjectSpace
+};
+
 struct world
 {
   r32 GlobalTimeSec;
@@ -20,9 +28,10 @@ struct world
 
   memory_arena* Arena;
 
-  tile_map     TileMap;
+  tile_map TileMap;
 
   raycast_result CastedRay;
+  picked_entity PickedEntity;
 
   aabb_tree BroadPhaseTree;
   world_contact_chunk* ContactManifolds;

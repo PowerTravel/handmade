@@ -640,7 +640,9 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   if(World->AdvanceOneFrame)
   {
     SpatialSystemUpdate(World);
-
+  }
+  
+  {
     b32 MouseClicked = Input->MouseButton[PlatformMouseButton_Left].EndedDown;
     v2 MousePos = V2(Input->MouseX,Input->MouseY);
     if(MouseClicked)
@@ -654,13 +656,29 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
       ray Ray = GetRayFromCamera(Camera, MousePos);
       World->CastedRay = RayCast( GlobalGameState->TransientArena, &World->BroadPhaseTree, Ray.Origin, Ray.Direction);
+
+      if(World->CastedRay.Hit)
+      {
+        World->PickedEntity.Active = true;
+        World->PickedEntity.EntityID = World->CastedRay.EntityID;
+        World->PickedEntity.Point = World->CastedRay.Intersection;
+        World->PickedEntity.PointObjectSpace = World->CastedRay.IntersectionObjectSpace;
+      }else{
+        World->PickedEntity = {};
+      }
+    }  
+
+    if(World->CastedRay.Hit)
+    {
+
     }
   }
+
   CameraSystemUpdate(World);
   SpriteAnimationSystemUpdate(World);
   if(World->AdvanceOneFrame)
   {
-    World->GlobalTimeSec += Input->dt;  
+    World->GlobalTimeSec += Input->dt;
   }
 #if 1
   bitmap_handle Plot;

@@ -95,7 +95,7 @@ struct component_dynamics
   v3  AngularVelocity;
   v3  ExternalForce;
   r32 Mass;
-  m3 I; // Inertial tensor around CM aligned with principal axis
+  m3 I;     // Inertial tensor around CM aligned with principal axis
   m3 I_inv; // Inverse of I
 };
 

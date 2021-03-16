@@ -264,12 +264,13 @@ void FillRenderPushBuffer(world* World)
   game_asset_manager* AM = GlobalGameState->AssetManager;
 
   v3 CameraPosition = {};
+  component_camera* Camera = 0;
   {
     ScopedTransaction(EM);
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
     while(Next(EM, ComponentList))
     {
-      component_camera* Camera = (component_camera*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CAMERA);
+      Camera = (component_camera*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CAMERA);
       RenderGroup->ProjectionMatrix = Camera->P;
       RenderGroup->ViewMatrix       = Camera->V;
       CameraPosition = V3(Column(RigidInverse(Camera->V),3));
@@ -380,6 +381,18 @@ void FillRenderPushBuffer(world* World)
     }
   }
 
+  {
+    if(World->PickedEntity.Active)
+    {
+      v3 Up, Right, Forward;
+      GetCameraDirections(Camera, &Up, &Right, &Forward);
+      ray Ray = GetRayFromCamera(Camera, V2(GlobalGameState->Input->MouseX, GlobalGameState->Input->MouseY));
+      r32 t = RaycastPlane(Ray.Origin, Ray.Direction, World->PickedEntity.Point, -Forward);
+
+
+      PushLine(RenderGroup, World->PickedEntity.Point, Ray.Origin + t*Ray.Direction, CameraPosition, 0.1, "red");
+    }
+  }
 
 #if SHOW_COLLIDER
   {
