@@ -17,7 +17,8 @@ struct picked_entity
   b32 Active;
   u32 EntityID;
   v3 Point;
-  v3 PointObjectSpace
+  v3 PointObjectSpace;
+  v3 MousePointOnPlane;
 };
 
 struct world
@@ -25,14 +26,15 @@ struct world
   r32 GlobalTimeSec;
   r32 dtForFrame;
   b32 AdvanceOneFrame;
-
+  
   memory_arena* Arena;
-
+  
   tile_map TileMap;
-
+  
+  component_camera* ActiveCamera;
   raycast_result CastedRay;
   picked_entity PickedEntity;
-
+  
   aabb_tree BroadPhaseTree;
   world_contact_chunk* ContactManifolds;
 };
@@ -55,25 +57,26 @@ struct function_pool
 struct game_state
 {
   game_render_commands* RenderCommands;
-
+  
   memory_arena* PersistentArena;
   memory_arena* TransientArena;
   temporary_memory TransientTempMem;
-
+  
   game_asset_manager* AssetManager;
   entity_manager* EntityManager;
   menu_interface* MenuInterface;
-
+  
   game_input* Input;
-
+  
   world* World;
-
+  
   function_pool* FunctionPool;
-
+  
   b32 IsInitialized;
-
+  
   u32 Threads[4];
 };
+
 
 /// Game Global API
 
@@ -157,7 +160,7 @@ inline func_ptr_void* _DeclareFunction(func_ptr_void Function, const c8* Name)
   Assert(GlobalGameState);
   function_pool* Pool = GlobalGameState->FunctionPool;
   Assert(Pool->Count < ArrayCount(Pool->Functions))
-  function_ptr* Result = Pool->Functions;
+    function_ptr* Result = Pool->Functions;
   u32 FunctionIndex = 0;
   while(Result->Name && !str::ExactlyEquals(Result->Name, Name))
   {
@@ -166,7 +169,7 @@ inline func_ptr_void* _DeclareFunction(func_ptr_void Function, const c8* Name)
   if(!Result->Function)
   {
     Assert(Pool->Count == (Result - Pool->Functions))
-    Pool->Count++;
+      Pool->Count++;
     Result->Name = (c8*) PushCopy(GlobalGameState->PersistentArena, (str::StringLength(Name)+1)*sizeof(c8), (void*) Name);
     Result->Function = Function;
   }else{

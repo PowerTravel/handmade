@@ -9,7 +9,7 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup, render_buffer_entry
   push_buffer_header* NewEntryHeader = PushStruct(&RenderGroup->Arena, push_buffer_header);
   NewEntryHeader->SortKey = SortKey;
   NewEntryHeader->Next = 0;
-
+  
   if(!RenderGroup->First)
   {
     RenderGroup->First = NewEntryHeader;
@@ -21,7 +21,7 @@ push_buffer_header* PushNewHeader(render_group* RenderGroup, render_buffer_entry
   NewEntryHeader->Type = Type;
   NewEntryHeader->RenderState = RenderState;
   RenderGroup->BufferCounts[(u32) Type]++;
-
+  
   return NewEntryHeader;
 }
 
@@ -77,7 +77,7 @@ r32 GetTextWidth(const c8* String, u32 FontSize)
   
   game_window_size WindowSize = GameGetWindowSize();
   const r32 PixelSize = 1.f / WindowSize.HeightPx;
-
+  
   r32 Width = 0;
   while (*String != '\0')
   {
@@ -95,7 +95,7 @@ rect2f GetTextSize(r32 x, r32 y, const c8* String, u32 FontSize)
   
   game_window_size WindowSize = GameGetWindowSize();
   const r32 ScreenScaleFactor = 1.f / WindowSize.HeightPx;
-
+  
   r32 Width = 0;
   while (*String != '\0')
   {
@@ -123,11 +123,11 @@ GetSTBBitMapTextureCoords(stbtt_bakedchar* CH, r32 WidthScale, r32 HeightScale)
   const r32 s0 = CH->x0 * WidthScale;
   const r32 s1 = CH->x1 * WidthScale;
   const r32 Width  = s1-s0;
-
+  
   const r32 t0 = CH->y1 * HeightScale;
   const r32 t1 = CH->y0 * HeightScale;
   const r32 Height = t1-t0;
-
+  
   rect2f Result = Rect2f(s0, t0, Width, Height);
   return Result;
 }
@@ -143,7 +143,7 @@ GetSTBGlyphRect(r32 xPosPx, r32 yPosPx, stbtt_bakedchar* CH )
   const r32 GlyphHeight  =  (r32)(CH->y1 - CH->y0); // Height of the symbol
   const r32 GlyphOffsetX =  CH->xoff;               // Distance from Left to BasepointX
   const r32 GlyphOffsetY = -CH->yoff;               // Distance from Top to BasepointY
-
+  
   const r32 X = Floor(xPosPx + 0.5f) + GlyphWidth*0.5f + GlyphOffsetX;
   const r32 Y = Floor(yPosPx + 0.5f) - GlyphHeight*0.5f + GlyphOffsetY;
   rect2f Result = Rect2f(X,Y, GlyphWidth, GlyphHeight);
@@ -157,15 +157,15 @@ void PushTextAt(r32 CanPosX, r32 CanPosY, const c8* String, u32 FontSize, v4 Col
   r32 PixelPosY = Floor(CanPosY*WindowSize.HeightPx);
   game_asset_manager* AssetManager =  GlobalGameState->AssetManager;
   stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
-
+  
   bitmap* BitMap = GetAsset(AssetManager, FontMap->BitmapHandle);
   stbtt_aligned_quad Quad  = {};
-
+  
   const r32 ScreenScaleFactor = 1.f / WindowSize.HeightPx;
-
+  
   const r32 Ks = 1.f / BitMap->Width;
   const r32 Kt = 1.f / BitMap->Height;
-
+  
   while (*String != '\0')
   {
     stbtt_bakedchar* CH = &FontMap->CharData[*String-0x20];
@@ -188,7 +188,7 @@ render_group* InitiateRenderGroup()
 {
   render_group* Result = BootstrapPushStruct(render_group, Arena);
   Result->PushBufferMemory = BeginTemporaryMemory(&Result->Arena);
-
+  
   ResetRenderGroup(Result);
   return Result;
 }
@@ -198,24 +198,24 @@ PushLine(render_group* RenderGroup, v3 Start, v3 End, v3 CameraPosition, r32 Lin
 {
   v3 xAxis = End-Start;
   v3 cameraDir = CameraPosition - Start;
-
+  
   m4 RotMat = GetRotationMatrix_X_ZHint(xAxis, cameraDir);
-
+  
   r32 Length = Norm(End-Start);
-
+  
   m4 ScaleMat = M4Identity();
   ScaleMat.E[0] = Length;
   ScaleMat.E[5] = LineThickness;
-
+  
   v3 MidPoint = (Start + End) / 2;
   m4 TransMat = M4Identity();
   TransMat.E[3]  = MidPoint.X;
   TransMat.E[7]  = MidPoint.Y;
   TransMat.E[11] = MidPoint.Z;
-
+  
   push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_CULL_BACK | RENDER_STATE_FILL );
   entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-
+  
   GetHandle(GlobalGameState->AssetManager, "quad", &Body->Object);
   GetHandle(GlobalGameState->AssetManager, MaterialName, &Body->Material);
   GetHandle(GlobalGameState->AssetManager, "null", &Body->Bitmap);
@@ -233,7 +233,7 @@ PushBoxFrame(render_group* RenderGroup, m4 M, aabb3f AABB, v3 CameraPosition, r3
   {
     P[i] = V3(M*V4(P[i],1));
   }
-
+  
   // Negative Z
   PushLine(RenderGroup, P[0], P[1], CameraPosition, LineThickness, MaterialName);
   PushLine(RenderGroup, P[1], P[2], CameraPosition, LineThickness, MaterialName);
@@ -249,20 +249,20 @@ PushBoxFrame(render_group* RenderGroup, m4 M, aabb3f AABB, v3 CameraPosition, r3
   PushLine(RenderGroup, P[1], P[5], CameraPosition, LineThickness, MaterialName);
   PushLine(RenderGroup, P[2], P[6], CameraPosition, LineThickness, MaterialName);
   PushLine(RenderGroup, P[3], P[7], CameraPosition, LineThickness, MaterialName);
-
+  
 }
 
 void FillRenderPushBuffer(world* World)
 {
   render_group* RenderGroup = GlobalGameState->RenderCommands->RenderGroup;
   render_group* LightGroup = GlobalGameState->RenderCommands->LightsGroup;
-
+  
   TIMED_FUNCTION();
   game_asset_manager* AssetManager = GlobalGameState->AssetManager;
   ResetRenderGroup(RenderGroup);
   entity_manager* EM = GlobalGameState->EntityManager;
   game_asset_manager* AM = GlobalGameState->AssetManager;
-
+  
   v3 CameraPosition = {};
   component_camera* Camera = 0;
   {
@@ -276,7 +276,7 @@ void FillRenderPushBuffer(world* World)
       CameraPosition = V3(Column(RigidInverse(Camera->V),3));
     }
   }
-
+  
   {
     ScopedTransaction(EM);
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_LIGHT | COMPONENT_FLAG_SPATIAL);
@@ -285,14 +285,14 @@ void FillRenderPushBuffer(world* World)
       component_light* Light = (component_light*) GetComponent(EM, ComponentList, COMPONENT_FLAG_LIGHT);
       component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
       Assert(Spatial);
-
+      
       push_buffer_header* Header = PushNewHeader( LightGroup, render_buffer_entry_type::LIGHT, 0 );
       entry_type_light* Body = PushStruct(&LightGroup->Arena, entry_type_light);
       Body->Color  = Light->Color;
       Body->M      = Spatial->ModelMatrix;
     }
   }
-
+  
   {
     ScopedTransaction(EM);
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_RENDER | COMPONENT_FLAG_SPATIAL);
@@ -300,7 +300,7 @@ void FillRenderPushBuffer(world* World)
     {
       component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL );
       component_render* Render = (component_render*) GetComponent(EM, ComponentList, COMPONENT_FLAG_RENDER );
-
+      
       push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_CULL_BACK | RENDER_STATE_FILL);
       entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
       Body->Object = Render->Object;
@@ -309,7 +309,7 @@ void FillRenderPushBuffer(world* World)
       Body->M  = Spatial->ModelMatrix;
       Body->NM = Transpose(RigidInverse(Body->M));
       Body->TM = M4Identity();
-
+      
       component_sprite_animation* SpriteAnimation = (component_sprite_animation*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPRITE_ANIMATION );
       if(SpriteAnimation)
       {
@@ -317,7 +317,7 @@ void FillRenderPushBuffer(world* World)
       }
     }
   }
-
+  
   { 
     if( World->CastedRay.Hit)
     {
@@ -329,7 +329,7 @@ void FillRenderPushBuffer(world* World)
       PushLine(RenderGroup, O, E, CameraPosition, 0.1, "red");
     }
   }
-
+  
   {
     ScopedTransaction(EM);
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_DYNAMICS);
@@ -346,30 +346,30 @@ void FillRenderPushBuffer(world* World)
         Translate(V4(Speed/2,0,0,1), M);
         M = ObjRotation * M;
         Translate(V4(VelSpatial->Position) + V4(0,2,0,1), M);
-
+        
         push_buffer_header* VelocityHeader = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK);
         entry_type_render_asset* VelocityBody = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
         GetHandle(AM,"voxel", &VelocityBody->Object);
         GetHandle(AM, "red", &VelocityBody->Material);
-
+        
         VelocityBody->M = M;
         VelocityBody->NM = Transpose(RigidInverse(VelocityBody->M));
       }
-
+      
       {
         r32 Speed = Norm(VelDynamics->AngularVelocity);
         v4 Q = GetRotation( V3(1,0,0), VelDynamics->AngularVelocity);
-        #if USE_ANGULAR_VEL_OBJECT_SPACE
+#if USE_ANGULAR_VEL_OBJECT_SPACE
         const m4 ObjRotation =  GetRotationMatrix(QuaternionMultiplication(Q,VelSpatial->Rotation));
-        #else
+#else
         const m4 ObjRotation = GetRotationMatrix(Q);
-        #endif
-
+#endif
+        
         m4 M  = GetScaleMatrix(V4(Speed, 0.05, 0.05, 1));
         Translate(V4(Speed/2,0,0,1), M);
         M = ObjRotation * M;
         Translate(V4(VelSpatial->Position) + V4(0,2,0,1), M);
-
+        
         push_buffer_header* WorldArrowHeader = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK);
         entry_type_render_asset* WoldArrowBody = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
         GetHandle(AM,"voxel", &WoldArrowBody->Object);
@@ -377,23 +377,19 @@ void FillRenderPushBuffer(world* World)
         WoldArrowBody->M = M;
         WoldArrowBody->NM = Transpose(RigidInverse(WoldArrowBody->M));
       }
-
+      
     }
   }
-
+  
   {
     if(World->PickedEntity.Active)
     {
-      v3 Up, Right, Forward;
-      GetCameraDirections(Camera, &Up, &Right, &Forward);
-      ray Ray = GetRayFromCamera(Camera, V2(GlobalGameState->Input->MouseX, GlobalGameState->Input->MouseY));
-      r32 t = RaycastPlane(Ray.Origin, Ray.Direction, World->PickedEntity.Point, -Forward);
-
-
-      PushLine(RenderGroup, World->PickedEntity.Point, Ray.Origin + t*Ray.Direction, CameraPosition, 0.1, "red");
+      component_spatial* Spatial = GetSpatialComponent(World->PickedEntity.EntityID);
+      v3 ObjectPoint_WS = V3(Spatial->ModelMatrix * V4(World->PickedEntity.PointObjectSpace));
+      PushLine(RenderGroup, ObjectPoint_WS, World->PickedEntity.MousePointOnPlane , CameraPosition, 0.1, "red");
     }
   }
-
+  
 #if SHOW_COLLIDER
   {
     ScopedTransaction(EM);
@@ -405,12 +401,12 @@ void FillRenderPushBuffer(world* World)
       m4 M = Spatial->ModelMatrix;
       aabb3f AABB = Collider->AABB;
       r32 LineThickness = 0.03;
-
+      
       PushBoxFrame(RenderGroup, M, AABB, CameraPosition, LineThickness, "jade");
     }
   }
 #endif
-
+  
 #if SHOW_COLLISION_POINTS
   contact_manifold* Manifold = World->ContactManifolds->FirstManifold;
   while(Manifold)
@@ -421,8 +417,8 @@ void FillRenderPushBuffer(world* World)
     {
       {
         push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK );
-
-
+        
+        
         entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
         GetHandle(AM,"voxel", &Body->Object);
         GetHandle(AM, "blue", &Body->Material);
@@ -435,11 +431,11 @@ void FillRenderPushBuffer(world* World)
       }
       {
         push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK );
-
+        
         entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
         GetHandle(AM, "voxel", &Body->Object);
         GetHandle(AM, "white", &Body->Material);
-
+        
         component_spatial* Spatial = (component_spatial*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_SPATIAL);
         const m4 Rotation = GetRotationMatrix(Spatial->Rotation);
         const m4 Translation = GetTranslationMatrix(Spatial->Position);
@@ -452,7 +448,7 @@ void FillRenderPushBuffer(world* World)
     Manifold = Manifold->Next;
   }
 #endif
-
+  
 #if SHOW_AABB_TREE
   aabb3f* AABBTree;
   u32 Count = GetAABBList(&World->BroadPhaseTree, &AABBTree);
@@ -462,5 +458,5 @@ void FillRenderPushBuffer(world* World)
     PushBoxFrame(RenderGroup, M4Identity(), *AABBTree++, CameraPosition, LineThickness, "ruby");
   }
 #endif
-
+  
 }

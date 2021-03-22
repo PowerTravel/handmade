@@ -5,50 +5,50 @@
 union v2
 {
   struct{
-     r32 X, Y;
+    r32 X, Y;
   };
-   r32 E[2];
+  r32 E[2];
 };
 
 union v3
 {
   struct{
-     r32 X, Y, Z;
+    r32 X, Y, Z;
   };
-   r32 E[3];
+  r32 E[3];
 };
 
 union v4
 {
   struct{
-     r32 X, Y, Z, W;
+    r32 X, Y, Z, W;
   };
   r32 E[4];
 };
 
 union m3
 {
-//  Row Dominant indexing
-//   0,  1,  2,
-//   3,  4,  5,
-//   6,  7,  8,
+  //  Row Dominant indexing
+  //   0,  1,  2,
+  //   3,  4,  5,
+  //   6,  7,  8,
   struct{
     v3 r0, r1, r2;
   };
-   r32 E[9];
+  r32 E[9];
 };
 
 union m4
 {
-//  Row Dominant indexing
-//   0,  1,  2,  3,
-//   4,  5,  6,  7,
-//   8,  9, 10, 11,
-//  12, 13, 14, 15
+  //  Row Dominant indexing
+  //   0,  1,  2,  3,
+  //   4,  5,  6,  7,
+  //   8,  9, 10, 11,
+  //  12, 13, 14, 15
   struct{
     v4 r0, r1, r2, r3;
   };
-   r32 E[16];
+  r32 E[16];
 };
 
 inline b32
@@ -104,7 +104,7 @@ V2( const v4& R )
 inline r32
 operator*( const v2& A, const v2& B )
 {
-   r32 Result = A.X*B.X + A.Y*B.Y;
+  r32 Result = A.X*B.X + A.Y*B.Y;
   return(Result);
 }
 
@@ -213,7 +213,7 @@ NormSq( const v2& A )
 inline r32
 Norm( const v2& A )
 {
-   r32 Result;
+  r32 Result;
   Result = Sqrt( A*A );
   return Result;
 }
@@ -611,7 +611,7 @@ NormSq( const v4& R )
 inline r32
 Norm( const v4& R )
 {
-   r32 Result;
+  r32 Result;
   Result =  Sqrt(R.X*R.X + R.Y*R.Y + R.Z*R.Z + R.W*R.W);
   return Result;
 }
@@ -640,7 +640,7 @@ M4Identity()
     0,1,0,0,
     0,0,1,0,
     0,0,0,1};
-
+  
   return(Result);
 }
 
@@ -667,14 +667,14 @@ AssertIdentity( const m4& I, const r32 epsilon = 0.00001)
 
 inline m3
 M3(  const r32 a11, const r32 a12, const r32 a13,
-     const r32 a21, const r32 a22, const r32 a23,
-     const r32 a31, const r32 a32, const r32 a33)
+   const r32 a21, const r32 a22, const r32 a23,
+   const r32 a31, const r32 a32, const r32 a33)
 {
   m3 Result = {
     a11, a12, a13,
     a21, a22, a23,
     a31, a32, a33 };
-
+  
   return(Result);
 };
 
@@ -682,7 +682,7 @@ inline m3
 M3( const v3& R0, const v3& R1, const v3& R2 )
 {
   m3 Result = {R0, R1, R2};
-
+  
   return(Result);
 };
 
@@ -690,7 +690,7 @@ inline m3
 M3( const m4 M)
 {
   m3 Result = {V3(M.r0), V3(M.r1), V3(M.r2)};
-
+  
   return(Result);
 };
 
@@ -699,8 +699,8 @@ inline m3
 operator*( const r32 a, const m3& M )
 {
   m3 Result =  M3( M.r0 * a,
-                   M.r1 * a,
-                   M.r2 * a);
+                  M.r1 * a,
+                  M.r2 * a);
   return Result;
 }
 
@@ -715,11 +715,11 @@ inline m3
 Transpose( const m3& A )
 {
   m3 Result;
-
+  
   Result = M3( V3( A.E[0], A.E[ 3], A.E[ 6]),
-               V3( A.E[1], A.E[ 4], A.E[ 7]),
-               V3( A.E[2], A.E[ 5], A.E[ 8]));
-
+              V3( A.E[1], A.E[ 4], A.E[ 7]),
+              V3( A.E[2], A.E[ 5], A.E[ 8]));
+  
   return Result;
 }
 
@@ -728,8 +728,8 @@ operator*( const m3& A, const m3& B )
 {
   m3 BT = Transpose(B);
   m3 Result = M3( A.r0 * BT.r0, A.r0 * BT.r1, A.r0 * BT.r2,
-                  A.r1 * BT.r0, A.r1 * BT.r1, A.r1 * BT.r2,
-                  A.r2 * BT.r0, A.r2 * BT.r1, A.r2 * BT.r2);
+                 A.r1 * BT.r0, A.r1 * BT.r1, A.r1 * BT.r2,
+                 A.r2 * BT.r0, A.r2 * BT.r1, A.r2 * BT.r2);
   return Result;
 }
 
@@ -747,8 +747,8 @@ inline v3
 operator*( const m3& M, const v3& b )
 {
   v3 Result =  V3( M.r0 * b,
-                   M.r1 * b,
-                   M.r2 * b);
+                  M.r1 * b,
+                  M.r2 * b);
   return Result;
 }
 
@@ -811,16 +811,16 @@ Index( m3& M, const u32 Row, const u32 Column, const r32 Value )
 
 inline m4
 M4( const r32 a11, const r32 a12, const r32 a13, const r32 a14,
-    const r32 a21, const r32 a22, const r32 a23, const r32 a24,
-    const r32 a31, const r32 a32, const r32 a33, const r32 a34,
-    const r32 a41, const r32 a42, const r32 a43, const r32 a44)
+   const r32 a21, const r32 a22, const r32 a23, const r32 a24,
+   const r32 a31, const r32 a32, const r32 a33, const r32 a34,
+   const r32 a41, const r32 a42, const r32 a43, const r32 a44)
 {
   m4 Result = {
     a11, a12, a13, a14,
     a21, a22, a23, a24,
     a31, a32, a33, a34,
     a41, a42, a43, a44 };
-
+  
   return(Result);
 };
 
@@ -828,7 +828,7 @@ inline m4
 M4( const v4& R0, const v4& R1, const v4& R2, const v4& R3 )
 {
   m4 Result = {R0, R1, R2, R3};
-
+  
   return(Result);
 };
 
@@ -836,9 +836,9 @@ inline m4
 operator*( const r32 a, const m4& M )
 {
   m4 Result =  M4( M.r0 * a,
-             M.r1 * a,
-             M.r2 * a,
-             M.r3 * a);
+                  M.r1 * a,
+                  M.r2 * a,
+                  M.r3 * a);
   return Result;
 }
 
@@ -853,12 +853,12 @@ inline m4
 Transpose( const m4& A )
 {
   m4 Result;
-
+  
   Result = M4( V4( A.E[0], A.E[ 4], A.E[ 8], A.E[12] ) ,
-               V4( A.E[1], A.E[ 5], A.E[ 9], A.E[13] ) ,
-               V4( A.E[2], A.E[ 6], A.E[10], A.E[14] ) ,
-               V4( A.E[3], A.E[ 7], A.E[11], A.E[15] ) );
-
+              V4( A.E[1], A.E[ 5], A.E[ 9], A.E[13] ) ,
+              V4( A.E[2], A.E[ 6], A.E[10], A.E[14] ) ,
+              V4( A.E[3], A.E[ 7], A.E[11], A.E[15] ) );
+  
   return Result;
 }
 
@@ -868,9 +868,9 @@ operator*( const m4& A, const m4& B )
   //TIMED_FUNCTION();
   m4 BT = Transpose(B);
   m4 Result = M4( A.r0 * BT.r0, A.r0 * BT.r1, A.r0 * BT.r2, A.r0 * BT.r3,
-                A.r1 * BT.r0, A.r1 * BT.r1, A.r1 * BT.r2, A.r1 * BT.r3,
-                A.r2 * BT.r0, A.r2 * BT.r1, A.r2 * BT.r2, A.r2 * BT.r3,
-                A.r3 * BT.r0, A.r3 * BT.r1, A.r3 * BT.r2, A.r3 * BT.r3);
+                 A.r1 * BT.r0, A.r1 * BT.r1, A.r1 * BT.r2, A.r1 * BT.r3,
+                 A.r2 * BT.r0, A.r2 * BT.r1, A.r2 * BT.r2, A.r2 * BT.r3,
+                 A.r3 * BT.r0, A.r3 * BT.r1, A.r3 * BT.r2, A.r3 * BT.r3);
   return Result;
 }
 
@@ -890,9 +890,9 @@ inline v4
 operator*( const m4& M, const v4& b )
 {
   v4 Result =  V4( M.r0 * b,
-             M.r1 * b,
-             M.r2 * b,
-             M.r3 * b);
+                  M.r1 * b,
+                  M.r2 * b,
+                  M.r3 * b);
   return Result;
 }
 
@@ -982,12 +982,12 @@ RaycastPlane( const v3& RayOrigin, const v3& RayDirection, const v3& PointOnPlan
   v3 RayToPlanePoint = PointOnPlane - RayOrigin;
   r32 Numerator = RayToPlanePoint * PlaneNormal;
   r32 Denominator = PlaneNormal * RayDirection;
-
+  
   // The RayOrigin is on the plane and the ray goes parallel to the plane
   // Can probably be handled in some way, but cant be arsed to do it untill it becomes
   // a problem. This assert should notify me when it does become a problem.
   Assert(!(Equals(Numerator,0) && Equals(Denominator,0)));
-
+  
   // P = RayOrigin + t * RayDirection;
   r32 t = Numerator / Denominator;
   return t;
@@ -1000,7 +1000,7 @@ IsPointOnLinesegment(const v3& o, const v3& d, const v3& p)
   // d = destination of linesegment
   // p = point to check
   Assert(o != d);
-
+  
   const v3 od = d-o;
   const v3 op = p-o;
   const v3 cross = CrossProduct(od,op);
@@ -1009,19 +1009,19 @@ IsPointOnLinesegment(const v3& o, const v3& d, const v3& p)
   {
     return false;
   }
-
+  
   r32 dotp = od*op;
   if(dotp < 0)
   {
     return false;
   }
-
+  
   r32 LenSq = NormSq(od);
   if(dotp > LenSq)
   {
     return false;
   }
-
+  
   return true;
 }
 
@@ -1043,11 +1043,11 @@ v3 GetBaryocentricCoordinates(const v3& p0, const v3& p1, const v3& p2, const v3
   r32 OneOverFaceArea = 1.f/(normal * CrossProduct( p1 - p0, p2 - p0));
   r32 SubAreaA = normal * CrossProduct( p2 - p1, Point - p1);
   r32 SubAreaB = normal * CrossProduct( p0 - p2, Point - p2);
-
+  
   r32 LambdaA = SubAreaA * OneOverFaceArea;
   r32 LambdaB = SubAreaB * OneOverFaceArea;
   r32 LambdaC = 1.f-(LambdaA + LambdaB);
-
+  
   v3 Result = V3(LambdaA, LambdaB, LambdaC);
   return Result;
 }
@@ -1058,8 +1058,8 @@ IsVertexInsideTriangle(const v3& VertexOnPlane, const v3& Normal, const v3& p0, 
 {
   const v3 Coords = GetBaryocentricCoordinates( p0, p1, p2, Normal, VertexOnPlane);
   const b32 InsideTriangle = (Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
-                             (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
-                             (Coords.E[2] >= 0) && (Coords.E[2] <= 1);
+    (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
+    (Coords.E[2] >= 0) && (Coords.E[2] <= 1);
   return InsideTriangle;
 }
 
@@ -1090,7 +1090,7 @@ QuaternionToEuler(const v4 q)
   r32 sinr_cosp = 2 * (q.W * q.X + q.Y * q.Z);
   r32 cosr_cosp = 1 - 2 * (q.X * q.X + q.Y * q.Y);
   r32 roll = ATan2(sinr_cosp, cosr_cosp);
-
+  
   // pitch (y-axis rotation)
   r32 sinp = 2 * (q.W * q.Y - q.Z * q.X);
   r32 pitch = 0;
@@ -1098,12 +1098,12 @@ QuaternionToEuler(const v4 q)
     pitch = sinp > 0 ? Pi32 / 2.f : -Pi32 / 2.f;
   else
     pitch = ASin(sinp);
-
+  
   // yaw (z-axis rotation)
   r32 siny_cosp = 2 * (q.W * q.Z + q.X * q.Y);
   r32 cosy_cosp = 1 - 2 * (q.Y * q.Y + q.Z * q.Z);
   r32 yaw = ATan2(siny_cosp, cosy_cosp);
-
+  
   v3 Result = V3(roll, pitch, yaw);
   return Result;
 }
@@ -1115,27 +1115,27 @@ GetRotationMatrix_X_ZHint(v3 ObjWorld_X, v3 ObjWorld_Z_Hint)
   // ObjWorld_X is the x-axis (left) of the obeject in the worlds coordinate system
   // ObjWorld_Z_Hint is a hint of the z-axis (front facing) of the obeject in the worlds coordinate system
   // These will be used to find the up-direction of the object in world-coordinate system
-
+  
   // Make sure ObjWorld_Z_Hint and ObjWorld_X are not parallel
   if( Abs( (ObjWorld_Z_Hint * ObjWorld_X) - 1.0f ) <  0.0001f )
   {
     return M4Identity();
   }
-
+  
   // Z cross X = Y
   v3 ObjWorld_Y = Normalize(CrossProduct(ObjWorld_Z_Hint, ObjWorld_X));
   // X cross Y = Z
   v3 ObjWorld_Z = Normalize(CrossProduct(ObjWorld_X, ObjWorld_Y));
-
+  
   // Rotates from WorldCoordinateSystem to NewCoordinateSystem
   // RotMat * V3(1,0,0) = xp
   // RotMat * V3(0,1,0) = yp
   // RotMat * V3(0,0,1) = zp
   m4 RotMat = M4( ObjWorld_X.X, ObjWorld_Y.X, ObjWorld_Z.X, 0,
-                  ObjWorld_X.Y, ObjWorld_Y.Y, ObjWorld_Z.Y, 0,
-                  ObjWorld_X.Z, ObjWorld_Y.Z, ObjWorld_Z.Z, 0,
-                  0,   0,   0, 1);
-
+                 ObjWorld_X.Y, ObjWorld_Y.Y, ObjWorld_Z.Y, 0,
+                 ObjWorld_X.Z, ObjWorld_Y.Z, ObjWorld_Z.Z, 0,
+                 0,   0,   0, 1);
+  
   return RotMat;
 }
 
@@ -1146,26 +1146,26 @@ GetRotationMatrix_X_YHint(v3 ObjWorld_X, v3 ObjWorld_Y_Hint)
   // ObjWorld_X is the x-axis (left) of the obeject in the worlds coordinate system
   // ObjWorld_Y_Hint is a hint of the y-axis (up) of the obeject in the worlds coordinate system
   // These will be used to find the up-direction of the object in world-coordinate system
-
+  
   // Make sure ObjWorld_Y_Hint and ObjWorld_X are not parallel
   if( Abs( (ObjWorld_X * ObjWorld_Y_Hint) - 1.0f ) <  0.0001f )
   {
     return M4Identity();
   }
-
+  
   // X cross Y = Z
   v3 ObjWorld_Z = Normalize(CrossProduct(ObjWorld_X, ObjWorld_Y_Hint));
   // Z cross X = Y
   v3 ObjWorld_Y = Normalize(CrossProduct(ObjWorld_Z, ObjWorld_X));
-
+  
   // Rotates from WorldCoordinateSystem to NewCoordinateSystem
   // RotMat * V3(1,0,0) = xp
   // RotMat * V3(0,1,0) = yp
   // RotMat * V3(0,0,1) = zp
   m4 RotMat = M4( ObjWorld_X.X, ObjWorld_Y.X, ObjWorld_Z.X, 0,
-                  ObjWorld_X.Y, ObjWorld_Y.Y, ObjWorld_Z.Y, 0,
-                  ObjWorld_X.Z, ObjWorld_Y.Z, ObjWorld_Z.Z, 0,
-                  0,   0,   0, 1);
-
+                 ObjWorld_X.Y, ObjWorld_Y.Y, ObjWorld_Z.Y, 0,
+                 ObjWorld_X.Z, ObjWorld_Y.Z, ObjWorld_Z.Z, 0,
+                 0,   0,   0, 1);
+  
   return RotMat;
 }

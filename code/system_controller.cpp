@@ -77,7 +77,7 @@ void FlyingCameraController( world* World, component_controller* Controller, com
 {
   Assert(Camera);
   Assert(Controller);
-
+  
   game_controller_input* Input = Controller->Controller;
   keyboard_input* Keyboard = Controller->Keyboard;
   if( Input->IsAnalog )
@@ -145,7 +145,7 @@ void FlyingCameraController( world* World, component_controller* Controller, com
         hasMoved = true;
       }  
     }
- 
+    
     if(Keyboard->Key_N.EndedDown)
     {
       World->AdvanceOneFrame = true;
@@ -156,8 +156,8 @@ void FlyingCameraController( world* World, component_controller* Controller, com
       World->AdvanceOneFrame = true;
     }
     spaceToggle = Keyboard->Key_SPACE.EndedDown;
-
-
+    
+    
     
     if(Input->RightTrigger.EndedDown || Keyboard->Key_W.EndedDown)
     {
@@ -197,7 +197,7 @@ void FlyingCameraController( world* World, component_controller* Controller, com
     {
       SetPerspectiveProj( Camera, 0.1, 1000 );
     }
-
+    
     if(hasMoved)
     {
       UpdateViewMatrix(  Camera );
@@ -206,46 +206,46 @@ void FlyingCameraController( world* World, component_controller* Controller, com
 }
 
 void HeroController( component_controller*  Controller,
-                     component_spatial*     Spatial,
-                     component_dynamics*    Dynamics,
-                     component_camera*      Camera )
+                    component_spatial*     Spatial,
+                    component_dynamics*    Dynamics,
+                    component_camera*      Camera )
 {
   Assert(Spatial);
   Assert(Dynamics);
   Assert(Controller);
   Assert(Camera);
-
+  
   game_controller_input* Input = Controller->Controller;
   if( Input->IsAnalog )
   {
     r32 ImpulseStrength = 20;
     r32 JumpImpulse = 0;
     v2 StickAverage = V2(0,0);
-
+    
     if(Input->LeftStickLeft.EndedDown || Input->LeftStickRight.EndedDown )
     {
       StickAverage.X = Input->LeftStickAverageX;
     }
-
+    
     if(Input->A.EndedDown)
     {
       JumpImpulse = 4;
     }
-
+    
     Dynamics->ExternalForce = ImpulseStrength * (V3(StickAverage, 0) + V3(0,JumpImpulse,0));
-
+    
     if(Input->X.EndedDown)
     {
       *Spatial = component_spatial(V3(0,1,0));
       Dynamics->ExternalForce  = V3(0,0,0);
       Dynamics->LinearVelocity = V3(0,0,0);
     }
-
+    
     v3 to = Spatial->Position;
     v3 from = to + V3(0,0,3);
     LookAt(Camera, from, to);
   }
-
+  
 }
 
 void ControllerSystemUpdate( world* World )
