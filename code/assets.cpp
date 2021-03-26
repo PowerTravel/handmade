@@ -13,7 +13,7 @@ void* AllocateValue_(memory_arena* Arena, midx Size, void** Values, u32 Index, u
     Result = PushSize(Arena, Size);
     Values[Index] = Result;
   }
-
+  
   return Result;
 }
 
@@ -27,9 +27,9 @@ u32 StringToIndex(asset_hash_map* HashMap, c8* Key)
 {
   Assert(Key);
   Assert(str::StringLength(Key) > 0);
-
+  
   const u32 StartIndex = utils::djb2_hash(Key) % HashMap->MaxCount;
-
+  
   u32 Index = StartIndex;
   c8* MapKey = HashMap->Keys[StartIndex];
   while(MapKey && !str::Equals(Key, MapKey))
@@ -117,7 +117,7 @@ internal object_handle
 PushIndexData(game_asset_manager* AssetManager, c8* Key, mesh_handle MeshHandle, u32 Count, u32* vi, u32* ti, u32* ni, aabb3f AABB)
 {
   object_handle Handle = {};
-
+  
   Handle.Value = GetObjectAssetIndex(AssetManager, Key);
   SetKey(&AssetManager->AssetArena, &AssetManager->Objects, Handle.Value, Key);
   mesh_indeces* Indeces = AllocateObject(AssetManager, Handle.Value);
@@ -134,7 +134,7 @@ PushIndexData(game_asset_manager* AssetManager, c8* Key, mesh_handle MeshHandle,
   }
   Indeces->AABB = AABB;
   str::CopyStrings( str::StringLength( Key ), Key,
-                    ArrayCount( Indeces->Name ), Indeces->Name );
+                   ArrayCount( Indeces->Name ), Indeces->Name );
   return Handle;
 }
 
@@ -146,12 +146,12 @@ PushMaterialData(game_asset_manager* AssetManager, c8* Key, material SrcMaterial
   material* DstMaterial = AllocateMaterial(AssetManager, Index);
   *DstMaterial = SrcMaterial;
 }
-  
+
 void GetHandle(game_asset_manager* AssetManager, char* Key, bitmap_handle* Handle)
 {
   Assert(Key && Handle);
   Handle->Value = GetBitmapAssetIndex(AssetManager, Key);
-
+  
   bitmap_keeper* BitmapKeeper =  AssetManager->BitmapKeeper + Handle->Value;
   if(!BitmapKeeper->Referenced)
   {
@@ -181,7 +181,7 @@ void GetHandle(game_asset_manager* AssetManager, char* Key, object_handle* Handl
 {
   Assert(Key && Handle);
   Handle->Value = GetObjectAssetIndex(AssetManager, Key);
-
+  
   buffer_keeper* ObjectKeeper = AssetManager->ObjectKeeper + Handle->Value;
   if(!ObjectKeeper->Referenced)
   {
@@ -203,12 +203,12 @@ GetAsset(game_asset_manager* AssetManager, object_handle Handle, buffer_keeper**
   mesh_indeces** Objects = (mesh_indeces**) AssetManager->Objects.Values;
   mesh_indeces* Result = Objects[Handle.Value];
   Assert(Result);
-
-
+  
+  
   buffer_keeper* ObjectKeeper = AssetManager->ObjectKeeper + Handle.Value;
   Assert(ObjectKeeper->Referenced);
   if(Keeper) *Keeper = ObjectKeeper;
-
+  
   return Result;
 }
 inline mesh_data*
@@ -217,9 +217,9 @@ GetAsset(game_asset_manager* AssetManager, mesh_handle Handle)//, buffer_keeper*
   Assert(Handle.Value < AssetManager->Meshes.Count);
   mesh_data** MeshData = (mesh_data**) AssetManager->Meshes.Values;
   mesh_data* Result = MeshData[Handle.Value];
-
- // if(Keeper) *Keeper = AssetManager->MeshKeeper + Handle.Value;
-
+  
+  // if(Keeper) *Keeper = AssetManager->MeshKeeper + Handle.Value;
+  
   Assert(Result);
   return Result;
 }
@@ -238,13 +238,13 @@ GetAsset(game_asset_manager* AssetManager, bitmap_handle Handle, bitmap_keeper**
   Assert(Handle.Value < AssetManager->Bitmaps.MaxCount);
   bitmap** Bitmaps = (bitmap**) AssetManager->Bitmaps.Values;
   bitmap* Result = Bitmaps[Handle.Value];
-
+  
   Assert(Result);
-
+  
   bitmap_keeper* BitmapKeeper = AssetManager->BitmapKeeper + Handle.Value;
   Assert(BitmapKeeper->Referenced);
   if(Keeper) *Keeper = BitmapKeeper;
-
+  
   return Result;
 }
 

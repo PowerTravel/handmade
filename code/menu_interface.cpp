@@ -101,7 +101,7 @@ PivotNodes(container_node* ShiftLeft, container_node* ShiftRight)
   {
     ShiftRight->NextSibling->PreviousSibling = ShiftRight;
   }
-
+  
   ShiftLeft->PreviousSibling = ShiftRight->PreviousSibling;
   if(ShiftLeft->PreviousSibling)
   {
@@ -110,10 +110,10 @@ PivotNodes(container_node* ShiftLeft, container_node* ShiftRight)
     Assert(ShiftRight->Parent->FirstChild == ShiftRight);
     ShiftRight->Parent->FirstChild = ShiftLeft;
   }
-
+  
   ShiftLeft->NextSibling = ShiftRight;
   ShiftRight->PreviousSibling = ShiftLeft;
-
+  
   Assert(ShiftRight->PreviousSibling == ShiftLeft);
   Assert(ShiftLeft->NextSibling == ShiftRight);
   
@@ -143,26 +143,26 @@ internal void
 ReplaceNode(container_node* Out, container_node* In)
 {  
   if(In == Out) return;
-
+  
   In->Parent = Out->Parent;
   if(In->Parent->FirstChild == Out)
   {
     In->Parent->FirstChild = In;
   }
-
+  
   In->NextSibling = Out->NextSibling;
   if(In->NextSibling)
   {
     In->NextSibling->PreviousSibling = In;  
   }
-
+  
   In->PreviousSibling = Out->PreviousSibling;
   if(In->PreviousSibling)
   {
     
     In->PreviousSibling->NextSibling = In;
   }
-
+  
   Out->NextSibling = 0;
   Out->PreviousSibling = 0;
   Out->Parent = 0;
@@ -189,12 +189,12 @@ GetAttributeBatchSize(container_attribute Attri)
   {
     bit_scan_result ScanResult = FindLeastSignificantSetBit(Attributes);
     Assert(ScanResult.Found);
-
+    
     u32 Attribute = (1 << ScanResult.Index);
     Result += GetAttributeSize(Attribute);
     Attributes -= Attribute;
   }
-
+  
   return Result;
 }
 
@@ -241,7 +241,7 @@ void __CheckMemoryListIntegrity(menu_interface* Interface)
 // TODO (Add option to align by a certain byte?)
 internal void* PushSize(menu_interface* Interface, u32 RequestedSize)
 {
-  #if DEBUG_PRINT_MENU_MEMORY_ALLOCATION
+#if DEBUG_PRINT_MENU_MEMORY_ALLOCATION
   {
     u32 RegionUsed = (u32)(Interface->Memory - Interface->MemoryBase);
     u32 TotSize = (u32) Interface->MaxMemSize;
@@ -252,7 +252,7 @@ internal void* PushSize(menu_interface* Interface, u32 RequestedSize)
     Platform.DEBUGPrint(" - Tot Mem Used   : %2.3f  (%d/%d)\n", Percentage, RegionUsed, TotSize );
     Platform.DEBUGPrint(" - Fragmentation  : %2.3f  (%d/%d)\n", Fragmentation, ActiveMemory, RegionUsed );
   }
-  #endif
+#endif
   memory_link* NewLink = 0;
   u32 ActualSize = RequestedSize + sizeof(memory_link);
   // Get memory from the middle if we have continous space that is big enough
@@ -261,21 +261,21 @@ internal void* PushSize(menu_interface* Interface, u32 RequestedSize)
   b32 MemoryTooFragmented = MemoryFragmentation < 0.8;
   if( MemoryTooFragmented || RegionUsed == Interface->MaxMemSize )
   {
-    #if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
+#if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
     u32 Slot = 0;
     u32 SlotSpace = 0;
     u32 SlotSize = 0;
-    #endif
-
+#endif
+    
     memory_link* CurrentLink = Interface->Sentinel.Next;
     while( CurrentLink->Next != &Interface->Sentinel)
     {
       midx Base = (midx) CurrentLink + CurrentLink->Size;
       midx NextAddress = (midx)  CurrentLink->Next;
       Assert(Base <= NextAddress);
-
+      
       midx OpenSpace = NextAddress - Base;
-
+      
       if(OpenSpace >= ActualSize)
       {
         NewLink = (memory_link*) Base;
@@ -284,27 +284,27 @@ internal void* PushSize(menu_interface* Interface, u32 RequestedSize)
         Assert(CurrentLink < CurrentLink->Next);
         Assert(NewLink < NewLink->Next);
         Assert(CurrentLink->Next == NewLink);
-
+        
         Assert(((u8*)NewLink - (u8*)CurrentLink) == CurrentLink->Size);
         Assert(((u8*)NewLink->Next - (u8*)NewLink) >= ActualSize);
-        #if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
+#if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
         SlotSpace = (u32) Slot;
         SlotSize  = (u32) OpenSpace;
-        #endif
-
+#endif
+        
         break;
       }
-      #if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
+#if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
       Slot++;
-      #endif
+#endif
       CurrentLink =  CurrentLink->Next;
     }
-
-    #if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
+    
+#if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
     {
       u32 SlotCount = 0;
       memory_link* CurrentLink2 = Interface->Sentinel.Next;
-
+      
       while( CurrentLink2->Next != &Interface->Sentinel)
       {
         SlotCount++;
@@ -315,18 +315,18 @@ internal void* PushSize(menu_interface* Interface, u32 RequestedSize)
       Platform.DEBUGPrint(" - Slot: [%d,%d]\n", SlotSpace, SlotCount);
       Platform.DEBUGPrint(" - Size: [%d,%d]\n", ActualSize, SlotSize);
     }
-    #endif
+#endif
   }
-
+  
   // Otherwise push it to the end
   if(!NewLink)
   {
     Assert(RegionUsed+ActualSize < Interface->MaxMemSize);
-    #if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
+#if DEBUG_PRINT_FRAGMENTED_MEMORY_ALLOCATION
     Platform.DEBUGPrint("--==<< Post Inset >>==--\n");
     Platform.DEBUGPrint(" - Memory Left  : %d\n", Interface->MaxMemSize - (u32)RegionUsed + ActualSize);
     Platform.DEBUGPrint(" - Size: %d\n\n", ActualSize);
-    #endif
+#endif
     NewLink = (memory_link*) Interface->Memory;
     NewLink->Size = ActualSize;
     Interface->Memory += ActualSize;
@@ -337,8 +337,8 @@ internal void* PushSize(menu_interface* Interface, u32 RequestedSize)
   Assert(NewLink);
   void* Result = (void*)(((u8*)NewLink)+sizeof(memory_link));
   utils::ZeroSize(RequestedSize, Result);
-
-  #if DEBUG_PRINT_MENU_MEMORY_ALLOCATION
+  
+#if DEBUG_PRINT_MENU_MEMORY_ALLOCATION
   {
     u32 RegionUsed2 = (u32)(Interface->Memory - Interface->MemoryBase);
     u32 TotSize = (u32) Interface->MaxMemSize;
@@ -351,24 +351,24 @@ internal void* PushSize(menu_interface* Interface, u32 RequestedSize)
     Platform.DEBUGPrint(" - Fragmentation  : %2.3f  (%d/%d)\n", Fragmentation, ActiveMemory, RegionUsed2 );
     
   }
-  #endif
+#endif
   return Result;
 }
 
 container_node* NewContainer(menu_interface* Interface, container_type Type)
 {
   CheckMemoryListIntegrity(Interface);
-
+  
   u32 BaseNodeSize    = sizeof(container_node) + sizeof(memory_link);
   u32 NodePayloadSize = GetContainerPayloadSize(Type);
   u32 ContainerSize = (BaseNodeSize + NodePayloadSize);
- 
+  
   container_node* Result = (container_node*) PushSize(Interface, ContainerSize);
   Result->Type = Type;
   Result->Functions = GetMenuFunction(Type);
   
   CheckMemoryListIntegrity(Interface);
-
+  
   return Result;
 }
 
@@ -400,16 +400,16 @@ internal void
 DeleteAttribute(menu_interface* Interface, container_node* Node, container_attribute AttributeType)
 {
   Assert(Node->Attributes & (u32)AttributeType);
-
+  
   menu_attribute_header** AttributePtr = &Node->FirstAttribute;
   while((*AttributePtr)->Type != AttributeType)
   {
     AttributePtr = &(*AttributePtr)->Next;
   }  
-
+  
   menu_attribute_header* AttributeToRemove = *AttributePtr;
   *AttributePtr = AttributeToRemove->Next;
-
+  
   FreeMemory(Interface, (void*) AttributeToRemove);
   Node->Attributes =Node->Attributes - (u32)AttributeType;
 }
@@ -459,12 +459,12 @@ internal void DeleteMenuSubTree(menu_interface* Interface, container_node* Root)
   container_node* Node = Root->FirstChild;
   while(Node)
   {
-
+    
     while(Node->FirstChild)
     {
       Node = Node->FirstChild;
     }
-
+    
     Node = Node->Parent;
     if(Node)
     {
@@ -490,7 +490,7 @@ inline internal menu_tree* GetNextSpawningWindow(menu_interface* Interface)
     }
     SpawningMenu = SpawningMenu->Next;
   }
-
+  
   return Result;
 }
 
@@ -500,22 +500,22 @@ u32_pair UpdateSubTreeDepthAndCount( u32 ParentDepth, container_node* SubTreeRoo
   u32 TotalDepth = 0;
   u32 CurrentDepth = ParentDepth;
   u32 NodeCount = 0;
-
+  
   // Make SubTreeRoot look like an actual root node
   container_node* SubTreeParent = SubTreeRoot->Parent;
   container_node* SubTreeSibling = Next(SubTreeRoot);
-
+  
   SubTreeRoot->Parent = 0;
   SubTreeRoot->NextSibling = 0;
-
+  
   container_node* CurrentNode = SubTreeRoot;
-
+  
   while(CurrentNode != SubTreeRoot->Parent)
   {
     // Set the depth of the current Node
     CurrentNode->Depth = CurrentDepth++;
     ++NodeCount;
-
+    
     // Step all the way down (setting depth as you go along)
     while(CurrentNode->FirstChild)
     {
@@ -523,10 +523,10 @@ u32_pair UpdateSubTreeDepthAndCount( u32 ParentDepth, container_node* SubTreeRoo
       CurrentNode->Depth = CurrentDepth++;
       ++NodeCount;
     }
-
+    
     // The depth is now set until the leaf.
     TotalDepth = Maximum(CurrentDepth, TotalDepth);
-
+    
     // Step up until you find another sibling or we reach root
     while(!Next(CurrentNode) && CurrentNode->Parent)
     {
@@ -534,32 +534,32 @@ u32_pair UpdateSubTreeDepthAndCount( u32 ParentDepth, container_node* SubTreeRoo
       CurrentDepth--;
       Assert(CurrentDepth >= 0)
     }
-
+    
     CurrentDepth--;
-
+    
     // Either we found another sibling and we can traverse that part of the tree
     //  or we are at root and root has no siblings and we are done.
     CurrentNode = Next(CurrentNode);
   }
-
+  
   // Restore the Root
   SubTreeRoot->Parent = SubTreeParent;
   SubTreeRoot->NextSibling = SubTreeSibling;
-
+  
   u32_pair Result = {};
   Result.a = NodeCount;
   Result.b = TotalDepth;
-
+  
   return Result;
 }
 
 void TreeSensus( menu_tree* Menu )
 {
   u32_pair Pair =  UpdateSubTreeDepthAndCount( 0, Menu->Root );
-
+  
   Menu->NodeCount = Pair.a;
   Menu->Depth = Pair.b;
- // Platform.DEBUGPrint("Tree Sensus:  Depth: %d, Count: %d\n", Pair.b, Pair.a);
+  // Platform.DEBUGPrint("Tree Sensus:  Depth: %d, Count: %d\n", Pair.b, Pair.a);
 }
 
 
@@ -571,12 +571,12 @@ void FreeMenuTree(menu_interface* Interface, menu_tree* MenuToFree)
     Interface->SpawningWindow = GetNextSpawningWindow(Interface);
   }
   Assert(MenuToFree != &Interface->MenuSentinel);
-
+  
   ListRemove( MenuToFree );
   container_node* Root = MenuToFree->Root;
-
+  
   FreeMemory(Interface, (void*)MenuToFree);
-
+  
   DeleteMenuSubTree(Interface, Root);
 }
 
@@ -589,7 +589,7 @@ rect2f GetSizedParentRegion(size_attribute* SizeAttr, rect2f BaseRegion)
   }else if(SizeAttr->Width.Type == menu_size_type::ABSOLUTE){
     Result.W = SizeAttr->Width.Value;  
   }
-
+  
   if(SizeAttr->Height.Type == menu_size_type::RELATIVE)
   {
     Result.H = SizeAttr->Height.Value * BaseRegion.H;
@@ -628,14 +628,14 @@ rect2f GetSizedParentRegion(size_attribute* SizeAttr, rect2f BaseRegion)
       Result.Y = BaseRegion.Y + (BaseRegion.H - Result.H)*0.5f;
     }break;
   }
-
+  
   if(SizeAttr->LeftOffset.Type == menu_size_type::RELATIVE)
   {
     Result.X += SizeAttr->LeftOffset.Value * BaseRegion.W;
   }else if(SizeAttr->LeftOffset.Type == menu_size_type::ABSOLUTE){
     Result.X += SizeAttr->LeftOffset.Value;
   }
-
+  
   if(SizeAttr->TopOffset.Type == menu_size_type::RELATIVE)
   {
     Result.Y -= SizeAttr->TopOffset.Value * BaseRegion.H;
@@ -649,28 +649,28 @@ rect2f GetSizedParentRegion(size_attribute* SizeAttr, rect2f BaseRegion)
 void UpdateRegions( menu_tree* Menu )
 {
   temporary_memory TempMem =  BeginTemporaryMemory(GlobalGameState->TransientArena);
-
+  
   u32 StackElementSize = sizeof(container_node*);
   u32 StackByteSize = Menu->NodeCount * StackElementSize;
-
+  
   u32 StackCount = 0;
   container_node** ContainerStack = PushArray(GlobalGameState->TransientArena, Menu->NodeCount, container_node*);
-
+  
   // Push Root
   ContainerStack[StackCount++] = Menu->Root;
-
+  
   while(StackCount>0)
   {
     // Pop new parent from Stack
     container_node* Parent = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
-
+    
     if(HasAttribute(Parent, ATTRIBUTE_SIZE))
     {
       size_attribute* SizeAttr = (size_attribute*) GetAttributePointer(Parent, ATTRIBUTE_SIZE);
       Parent->Region = GetSizedParentRegion(SizeAttr, Parent->Region);
     }
-
+    
     // Update the region of all children and push them to the stack
     CallFunctionPointer(Parent->Functions.UpdateChildRegions, Parent);
     container_node* Child = Parent->FirstChild;
@@ -680,7 +680,7 @@ void UpdateRegions( menu_tree* Menu )
       Child = Next(Child);
     }
   }
-
+  
   EndTemporaryMemory(TempMem);
 }
 
@@ -701,44 +701,44 @@ void DrawMenu( memory_arena* Arena, menu_interface* Interface, u32 NodeCount, co
 {
   u32 StackElementSize = sizeof(container_node*);
   u32 StackByteSize = NodeCount * StackElementSize;
-
+  
   u32 StackCount = 0;
   container_node** ContainerStack = PushArray(Arena, NodeCount, container_node*);
-
+  
   // Push Root
   ContainerStack[StackCount++] = Container;
-
+  
   while(StackCount>0)
   {
     // Pop new parent from Stack
     container_node* Parent = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
-
+    
     if(HasAttribute(Parent, ATTRIBUTE_COLOR))
     {
       color_attribute* Color = (color_attribute*) GetAttributePointer(Parent, ATTRIBUTE_COLOR);
       PushOverlayQuad(Parent->Region, Color->Color);
     }
-
+    
     if(Parent->Functions.Draw)
     {
       CallFunctionPointer(Parent->Functions.Draw, Interface, Parent);  
     }
-
+    
     if(HasAttribute(Parent, ATTRIBUTE_TEXT))
     {
       text_attribute* Text = (text_attribute*) GetAttributePointer(Parent, ATTRIBUTE_TEXT);
       rect2f TextBox = GetTextSize(0, 0, Text->Text, Text->FontSize);
       PushTextAt(Parent->Region.X + Parent->Region.W/2.f - TextBox.W/2.f,
-                     Parent->Region.Y + Parent->Region.H/2.f - TextBox.H/3.f, Text->Text, Text->FontSize, Text->Color);
+                 Parent->Region.Y + Parent->Region.H/2.f - TextBox.H/3.f, Text->Text, Text->FontSize, Text->Color);
     }
-
+    
     if(HasAttribute(Parent, ATTRIBUTE_TEXTURE))
     {
       texture_attribute* Texture = (texture_attribute*) GetAttributePointer(Parent, ATTRIBUTE_TEXTURE);
       PushTexturedOverlayQuad(Parent->Region, Rect2f(0,0,1,1), Texture->Handle);
     }
-
+    
     if(HasAttribute(Parent,ATTRIBUTE_MERGE))
     {
       DrawMergeSlots(Parent);
@@ -758,22 +758,22 @@ u32 GetIntersectingNodes(u32 NodeCount, container_node* Container, v2 MousePos, 
 {
   u32 StackElementSize = sizeof(container_node*);
   u32 StackByteSize = NodeCount * StackElementSize;
-
+  
   u32 StackCount = 0;
   temporary_memory TempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
   container_node** ContainerStack = PushArray(GlobalGameState->TransientArena, NodeCount, container_node*);
-
+  
   u32 IntersectingLeafCount = 0;
-
+  
   // Push Root
   ContainerStack[StackCount++] = Container;
-
+  
   while(StackCount>0)
   {
     // Pop new parent from Stack
     container_node* Parent = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
-
+    
     // Check if mouse is inside the child region and push those to the stack.
     if(Intersects(Parent->Region, MousePos))
     {
@@ -788,7 +788,7 @@ u32 GetIntersectingNodes(u32 NodeCount, container_node* Container, v2 MousePos, 
         }
         Child = Next(Child);
       }  
-
+      
       if(IntersectingChildren==0)
       {
         Assert(IntersectingLeafCount < MaxCount);
@@ -803,7 +803,7 @@ u32 GetIntersectingNodes(u32 NodeCount, container_node* Container, v2 MousePos, 
 container_node* ConnectNodeToFront(container_node* Parent, container_node* NewNode)
 {
   NewNode->Parent = Parent;
-
+  
   if(!Parent->FirstChild){
     Parent->FirstChild = NewNode;
   }else{
@@ -813,14 +813,14 @@ container_node* ConnectNodeToFront(container_node* Parent, container_node* NewNo
     Assert(NewNode != NewNode->NextSibling);
     Assert(NewNode->PreviousSibling == 0);
   }
-
+  
   return NewNode;
 }
 
 container_node* ConnectNodeToBack(container_node* Parent, container_node* NewNode)
 {
   NewNode->Parent = Parent;
-
+  
   if(!Parent->FirstChild){
     Parent->FirstChild = NewNode;
   }else{
@@ -832,7 +832,7 @@ container_node* ConnectNodeToBack(container_node* Parent, container_node* NewNod
     Child->NextSibling = NewNode;
     NewNode->PreviousSibling = Child;
   }
-
+  
   return NewNode;
 }
 
@@ -872,12 +872,12 @@ internal inline b32 IsFocusWindow(menu_interface* Interface, menu_tree* Menu)
 void SetFocusWindow(menu_interface* Interface, menu_tree* Menu)
 {
   Assert(Menu != &Interface->MenuSentinel);
-
+  
   if(Interface->MenuInFocus && Menu != Interface->MenuInFocus)
   {
     CallFunctionPointer(Interface->MenuInFocus->LosingFocus, Interface, Interface->MenuInFocus);
   }
-
+  
   if(Menu)
   {
     if(Menu != Interface->MenuSentinel.Next)
@@ -891,7 +891,7 @@ void SetFocusWindow(menu_interface* Interface, menu_tree* Menu)
       CallFunctionPointer(Menu->GainingFocus, Interface, Menu);      
     }
   }
-
+  
   Interface->MenuInFocus = Menu;
 }
 
@@ -900,7 +900,7 @@ void FormatNodeString(container_node* Node, u32 BufferSize, c8 StringBuffer[])
   u32 Attributes = Node->Attributes;
   
   Platform.DEBUGFormatString(StringBuffer, BufferSize, BufferSize-1,
-  "%s", ToString(Node->Type));
+                             "%s", ToString(Node->Type));
   b32 First = true;
   while(Attributes)
   {
@@ -912,18 +912,18 @@ void FormatNodeString(container_node* Node, u32 BufferSize, c8 StringBuffer[])
     {
       First = false;
       str::CatStrings( str::StringLength(StringBuffer), StringBuffer,
-              2, ": ",
-              BufferSize, StringBuffer);
+                      2, ": ",
+                      BufferSize, StringBuffer);
     }else{
       str::CatStrings( str::StringLength(StringBuffer), StringBuffer,
-              3, " | ",
-              BufferSize, StringBuffer);  
+                      3, " | ",
+                      BufferSize, StringBuffer);  
     }
     
     const c8* AttributeString = ToString(Attribute);
     str::CatStrings( str::StringLength(StringBuffer), StringBuffer,
-                str::StringLength(AttributeString), AttributeString,
-                ArrayCount(StringBuffer), StringBuffer);
+                    str::StringLength(AttributeString), AttributeString,
+                    ArrayCount(StringBuffer), StringBuffer);
   }
 }
 
@@ -941,7 +941,7 @@ r32 PrintTree(u32 Count, container_node** HotLeafs, r32 YStart, u32 FontSize, r3
     Node = Node->Parent;
   }
   Assert(Nodes[0]->Depth == 0);
-
+  
   for (u32 Depth = 0; Depth <= DepthCount; ++Depth)
   {
     Assert(Depth < ArrayCount(Nodes));
@@ -959,7 +959,7 @@ r32 PrintTree(u32 Count, container_node** HotLeafs, r32 YStart, u32 FontSize, r3
         Color = V4(1,1,0,1);
         CheckPoints[Depth] = Next(Sibling);
       }
-
+      
       for (u32 LeadIndex = 0; LeadIndex < Count; ++LeadIndex)
       {
         if (Sibling == HotLeafs[LeadIndex])
@@ -967,15 +967,15 @@ r32 PrintTree(u32 Count, container_node** HotLeafs, r32 YStart, u32 FontSize, r3
           Color = V4(1,0,0,1);
         }
       }
-
+      
       u32 Attributes = Sibling->Attributes;
       c8 StringBuffer[1024] = {};
       FormatNodeString(Sibling, ArrayCount(StringBuffer), StringBuffer);
-
+      
       XOff = WidthStep * Sibling->Depth;
       PushTextAt(XOff, YOff, StringBuffer, FontSize, Color);
       YOff -= HeightStep;
-
+      
       if(CheckPoints[Depth])
       {
         break;
@@ -983,7 +983,7 @@ r32 PrintTree(u32 Count, container_node** HotLeafs, r32 YStart, u32 FontSize, r3
       Sibling = Next(Sibling);
     }
   }
-
+  
   for (s32 Depth = DepthCount; Depth >= 0; --Depth)
   {
     container_node* Sibling = CheckPoints[Depth];
@@ -995,7 +995,7 @@ r32 PrintTree(u32 Count, container_node** HotLeafs, r32 YStart, u32 FontSize, r3
         Color = V4(1,1,0,1);
         CheckPoints[Depth] = Sibling;
       }
-
+      
       for (u32 LeadIndex = 0; LeadIndex < Count; ++LeadIndex)
       {
         if (Sibling == HotLeafs[LeadIndex])
@@ -1003,17 +1003,17 @@ r32 PrintTree(u32 Count, container_node** HotLeafs, r32 YStart, u32 FontSize, r3
           Color = V4(1,0,0,1);
         }
       }
-
+      
       c8 StringBuffer[1024] = {};
       FormatNodeString(Sibling, ArrayCount(StringBuffer), StringBuffer);
       XOff = WidthStep * Sibling->Depth;
       PushTextAt(XOff, YOff, StringBuffer, FontSize, Color);
       YOff -= HeightStep;
-
+      
       Sibling = Next(Sibling);
     }
   }
-
+  
   return YStart-YOff;
 }
 
@@ -1025,13 +1025,13 @@ void PrintHotLeafs(menu_interface* Interface)
   r32 HeightStep = (FontMap->Ascent - FontMap->Descent)/WindowSize.HeightPx;
   r32 WidthStep  = 0.02;
   r32 YOff = 1 - 2*HeightStep;
-
+  
   menu_tree* Menu = Interface->MenuSentinel.Next;
   while(Menu != &Interface->MenuSentinel)
   {
     if(Menu->Visible && Menu->HotLeafCount > 0)
     {
-       YOff -= PrintTree(Menu->HotLeafCount, Menu->HotLeafs, YOff, FontSize, HeightStep, WidthStep);
+      YOff -= PrintTree(Menu->HotLeafCount, Menu->HotLeafs, YOff, FontSize, HeightStep, WidthStep);
     }
     Menu = Menu->Next;
   }
@@ -1098,7 +1098,7 @@ menu_tree* GetMenu(menu_interface* Interface, container_node* Node)
 void * PushAttribute(menu_interface* Interface, container_node* Node, container_attribute AttributeType)
 {
   Assert(!(Node->Attributes & AttributeType));
-
+  
   Node->Attributes = Node->Attributes | AttributeType;
   menu_attribute_header** HeaderPtr = &Node->FirstAttribute;
   while(*HeaderPtr)
@@ -1106,7 +1106,7 @@ void * PushAttribute(menu_interface* Interface, container_node* Node, container_
     menu_attribute_header* Header = *HeaderPtr;
     HeaderPtr = &(Header->Next);
   }
-
+  
   u32 TotalSize = sizeof(menu_attribute_header) + GetAttributeSize(AttributeType);
   menu_attribute_header* Attr =  (menu_attribute_header*) PushSize(Interface, TotalSize);
   Attr->Type = AttributeType;
@@ -1133,16 +1133,16 @@ void MoveAttribute(container_node* From, container_node* To, container_attribute
 {
   Assert(HasAttribute(From, AttributeType));
   Assert(!HasAttribute(To, AttributeType));
-
+  
   menu_attribute_header** AttributePtr = &From->FirstAttribute;
   while((*AttributePtr)->Type != AttributeType)
   {
     AttributePtr = &(*AttributePtr)->Next;
   }
-
+  
   menu_attribute_header* AttributeToMove = *AttributePtr;
   *AttributePtr = AttributeToMove->Next;
-
+  
   menu_attribute_header* DstAttribute = To->FirstAttribute;
   if(To->FirstAttribute)
   {
@@ -1154,7 +1154,7 @@ void MoveAttribute(container_node* From, container_node* To, container_attribute
   }else{
     To->FirstAttribute = AttributeToMove;
   }
-
+  
   From->Attributes = From->Attributes - (u32)AttributeType;
   To->Attributes = To->Attributes + (u32)AttributeType;
 }
@@ -1210,7 +1210,7 @@ void _PushToUpdateQueue(menu_interface* Interface, container_node* Caller, updat
     }
   }
   Assert(!Entry->InUse);
-
+  
   Entry->Interface = Interface;
   Entry->Caller = Caller;
   Entry->InUse = true;
@@ -1230,12 +1230,12 @@ void RegisterEventWithNode(menu_interface* Interface, container_node* Node, u32 
 // From http://burtleburtle.net/bob/hash/integer.html
 umm IntegerHash(umm a)
 {
-    a = (a ^ 61) ^ (a >> 16);
-    a = a + (a << 3);
-    a = a ^ (a >> 4);
-    a = a * 0x27d4eb2d;
-    a = a ^ (a >> 15);
-    return a;
+  a = (a ^ 61) ^ (a >> 16);
+  a = a + (a << 3);
+  a = a ^ (a >> 4);
+  a = a * 0x27d4eb2d;
+  a = a ^ (a >> 15);
+  return a;
 }
 umm PointerToHash(void* Ptr)
 {
@@ -1275,7 +1275,7 @@ menu_event* GetMenuEvent(menu_interface* Interface, u32 Handle)
 
 void _RegisterMenuEvent(menu_interface* Interface, menu_event_type EventType, container_node* CallerNode, void* Data, menu_event_callback** Callback,  menu_event_callback** OnDelete)
 {
-
+  
   u32 Index = GetEmptyMenuEventHandle(Interface, CallerNode);
   menu_event* Event  = GetMenuEvent(Interface, Index);
   Assert(!Event->Active);
@@ -1295,7 +1295,7 @@ MENU_UPDATE_FUNCTION(SplitWindowBorderUpdate)
   Assert(BorderNode->Type == container_type::Border);
   container_node* SplitNode = BorderNode->Parent;
   Assert(SplitNode->Type == container_type::Split);
-
+  
   // The Caller is the border which we want to update
   border_leaf* Border = GetBorderNode(BorderNode);
   if(Border->Vertical)
@@ -1336,13 +1336,13 @@ container_node* CreateBorderNode(menu_interface* Interface, b32 Vertical, r32 Po
   Border.Vertical = Vertical;
   Border.Position = Position;
   Border.Thickness = Interface->BorderSize;
-
+  
   container_node* Result = NewContainer(Interface, container_type::Border);
   border_leaf* BorderLeaf = GetBorderNode(Result);
- 
+  
   color_attribute* ColorAttr = (color_attribute*) PushAttribute(Interface, Result, ATTRIBUTE_COLOR);
   ColorAttr->Color = Color;
-
+  
   Assert(Result->Type == container_type::Border);
   *BorderLeaf = Border;
   return Result;
@@ -1374,7 +1374,7 @@ void SortHotLeafs(u32 OldHotLeafCount,   container_node** OldHotLeafs,
   u32 NrNew = 0;
   u32 NrRemoved = 0;
   u32 NrExisting = 0;
-
+  
   // Put all ptr's that exist in both arrays in Existing
   // And remove it from OldHotLeafs and NewHotLeafs
   for (u32 i = 0; i < OldHotLeafCount; ++i)
@@ -1404,7 +1404,7 @@ void SortHotLeafs(u32 OldHotLeafCount,   container_node** OldHotLeafs,
       Removed[NrRemoved++] = OldHotLeafs[i];
     }
   }
- 
+  
   *NewCount = NrNew;
   *RemovedCount = NrRemoved;
   *ExistingCount = NrExisting;
@@ -1414,19 +1414,19 @@ internal void UpdateHotLeafs(menu_interface* Interface, menu_tree* Menu)
 {
   memory_arena* Arena = GlobalGameState->TransientArena;
   ScopedMemory Memory(Arena);
-
+  
   // Get all new intersecting nodes
   u32 HotLeafsMaxCount = ArrayCount(Menu->HotLeafs);
   container_node** CurrentHotLeafs = (container_node**) PushArray(Arena, HotLeafsMaxCount, container_node*);
   u32 CurrentHotLeafCount = GetIntersectingNodes(Menu->NodeCount, Menu->Root, Interface->MousePos, HotLeafsMaxCount, CurrentHotLeafs);
-
+  
   Assert(CurrentHotLeafCount < HotLeafsMaxCount);
-
+  
   container_node** OldHotLeafs = (container_node**) PushCopy(Arena, HotLeafsMaxCount, Menu->HotLeafs);
   
   // Sort the newly gathered hot leafs into "new", "existing", "removed"
   u32 RemovedHotLeafsMaxCount = ArrayCount(Menu->RemovedHotLeafs);
-
+  
   u32 NewCount = 0;
   u32 RemovedCount = 0;
   u32 ExistingCount = 0;
@@ -1438,7 +1438,7 @@ internal void UpdateHotLeafs(menu_interface* Interface, menu_tree* Menu)
                &NewCount,           New,
                &RemovedCount,       Removed,
                &ExistingCount,      Existing);
-
+  
   Assert(NewCount + ExistingCount < HotLeafsMaxCount);
   CopyArray( ExistingCount, Existing, Menu->HotLeafs);
   CopyArray( NewCount, New, Menu->HotLeafs+ExistingCount);
@@ -1466,7 +1466,7 @@ inline internal container_node* GetTabWindowFromTab(container_node* Tab)
   container_node* TabRegion = TabHeader->Parent;
   Assert(TabRegion->Type == container_type::None);
   container_node* TabWindow = TabRegion->Parent;
-
+  
   Assert(TabWindow->Type == container_type::TabWindow);
   return TabWindow;
 }
@@ -1515,7 +1515,7 @@ internal container_node* PopTab(container_node* Tab)
   }else if(Previous(Tab)){
     SetTabAsActive(Previous(Tab));
   }
-
+  
   DisconnectNode(Tab);
   return Tab;
 }
@@ -1527,18 +1527,18 @@ internal u32 FillArrayWithTabs(u32 MaxArrSize, container_node* TabArr[], menu_tr
   ScopedMemory Memory(GlobalGameState->TransientArena);
   u32 StackCount = 0;
   u32 TabCount = 0;
-
+  
   container_node** ContainerStack = PushArray(GlobalGameState->TransientArena, MaxArrSize, container_node*);
-
+  
   // Push StartNode
   ContainerStack[StackCount++] = StartNode;
-
+  
   while(StackCount>0)
   {
     // Pop new parent from Stack
     container_node* Parent = ContainerStack[--StackCount];
     ContainerStack[StackCount] = 0;
-
+    
     // Update the region of all children and push them to the stack
     if(Parent->Type == container_type::Split)
     {
@@ -1587,7 +1587,7 @@ internal void UpdateMergableAttribute( menu_interface* Interface, container_node
 {
   container_node* PluginWindow = GetPluginWindow(Interface, Node);
   mergable_attribute* Merge = GetFirstMergeNodeAttribute(Node);
-
+  
   Merge->HotMergeZone = merge_zone::NONE;
   if(PluginWindow)
   {
@@ -1595,19 +1595,19 @@ internal void UpdateMergableAttribute( menu_interface* Interface, container_node
     r32 W = Rect.W;
     r32 H = Rect.H;
     r32 S = Minimum(W,H)/4;
-
+    
     v2 MP = V2(Rect.X+W/2,Rect.Y+H/2); // Middle Point
     v2 LS = V2(MP.X-S, MP.Y);          // Left Square
     v2 RS = V2(MP.X+S, MP.Y);          // Right Square
     v2 BS = V2(MP.X,   MP.Y-S);        // Bot Square
     v2 TS = V2(MP.X,   MP.Y+S);        // Top Square
-
+    
     Merge->MergeZone[(u32) merge_zone::CENTER] = Rect2f(MP.X-S/2.f, MP.Y-S/2.f,S/1.1f,S/1.1f);
     Merge->MergeZone[(u32) merge_zone::LEFT]   = Rect2f(LS.X-S/2.f, LS.Y-S/2.f,S/1.1f,S/1.1f);
     Merge->MergeZone[(u32) merge_zone::RIGHT]  = Rect2f(RS.X-S/2.f, RS.Y-S/2.f,S/1.1f,S/1.1f);
     Merge->MergeZone[(u32) merge_zone::TOP]    = Rect2f(BS.X-S/2.f, BS.Y-S/2.f,S/1.1f,S/1.1f);
     Merge->MergeZone[(u32) merge_zone::BOT]    = Rect2f(TS.X-S/2.f, TS.Y-S/2.f,S/1.1f,S/1.1f);
-
+    
     if(Intersects(Merge->MergeZone[EnumToIdx(merge_zone::CENTER)], Interface->MousePos))
     {
       Merge->HotMergeZone = merge_zone::CENTER;
@@ -1623,9 +1623,9 @@ internal void UpdateMergableAttribute( menu_interface* Interface, container_node
       Merge->HotMergeZone = merge_zone::HIGHLIGHTED;
     }
   }
-
+  
   if(Interface->MouseLeftButton.Edge &&
-    !Interface->MouseLeftButton.Active )
+     !Interface->MouseLeftButton.Active )
   {
     merge_zone MergeZone = Merge->HotMergeZone;
     switch(Merge->HotMergeZone)
@@ -1634,20 +1634,20 @@ internal void UpdateMergableAttribute( menu_interface* Interface, container_node
       {
         container_node* HomeTabWindow = PluginWindow->Parent;
         container_node* TabWindow = Node;
-
+        
         menu_tree* MenuToRemove = GetMenu(Interface, TabWindow);
-
+        
         Assert(HomeTabWindow->Type == container_type::TabWindow);
-
+        
         container_node* TabArr[64] = {};
         u32 TabCount = FillArrayWithTabs(ArrayCount(TabArr), TabArr, MenuToRemove);
-
+        
         for(u32 Index = 0; Index < TabCount; ++Index)
         {
           container_node* TabToMove = TabArr[Index];
           PushTab(HomeTabWindow, TabToMove);
         }
-
+        
         SetTabAsActive(TabArr[TabCount-1]);
         
         FreeMenuTree(Interface, MenuToRemove);
@@ -1660,10 +1660,10 @@ internal void UpdateMergableAttribute( menu_interface* Interface, container_node
       {
         container_node* HomeTabWindow = PluginWindow->Parent;
         container_node* NodeToInsert = Node;
-
+        
         menu_tree* MenuToRemove = GetMenu(Interface, NodeToInsert);
         menu_tree* MenuToRemain = GetMenu(Interface, HomeTabWindow);
-
+        
         while(NodeToInsert && NodeToInsert->Type != container_type::Split)
         {
           NodeToInsert = NodeToInsert->Parent;
@@ -1677,14 +1677,14 @@ internal void UpdateMergableAttribute( menu_interface* Interface, container_node
         }
         
         Assert(HomeTabWindow->Type == container_type::TabWindow);
-
+        
         DisconnectNode(NodeToInsert);
-
+        
         b32 Vertical = (Merge->HotMergeZone == merge_zone::LEFT || Merge->HotMergeZone == merge_zone::RIGHT);
-
+        
         container_node* SplitNode = CreateSplitWindow(Interface, Vertical);
         ReplaceNode(HomeTabWindow, SplitNode);
-
+        
         b32 VisitorIsFirstChild = (Merge->HotMergeZone == merge_zone::LEFT || Merge->HotMergeZone == merge_zone::TOP);
         if(VisitorIsFirstChild)
         {
@@ -1694,13 +1694,13 @@ internal void UpdateMergableAttribute( menu_interface* Interface, container_node
           ConnectNodeToBack(SplitNode, HomeTabWindow);
           ConnectNodeToBack(SplitNode, NodeToInsert);
         }
-
+        
         FreeMenuTree(Interface, MenuToRemove);
         Merge->HotMergeZone = merge_zone::NONE;
       }break;
     }
   }
-
+  
   if(!Interface->MouseLeftButton.Active)
   {
     Merge->HotMergeZone = merge_zone::NONE;
@@ -1719,7 +1719,7 @@ MENU_UPDATE_FUNCTION(WindowDragUpdate)
   }
   
   UpdateMergableAttribute(Interface, CallerNode);
-
+  
   return Interface->MouseLeftButton.Active;
 }
 
@@ -1729,9 +1729,9 @@ MENU_EVENT_CALLBACK(InitiateWindowDrag)
   container_node* TabWindow = CallerNode->Parent;
   Assert(TabWindow->Type == container_type::TabWindow);
   container_node* TabGrid = GetTabGridFromWindow(TabWindow);
-
+  
   u32 ChildCount = GetChildCount(TabGrid);
-
+  
   if(TabWindow->Parent->Type == container_type::Split)
   {
     if(!Intersects(CallerNode->FirstChild->Region, Interface->MousePos))
@@ -1781,7 +1781,7 @@ menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* Bas
   menu_tree* Root = NewMenuTree(Interface); // Root
   Root->Visible = true;
   Root->Root = NewContainer(Interface, container_type::Root);
-
+  
   //  Root Node Complex, 4 Borders, 1 Header, 1 None
   container_node* RootBody = 0; // Output
   { 
@@ -1797,19 +1797,19 @@ menu_tree* CreateNewRootContainer(menu_interface* Interface, container_node* Bas
     container_node* Border4 = CreateBorderNode(Interface, false, Region.Y + Region.H);
     ConnectNodeToBack(Root->Root, Border4);
     RegisterMenuEvent(Interface, menu_event_type::MouseDown, Border4, 0, InitiateBorderDrag, 0);
-
+    
     //ConnectNodeToBack(Root->Root, RootHeader); // Header
     ConnectNodeToBack(Root->Root, BaseWindow); // Body
   }
-
+  
   TreeSensus(Root);
-
+  
   UpdateRegions(Root);
-
+  
   UpdateHotLeafs(Interface, Root);
-
+  
   SetFocusWindow(Interface, Root);
-
+  
   return Root;
 }
 
@@ -1817,19 +1817,19 @@ container_node* CreateTabWindow(menu_interface* Interface)
 {
   container_node* TabWindow = NewContainer(Interface, container_type::TabWindow);
   GetTabWindowNode(TabWindow)->HeaderSize = 0.02f;
-
+  
   container_node* TabRegion = ConnectNodeToBack(TabWindow, NewContainer(Interface, container_type::None));
-
+  
   color_attribute* Color = (color_attribute*  )PushAttribute(Interface, TabRegion, ATTRIBUTE_COLOR);
   Color->Color = V4(1,1,1,1);
   RegisterMenuEvent(Interface, menu_event_type::MouseDown, TabRegion, 0, InitiateWindowDrag, 0);
   PushAttribute(Interface, TabRegion, ATTRIBUTE_MERGE);
-
+  
   container_node* TabbedHeader = ConnectNodeToBack(TabRegion, NewContainer(Interface, container_type::Grid));
   grid_node* Grid = GetGridNode(TabbedHeader);
   Grid->Row = 1;
   Grid->Stack = true;
-
+  
   size_attribute* SizeAttr = (size_attribute*) PushAttribute(Interface, TabbedHeader, ATTRIBUTE_SIZE);
   SizeAttr->Width = ContainerSizeT(menu_size_type::RELATIVE, 0.7);
   SizeAttr->Height = ContainerSizeT(menu_size_type::RELATIVE, 1);
@@ -1851,12 +1851,12 @@ void ReduceSplitWindowTree(menu_interface* Interface, container_node* WindowToRe
     Assert(WindowToRemain);
     Assert(WindowToRemain->NextSibling == WindowToRemove);
   }
-
+  
   DisconnectNode(WindowToRemove);
   DeleteMenuSubTree(Interface, WindowToRemove);
-
+  
   DisconnectNode(WindowToRemain);
-
+  
   ReplaceNode(SplitNodeToSwapOut, WindowToRemain);
   DeleteMenuSubTree(Interface, SplitNodeToSwapOut);
 }
@@ -1865,10 +1865,10 @@ void ReduceWindowTree(menu_interface* Interface, container_node* WindowToRemove)
 {
   // Just to let us know if we need to handle another case
   Assert(WindowToRemove->Type == container_type::TabWindow);
-
+  
   // Make sure the tab window is empty
   Assert(GetChildCount(GetTabGridFromWindow(WindowToRemove)) == 0);
-
+  
   container_node* ParentContainer = WindowToRemove->Parent;
   switch(ParentContainer->Type)
   {
@@ -1897,20 +1897,20 @@ container_node* GetWindowDragNode(container_node* TabWindow)
 void SplitTabToNewWindow(menu_interface* Interface, container_node* Tab, v2 WindowSize, v2 HeaderOrigin)
 {
   v2 MouseDownPos = Interface->MouseLeftButtonPush;
-
+  
   v2 MouseDownHeaderFrame = MouseDownPos - HeaderOrigin;
   v2 NewOrigin = Interface->MousePos - MouseDownHeaderFrame - V2(0, WindowSize.Y - Interface->BorderSize);
   rect2f NewRegion = Rect2f(NewOrigin.X, NewOrigin.Y, WindowSize.X, WindowSize.Y);
   NewRegion = Shrink(NewRegion, -Interface->BorderSize/2);
-
+  
   container_node* NewTabWindow = CreateTabWindow(Interface);
   menu_tree* NewMenu = CreateNewRootContainer(Interface, NewTabWindow, NewRegion);
-
+  
   PopTab(Tab);
   PushTab(NewTabWindow, Tab);
-
+  
   ConnectNodeToBack(NewTabWindow, GetTabNode(Tab)->Payload);
-
+  
   // Trigger the window-drag instead of this tab-drag
   PushToUpdateQueue(Interface, Tab, WindowDragUpdate, NewMenu->Root);
 }
@@ -1918,14 +1918,14 @@ void SplitTabToNewWindow(menu_interface* Interface, container_node* Tab, v2 Wind
 b32 TabDrag(menu_interface* Interface, container_node* Tab)
 {
   Assert(Tab->Type == container_type::Tab);
-
+  
   container_node* TabWindow = GetTabWindowFromTab(Tab);
   container_node* TabHeader = GetTabGridFromWindow(TabWindow);
-
+  
   b32 Continue = Interface->MouseLeftButton.Active; // Tells us if we should continue to call the update function;
-
+  
   SetTabAsActive(Tab);
-
+  
   u32 Count = GetChildCount(TabHeader);
   if(Count > 1)
   {
@@ -1964,7 +1964,7 @@ b32 TabDrag(menu_interface* Interface, container_node* Tab)
       Continue = false;
     }  
   }
-
+  
   return Continue;
 }
 
@@ -1978,7 +1978,7 @@ internal void GetInput(game_input* GameInput, menu_interface* Interface)
   {
     Interface->MenuVisible = !Interface->MenuVisible;
   }
-
+  
   Update(&Interface->MouseLeftButton, GameInput->MouseButton[PlatformMouseButton_Left].EndedDown);
   if(Interface->MouseLeftButton.Edge)
   {
@@ -2152,7 +2152,7 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
   {
     return;
   }
-
+  
   // Updates all the hot leaf struct for the active window windows
   menu_tree* Menu = Interface->MenuSentinel.Next;
   while(Menu != &Interface->MenuSentinel)
@@ -2160,9 +2160,9 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
     UpdateHotLeafs(Interface, Menu);
     Menu = Menu->Next;
   }
-
+  
   PrintHotLeafs(Interface);
-
+  
   // Checks if a window was selected/deselected
   // * Sets or clears MenuFocusWindow
   // * Calls Gaining/Loosing Focus Functions
@@ -2186,19 +2186,19 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
     {
       MouseEnterCalled = CallMouseEnterFunctions(Interface, Menu);
     }
-
+    
     if(Menu->Visible)
     {
       if(!MouseDownCalled && Interface->MouseLeftButton.Edge && Interface->MouseLeftButton.Active)
       {
         MouseDownCalled = CallMouseDownFunctions(Interface, Menu);  
       }
-
+      
       if(!MouseUpCalled && Interface->MouseLeftButton.Edge && !Interface->MouseLeftButton.Active)
       {
         MouseUpCalled = CallMouseUpFunctions(Interface, Menu);  
       }
-
+      
       if(MouseExitCalled && MouseEnterCalled && MouseUpCalled && MouseDownCalled)
       {
         break;
@@ -2206,9 +2206,9 @@ void UpdateAndRenderMenuInterface(game_input* GameInput, menu_interface* Interfa
     }
     Menu = Menu->Next;
   }
-
+  
   CallUpdateFunctions(Interface);
-
+  
   if(Interface->MenuVisible)
   {
     Menu = Interface->MenuSentinel.Previous;
@@ -2232,9 +2232,9 @@ container_node* CreatePlugin(menu_interface* Interface, c8* HeaderName, v4 Heade
   plugin_node* PluginNode = GetPluginNode(Plugin);
   str::CopyStringsUnchecked(HeaderName, PluginNode->Title);
   PluginNode->Color = HeaderColor;
-
+  
   ConnectNodeToBack(Plugin, BodyNode);
-
+  
   return Plugin;
 }
 
@@ -2258,11 +2258,11 @@ menu_interface* CreateMenuInterface(memory_arena* Arena, midx MaxMemSize)
   Interface->BorderSize = 0.007;
   Interface->HeaderSize = 0.02;
   Interface->MinSize = 0.2f;
-
+  
   ListInitiate(&Interface->Sentinel);
   ListInitiate(&Interface->MenuSentinel);
   ListInitiate(&Interface->EventSentinel);
- 
+  
   return Interface;
 }
 
@@ -2274,24 +2274,24 @@ void DisplayOrRemovePluginTab(menu_interface* Interface, container_node* Tab)
   if(TabHeader)
   {
     Assert(TabHeader->Type == container_type::Grid);
-
+    
     container_node* TabWindow = GetTabWindowFromTab(Tab);
-
+    
     PopTab(Tab);
     if(GetChildCount(TabHeader) == 0)
     {
       ReduceWindowTree(Interface, TabWindow);
     }
-
+    
   }else{
-
+    
     container_node* TabWindow = 0;
     if(!Interface->SpawningWindow)
     {
       TabWindow = CreateTabWindow(Interface);
-
+      
       Interface->SpawningWindow = CreateNewRootContainer(Interface, TabWindow, Rect2f( 0.25, 0.25, 0.7, 0.5));
-
+      
     }else{
       TabWindow = GetRootBody(Interface->SpawningWindow->Root);
       while(TabWindow->Type != container_type::TabWindow)
@@ -2304,9 +2304,9 @@ void DisplayOrRemovePluginTab(menu_interface* Interface, container_node* Tab)
         }
       }
     }
-
+    
     PushTab(TabWindow, Tab);
-
+    
     container_node* Body = Next(TabWindow->FirstChild);
     tab_node* TabNode = GetTabNode(Tab);
     if(Body)
@@ -2316,7 +2316,7 @@ void DisplayOrRemovePluginTab(menu_interface* Interface, container_node* Tab)
       ConnectNodeToBack(TabWindow, TabNode->Payload);
     }
   }
-
+  
   SetFocusWindow(Interface, Interface->SpawningWindow);
 }
 
@@ -2343,7 +2343,7 @@ menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
   u32 FontSize = 14;
   r32 FontHeight = GetTextLineHeightSize(FontSize);
   r32 TextWidth = GetTextWidth(Name, FontSize);
-
+  
   game_window_size WindowSize = GameGetWindowSize();
   r32 AspectRatio = WindowSize.WidthPx/WindowSize.HeightPx;
   if(!Interface->MenuBar)
@@ -2353,7 +2353,7 @@ menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
     Interface->MenuBar->Root = NewContainer(Interface);
     r32 MainMenuHeight = FontHeight * 1.1f;
     Interface->MenuBar->Root->Region = Rect2f(0, 1 - MainMenuHeight, AspectRatio, MainMenuHeight);
-  
+    
     container_node* DropDownContainer = ConnectNodeToBack(Interface->MenuBar->Root, NewContainer(Interface, container_type::Grid));
     grid_node* Grid = GetGridNode(DropDownContainer);
     Grid->Col = 0;
@@ -2362,14 +2362,14 @@ menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
     Grid->TotalMarginY = 0.0;
     Grid->Stack = true;
   }
-
+  
   container_node* DropDownContainer = Interface->MenuBar->Root->FirstChild;
-
+  
   container_node* NewMenu = ConnectNodeToBack(DropDownContainer, NewContainer(Interface));
-
+  
   color_attribute* ColorAttr = (color_attribute*) PushAttribute(Interface, NewMenu, ATTRIBUTE_COLOR);
   ColorAttr->Color = V4(0.3,0,0.3,1);
-
+  
   size_attribute* SizeAttr = (size_attribute*) PushAttribute(Interface, NewMenu, ATTRIBUTE_SIZE);
   SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, TextWidth + 0.05f);
   SizeAttr->Height = ContainerSizeT(menu_size_type::ABSOLUTE, FontHeight);
@@ -2382,25 +2382,25 @@ menu_tree* RegisterMenu(menu_interface* Interface, const c8* Name)
   str::CopyStringsUnchecked(Name, Text->Text);
   Text->FontSize = FontSize;
   Text->Color = V4(0.9,0.9,0.9,1);
-
+  
   menu_tree* ViewMenuRoot = NewMenuTree(Interface);
   ViewMenuRoot->Root = NewContainer(Interface);
   ViewMenuRoot->Root->Region = {};
   ViewMenuRoot->LosingFocus = DeclareFunction(menu_losing_focus, DropDownLosingFocus);
   ViewMenuRoot->GainingFocus = DeclareFunction(menu_losing_focus, DropDownGainingFocus);
-
+  
   container_node* ViewMenuItems = ConnectNodeToBack(ViewMenuRoot->Root, NewContainer(Interface, container_type::Grid));
   grid_node* Grid = GetGridNode(ViewMenuItems);
   Grid->Col = 1;
   Grid->Row = 0;
   Grid->TotalMarginX = 0.0;
   Grid->TotalMarginY = 0.0;
-
+  
   ColorAttr = (color_attribute*) PushAttribute(Interface, ViewMenuItems, ATTRIBUTE_COLOR);
   ColorAttr->Color = V4(1,1,1,1);
-
+  
   RegisterMenuEvent(Interface, menu_event_type::MouseDown, NewMenu, (void*) ViewMenuRoot, DropDownMenuButton, 0);
-
+  
   return ViewMenuRoot;
 }
 
@@ -2419,7 +2419,7 @@ MENU_EVENT_CALLBACK(InitiateTabDrag)
     TabWindow = TabWindow->Parent;
   }
   container_node* TabGrid = GetTabGridFromWindow(TabWindow);
-
+  
   if(GetChildCount(TabGrid) > 1 || TabWindow->Parent->Type == container_type::Split)
   {
     PushToUpdateQueue(Interface, CallerNode, TabDragUpdate, 0);
@@ -2429,22 +2429,22 @@ MENU_EVENT_CALLBACK(InitiateTabDrag)
 internal container_node* CreateTab(menu_interface* Interface, container_node* Plugin)
 {
   plugin_node* PluginNode = GetPluginNode(Plugin);
-
+  
   container_node* Tab = NewContainer(Interface, container_type::Tab);  
-
+  
   color_attribute* ColorAttr = (color_attribute*) PushAttribute(Interface, Tab, ATTRIBUTE_COLOR);
   ColorAttr->Color = PluginNode->Color;
-
+  
   GetTabNode(Tab)->Payload = Plugin;
   PluginNode->Tab = Tab;
-
+  
   RegisterMenuEvent(Interface, menu_event_type::MouseDown, Tab, 0, InitiateTabDrag, 0);
-
+  
   text_attribute* MenuText = (text_attribute*) PushAttribute(Interface, Tab, ATTRIBUTE_TEXT);
   str::CopyStringsUnchecked(PluginNode->Title, MenuText->Text);
   MenuText->FontSize = 12;
   MenuText->Color =  HexCodeToColorV4(0x000000);
-
+  
   rect2f TextSize = GetTextSize(0, 0, PluginNode->Title, MenuText->FontSize);
   TextSize.W += 0.02;
   size_attribute* SizeAttr = (size_attribute*) PushAttribute(Interface, Tab, ATTRIBUTE_SIZE);
@@ -2454,8 +2454,8 @@ internal container_node* CreateTab(menu_interface* Interface, container_node* Pl
   SizeAttr->TopOffset = ContainerSizeT(menu_size_type::ABSOLUTE, 0);
   SizeAttr->XAlignment = menu_region_alignment::LEFT;
   SizeAttr->YAlignment = menu_region_alignment::CENTER;
-
-
+  
+  
   return Tab;
 }
 
@@ -2481,27 +2481,27 @@ void RegisterWindow(menu_interface* Interface, menu_tree* DropDownMenu, containe
   container_node* DropDownGrid = DropDownMenu->Root->FirstChild;
   Assert(DropDownGrid->Type == container_type::Grid);
   Assert(Plugin->Type == container_type::Plugin);
-
+  
   plugin_node* PluginNode = GetPluginNode(Plugin);
-
+  
   container_node* MenuItem = ConnectNodeToBack(DropDownGrid, NewContainer(Interface));
   text_attribute* MenuText = (text_attribute*) PushAttribute(Interface, MenuItem, ATTRIBUTE_TEXT);
   str::CopyStringsUnchecked(PluginNode->Title, MenuText->Text);
   MenuText->FontSize = 12;
   MenuText->Color = V4(0,0,0,1);
-
+  
   color_attribute* MenuColor = (color_attribute*) PushAttribute(Interface, MenuItem, ATTRIBUTE_COLOR);
   MenuColor->Color = V4(1,1,1,1);
-
-
+  
+  
   rect2f TextSize = GetTextSize(0, 0, PluginNode->Title, MenuText->FontSize);
   DropDownMenu->Root->Region.H += TextSize.H;
   DropDownMenu->Root->Region.W = DropDownMenu->Root->Region.W >= TextSize.W ? DropDownMenu->Root->Region.W : TextSize.W;
- 
+  
   container_node* Tab = CreateTab(Interface, Plugin);
-
+  
   Interface->PermanentWindows[Interface->PermanentWindowCount++] = Tab;
-
+  
   RegisterMenuEvent(Interface, menu_event_type::MouseUp, MenuItem, Tab, DropDownMouseUp, 0);
   RegisterMenuEvent(Interface, menu_event_type::MouseEnter, MenuItem, Tab, DropDownMouseEnter, 0);
   RegisterMenuEvent(Interface, menu_event_type::MouseExit, MenuItem, Tab, DropDownMouseExit, 0);
@@ -2513,7 +2513,7 @@ void ToggleWindow(menu_interface* Interface, char* WindowName)
   {
     container_node* PluginTab = Interface->PermanentWindows[PluginIndex];
     container_node* Plugin = GetTabNode(PluginTab)->Payload;
-
+    
     if(str::ExactlyEquals(WindowName, GetPluginNode(Plugin)->Title))
     {
       DisplayOrRemovePluginTab(Interface,PluginTab);  

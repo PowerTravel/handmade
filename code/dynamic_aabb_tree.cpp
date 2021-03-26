@@ -288,17 +288,17 @@ void PointPick( memory_arena* Arena, aabb_tree* Tree, v3* point, v3 direction, v
   }
 }
 
-b32 ColliderRaycast( v3 const & RayOrigin, v3 const & RayDirection, component_spatial* Spatial, component_collider* Collider, r32* Distance, v3* HitNormal)
+raycast_result ColliderRaycast( v3 const & RayOrigin, v3 const & RayDirection, component_spatial* Spatial, component_collider* Collider)
 {
   Assert(Equals(Norm(RayDirection),1, 10E-3));
   collider_mesh Mesh = GetColliderMesh( GlobalGameState->AssetManager, Collider->Object);
-
+  raycast_result Result{};
+  Result.Distance = R32Max;
   m4 const & ModelMatrix = Spatial->ModelMatrix;
   v3 RayDirectionModelSpace = Normalize( V3(AffineInverse(ModelMatrix) * V4(RayDirection,0)));
   v3 RayOriginModelSpace = V3(AffineInverse(ModelMatrix) * V4(RayOrigin,1));
 
   u32 VerticeIndexCount = 0;
-  r32 ResultDistance = R32Max;
   v3 ResultHitNormal{};
   b32 ResultHit = false;
   while (VerticeIndexCount < Mesh.nvi)
@@ -315,31 +315,28 @@ b32 ColliderRaycast( v3 const & RayOrigin, v3 const & RayDirection, component_sp
     {
       continue;
     }
-    v3 ProjectedPoint = RayOriginModelSpace + t*RayDirectionModelSpace;
-    if (IsVertexInsideTriangle( ProjectedPoint, PlaneNormal, p0, p1, p2))
+    v3 ProjectedPointModelSpace = RayOriginModelSpace + t*RayDirectionModelSpace;
+    if (IsVertexInsideTriangle( ProjectedPointModelSpace, PlaneNormal, p0, p1, p2))
     {
-      v3 ProjectedPointWorldSpace = V3(ModelMatrix * V4(ProjectedPoint,1));
+      v3 ProjectedPointWorldSpace = V3(ModelMatrix * V4(ProjectedPointModelSpace,1));
       r32 WorldDistance = Norm(ProjectedPointWorldSpace - RayOrigin);
-      if (WorldDistance < ResultDistance)
+      if (WorldDistance < Result.Distance)
       {
-        ResultDistance = WorldDistance;
-        ResultHitNormal = V3(Transpose(RigidInverse(ModelMatrix)) * V4(PlaneNormal,0));
-        ResultHit = true;
+        Result.IntersectionObjectSpace = ProjectedPointModelSpace;
+        Result.Intersection = ProjectedPointWorldSpace;
+        Result.Distance = WorldDistance;
+        Result.HitNormal = V3(Transpose(RigidInverse(ModelMatrix)) * V4(PlaneNormal,0));
+        Result.Hit = true;
       }
     }
   }
-
-  *Distance = ResultDistance;
-  *HitNormal = ResultHitNormal;
-  return ResultHit;
+  return Result;
 }
 
 raycast_result RayCast( memory_arena* Arena, aabb_tree* Tree, v3 const & RayOrigin, v3 const & RayDirection )
 {
   Assert(Equals(Norm(RayDirection), 1, 10E-3));
   raycast_result Result{};
-  Result.RayOrigin = RayOrigin;
-  Result.RayDirection = RayDirection;
 
   vector_list<aabb_tree_node*> queue = vector_list<aabb_tree_node*>(Arena, Tree->Size);
   if (Tree->Root)
@@ -362,33 +359,26 @@ raycast_result RayCast( memory_arena* Arena, aabb_tree* Tree, v3 const & RayOrig
 
       if (IsLeaf(Node))
       {
-        r32 Distance = 0;
-        v3 Normal{};
-
         component_spatial* Spatial = (component_spatial*) GetComponent(GlobalGameState->EntityManager, Node->EntityID, COMPONENT_FLAG_SPATIAL);
         component_collider* Collider = (component_collider*) GetComponent(GlobalGameState->EntityManager, Node->EntityID, COMPONENT_FLAG_COLLIDER);
 
         Assert(Collider);
-        if(ColliderRaycast(RayOrigin, RayDirection, Spatial, Collider, &Distance, &Normal))
+        raycast_result ColliderResult = ColliderRaycast(RayOrigin, RayDirection, Spatial, Collider);
+        if(ColliderResult.Hit)
         {
           if (Result.Hit)
           {
-            if (Distance < Result.Distance)
+            if (ColliderResult.Distance < Result.Distance)
             {
+              Result = ColliderResult;
               Result.EntityID = Node->EntityID;
-              Result.Distance = Distance;
-              Result.HitNormal = Normal;
-              Result.Intersection = RayOrigin + RayDirection * Distance;
             }
           }
           else
           {
             // First Hit
+            Result = ColliderResult;
             Result.EntityID = Node->EntityID;
-            Result.Distance = Distance;
-            Result.HitNormal = Normal;
-            Result.Intersection = RayOrigin + RayDirection * Distance;
-            Result.Hit = true;
           }
         }
       }
@@ -399,6 +389,9 @@ raycast_result RayCast( memory_arena* Arena, aabb_tree* Tree, v3 const & RayOrig
       }
     }
   }
+
+  Result.RayOrigin = RayOrigin;
+  Result.RayDirection = RayDirection;
   return Result;
 }
 

@@ -14,7 +14,7 @@ struct entity_component_chunk
 {
   u32 Types;
   component_head** Components;
-
+  
   entity_component_chunk* Next;
 };
 
@@ -41,6 +41,7 @@ struct component_camera
   v3  DeltaPos;
   m4  V;
   m4  P;
+  b32 Active;
 };
 
 struct game_controller_input;
@@ -64,7 +65,7 @@ struct component_light
 struct component_spatial
 {
   component_spatial(v3 PosInit = V3(0,0,0), v3 ScaleInit = V3(1,1,1), v4 RotInit = V4(0,0,0,1) ) :
-        Position(PosInit), Scale(ScaleInit), Rotation(RotInit){};
+  Position(PosInit), Scale(ScaleInit), Rotation(RotInit){};
   v3 Scale;
   v3 Position;
   //  we define the Quaternion as (xi,yj,zk, Scalar)
@@ -95,7 +96,7 @@ struct component_dynamics
   v3  AngularVelocity;
   v3  ExternalForce;
   r32 Mass;
-  m3 I; // Inertial tensor around CM aligned with principal axis
+  m3 I;     // Inertial tensor around CM aligned with principal axis
   m3 I_inv; // Inverse of I
 };
 
@@ -162,12 +163,12 @@ struct entity_manager
 {
   memory_arena Arena;
   temporary_memory TemporaryMemory;
-
+  
   u32 EntityCount;
   u32 EntitiesPerChunk;
   u32 EntityChunkCount;
   em_chunk* EntityList;
-
+  
   u32 ComponentCount;
   component_list* Components;
 };
@@ -203,7 +204,7 @@ struct component_result
   midx MainTypeSize;
   u32 Types;
   b32 Begun;
-
+  
   u32 ArrayCount;
   u32 ArrayIndex;
   u32 ComponentIndex;
