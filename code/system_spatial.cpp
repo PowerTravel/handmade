@@ -8,7 +8,7 @@
 
 #define NEW_CONTACT_THRESHOLD 0.01f
 #define PERSISTENT_CONTACT_THRESHOLD 0.01f
-#define WARM_STARTING_FRACTION 0.21f
+#define WARM_STARTING_FRACTION 1.0f
 
 #define FRICTIONAL_COEFFICIENT 0.2f
 #define BAUMGARTE_COEFFICIENT  0.3f
@@ -461,13 +461,13 @@ internal void DoWarmStarting( contact_manifold* FirstManifold  )
         component_dynamics* DynamicsB = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->EntityIDB, COMPONENT_FLAG_DYNAMICS);
         if(DynamicsA)
         {
-          DynamicsA->LinearVelocity  += (DeltaV[0] + DeltaV1[0] + DeltaV[0]);
-          DynamicsA->AngularVelocity += (DeltaV[1] + DeltaV1[1] + DeltaV[1]);
+          DynamicsA->LinearVelocity  += (DeltaV[0] + DeltaV1[0] + DeltaV2[0]);
+          DynamicsA->AngularVelocity += (DeltaV[1] + DeltaV1[1] + DeltaV2[1]);
         }
         if(DynamicsB)
         {
-          DynamicsB->LinearVelocity  += (DeltaV[2] + DeltaV1[2] + DeltaV[2]);
-          DynamicsB->AngularVelocity += (DeltaV[3] + DeltaV1[3] + DeltaV[3]);
+          DynamicsB->LinearVelocity  += (DeltaV[2] + DeltaV1[2] + DeltaV2[2]);
+          DynamicsB->AngularVelocity += (DeltaV[3] + DeltaV1[3] + DeltaV2[3]);
         }
       }
       Contact = Contacts->Next(Contact);
