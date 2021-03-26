@@ -10,16 +10,9 @@ void ClearFrame(debug_frame* Frame)
   Frame->EndClock = 0;
   Frame->WallSecondsElapsed = 0;
   Frame->FrameBarLaneCount = 0;
-  {
-    TIMED_BLOCK(ClearingFrameBlocks);
-    ZeroArray(Frame->MaxBlockCount, Frame->Blocks);
-    ZeroArray(ArrayCount(Frame->Threads), Frame->Threads); 
-  }
+  ZeroArray(ArrayCount(Frame->Threads), Frame->Threads); 
   Frame->FirstFreeBlock = 0;
-  {
-    TIMED_BLOCK(ClearingFrameStatistics);
-    Frame->Statistics.Clear();
-  }
+  Frame->Statistics.Clear();
 }
 
 internal void ResetCollation()
@@ -363,11 +356,12 @@ void CollateDebugRecords(game_memory* Memory)
           DebugState->CurrentFrameIndex = 0;
           Frame = DebugState->Frames;
         }
-
+        
         ClearFrame(Frame);
         
         Frame->BeginClock = Event->Clock;
         Frame->FirstFreeBlock = Frame->Blocks;
+        *Frame->FirstFreeBlock = {};
         
       }break;
       case DebugEvent_BeginBlock:
@@ -384,9 +378,10 @@ void CollateDebugRecords(game_memory* Memory)
           }else{
             RecordEntry = FunctionList->GetFromVector(RecordIndex);
           }
-
+          
           debug_thread* Thread = GetDebugThread(Memory, Frame, Event->TC.ThreadID);
           debug_block* Block = Frame->FirstFreeBlock++;
+          *Frame->FirstFreeBlock = {};
           midx BlockCount = Block - Frame->Blocks;
           if(BlockCount >= MAX_BLOCKS_PER_FRAME)
           {
