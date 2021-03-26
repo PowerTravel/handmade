@@ -27,12 +27,12 @@ CreateComponent(memory_arena* Arena, component_list* ComponentList)
     Assert((ComponentList->ChunkSize - Chunk->Used) == 0);
     Chunk = PushNewChunk(Arena, ComponentList);
   }
-
+  
   component_head* ComponentHead = (component_head*) (Chunk->Memory + Chunk->Used);
   Chunk->Used += ComponentList->ComponentSize;
   ++ComponentList->Count;
   Assert(Chunk->Used <= ComponentList->ChunkSize);
-
+  
   return ComponentHead;
 }
 
@@ -55,9 +55,9 @@ internal inline entity* GetEntityFromID(entity_manager* EM, u32 EntityID)
 {
   em_chunk* EntityChunk = EM->EntityList;
   u32 ChunkStartIdx = EM->EntitiesPerChunk * (EM->EntityChunkCount-1);
-
+  
   u32 EntityIndex = EntityID-1;
-
+  
   while(EntityIndex < ChunkStartIdx)
   {
     Assert(EntityChunk->Next);
@@ -65,9 +65,9 @@ internal inline entity* GetEntityFromID(entity_manager* EM, u32 EntityID)
     ChunkStartIdx -= EM->EntitiesPerChunk;
     EntityChunk = EntityChunk->Next;
   }
-
+  
   Assert(ChunkStartIdx< EM->EntityCount);
-
+  
   u32 IDWithinChunk = EntityIndex % EM->EntitiesPerChunk;
   entity* Entity = ( (entity*) EntityChunk->Memory ) + IDWithinChunk;
   Assert(Entity->ID == EntityID);
@@ -98,7 +98,7 @@ void PopulateChunkWithComponents(entity_manager* EM, entity* Entity, entity_comp
     Chunk->Components[Index++] = Head;
     FlagsToAdd -= ComponentList->Type;
   }
-
+  
   Chunk->Next = Entity->Components;
   Entity->Components = Chunk;
 }
@@ -109,21 +109,21 @@ void NewComponents(entity_manager* EM, u32 EntityID, u32 ComponentFlags)
   Assert(EntityID != 0);
   Assert(EntityID <= EM->EntityCount);
   Assert( ! ( ComponentFlags & ( ~(COMPONENT_FLAG_FINAL - 1) ) ) );
-
+  
   entity* Entity = GetEntityFromID(EM, EntityID);
   Assert(( ComponentFlags & Entity->ComponentFlags) == COMPONENT_FLAG_NONE);
   Entity->ComponentFlags = Entity->ComponentFlags | ComponentFlags;
-
+  
   entity_component_chunk* Chunk = GetNewComponentChunk(&EM->Arena, ComponentFlags);
   PopulateChunkWithComponents(EM, Entity, Chunk);
-
+  
 }
 
 u32 NewEntity( entity_manager* EM )
 {
   CheckArena(&EM->Arena);
   em_chunk* Entities = EM->EntityList;
-
+  
   u32 EntitySize = sizeof(entity);
   u32 ChunkSize = EM->EntitiesPerChunk * EntitySize;
   midx SpaceLeft = ChunkSize - Entities->Used;
@@ -136,12 +136,12 @@ u32 NewEntity( entity_manager* EM )
     Entities = EM->EntityList;
     ++EM->EntityChunkCount;
   }
-
+  
   entity* NewEntity = (entity*)(Entities->Memory + Entities->Used);
   Entities->Used += EntitySize;
   NewEntity->ID = ++EM->EntityCount;
   NewEntity->Components = 0;
-
+  
   return NewEntity->ID;
 }
 
@@ -184,12 +184,12 @@ internal u8* GetComponent(entity_manager* EM, entity* Entity, u32 ComponentFlag)
   {
     return Result;
   }
-
+  
   entity_component_chunk* Chunk = GetChunkContainingComponent( Entity, ComponentFlag );
   u32 Index = GetOrderIndexOfBit(Chunk->Types, ComponentFlag);
   component_head* Head = Chunk->Components[Index];
   Assert(Head->Type == ComponentFlag);
-
+  
   Result = ((u8*) Head) + sizeof(component_head);
   return Result;
 }
@@ -248,10 +248,10 @@ internal inline b32 HasAllComponents(component_head* Component, u32 Flags)
 }
 
 internal u32 FilterForComponentTypes(entity_manager* EM, component_list* ComponentList, u32 ComponentFlags,
-  component_filter_list_entry** ReturnList)
+                                     component_filter_list_entry** ReturnList)
 {
   u32 FlagsToAdd = ComponentFlags - (ComponentList->Type & ComponentFlags);
-
+  
   component_filter_list_entry* ListHead = 0;
   u32 ListEntryCount = 0;
   em_chunk* Chunk = ComponentList->First;
@@ -295,7 +295,7 @@ internal u32 FilterForComponentTypes(entity_manager* EM, component_list* Compone
     }
     Chunk = Chunk->Next;
   }
-
+  
   *ReturnList = ListHead;
   return ListEntryCount;
 }
@@ -307,10 +307,10 @@ component_result* GetComponentsOfType(entity_manager* EM, u32 ComponentFlags)
     *((int*)0) = 0;
   }
   component_list* SmallestList = GetListWithLowestCount(EM, ComponentFlags);
-
+  
   component_filter_list_entry* ReturnList;
   u32 ListCount = FilterForComponentTypes(EM, SmallestList, ComponentFlags, &ReturnList);
-
+  
   component_result* Result = PushStruct(&EM->Arena, component_result);
   Result->EM = EM;
   Result->MainType = SmallestList->Type;
@@ -320,9 +320,11 @@ component_result* GetComponentsOfType(entity_manager* EM, u32 ComponentFlags)
   Result->ArrayIndex = 0;
   Result->ComponentIndex = 0;
   Result->FilteredArray = PushArray(&EM->Arena, ListCount, filtered_components);
+  
   filtered_components* FilteredEntry = Result->FilteredArray;
   while (ReturnList)
   {
+    Result->EntityCount += ReturnList->Entry.Count;
     *FilteredEntry++ = ReturnList->Entry;
     ReturnList = ReturnList->Next;
   }
@@ -343,9 +345,9 @@ u8* GetComponent(entity_manager* EM, component_result* ComponentList, u32 Compon
   {
     return Result;
   }
-
+  
   filtered_components* Array = ComponentList->FilteredArray + ComponentList->ArrayIndex;
-
+  
   Assert(ComponentList->ComponentIndex < Array->Count);
   component_head* Head = (component_head*) (((u8*) Array->Heads) +  ComponentList->MainTypeSize * ComponentList->ComponentIndex);
   if(Head->Type & ComponentFlag)
@@ -354,7 +356,7 @@ u8* GetComponent(entity_manager* EM, component_result* ComponentList, u32 Compon
   }else if(HasAllComponents(Head,ComponentFlag)){
     Result = GetComponent(EM, Head->Entity, ComponentFlag);
   }
-
+  
   return Result;
 }
 
@@ -379,18 +381,12 @@ b32 Next(entity_manager* EM, component_result* ComponentList)
 entity_manager* CreateEntityManager( )
 {
   entity_manager* Result = BootstrapPushStruct(entity_manager, Arena);
-
+  
   u32 CameraChunkCount = 10;
   u32 LightChunkCount = 10;
   u32 ControllerChunkCount = 4;
   u32 EntityChunkCount = 128;
-
-  // Test to see if chunksizes work
-  CameraChunkCount = 4;
-  LightChunkCount = 4;
-  ControllerChunkCount = 4;
-  EntityChunkCount = 4;
-
+  
   Result->ComponentCount = IndexOfLeastSignificantSetBit(COMPONENT_FLAG_FINAL);
   Result->Components = PushArray( &Result->Arena, Result->ComponentCount, component_list);
   Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_CAMERA)] = ComponentList(COMPONENT_FLAG_CAMERA, sizeof(component_camera), CameraChunkCount, COMPONENT_FLAG_NONE);
@@ -401,7 +397,7 @@ entity_manager* CreateEntityManager( )
   Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_DYNAMICS)] = ComponentList(COMPONENT_FLAG_DYNAMICS, sizeof(component_dynamics), EntityChunkCount, COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_COLLIDER);
   Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_RENDER)] = ComponentList(COMPONENT_FLAG_RENDER, sizeof(component_render), EntityChunkCount, COMPONENT_FLAG_NONE);
   Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_SPRITE_ANIMATION)] = ComponentList(COMPONENT_FLAG_SPRITE_ANIMATION, sizeof(component_sprite_animation), EntityChunkCount, COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_RENDER);
-
+  
   Result->EntityCount = 0;
   Result->EntityChunkCount = 1;
   Result->EntitiesPerChunk = EntityChunkCount;
@@ -409,6 +405,6 @@ entity_manager* CreateEntityManager( )
   Result->EntityList->Used = 0;
   Result->EntityList->Memory = PushArray(&Result->Arena, Result->EntitiesPerChunk * sizeof(entity), u8);
   Result->EntityList->Next = 0;
-
+  
   return Result;
 }

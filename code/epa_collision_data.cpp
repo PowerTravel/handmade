@@ -23,7 +23,7 @@ void FixWindingCCW(gjk_support Support[4])
   v3 v03 = Support[3].S - Support[0].S;
   const r32 Determinant = v03 * CrossProduct(v01,v02);
   Assert(Abs(Determinant) > 10E-7);
-
+  
   if(Determinant > 0.f)
   {
   	// Swap first and third Support
@@ -58,7 +58,7 @@ CreateSimplexMesh(memory_arena* Arena, gjk_simplex* Simplex )
   FixWindingCCW(Tetrahedron);
   epa_mesh* Result = InitializeMesh(Arena, &Tetrahedron[0], &Tetrahedron[1], &Tetrahedron[2]);
   FillHole(Result, &Tetrahedron[3]);
-
+  
   return Result;
 }
 
@@ -69,33 +69,29 @@ void PopulateContactData(const m4* AModelMat, const m4* BModelMat, epa_face* Fac
   gjk_support C = Face->Edge->Next->Next->TargetVertex->P;
   v3 FaceNormal = GetNormal(Face);
   v3 P = FaceNormal * DistanceToClosestFace;
-
+  
   v3 Coords = GetBaryocentricCoordinates(A.S,B.S,C.S,FaceNormal,P);
-
+  
   //Assert(((Coords.E[0] >= 0) && (Coords.E[0] <= 1) &&
   //        (Coords.E[1] >= 0) && (Coords.E[1] <= 1) &&
   //        (Coords.E[2] >= 0) && (Coords.E[2] <= 1)));
-
+  
   v3 InterpolatedSupportA = Coords.E[0] * A.A + Coords.E[1] * B.A + Coords.E[2] * C.A;
   v3 InterpolatedSupportB = Coords.E[0] * A.B + Coords.E[1] * B.B + Coords.E[2] * C.B;
-
-
-  v3 Tangent1 = V3(0.0f, FaceNormal.Z, -FaceNormal.Y);
-  if ( FaceNormal.X >= 0.57735f)
-  {
-    Tangent1 = V3(FaceNormal.Y, -FaceNormal.X, 0.0f);
-  }
-  Normalize(Tangent1);
-
+  
+  v3 Tangent1 = {};
+  v3 Tangent2 = {};
+  getOrthronormalVectorPair(FaceNormal, &Tangent1, &Tangent2);
+  
   ContactData->A_ContactWorldSpace = V3(*AModelMat * V4(InterpolatedSupportA,1));
   ContactData->B_ContactWorldSpace = V3(*BModelMat * V4(InterpolatedSupportB,1));
   ContactData->A_ContactModelSpace = InterpolatedSupportA;
   ContactData->B_ContactModelSpace = InterpolatedSupportB;
   ContactData->ContactNormal       = FaceNormal;
   ContactData->TangentNormalOne    = Tangent1;
-  ContactData->TangentNormalTwo    = CrossProduct(FaceNormal, Tangent1);
+  ContactData->TangentNormalTwo    = Tangent2;
   ContactData->PenetrationDepth    = DistanceToClosestFace;
-
+  
   Assert(Norm(FaceNormal)>0.5f);
 }
 
@@ -105,21 +101,21 @@ contact_data EPACollisionResolution(memory_arena* Arena,
                                     gjk_simplex* Simplex)
 {
   TIMED_FUNCTION();
-
+  
   BlowUpSimplex(AModelMat, AMesh,
                 BModelMat, BMesh,
                 Simplex);
-
+  
   epa_mesh* Mesh = CreateSimplexMesh(Arena, Simplex);
-
+  
   epa_face* ClosestFace = 0;
   const v3 Origin = {};
   r32 PreviousDistanceToClosestFace = R32Max;
   r32 DistanceToClosestFace = R32Max;
-
+  
   u32 Tries = 0;
-  const u32 TriesUntilGivingUp = 2;
-
+  const u32 TriesUntilGivingUp = 12;
+  
   for(;;)
   {
     // Todo: Does the line from the origin to the face have to be parallel with the face normal?
@@ -129,27 +125,27 @@ contact_data EPACollisionResolution(memory_arena* Arena,
     {
       break;
     }
-
+    
     gjk_support SupportPoint = CsoSupportFunction( AModelMat, AMesh,
-                                                   BModelMat, BMesh,
-                                                   GetNormal(ClosestFace));
-
-
+                                                  BModelMat, BMesh,
+                                                  GetNormal(ClosestFace));
+    
+    
     if(!GrowMesh(Mesh, &SupportPoint))
     {
       break;
     }
-
+    
     PreviousDistanceToClosestFace = DistanceToClosestFace;
-
+    
   };
   Assert(ClosestFace);
-
+  
   contact_data ContactData = {};
   PopulateContactData(AModelMat, BModelMat, ClosestFace, DistanceToClosestFace, &ContactData);
-
+  
   return ContactData;
-
+  
 }
 
 void ResetManifoldSlot(contact_manifold* ManifoldSlot, u32 ManifoldIndex, u32 EntityIDA, u32 EntityIDB)
@@ -158,7 +154,7 @@ void ResetManifoldSlot(contact_manifold* ManifoldSlot, u32 ManifoldIndex, u32 En
   Assert(!ManifoldSlot->EntityIDA);
   Assert(!ManifoldSlot->EntityIDB);
   Assert(ManifoldSlot->Contacts.Valid());
-
+  
   ManifoldSlot->EntityIDA = EntityIDA;
   ManifoldSlot->EntityIDB = EntityIDB;
   ManifoldSlot->MaxContactCount = 4;
@@ -191,7 +187,7 @@ contact_manifold* FindManifoldSlot(world_contact_chunk* Manifolds, u32 EntityIDA
       TIMED_BLOCK(ContactArrayCollisions);
       ++HashMapCollisions;
       Assert( !((EntityIDA == ManifoldArraySlot->EntityIDA) && (EntityIDB == ManifoldArraySlot->EntityIDB)) &&
-              !((EntityIDB == ManifoldArraySlot->EntityIDA) && (EntityIDA == ManifoldArraySlot->EntityIDB)) );
+             !((EntityIDB == ManifoldArraySlot->EntityIDA) && (EntityIDA == ManifoldArraySlot->EntityIDB)) );
       ManifoldIndex = (ManifoldIndex+1) % Manifolds->MaxCount;
     }
   }

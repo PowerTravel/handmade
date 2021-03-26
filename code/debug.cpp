@@ -10,7 +10,7 @@ void ClearFrame(debug_frame* Frame)
   Frame->EndClock = 0;
   Frame->WallSecondsElapsed = 0;
   Frame->FrameBarLaneCount = 0;
-  ZeroArray(ArrayCount(Frame->Threads), Frame->Threads); 
+  ZeroArray(ArrayCount(Frame->Threads), Frame->Threads);
   Frame->FirstFreeBlock = 0;
   Frame->Statistics.Clear();
 }
@@ -24,8 +24,8 @@ internal void ResetCollation()
   DebugState->SelectedThreadIndex = 0;
   DebugState->FunctionList.Clear();
   for(u32 FrameIndex = 0;
-          FrameIndex < ArrayCount(DebugState->Frames);
-          ++FrameIndex)
+      FrameIndex < ArrayCount(DebugState->Frames);
+      ++FrameIndex)
   {
     debug_frame* Frame = DebugState->Frames+FrameIndex;
     ClearFrame(Frame);
@@ -36,7 +36,7 @@ MENU_EVENT_CALLBACK(DebugToggleButton)
 {
   v4 InactiveColor = V4(0.3,0.1,0.1,1);
   v4 ActiveColor = V4(0.1,0.3,0.1,1);
-
+  
   b32* ButtonFlag = (b32*) Data;
   *ButtonFlag = !*ButtonFlag;
   color_attribute* ColorAttr =  (color_attribute*) GetAttributePointer(CallerNode, ATTRIBUTE_COLOR);
@@ -55,9 +55,9 @@ DEBUGGetState()
   if(!DebugState)
   {
     DebugGlobalMemory->DebugState = BootstrapPushStruct(debug_state, Arena);
-
+    
     DebugGlobalMemory->DebugState->FunctionList = vector_list<debug_record_entry>(&DebugGlobalMemory->DebugState->Arena, MAX_DEBUG_RECORD_COUNT*MAX_DEBUG_TRANSLATION_UNITS);
-
+    
     for(u32 FrameIndex = 0;
         FrameIndex < ArrayCount(DebugGlobalMemory->DebugState->Frames);
         ++FrameIndex)
@@ -69,25 +69,25 @@ DEBUGGetState()
     }
     DebugState = DebugGlobalMemory->DebugState;
   }
-
+  
   if(!DebugState->Initialized)
   {
     // Transient Memory Begin
     DebugState->Initialized = true;
     DebugState->Paused = false;
     DebugState->ThreadSelected = true;
-
+    
     // Config state
     DebugState->ConfigMultiThreaded = MULTI_THREADED;
     DebugState->ConfigCollisionPoints = SHOW_COLLISION_POINTS;
     DebugState->ConfigCollider = SHOW_COLLIDER;
     DebugState->ConfigAABBTree = SHOW_AABB_TREE;
-
+    
     // Set menu window
     u32 FontSize = 18;
     rect2f ButtonSize = GetTextSize(0, 0, "CollisionPoints", FontSize);
     v4 TextColor = V4(1,1,1,1);
-
+    
     ButtonSize.W += 0.02f;
     ButtonSize.H += 0.02f;
     r32 ContainerWidth = 0.7;
@@ -100,10 +100,10 @@ DEBUGGetState()
       Grid->Row = 0;
       Grid->TotalMarginX = 0.0;
       Grid->TotalMarginY = 0.0;
-
+      
       color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, ButtonContainer, ATTRIBUTE_COLOR);
       BackgroundColor->Color = V4(0,0,0,0.7);
-
+      
       auto CreateButton = [&ButtonSize, &FontSize, &TextColor]( b32* ButtonFlag, c8* ButtonText)
       {
         container_node* ButtonNode = NewContainer(GlobalGameState->MenuInterface);
@@ -112,7 +112,7 @@ DEBUGGetState()
         str::CopyStringsUnchecked( ButtonText, Text->Text );
         Text->FontSize = FontSize;
         Text->Color = TextColor;
-
+        
         size_attribute* SizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_SIZE);
         SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, ButtonSize.W);
         SizeAttr->Height = ContainerSizeT(menu_size_type::ABSOLUTE, ButtonSize.H);
@@ -120,18 +120,18 @@ DEBUGGetState()
         SizeAttr->TopOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
         SizeAttr->XAlignment = menu_region_alignment::CENTER;
         SizeAttr->YAlignment = menu_region_alignment::CENTER;
-
+        
         v4 InactiveColor = V4(0.3,0.1,0.1,1);
         v4 ActiveColor = V4(0.1,0.3,0.1,1);
-
+        
         color_attribute* ColorAttr = (color_attribute*) PushAttribute(GlobalGameState->MenuInterface, ButtonNode, ATTRIBUTE_COLOR);
         ColorAttr->Color = *ButtonFlag ?  ActiveColor : InactiveColor;
-
+        
         RegisterMenuEvent(GlobalGameState->MenuInterface, menu_event_type::MouseDown, ButtonNode, ButtonFlag, DebugToggleButton, 0 );
-
+        
         return ButtonNode;
       };
-
+      
       ConnectNodeToBack(ButtonContainer, CreateButton(&DebugState->ConfigMultiThreaded, "Multithread"));
       ConnectNodeToBack(ButtonContainer, CreateButton(&DebugState->ConfigCollisionPoints, "CollisionPoints"));
       ConnectNodeToBack(ButtonContainer, CreateButton(&DebugState->ConfigCollider, "Colliders"));
@@ -145,7 +145,7 @@ DEBUGGetState()
         str::CopyStringsUnchecked( "Recompile", Text->Text );
         Text->FontSize = FontSize;
         Text->Color = TextColor;
-
+        
         size_attribute* SizeAttr = (size_attribute*) PushAttribute(GlobalGameState->MenuInterface, RecompileButton, ATTRIBUTE_SIZE);
         SizeAttr->Width = ContainerSizeT(menu_size_type::ABSOLUTE, ButtonSize.W);
         SizeAttr->Height = ContainerSizeT(menu_size_type::RELATIVE, 1);
@@ -153,69 +153,69 @@ DEBUGGetState()
         SizeAttr->TopOffset = ContainerSizeT(menu_size_type::RELATIVE, 0);
         SizeAttr->XAlignment = menu_region_alignment::CENTER;
         SizeAttr->YAlignment = menu_region_alignment::CENTER;
-
+        
         RegisterMenuEvent(GlobalGameState->MenuInterface, menu_event_type::MouseDown, RecompileButton, 0, DebugRecompileButton, 0 );
       }
       SettingsPlugin = CreatePlugin(GlobalGameState->MenuInterface, "Settings", V4(0.5,0.5,0.5,1), ButtonContainer);
     }
-
+    
     // Create graph window
     container_node* FunctionPlugin = 0;
     {
-
+      
       container_node* FunctionContainer = NewContainer(GlobalGameState->MenuInterface);
       FunctionContainer->Functions.Draw = DeclareFunction(menu_draw, DrawStatistics);
-
+      
       FunctionPlugin = CreatePlugin(GlobalGameState->MenuInterface, "Functions", HexCodeToColorV4( 0xABF74F ), FunctionContainer);
       color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, FunctionPlugin, ATTRIBUTE_COLOR);
       BackgroundColor->Color = V4(0,0,0,0.7);
     }
-
+    
     // Create graph window
     container_node* GraphPlugin = 0;
     {
       container_node* ChartContainer = NewContainer(GlobalGameState->MenuInterface);
       ChartContainer->Functions.Draw = DeclareFunction(menu_draw, DrawFunctionTimeline);
-
+      
       container_node* FrameContainer = NewContainer(GlobalGameState->MenuInterface);
       FrameContainer->Functions.Draw = DeclareFunction(menu_draw, DrawFrameFunctions);
-
+      
       container_node* SplitNode  = NewContainer(GlobalGameState->MenuInterface, container_type::Split);
       color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, SplitNode, ATTRIBUTE_COLOR);
       BackgroundColor->Color = V4(0,0,0,0.7);
-
+      
       container_node* BorderNode = CreateBorderNode(GlobalGameState->MenuInterface, false, 0.7);
       ConnectNodeToBack(SplitNode, BorderNode);
       ConnectNodeToBack(SplitNode, FrameContainer);
       ConnectNodeToBack(SplitNode, ChartContainer);
-
+      
       GraphPlugin = CreatePlugin(GlobalGameState->MenuInterface, "Profiler", HexCodeToColorV4( 0xAB274F ), SplitNode);
     }
-
+    
     container_node* EnergyChart = 0;
     {
       container_node* ChartContainer = NewContainer(GlobalGameState->MenuInterface);
       color_attribute* BackgroundColor = (color_attribute* ) PushAttribute(GlobalGameState->MenuInterface, ChartContainer, ATTRIBUTE_COLOR);
-      BackgroundColor->Color = V4(0,0,0,0.7);      
+      BackgroundColor->Color = V4(0,0,0,0.7);
       EnergyChart = CreatePlugin(GlobalGameState->MenuInterface, "EnergyChart", HexCodeToColorV4( 0xA1272F ), ChartContainer);
       texture_attribute* Texture = (texture_attribute*) PushAttribute(GlobalGameState->MenuInterface, ChartContainer, ATTRIBUTE_TEXTURE);
       GetHandle(GlobalGameState->AssetManager, "energy_plot", &Texture->Handle);
     }
-
+    
     menu_tree* WindowsDropDownMenu = RegisterMenu(GlobalGameState->MenuInterface, "Windows");
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, SettingsPlugin);
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, GraphPlugin);
     RegisterWindow(GlobalGameState->MenuInterface, WindowsDropDownMenu, FunctionPlugin);
-
+    
     menu_tree* ChartsDropDownMenu = RegisterMenu(GlobalGameState->MenuInterface, "Charts");
     RegisterWindow(GlobalGameState->MenuInterface, ChartsDropDownMenu, EnergyChart);
-
+    
     //ToggleWindow(GlobalGameState->MenuInterface, "Functions");
     //ToggleWindow(GlobalGameState->MenuInterface, "Settings");
     //ToggleWindow(GlobalGameState->MenuInterface, "Profiler");
-
+    
     ToggleWindow(GlobalGameState->MenuInterface, "EnergyChart");
-
+    
   }
   return DebugState;
 }
@@ -310,34 +310,34 @@ inline u32 GetRecordIndexFromEvent( debug_event* Event )
 void CollateDebugRecords(game_memory* Memory)
 {
   debug_state* DebugState = DEBUGGetState();
-
+  
   // Start on the frame after the one we are writing to
   u32 DebugTableFrame = GlobalDebugTable->CurrentEventArrayIndex - 1;
   if(GlobalDebugTable->CurrentEventArrayIndex == 0)
   {
     DebugTableFrame = MAX_DEBUG_EVENT_ARRAY_COUNT-1;
   }
-
+  
   debug_frame* Frame = DebugState->Frames + DebugState->CurrentFrameIndex;
-
+  
   // Get the  statistics list for the current frame;
   vector_list<debug_statistics>* FrameStatistics = &Frame->Statistics;
-
+  
   // Get the persistent function list from the debug state
   vector_list<debug_record_entry>* FunctionList = &DebugState->FunctionList;
-
+  
   BEGIN_BLOCK(ProfileCollation);
   u32 EventCount = GlobalDebugTable->EventCount[DebugTableFrame];
   for(u32 EventIndex = 0;
-          EventIndex < EventCount;
-          ++EventIndex)
+      EventIndex < EventCount;
+      ++EventIndex)
   {
     // Get the record and event from the debug table
     debug_event* Event = GlobalDebugTable->Events[DebugTableFrame] + EventIndex;
     debug_record* DebugRecord = (GlobalDebugTable->Records[Event->TranslationUnit] + Event->DebugRecordIndex);
-
+    
     u32 RecordIndex = GetRecordIndexFromEvent(Event);
-
+    
     switch(Event->Type)
     {
       case DebugEvent_FrameMarker:
@@ -347,7 +347,7 @@ void CollateDebugRecords(game_memory* Memory)
           Frame->EndClock = Event->Clock;
           Frame->WallSecondsElapsed = Event->SecondsElapsed;
         }
-
+        
         u32 MaxFrameCount = ArrayCount(DebugState->Frames);
         ++Frame;
         ++DebugState->CurrentFrameIndex;
@@ -372,7 +372,7 @@ void CollateDebugRecords(game_memory* Memory)
           if(!FunctionList->Exists(RecordIndex))
           {
             debug_record_entry Entry{};
-            str::CopyStringsUnchecked(DebugRecord->BlockName, Entry.BlockName); 
+            str::CopyStringsUnchecked(DebugRecord->BlockName, Entry.BlockName);
             Entry.LineNumber = DebugRecord->LineNumber;
             RecordEntry = FunctionList->PushBack(Entry, RecordIndex);
           }else{
@@ -389,32 +389,32 @@ void CollateDebugRecords(game_memory* Memory)
             //       For now just change the MAX_BLOCKS_PER_FRAME if we hit this assert
             Assert(0);
           }
-
+          
           Block->Record = RecordEntry;
           Block->ThreadIndex = Thread->ID;
           Block->BeginClock = Event->Clock - Frame->BeginClock;
           Block->EndClock = 0;
           Block->OpeningEvent = *Event;
-
+          
           // Set the opening block for this thread
           if(!Thread->FirstBlock)
           {
             Thread->FirstBlock = Block;
           }
-
+          
           // If we have an open block it means this event was called inside it -> we are going deeper into the stack
           if(Thread->OpenBlock && !Thread->OpenBlock->FirstChild)
           {
             Thread->OpenBlock->FirstChild = Block;
           }
-
+          
           Block->Parent = Thread->OpenBlock;
-
+          
           if(Thread->ClosedBlock && GetRecordFrom(Thread->ClosedBlock->Parent) == GetRecordFrom(Block->Parent))
           {
             Thread->ClosedBlock->Next = Block;
           }
-
+          
           Thread->OpenBlock = Block;
         }
       }break;
@@ -424,21 +424,21 @@ void CollateDebugRecords(game_memory* Memory)
         {
           debug_record_entry* RecordEntry = FunctionList->GetFromVector(RecordIndex);
           Assert(FunctionList->Exists(RecordIndex));
-
+          
           debug_thread* Thread = GetDebugThread(Memory, Frame, Event->TC.ThreadID);
           Assert(Thread->OpenBlock);
           debug_block* Block = Thread->OpenBlock;
           Block->EndClock = Event->Clock - Frame->BeginClock;
-
+          
           debug_event* OpeningEvent = &Block->OpeningEvent;
           Assert(OpeningEvent->TC.ThreadID      == Event->TC.ThreadID);
           Assert(OpeningEvent->DebugRecordIndex == Event->DebugRecordIndex);
           Assert(OpeningEvent->TranslationUnit  == Event->TranslationUnit);
-
+          
           Thread->ClosedBlock = Block;
           
           Thread->OpenBlock = Block->Parent;
-
+          
           u32 Hash = utils::djb2_hash(RecordEntry->BlockName);
           u32 HashedIndex = Hash % FrameStatistics->maxSize();
           debug_statistics* Statistic = 0;
@@ -453,14 +453,14 @@ void CollateDebugRecords(game_memory* Memory)
             }
             ++HashedIndex;
           }
-
+          
           if(!EntryFound)
           {
             debug_statistics Stats = {};
             BeginDebugStatistics(&Stats, RecordEntry);
             Statistic = FrameStatistics->PushBack(Stats, HashedIndex);
           }
-
+          
           AccumulateStatistic(Statistic, (r32)(Block->EndClock - Block->BeginClock));
         }
       }break;
@@ -473,25 +473,25 @@ inline void
 DebugRewriteConfigFile()
 {
   debug_state* DebugState = DEBUGGetState();
-
+  
   c8 Buffer[4096] = {};
   u32 Size = Platform.DEBUGFormatString(Buffer, sizeof(Buffer), sizeof(Buffer)-1,
-"#define MULTI_THREADED %d // b32\n\
+                                        "#define MULTI_THREADED %d // b32\n\
 #define SHOW_COLLISION_POINTS %d // b32\n\
 #define SHOW_COLLIDER %d // b32\n\
 #define SHOW_AABB_TREE %d // b32",
-    DebugState->ConfigMultiThreaded,
-    DebugState->ConfigCollisionPoints,
-    DebugState->ConfigCollider,
-    DebugState->ConfigAABBTree);
+                                        DebugState->ConfigMultiThreaded,
+                                        DebugState->ConfigCollisionPoints,
+                                        DebugState->ConfigCollider,
+                                        DebugState->ConfigAABBTree);
   thread_context Dummy = {};
-
+  
   Platform.DEBUGPlatformWriteEntireFile(&Dummy, "W:\\handmade\\code\\debug_config.h", Size, Buffer);
-
+  
   //DebugState->UpdateConfig = false;
   DebugState->Compiler = Platform.DEBUGExecuteSystemCommand("W:\\handmade\\code", "C:\\windows\\system32\\cmd.exe", "/C build_game.bat");
   DebugState->Compiling = true;
-
+  
 }
 
 
@@ -499,7 +499,7 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
 {
   if(!GlobalDebugTable) return 0;
   GlobalDebugTable->RecordCount[0] = DebugRecords_Main_Count; // This stores the amount of records found is the first translation unit, (The Game)
-
+  
   // Increment which event-array we should  be writing to. (Each frame writes into it's own array)
   ++GlobalDebugTable->CurrentEventArrayIndex;
   if(GlobalDebugTable->CurrentEventArrayIndex >= ArrayCount(GlobalDebugTable->Events))
@@ -507,18 +507,18 @@ extern "C" DEBUG_GAME_FRAME_END(DEBUGGameFrameEnd)
     // Wrap if we reached the final array
     GlobalDebugTable->CurrentEventArrayIndex=0;
   }
-
+  
   // Shift CurrentEventArrayIndex to the high bits of ArrayIndex_EventIndex.
   //  The old value of ArrayIndex_EventIndex is returned by AtomicExchangeu64
   // Note the low bits "EventIndex" is zeroed out since we wanna start writing from the top of the array next frame.
   // EventIndex is incremented each time we run through a TIMED_FUNCTION macro
   u64 ArrayIndex_EventIndex = AtomicExchangeu64(&GlobalDebugTable->EventArrayIndex_EventIndex,          // The new value is stored in this variable
-                                               ((u64)GlobalDebugTable->CurrentEventArrayIndex << 32));  // This is the new value
-
+                                                ((u64)GlobalDebugTable->CurrentEventArrayIndex << 32));  // This is the new value
+  
   u32 EventArrayIndex = (ArrayIndex_EventIndex >> 32);         // The event array index we just finished writing to
   u32 EventCount = (ArrayIndex_EventIndex & 0xFFFFFFFF);       // The number of events encountered last frame
   GlobalDebugTable->EventCount[EventArrayIndex] = EventCount;  // The frame "EventArrayIndex" saw "EventCount" Recorded Events
-
+  
   debug_state* DebugState = DEBUGGetState();
   if(DebugState)
   {
@@ -553,7 +553,7 @@ MENU_DRAW(DrawStatistics)
   BEGIN_BLOCK(AllocatingMemory);
   rect2f Region = Shrink(Node->Region,0.01);
   debug_state* DebugState = DEBUGGetState();
-
+  
   ScopedMemory Memory(GlobalGameState->TransientArena);
   memory_arena* Arena = GlobalGameState->TransientArena;
   
@@ -563,8 +563,8 @@ MENU_DRAW(DrawStatistics)
   // TODO: This loop is super slow and it's unecessary to loop through it all every frame.
   //       Instead we can store the sum of CycleCount and HitCount for all previous farmes
   //       in each frame and calculate the average by just going through the latest frame
-
-  // For each frame and for each debug-record: 
+  
+  // For each frame and for each debug-record:
   u32 RowCount = 0;
   u32 CurrentFrameIndex = DebugState->CurrentFrameIndex == 0 ? MAX_DEBUG_FRAME_COUNT-1 : DebugState->CurrentFrameIndex-1;
   u32 FrameCount = 0;
@@ -574,81 +574,81 @@ MENU_DRAW(DrawStatistics)
     FrameCount++;
     debug_frame* Frame = DebugState->Frames + FrameIndex;
     u64 FrameCycleCount = Frame->EndClock - Frame->BeginClock;
-
+    
     vector_list<debug_statistics>* FrameStatistics = &Frame->Statistics;
     debug_statistics*  Stat = FrameStatistics->First();
     
     while(Stat)
     {
       Assert(Stat->HitCount);
-
+      
       u32 ArrayIndex = FrameStatistics->GetIndexOfEntry(Stat);
-
+      
       debug_statistics* CumulativeStat = CumulativeStats.GetFromVector(ArrayIndex);
-
+      
       if(!CumulativeStats.Exists(ArrayIndex))
       {
         debug_statistics NewStatisticEntry{};
         BeginDebugStatistics(&NewStatisticEntry, Stat->Record);
         CumulativeStat = CumulativeStats.PushBack(NewStatisticEntry, ArrayIndex);
       }
-
+      
       CumulativeStat->HitCount += Stat->HitCount;
       CumulativeStat->Min = Minimum(CumulativeStat->Min, Stat->Min);
       CumulativeStat->Max = Maximum(CumulativeStat->Max, Stat->Max);
       CumulativeStat->Tot += Stat->Tot;
-
+      
       Stat = FrameStatistics->Next(Stat);
     }
   }
-
+  
   debug_statistics* Stat = CumulativeStats.First();
   while(Stat)
   {
     Assert(Stat->HitCount);
-
+    
     r32 HitCount = (Stat->HitCount / (r32) FrameCount);
     r32 CycleCount = (Stat->Tot / (r32) FrameCount);
-
+    
     debug_record_entry* Record = Stat->Record;
     u32 ArrayIndex = DebugFunctions->GetIndexOfEntry(Record);
     Assert(DebugFunctions->Exists(ArrayIndex));
-
+    
     Record->CycleCount = (u32) CycleCount;
     Record->HitCount = Ciel(HitCount);
     Record->HCCount = Ciel(CycleCount/HitCount);
-
+    
     Stat = CumulativeStats.Next(Stat);
   }
-
+  
   END_BLOCK(SummingStats);
-
-
+  
+  
   u32 Cols = 5;
   u32 FontSize = 8;
   r32 LineHeight = GetTextLineHeightSize(FontSize);
   rect2f HeaderRects[5] = {};
   char* Text[] = {"LineNumber ",
-                  "BlockName  ",
-                  "  CycleCount",
-                  "  HitCount",
-                  "Cy/Hi"};
+    "BlockName  ",
+    "  CycleCount",
+    "  HitCount",
+    "Cy/Hi"};
   r32 ColWidthPercent[5] = {};
   r32 ColWidthSum[5] = {};
-
+  
   r32 Width = GetTextWidth(Text[0], FontSize);
   ColWidthPercent[0] = Width / Region.W;
   ColWidthSum[1] = ColWidthPercent[0];
   ColWidthPercent[1] = 0.4;
   ColWidthSum[2] = ColWidthSum[1] + ColWidthPercent[1];
   r32 RemainingWidth =1.f - (ColWidthPercent[0] + ColWidthPercent[1]);
-
+  
   ColWidthPercent[2] = RemainingWidth/3.f;
   ColWidthSum[3] = ColWidthSum[2] + ColWidthPercent[2];
   ColWidthPercent[3] = RemainingWidth/3.f;
   ColWidthSum[4] =ColWidthSum[3] + ColWidthPercent[3];
   ColWidthPercent[4] = RemainingWidth/3.f;
-
+  
   rect2f TextRect[] = {
     Rect2f(Region.X + Region.W * ColWidthSum[0], Region.Y + Region.H - LineHeight, Region.W * ColWidthPercent[0], LineHeight ),
     Rect2f(Region.X + Region.W * ColWidthSum[1], Region.Y + Region.H - LineHeight, Region.W * ColWidthPercent[1], LineHeight ),
@@ -662,7 +662,7 @@ MENU_DRAW(DrawStatistics)
   PushTextAt(TextRect[2].X + TextRect[2].W - GetTextWidth(Text[2], FontSize), TextRect[2].Y, Text[2], FontSize, V4(1,1,1,1));
   PushTextAt(TextRect[3].X + TextRect[3].W - GetTextWidth(Text[3], FontSize), TextRect[3].Y, Text[3], FontSize, V4(1,1,1,1));
   PushTextAt(TextRect[4].X + TextRect[4].W - GetTextWidth(Text[4], FontSize), TextRect[4].Y, Text[4], FontSize, V4(1,1,1,1));
-
+  
   if(GlobalGameState->MenuInterface->MouseLeftButton.Active)
   {
     v2 DeltaMouse = Interface->PreviousMousePos - Interface->MousePos;
@@ -673,132 +673,132 @@ MENU_DRAW(DrawStatistics)
         if(DebugState->LineSorted == function_sorting::Ascending || DebugState->LineSorted == function_sorting::None){
           DebugState->LineSorted = function_sorting::Descending;
           DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
-          {
-            b32 Result = false;
-
-            if(A->LineNumber <= B->LineNumber)
-            {
-              Result = true;
-            }
-            return Result;
-          });
+                                    {
+                                      b32 Result = false;
+                                      
+                                      if(A->LineNumber <= B->LineNumber)
+                                      {
+                                        Result = true;
+                                      }
+                                      return Result;
+                                    });
         }else if(DebugState->LineSorted == function_sorting::Descending)
         {
           DebugState->LineSorted = function_sorting::Ascending;
           DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
-          {
-            b32 Result = false;
-
-            if(A->LineNumber >= B->LineNumber)
-            {
-              Result = true;
-            }
-            return Result;
-          });
+                                    {
+                                      b32 Result = false;
+                                      
+                                      if(A->LineNumber >= B->LineNumber)
+                                      {
+                                        Result = true;
+                                      }
+                                      return Result;
+                                    });
         }
       }else if(Intersects(TextRect[1], Interface->MousePos)){
-
+        
         if(DebugState->BlockNameSorted == function_sorting::Ascending || DebugState->BlockNameSorted == function_sorting::None){
           DebugState->BlockNameSorted = function_sorting::Descending;
           DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
-          {
-            b32 Result = str::Compare(A->BlockName, B->BlockName) >= 0;
-            return Result;
-          });
+                                    {
+                                      b32 Result = str::Compare(A->BlockName, B->BlockName) >= 0;
+                                      return Result;
+                                    });
         }else if(DebugState->BlockNameSorted == function_sorting::Descending)
         {
           DebugState->BlockNameSorted = function_sorting::Ascending;
           DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
-          {
-            b32 Result = str::Compare(A->BlockName,B->BlockName) <= 0;
-            return Result;
-          });
+                                    {
+                                      b32 Result = str::Compare(A->BlockName,B->BlockName) <= 0;
+                                      return Result;
+                                    });
         }
       }else if(Intersects(TextRect[2], Interface->MousePos)){
         if(DebugState->CycleCountSorted == function_sorting::Descending || DebugState->CycleCountSorted == function_sorting::None)
         {
           DebugState->CycleCountSorted = function_sorting::Ascending;
           DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
-          {
-            b32 Result = false;
-            if(A->CycleCount <= B->CycleCount)
-            {
-              Result = true;
-            }
-            return Result;
-          });
+                                    {
+                                      b32 Result = false;
+                                      if(A->CycleCount <= B->CycleCount)
+                                      {
+                                        Result = true;
+                                      }
+                                      return Result;
+                                    });
         }else if(DebugState->CycleCountSorted == function_sorting::Ascending){
           DebugState->CycleCountSorted = function_sorting::Descending;
           DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
-          {
-            b32 Result = false;
-            if(A->CycleCount >= B->CycleCount)
-            {
-              Result = true;
-            }
-            return Result;
-          });
+                                    {
+                                      b32 Result = false;
+                                      if(A->CycleCount >= B->CycleCount)
+                                      {
+                                        Result = true;
+                                      }
+                                      return Result;
+                                    });
         }
       }else if(Intersects(TextRect[3], Interface->MousePos)){
         if(DebugState->HitCountSorted == function_sorting::Descending || DebugState->HitCountSorted == function_sorting::None)
         {
           DebugState->HitCountSorted = function_sorting::Ascending;
           DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
-          {
-            b32 Result = false;
-            if(A->HitCount <= B->HitCount)
-            {
-              Result = true;
-            }
-            return Result;
-          });
+                                    {
+                                      b32 Result = false;
+                                      if(A->HitCount <= B->HitCount)
+                                      {
+                                        Result = true;
+                                      }
+                                      return Result;
+                                    });
         }else if(DebugState->HitCountSorted == function_sorting::Ascending){
           DebugState->HitCountSorted = function_sorting::Descending;
           DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
-          {
-            b32 Result = false;
-            if(A->HitCount >= B->HitCount)
-            {
-              Result = true;
-            }
-            return Result;
-          });
+                                    {
+                                      b32 Result = false;
+                                      if(A->HitCount >= B->HitCount)
+                                      {
+                                        Result = true;
+                                      }
+                                      return Result;
+                                    });
         }
       }else if(Intersects(TextRect[4], Interface->MousePos)){
         if(DebugState->CyclePerHitSorted == function_sorting::Descending || DebugState->CyclePerHitSorted == function_sorting::None)
         {
           DebugState->CyclePerHitSorted = function_sorting::Ascending;
           DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
-          {
-            b32 Result = false;
-            if(A->HCCount <= B->HCCount)
-            {
-              Result = true;
-            }
-            return Result;
-          });
+                                    {
+                                      b32 Result = false;
+                                      if(A->HCCount <= B->HCCount)
+                                      {
+                                        Result = true;
+                                      }
+                                      return Result;
+                                    });
         }else if(DebugState->CyclePerHitSorted == function_sorting::Ascending){
           DebugState->CyclePerHitSorted = function_sorting::Descending;
           DebugFunctions->MergeSort(GlobalGameState->TransientArena, [](debug_record_entry* A, debug_record_entry* B)
-          {
-            b32 Result = false;
-            if(A->HCCount >= B->HCCount)
-            {
-              Result = true;
-            }
-            return Result;
-          });
+                                    {
+                                      b32 Result = false;
+                                      if(A->HCCount >= B->HCCount)
+                                      {
+                                        Result = true;
+                                      }
+                                      return Result;
+                                    });
         }
-
+        
       }
     }
   }
-
-
-
+  
+  
+  
   BEGIN_BLOCK(PaintingStats);
   r32 YPos = Region.Y + Region.H - 2.5f * LineHeight;
-
+  
   v4 EventColor =  HexCodeToColorV4(0x00008B);
   EventColor.W = 0.5;
   v4 OddColor = HexCodeToColorV4(0x9400D3);
@@ -806,58 +806,58 @@ MENU_DRAW(DrawStatistics)
   b32 EvenRow = false;
   debug_record_entry* Entry = DebugFunctions->First();
   while(Entry)
-  { 
+  {
     rect2f RowRect = Rect2f(Node->Region.X, YPos-LineHeight*0.5f, Node->Region.W, LineHeight*1.5f);
     PushOverlayQuad(RowRect, EvenRow ? EventColor : OddColor );
     EvenRow = !EvenRow;
-
+    
     char StringBuffer[512]={};
-
+    
     Platform.DEBUGFormatString(StringBuffer, ArrayCount(StringBuffer), ArrayCount(StringBuffer)-1,
-    "%d: ", (u32)(Entry->LineNumber));
+                               "%d: ", (u32)(Entry->LineNumber));
     Width = GetTextWidth(StringBuffer,FontSize);
     r32 XPos = TextRect[0].X + TextRect[0].W - Width;
     PushTextAt(XPos, YPos, StringBuffer, FontSize, V4(1,1,1,1));
-
-
+    
+    
     Platform.DEBUGFormatString(StringBuffer, ArrayCount(StringBuffer), ArrayCount(StringBuffer)-1,
-    "%s", Entry->BlockName);
-
+                               "%s", Entry->BlockName);
+    
     XPos = TextRect[1].X;
     PushTextAt(XPos, YPos, StringBuffer, FontSize, V4(1,1,1,1));
-
+    
     Platform.DEBUGFormatString(StringBuffer, ArrayCount(StringBuffer), ArrayCount(StringBuffer)-1,
-    "%d", (u32) Entry->CycleCount);
+                               "%d", (u32) Entry->CycleCount);
     Width = GetTextWidth(StringBuffer,FontSize);
     
     XPos = TextRect[2].X + TextRect[2].W - Width;
     PushTextAt(XPos, YPos, StringBuffer, FontSize, V4(1,1,1,1));
-
-
+    
+    
     Platform.DEBUGFormatString(StringBuffer, ArrayCount(StringBuffer), ArrayCount(StringBuffer)-1,
-    "%d", (u32) Entry->HitCount);
+                               "%d", (u32) Entry->HitCount);
     Width = GetTextWidth(StringBuffer,FontSize);
     XPos = TextRect[3].X + TextRect[3].W - Width;
     PushTextAt(XPos, YPos, StringBuffer, FontSize, V4(1,1,1,1));
-
-
+    
+    
     Platform.DEBUGFormatString(StringBuffer, ArrayCount(StringBuffer), ArrayCount(StringBuffer)-1,
-    "%d", (u32) Entry->HCCount);
+                               "%d", (u32) Entry->HCCount);
     Width = GetTextWidth(StringBuffer,FontSize);
     XPos = TextRect[4].X + TextRect[4].W - Width;
     PushTextAt(XPos, YPos, StringBuffer, FontSize, V4(1,1,1,1));
-
-
+    
+    
     if(YPos-LineHeight < Region.Y){
       break;
     }
-
+    
     YPos -= LineHeight*1.5f;
-
+    
     Entry = DebugFunctions->Next(Entry);
     
   }
-
+  
   END_BLOCK(PaintingStats);
 }
 
@@ -887,7 +887,7 @@ b32 DrawLane(u32 ArrayMaxCount, u32 BlockCount, debug_block*** BlockArray, u32* 
       {
         (*Buffer)[(*BufferCount)++] = Block->FirstChild;
       }
-
+      
       rect2f Rect{};
       Rect.X = StartX + CycleScaling * (r32)( Block->BeginClock - CycleOffset) + PixelSize*0.5f;
       Rect.Y = StartY + LaneWidth * LaneIndex + PixelSize*0.5f;
@@ -904,7 +904,7 @@ b32 DrawLane(u32 ArrayMaxCount, u32 BlockCount, debug_block*** BlockArray, u32* 
         {
           c8 StringBuffer[1048] = {};
           Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
-          "%s : %2.2f MCy", Block->Record->BlockName, CycleCount/1000000.f);
+                                     "%s : %2.2f MCy", Block->Record->BlockName, CycleCount/1000000.f);
           PushTextAt(MousePos.X, MousePos.Y+0.02f, StringBuffer, 24, V4(1,1,1,1));
           *SelectedBlock = Block;
         }
@@ -921,7 +921,7 @@ u32 PushLaneToBuffer(debug_block* Block, u32 BufferCount, debug_block** Buffer)
   {
     if(Block->FirstChild)
     {
-      Buffer[BufferCount++] = Block->FirstChild;  
+      Buffer[BufferCount++] = Block->FirstChild;
     }
     Block = Block->Next;
   }
@@ -939,27 +939,27 @@ debug_block* DrawBlockChain(debug_block* Block, r32 StartX, r32 StartY, r32 Lane
     r32 CycleCount = (r32)(Block->EndClock - Block->BeginClock);
     Rect.W = CycleScaling * CycleCount - PixelSize;
     Rect.H = LaneWidth - PixelSize;
-
+    
     if(Rect.W >= PixelSize)
     {
       v4 Color = GetColorForRecord(Block->Record);
       PushOverlayQuad(Rect, Color);
-
+      
       if(Intersects(Rect, MousePos))
       {
         c8 StringBuffer[1048] = {};
         Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
-        "%s : %2.2f MCy", Block->Record->BlockName, CycleCount/1000000.f);
+                                   "%s : %2.2f MCy", Block->Record->BlockName, CycleCount/1000000.f);
         PushTextAt(MousePos.X, MousePos.Y+0.02f, StringBuffer, 24, V4(1,1,1,1));
         
         Result = Block;
       }
     }
-
-
+    
+    
     Block = Block->Next;
   }
-
+  
   return Result;
 }
 
@@ -978,14 +978,14 @@ MENU_DRAW(DrawFrameFunctions)
 {
   TIMED_FUNCTION();
   debug_state* DebugState = DEBUGGetState();
-
+  
   r32 ThreadBreak = 0.005;
-
+  
   rect2f Chart = Node->Region;
   Chart.H -= ThreadBreak;
   
   v2 MousePos = Interface->MousePos;
-
+  
   debug_frame* Frame = DebugState->SelectedFrame;
   if(!Frame)
   {
@@ -993,27 +993,27 @@ MENU_DRAW(DrawFrameFunctions)
     u32 FrameIndex = (DebugState->CurrentFrameIndex-1) % FrameCount;
     Frame = DebugState->Frames + FrameIndex;
   };
-
+  
   r32 ThreadCount = (r32)Frame->FrameBarLaneCount;
   r32 MaxLaneCountPerThread = 8;
-
+  
   game_window_size WindowSize = GameGetWindowSize();
   r32 PixelSize = 1.f / WindowSize.HeightPx;
-
+  
   r32 LaneWidth = Chart.H/(MaxLaneCountPerThread + ThreadCount);
   r32 dt = GlobalGameState->Input->dt;
-
+  
   debug_block* SelectedBlock = 0;
   r32 ThreadHeight = 0;
   r32 StartY = Chart.Y;
   
   u32 SelectedThreadIndex = 0;
-
+  
   r32 ThreadStartY = Chart.Y;
-
+  
   debug_block* HotBlock = 0;
   debug_thread* HotThread = 0;
-
+  
   debug_block* SwapBuffer[2][1048] = {};
   debug_block** ConsumeBuffer = SwapBuffer[0];
   debug_block** ProduceBuffer = SwapBuffer[1];
@@ -1024,30 +1024,30 @@ MENU_DRAW(DrawFrameFunctions)
   {
     r32 CycleScaling = Chart.W / (r32) (Frame->EndClock - Frame->BeginClock);
     u64 CycleOffset = 0;
-
+    
     debug_thread* Thread = Frame->Threads + ThreadIndex;
-  
+    
     Assert(Thread->FirstBlock);
-
+    
     if(Thread->SelectedBlock)
     {
       debug_block* BaseBlock = Thread->SelectedBlock;
-
+      
       CycleScaling = Chart.W / (r32) (BaseBlock->EndClock - BaseBlock->BeginClock);
       CycleOffset = BaseBlock->BeginClock;
-
+      
       rect2f FirstBlockRect = {};
       FirstBlockRect.X = Chart.X;
       FirstBlockRect.Y = ThreadStartY+ ThreadBreak *0.5f;
       FirstBlockRect.W = Chart.W;
       FirstBlockRect.H = LaneWidth;
-
+      
       v4 Color = GetColorForRecord(BaseBlock->Record);
       if(Intersects(FirstBlockRect, MousePos))
       {
         c8 StringBuffer[1048] = {};
         Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer)-1,
-        "%s : %2.2f MCy", BaseBlock->Record->BlockName, (u32)(BaseBlock->EndClock - BaseBlock->BeginClock)/1000000.f);
+                                   "%s : %2.2f MCy", BaseBlock->Record->BlockName, (u32)(BaseBlock->EndClock - BaseBlock->BeginClock)/1000000.f);
         PushTextAt(MousePos.X, MousePos.Y+0.02f, StringBuffer, 24, V4(1,1,1,1));
         HotBlock = Thread->SelectedBlock;
       }
@@ -1084,34 +1084,34 @@ MENU_DRAW(DrawFrameFunctions)
         ProducedCount = PushLaneToBuffer(Block, ProducedCount, ProduceBuffer);
       }
       ++LaneIndex;
-
+      
       ZeroArray(ConsumeCount, ConsumeBuffer);
       ConsumeCount = ProducedCount;
       ProducedCount = 0;
-
+      
       debug_block** TmpBuffer = ConsumeBuffer;
       ConsumeBuffer = ProduceBuffer;
       ProduceBuffer = TmpBuffer;
     }
-
+    
     rect2f ThreadRegion = {};
     ThreadRegion.X = Chart.X;
     ThreadRegion.Y = ThreadStartY;
     ThreadRegion.W = Chart.W;
-
+    
     r32 ThreadRegionHeight = LaneWidth + ThreadBreak;
     if(DebugState->ThreadSelected && (ThreadIndex == DebugState->SelectedThreadIndex))
     {
       ThreadRegionHeight = LaneWidth*MaxLaneCountPerThread;
     }
-
+    
     ThreadRegion.H = ThreadRegionHeight;
     ThreadStartY += ThreadRegionHeight;
     if(!HotThread && Intersects(ThreadRegion, MousePos))
     {
       HotThread = Thread;
     }
-
+    
     if(ThreadIndex < ThreadCount)
     {
       rect2f ThreadBreakRect = {};
@@ -1122,7 +1122,7 @@ MENU_DRAW(DrawFrameFunctions)
       PushOverlayQuad(ThreadBreakRect, V4(0,0,1,1));
     }
   }
-
+  
   // Click-logic!
   if(Interface->MouseLeftButton.Edge && Interface->MouseLeftButton.Active && Intersects(Chart,MousePos))
   {
@@ -1142,25 +1142,25 @@ MENU_DRAW(DrawFrameFunctions)
             HotThread->SelectedBlock = HotThread->SelectedBlock->Parent;
           }else{
             // We set the threads selected block
-            HotThread->SelectedBlock = HotBlock;  
+            HotThread->SelectedBlock = HotBlock;
           }
-
-        // We did not click on a block inside the already selected thread-region
-        // And no block was selected
+          
+          // We did not click on a block inside the already selected thread-region
+          // And no block was selected
         }else if(!HotThread->SelectedBlock)
         {
           // Collapse the selected thread region
           DebugState->ThreadSelected = false;
-
-        // We did not click on a block inside the already selected thread-region
-        // But a block was selected
+          
+          // We did not click on a block inside the already selected thread-region
+          // But a block was selected
         }else if(HotThread->SelectedBlock)
         {
           // Reset the selected block
           HotThread->SelectedBlock = 0;
         }
-
-      // We klicked inside a thread-region but it's not an already selected region
+        
+        // We klicked inside a thread-region but it's not an already selected region
       }else{
         // Another region was already selected
         if(DebugState->ThreadSelected)
@@ -1172,7 +1172,7 @@ MENU_DRAW(DrawFrameFunctions)
         DebugState->ThreadSelected = true;
       }
       DebugState->SelectedThreadIndex = HotThread->LaneIndex;
-
+      
     }else{
       DebugState->ThreadSelected = false;
     }
@@ -1184,30 +1184,30 @@ MENU_DRAW(DrawFunctionTimeline)
 {
   TIMED_FUNCTION();
   debug_state* DebugState = DEBUGGetState();
-
+  
   rect2f Chart = Node->Region;
-
+  
   r32 dt = GlobalGameState->Input->dt;
-
+  
   r32 FrameTargetHeight = Chart.H * 0.7f;
   r32 HeightScaling = FrameTargetHeight/dt;
-
+  
   
   u32 MaxFramesToDisplay = ArrayCount(DebugState->Frames)-1;
-
+  
   game_window_size WindowSize = GameGetWindowSize();
   r32 PixelSize = 1.f / WindowSize.HeightPx;
-
+  
   r32 BarGap = PixelSize;
-
+  
   v4 RedColor = V4(1,0,0,1);
   r32 FullRed = 1.2;
   r32 FullBlue = 1;
   v4 BlueColor =  V4(0,0,1,1);
-
+  
   r32 MouseX = Interface->MousePos.X;
   r32 MouseY = Interface->MousePos.Y;
-
+  
   u32 FrameCount =  ArrayCount(DebugState->Frames);
   u32 Count = 0;
   debug_frame* Frame = DebugState->Frames + DebugState->CurrentFrameIndex+1;
@@ -1219,18 +1219,18 @@ MENU_DRAW(DrawFunctionTimeline)
     u32 FrameIndex = (u32) (Frame-DebugState->Frames);
     if(FrameIndex >= FrameCount)
     {
-      Frame = DebugState->Frames; 
+      Frame = DebugState->Frames;
     }
     
     debug_block* Block = Frame->Threads[0].FirstBlock;
-
+    
     r32 FrameY = Chart.Y;
-
+    
     r32 FrameHitRatio = Frame->WallSecondsElapsed / dt;
     r32 FrameCycleScaling = FrameTargetHeight * FrameHitRatio/(Frame->EndClock - Frame->BeginClock);
-
+    
     r32 FrameX = Chart.X + (r32)BarIndex*BarWidth;
-
+    
     if(DebugState->SelectedFrame && DebugState->SelectedFrame == Frame)
     {
       u64 LaneCycleCount = GetBlockChainCycleCount(Block);
@@ -1241,7 +1241,7 @@ MENU_DRAW(DrawFunctionTimeline)
       Rect.H = FrameCycleScaling*LaneCycleCount + 2*PixelSize;
       PushOverlayQuad(Rect, V4(1,1,0,1));
     }
-
+    
     while(Block)
     {
       rect2f Rect = {};
@@ -1249,7 +1249,7 @@ MENU_DRAW(DrawFunctionTimeline)
       Rect.Y = FrameY+FrameCycleScaling*Block->BeginClock;
       Rect.W = BarWidth - BarGap;
       Rect.H = FrameCycleScaling*(Block->EndClock - Block->BeginClock);
-
+      
       v4 Color = GetColorForRecord(Block->Record);
       PushOverlayQuad(Rect, Color);
       
@@ -1257,26 +1257,26 @@ MENU_DRAW(DrawFunctionTimeline)
       {
         c8 StringBuffer[2048] = {};
         Platform.DEBUGFormatString( StringBuffer, sizeof(StringBuffer), sizeof(StringBuffer),
-        "Frame %d: %2.2f Sec (%s)", FrameIndex, Frame->WallSecondsElapsed, Block->Record->BlockName);
-
+                                   "Frame %d: %2.2f Sec (%s)", FrameIndex, Frame->WallSecondsElapsed, Block->Record->BlockName);
+        
         PushTextAt(MouseX, MouseY+0.02f, StringBuffer, 24, V4(1,1,1,1));
       }
       Block = Block->Next;
-    }  
-
+    }
+    
     rect2f FrameRect = {};
     FrameRect.X = FrameX;
     FrameRect.Y = FrameY;
     FrameRect.W = BarWidth;
     FrameRect.H = Frame->WallSecondsElapsed * HeightScaling;
-
+    
     if(Intersects(FrameRect, V2(MouseX,MouseY)))
     {
       SelectedFrame = Frame;
     }
     ++Frame;
   }
-
+  
   if(Interface->MouseLeftButton.Edge && Interface->MouseLeftButton.Active)
   {
     if(SelectedFrame)
@@ -1289,7 +1289,7 @@ MENU_DRAW(DrawFunctionTimeline)
     }
   }
   
-
+  
   rect2f Rect = {};
   Rect.X = Chart.X;
   Rect.Y = Chart.Y + FrameTargetHeight - 0.001f*0.5f;
@@ -1301,9 +1301,9 @@ MENU_DRAW(DrawFunctionTimeline)
 void PushDebugOverlay(game_input* GameInput)
 {
   TIMED_FUNCTION();
-
+  
   debug_state* DebugState = DEBUGGetState();
-
+  
   if(DebugState->Compiling)
   {
     debug_process_state ProcessState = Platform.DEBUGGetProcessState(DebugState->Compiler);

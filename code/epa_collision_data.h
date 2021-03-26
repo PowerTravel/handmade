@@ -6,6 +6,49 @@ struct gjk_simplex;
 struct entity;
 struct memory_arena;
 
+
+struct joint_constraint
+{
+  u32 EntityA;
+  u32 EntityB;
+  v3 LocalAnchorA;
+  v3 LocalAnchorB;
+  v3 LocalCenterA;
+  v3 LocalCenterB;
+  v3 LocalRotationAxisA;
+  v3 LocalRotationAxisB;
+  
+  v3 GlobalRotationAxis;
+  r32 RotationAngle;
+  v4 ReferenceRotation;
+  
+  r32 Impulse;
+  r32 AxialMass;
+  
+  r32 LowerImpulse;
+  r32 UpperImpulse;
+  
+  
+  v3 rA;
+  v3 rB;
+  r32 mA;
+  r32 mB;
+  m3 IA_inv;
+  m3 IB_inv;
+  
+  
+  // Distance Constraint
+  b32 EnableLimit;
+  r32 LowerAngle;
+  r32 UpperAngle;
+  
+  // Motor Constraint
+  r32 MotorImpulse;
+  b32 EnableMotor;
+  r32 MaxMotorTorque;
+  r32 MotorSpeed;
+};
+
 struct contact_data_cache
 {
   v3 J[4];
