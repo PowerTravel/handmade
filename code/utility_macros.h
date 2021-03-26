@@ -33,7 +33,7 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 {
   char* At = Format;
   while(At[0])
-  va_arg();
+    va_arg();
 }
 #endif
 
@@ -44,30 +44,30 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 
 #define ListInitiate( Sentinel )               \
 {                                              \
-  (Sentinel)->Previous = (Sentinel);           \
-  (Sentinel)->Next = (Sentinel);               \
+(Sentinel)->Previous = (Sentinel);           \
+(Sentinel)->Next = (Sentinel);               \
 }
 
 #define ListInsertAfter( Sentinel, Element ) \
 {                                            \
-  (Element)->Previous = (Sentinel);          \
-  (Element)->Next = (Sentinel)->Next;        \
-  (Element)->Previous->Next = (Element);     \
-  (Element)->Next->Previous = (Element);     \
+(Element)->Previous = (Sentinel);          \
+(Element)->Next = (Sentinel)->Next;        \
+(Element)->Previous->Next = (Element);     \
+(Element)->Next->Previous = (Element);     \
 }
 
 #define ListInsertBefore( Sentinel, Element ) \
 {                                             \
-  (Element)->Previous = (Sentinel)->Previous; \
-  (Element)->Next = (Sentinel);               \
-  (Element)->Previous->Next = (Element);      \
-  (Element)->Next->Previous = (Element);      \
+(Element)->Previous = (Sentinel)->Previous; \
+(Element)->Next = (Sentinel);               \
+(Element)->Previous->Next = (Element);      \
+(Element)->Next->Previous = (Element);      \
 }
 
 #define ListRemove( Element )                      \
 {                                                  \
-  (Element)->Previous->Next = (Element)->Next;     \
-  (Element)->Next->Previous = (Element)->Previous; \
+(Element)->Previous->Next = (Element)->Next;     \
+(Element)->Next->Previous = (Element)->Previous; \
 }
 
 #define Maximum(A, B) (((A) > (B)) ? (A) : (B))
@@ -80,9 +80,9 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 
 #define OffsetOf(type, Member) (umm) &(((type *)0)->Member)
 
-#define AdvanceBytePointer(Pointer, ByteCount) ( (bptr) (Pointer) ) + (ByteCount);
-#define RetreatBytePointer(Pointer, ByteCount) ( (bptr) (Pointer) ) - (ByteCount);
-
+#define ToBptr( Pointer ) ( (bptr) Pointer )
+#define AdvanceBytePointer(Pointer, ByteCount) ToBptr(Pointer)+ (ByteCount);
+#define RetreatBytePointer(Pointer, ByteCount) ToBptr(Pointer) - (ByteCount);
 
 #define CopyArray( Count, Source, Dest ) utils::Copy( (Count)*sizeof( *(Source) ), ( Source ), ( Dest ) )
 
@@ -93,19 +93,19 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 
 #define ToArrayIndex(Row, Col, Stride) (Row)  * (Stride) + (Col)
 
-#define NextElement(Base, Stride, Type) (Type*)(((bptr)Base) + ByteStride);
+#define NextElement(Base, Stride, Type) (Type*)(ToBptr(Base) + ByteStride);
 
 
 #define HexToColorV4( Red, Green, Blue )  V4((Red)/(r32) 0xFF,(Green)/(r32) 0xFF,(Blue)/(r32)0xFF,1);
 #define HexCodeToColorV4( Code )  V4( \
-    (((Code) & 0xFF0000) >> 16)/(r32) 0xFF, \
-    (((Code) & 0x00FF00) >>  8)/(r32) 0xFF, \
-    (((Code) & 0x0000FF) >>  0)/(r32) 0xFF,1)
+(((Code) & 0xFF0000) >> 16)/(r32) 0xFF, \
+(((Code) & 0x00FF00) >>  8)/(r32) 0xFF, \
+(((Code) & 0x0000FF) >>  0)/(r32) 0xFF,1)
 
 namespace utils
 {
   inline void
-  ZeroSize( memory_index Size, void *Ptr )
+    ZeroSize( memory_index Size, void *Ptr )
   {
     u8 *Byte = (u8*) Ptr;
     while(Size--)
@@ -113,27 +113,27 @@ namespace utils
       *Byte++ = 0;
     }
   }
-
+  
   inline void* Copy(midx aSize, void* SourceInit, void* DestInit)
   {
     u8 *Source = (u8 *)SourceInit;
     u8 *Dest = (u8 *)DestInit;
     u32 i = 0;
     while (aSize--) { *Dest++ = *Source++;}
-
+    
     return(DestInit);
   }
-
+  
   // djb2 from http://www.cse.yorku.ca/~oz/hash.html
   inline u32 djb2_hash(const char* str)
   {
     u32 hash = 5381;
     u32 c;
-
+    
     while (c = *str++)
       hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
-
+    
     return hash;
   }
-
+  
 }

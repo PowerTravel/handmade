@@ -79,6 +79,7 @@ game_memory* DebugGlobalMemory = 0;
 #include "system_sprite_animation.cpp"
 #include "system_collider.cpp"
 #include "system_spatial.cpp"
+//#include "Spatial2.cpp"
 #include "system_camera.cpp"
 #include "assets.cpp"
 #include "asset_loading.cpp"
@@ -146,6 +147,27 @@ world* CreateWorld( u32 MaxNrManifolds )
   World->ContactManifolds = CreateWorldContactChunk(World->Arena, MaxNrManifolds);
   return World;
 }
+
+joint_constraint CreateJointConstraint(u32 EntityA, v3 LocalAnchorA, u32 EntityB, v3 LocalAnchorB, v3 GlobalRotationAxis)
+{
+  joint_constraint Joint = {};
+  Joint.EntityA = EntityA;
+  Joint.EntityB = EntityB;
+  Joint.LocalAnchorA = LocalAnchorA;
+  Joint.LocalAnchorB = LocalAnchorB;
+  component_spatial* A = GetSpatialComponent(EntityA);
+  component_spatial* B = GetSpatialComponent(EntityB);
+  Joint.LocalCenterA = ToLocal(A,A->Position);
+  Joint.LocalCenterB = ToLocal(B,B->Position);
+  
+  Joint.ReferenceRotation = QuaternionMultiplication(QuaternionConjugate(B->Rotation),
+                                                     A->Rotation);
+  Joint.GlobalRotationAxis = GlobalRotationAxis;
+  Joint.LocalRotationAxisA = DirectionToLocal(A, GlobalRotationAxis);
+  Joint.LocalRotationAxisB = DirectionToLocal(B, GlobalRotationAxis);
+  return Joint;
+}
+
 
 void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 {
@@ -306,6 +328,8 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
         CubeDynamics->Mass = mass;
         
         CalculateInertialTensor(CubeSpatial, CubeCollider, CubeDynamics);
+        
+        World->TrialEntity = CubeEntity;
       }
     }
   }
@@ -330,6 +354,12 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   FloorCollider->Object = FloorRender->Object;
   FloorCollider->AABB = GetMeshAABB( AssetManager, FloorRender->Object);
   
+  World->Joint = CreateJointConstraint(FloorEntity,
+                                       ToLocal(FloorSpatial, V3(0,0,0)),
+                                       World->TrialEntity,
+                                       V3(0,0,0),
+                                       V3(0,0,1)); // Global Rotation Angle
+  
   PushBitmapData(AssetManager, "energy_plot", 512, 512, 32, 0, false);
   
   bitmap_handle Plot;
@@ -346,7 +376,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
     *Pixels++ = PixelData;
   }
-#if 1
+#if 0
   u32 Teapot = NewEntity( EM );
   NewComponents( EM, Teapot,
                 COMPONENT_FLAG_RENDER   |
@@ -643,8 +673,8 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   {
     ColliderSystemUpdate(World);
     SpatialSystemUpdate(World);
-    SpriteAnimationSystemUpdate(World);
   }
+  SpriteAnimationSystemUpdate(World);
   
   CameraSystemUpdate(World);
   
@@ -656,7 +686,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   bitmap_handle Plot;
   GetHandle(GlobalGameState->AssetManager, "energy_plot", &Plot);
   bitmap* PlotBitMap = GetAsset(GlobalGameState->AssetManager, Plot);
-  
   
   ScopedTransaction(EM);
   component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_DYNAMICS);

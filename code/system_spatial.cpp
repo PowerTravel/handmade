@@ -6,11 +6,13 @@
 #include "gjk_narrow_phase.h"
 #include "epa_collision_data.h"
 
+
 #define WARM_STARTING_FRACTION 1.0f
 
-#define FRICTIONAL_COEFFICIENT 0.2f
-#define BAUMGARTE_COEFFICIENT  0.3f
-#define RESTITUTION_COEFFICIENT 0.f
+
+#define FRICTIONAL_COEFFICIENT 0.5f
+#define BAUMGARTE_COEFFICIENT  0.2f
+#define RESTITUTION_COEFFICIENT 0.0f
 #define SLOP 0.01f
 
 #define SLOVER_ITERATIONS 24
@@ -55,7 +57,7 @@ getRestitutionCoefficient(v3 V[], r32 Scalar, v3 Normal, r32 Slop)
   return Restitution;
 }
 
-internal r32 GetLambda(  v3 V[], v3 J[], v3 InvMJ[], r32 BaumgarteCoefficient, r32 RestitutionCoefficient)
+internal r32 GetLambda(v3 V[], v3 J[], v3 InvMJ[], r32 BaumgarteCoefficient, r32 RestitutionCoefficient)
 {
   r32 Bias = BaumgarteCoefficient + RestitutionCoefficient;
   r32 Numerator   = -(DotProductV12xV12( J, V) + Bias);
@@ -251,10 +253,10 @@ SolveNonPenetrationConstraints(r32 dtForFrame, contact_manifold* FirstManifold)
       r32 Restitution       = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, ContactNormal, SLOP);
       r32 Baumgarte         = getBaumgarteCoefficient(dtForFrame, BAUMGARTE_COEFFICIENT,  PenetrationDepth, SLOP);
       r32 Lambda            = GetLambda( V, Cache->J, Cache->InvMJ, Baumgarte, Restitution);
-      r32 OldCumulativeLambda = Cache->AccumulatedLambda;
-      Cache->AccumulatedLambda += Lambda;
-      Cache->AccumulatedLambda = Maximum(0, Cache->AccumulatedLambda);
-      r32 LambdaDiff = Cache->AccumulatedLambda - OldCumulativeLambda;
+      
+      r32 NewLambda = Maximum(Cache->AccumulatedLambda + Lambda, 0);
+      r32 LambdaDiff = NewLambda - Cache->AccumulatedLambda;
+      Cache->AccumulatedLambda = NewLambda;
       
       v3 DeltaV[4] = {};
       ScaleV12(LambdaDiff, Cache->InvMJ, DeltaV);
@@ -312,14 +314,13 @@ SolveFrictionalConstraints( contact_manifold* FirstManifold )
       
       r32 LambdaN1 = GetLambda( V, Cache->Jn1, Cache->InvMJn1, 0, 0);
       r32 LambdaN2 = GetLambda( V, Cache->Jn2, Cache->InvMJn2, 0, 0);
+      LambdaN1 = Clamp(Cache->AccumulatedLambdaN1 + LambdaN1, -ClampRange, ClampRange);
+      LambdaN2 = Clamp(Cache->AccumulatedLambdaN2 + LambdaN2, -ClampRange, ClampRange);
+      r32 LambdaDiffN1 = LambdaN1 - Cache->AccumulatedLambdaN1;
+      r32 LambdaDiffN2 = LambdaN2 - Cache->AccumulatedLambdaN2;
       
-      r32 OldCumulativeLambdaN1 = Cache->AccumulatedLambdaN1;
-      r32 OldCumulativeLambdaN2 = Cache->AccumulatedLambdaN2;
-      Cache->AccumulatedLambdaN1 = Clamp(Cache->AccumulatedLambdaN1 + LambdaN1, -ClampRange, ClampRange);
-      Cache->AccumulatedLambdaN2 = Clamp(Cache->AccumulatedLambdaN2 + LambdaN2, -ClampRange, ClampRange);
-      
-      r32 LambdaDiffN1 = Cache->AccumulatedLambdaN1 - OldCumulativeLambdaN1;
-      r32 LambdaDiffN2 = Cache->AccumulatedLambdaN2 - OldCumulativeLambdaN2;
+      Cache->AccumulatedLambdaN1 = LambdaN1;
+      Cache->AccumulatedLambdaN2 = LambdaN2;
       
       v3 DeltaV1[4] = {};
       v3 DeltaV2[4] = {};
@@ -527,9 +528,9 @@ void CastRay(game_input* GameInput, world* World )
         v3 ContactPointDiff  = R;
         r32 PenetrationDepth = 0;
         
-        //r32 Restitution = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, Normal, SLOP);
+        r32 Restitution = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, Normal, SLOP);
         r32 Baumgarte = getBaumgarteCoefficient(World->dtForFrame, BAUMGARTE_COEFFICIENT, Length*ScaleFactor, SLOP);
-        r32 Lambda = GetLambda( V, Jacobian, InvMJ, Baumgarte, 0);
+        r32 Lambda = GetLambda( V, Jacobian, InvMJ, Baumgarte+  Restitution, 0);
         r32 OldCumulativeLambda = AccumulatedLambda;
         AccumulatedLambda += Lambda;
         r32 LambdaDiff = AccumulatedLambda - OldCumulativeLambda;
@@ -545,6 +546,12 @@ void CastRay(game_input* GameInput, world* World )
       }
     }
   }
+}
+
+inline v3 DirectionToLocal(component_spatial* Spatial, v3 GlobalDirection)
+{
+  v3 Result = V3(Transpose(AffineInverse(Spatial->ModelMatrix))*V4(GlobalDirection,0));
+  return Result;
 }
 
 inline v3 ToLocal( component_spatial* Spatial, v3 GlobalPosition )
@@ -766,53 +773,124 @@ void SolveDistanceVelocityConstraint()
   
 }
 
+
+void InitiateContactVelocityConstraints(contact_manifold* Manifold)
+{
+  while(Manifold)
+  {
+    component_spatial* SpatialA = GetSpatialComponent(Manifold->EntityIDA);
+    component_collider* ColliderA = GetColliderComponent(Manifold->EntityIDA);
+    component_dynamics* DynamicsA = GetDynamicsComponent(Manifold->EntityIDA);
+    
+    component_spatial* SpatialB = GetSpatialComponent(Manifold->EntityIDB);
+    component_collider* ColliderB = GetColliderComponent(Manifold->EntityIDB);
+    component_dynamics* DynamicsB = GetDynamicsComponent(Manifold->EntityIDB);
+    
+    vector_list<contact_data> Contacts = Manifold->Contacts;
+    contact_data* Contact = Contacts.First();
+    while(Contact)
+    {
+      Contact->Cache = CreateDataCashe(*Contact, SpatialA, SpatialB, DynamicsA, DynamicsB, ColliderA, ColliderB);
+      Contact = Contacts.Next(Contact);
+    }
+    Manifold = Manifold->Next;
+  }
+}
+
+// Revolute Joint 
+// https://github.com/erincatto/box2d/blob/master/src/dynamics/b2_revolute_joint.cpp
+
+void InitiateJointVelocityConstraints(joint_constraint* Joint)
+{
+  Joint->Impulse = 0;
+  Joint->AxialMass = 0;
+  
+  Joint->LowerImpulse = 0;
+  Joint->UpperImpulse = 0;
+  
+  Joint->RotationAngle = 0;
+  
+  // Distance Constraint
+  Joint->EnableLimit = false;
+  Joint->LowerAngle = 0;
+  Joint->UpperAngle = 0;
+  
+  // Motor Constraint
+  Joint->MotorImpulse = 0;
+  Joint->EnableMotor = false;
+  Joint->MaxMotorTorque = 0;
+  Joint->MotorSpeed = 0;
+  
+  
+  component_spatial * SA = GetSpatialComponent(Joint->EntityA);
+  component_spatial * SB = GetSpatialComponent(Joint->EntityB);
+  component_dynamics * DA = GetDynamicsComponent(Joint->EntityA);
+  component_dynamics * DB = GetDynamicsComponent(Joint->EntityB);
+  
+  Joint->mA = R32Max;
+  Joint->IA_inv = {};
+  v3 VA = {};
+  v3 WA = {};
+  if(DA)
+  {
+    Joint->mA = DA->Mass;
+    Joint->IA_inv = DA->I_inv;
+    VA = DA->LinearVelocity;
+    WA = DA->AngularVelocity;
+  }
+  
+  Joint->mB = R32Max;
+  Joint->IB_inv = {};
+  v3 VB = {};
+  v3 WB = {};
+  if (DB)
+  {
+    Joint->mB = DB->Mass;
+    Joint->IB_inv = DB->I_inv;
+    VB = DB->LinearVelocity;
+    WB = DB->AngularVelocity;
+  }
+  
+  v4 RA = SA->Rotation;
+  v4 RB = SB->Rotation;
+  
+  Joint->rA = RotateQuaternion(RA, Joint->LocalAnchorA - Joint->LocalCenterA);
+  Joint->rB = RotateQuaternion(RB, Joint->LocalAnchorB - Joint->LocalCenterB);
+  
+  r32 mA_inv = 1.f / Joint->mA;
+  r32 mB_inv = 1.f / Joint->mB;
+  
+  
+}
+
+void SolveJointVelocityConstraints(joint_constraint* Joint)
+{
+  
+}
+
 void SpatialSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
   
-  
-  //IntegrateVelocities(World->dtForFrame);
-  //IntegratePositions(World->dtForFrame);
-  
-  
   world_contact_chunk* WorldContacts =  World->ContactManifolds;
-  
-  RemoveInvalidContactPoints( WorldContacts->FirstManifold );
-  
-  DoWarmStarting( WorldContacts->FirstManifold );
-  
-  World->BroadPhaseTree = BuildBroadPhaseTree( );
-  
-  u32 BroadPhaseResultCount = 0;
-  broad_phase_result_stack* const BroadPhaseResultStack = GetCollisionPairs( &World->BroadPhaseTree, &BroadPhaseResultCount );
-  
-  GenerateContactPoints( WorldContacts, BroadPhaseResultCount, BroadPhaseResultStack );
-  
-  RemoveNonIntersectingManifolds(WorldContacts);
-  
-  BEGIN_BLOCK(SolveConstraints);
   if(WorldContacts->FirstManifold)
   {
+    InitiateContactVelocityConstraints(WorldContacts->FirstManifold);
+    InitiateJointVelocityConstraints(&World->Joint);
+    DoWarmStarting(WorldContacts->FirstManifold);
+    
+    BEGIN_BLOCK(SolveConstraints);
     for (u32 i = 0; i < SLOVER_ITERATIONS; ++i)
     {
-      // TODO: Process Constraints MultiThreaded
-      SolveNonPenetrationConstraints(World->dtForFrame, WorldContacts->FirstManifold);
+      SolveJointVelocityConstraints(&World->Joint);
+      // NOTE(Jakob): Solve Frictional constraints first because non-penetration is more important
       SolveFrictionalConstraints(WorldContacts->FirstManifold);
+      SolveNonPenetrationConstraints(World->dtForFrame, WorldContacts->FirstManifold);
     }
-  }
-  
-  for (u32 i = 0; i < SLOVER_ITERATIONS; ++i)
-  {
-    // TODO: Process Constraints MultiThreaded
-    SolveNonPenetrationConstraints(World->dtForFrame, WorldContacts->FirstManifold);
-    SolveFrictionalConstraints(WorldContacts->FirstManifold);
+    END_BLOCK(SolveConstraints);
   }
   
   CastRay(GlobalGameState->Input, World);
-  
-  //SolveDistanceVelocityConstraint();
-  
-  END_BLOCK(SolveConstraints);
   
   IntegrateVelocities(World->dtForFrame);
   IntegratePositions(World->dtForFrame);
