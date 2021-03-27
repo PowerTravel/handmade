@@ -1169,6 +1169,18 @@ GetRotationMatrix_X_YHint(v3 ObjWorld_X, v3 ObjWorld_Y_Hint)
 
   return RotMat;
 }
+
+
+m3 Skew(v3 A)
+{
+  // NOTE(Jakob): Skew is a matrix representation of cross product such that
+  //              AxB = Skew(A)*B.  Transpose(Skew(A)) = -Skew(A);
+  m3 Result = M3(0,-A.Z,A.Y,
+                 A.Z, 0, -A.X,
+                 -A.Y, A.X,0);
+  return Result;
+}
+
 // Assumes Normal is of length one.
 // Returns two orthonormal vectors where Normal = Cross(Tangent1,Tangent2)
 void getOrthronormalVectorPair(v3 Normal, v3* Tangent1, v3* Tangent2)
