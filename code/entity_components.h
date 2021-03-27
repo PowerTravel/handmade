@@ -73,6 +73,38 @@ struct component_spatial
   m4 ModelMatrix;
 };
 
+
+inline v3 DirectionToLocal(component_spatial* Spatial, v3 GlobalDirection)
+{
+  v3 Result = V3(Transpose(AffineInverse(Spatial->ModelMatrix))*V4(GlobalDirection,0));
+  return Result;
+}
+
+inline v3 ToLocal( component_spatial* Spatial, v3 GlobalPosition )
+{
+  v3 Result = V3(AffineInverse(Spatial->ModelMatrix)*V4(GlobalPosition,1));
+  return Result;
+}
+
+inline v3 ToLocal( component_spatial* Spatial)
+{
+  v3 Result = ToLocal(Spatial, Spatial->Position);
+  return Result;
+}
+
+inline v3 ToGlobal( component_spatial* Spatial, v3 LocalPosition )
+{
+  v3 Result = V3(Spatial->ModelMatrix * V4(LocalPosition,1));
+  return Result;
+}
+
+inline v3 ToGlobal( component_spatial* Spatial )
+{
+  v3 Result = ToGlobal(Spatial, Spatial->Position);
+  return Result;
+}
+
+
 void UpdateModelMatrix( component_spatial* c )
 {
   TIMED_FUNCTION();
