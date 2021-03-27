@@ -79,13 +79,9 @@ void PopulateContactData(const m4* AModelMat, const m4* BModelMat, epa_face* Fac
   v3 InterpolatedSupportA = Coords.E[0] * A.A + Coords.E[1] * B.A + Coords.E[2] * C.A;
   v3 InterpolatedSupportB = Coords.E[0] * A.B + Coords.E[1] * B.B + Coords.E[2] * C.B;
 
-
-  v3 Tangent1 = V3(0.0f, FaceNormal.Z, -FaceNormal.Y);
-  if ( FaceNormal.X >= 0.57735f)
-  {
-    Tangent1 = V3(FaceNormal.Y, -FaceNormal.X, 0.0f);
-  }
-  Normalize(Tangent1);
+  v3 Tangent1 = {};
+  v3 Tangent2 = {};
+  getOrthronormalVectorPair(FaceNormal, &Tangent1, &Tangent2);
 
   ContactData->A_ContactWorldSpace = V3(*AModelMat * V4(InterpolatedSupportA,1));
   ContactData->B_ContactWorldSpace = V3(*BModelMat * V4(InterpolatedSupportB,1));
@@ -93,7 +89,7 @@ void PopulateContactData(const m4* AModelMat, const m4* BModelMat, epa_face* Fac
   ContactData->B_ContactModelSpace = InterpolatedSupportB;
   ContactData->ContactNormal       = FaceNormal;
   ContactData->TangentNormalOne    = Tangent1;
-  ContactData->TangentNormalTwo    = CrossProduct(FaceNormal, Tangent1);
+  ContactData->TangentNormalTwo    = Tangent2;
   ContactData->PenetrationDepth    = DistanceToClosestFace;
 
   Assert(Norm(FaceNormal)>0.5f);

@@ -1169,3 +1169,16 @@ GetRotationMatrix_X_YHint(v3 ObjWorld_X, v3 ObjWorld_Y_Hint)
 
   return RotMat;
 }
+// Assumes Normal is of length one.
+// Returns two orthonormal vectors where Normal = Cross(Tangent1,Tangent2)
+void getOrthronormalVectorPair(v3 Normal, v3* Tangent1, v3* Tangent2)
+{
+  Assert(Equals(Norm(Normal),1.0,10E-7));
+  *Tangent1 = V3(0.0f, Normal.Z, -Normal.Y);
+  if (Normal.X >= 0.57735f)
+  {
+    *Tangent1 = V3(Normal.Y, -Normal.X, 0.0f);
+  }
+  Normalize(*Tangent1);
+  *Tangent2 = CrossProduct(Normal, *Tangent1);
+}
