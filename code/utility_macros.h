@@ -80,9 +80,9 @@ FormatStringsList( u32 DestSize, char* Dest, char* Format, arg_list )
 
 #define OffsetOf(type, Member) (umm) &(((type *)0)->Member)
 
-#define AdvanceBytePointer(Pointer, ByteCount) ( (bptr) (Pointer) ) + (ByteCount);
-#define RetreatBytePointer(Pointer, ByteCount) ( (bptr) (Pointer) ) - (ByteCount);
-
+#define ToBptr( Pointer ) ( (bptr) Pointer )
+#define AdvanceBytePointer(Pointer, ByteCount) ToBptr(Pointer)+ (ByteCount);
+#define RetreatBytePointer(Pointer, ByteCount) ToBptr(Pointer) - (ByteCount);
 
 #define CopyArray( Count, Source, Dest ) utils::Copy( (Count)*sizeof( *(Source) ), ( Source ), ( Dest ) )
 
