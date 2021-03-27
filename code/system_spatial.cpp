@@ -443,6 +443,109 @@ IntegratePositions(r32 dtForFrame)
   }
 }
 
+void CastRay(game_input* GameInput, world* World )
+{
+  b32 MouseClicked = GameInput->MouseButton[PlatformMouseButton_Left].EndedDown;
+  v2 MousePos = V2(GameInput->MouseX,GameInput->MouseY);
+  if(MouseClicked)
+  {
+    game_window_size WindowSize = GameGetWindowSize();
+    entity_manager* EM = GlobalGameState->EntityManager;
+    ScopedTransaction(EM);
+    component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
+    Assert(Next(EM, ComponentList));
+    component_camera* Camera = (component_camera*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CAMERA);
+
+    ray Ray = GetRayFromCamera(Camera, MousePos);
+    World->CastedRay = RayCast(GlobalGameState->TransientArena, &World->BroadPhaseTree, Ray.Origin, Ray.Direction);
+
+    if(World->CastedRay.Hit)
+    {
+      World->PickedEntity.Active = true;
+      World->PickedEntity.EntityID = World->CastedRay.EntityID;
+      World->PickedEntity.Point = World->CastedRay.Intersection;
+      World->PickedEntity.PointObjectSpace = World->CastedRay.IntersectionObjectSpace;
+    }else{
+      World->PickedEntity = {};
+    }
+  }
+
+  if(World->PickedEntity.Active)
+  {
+    component_spatial* Spatial = GetSpatialComponent(World->PickedEntity.EntityID);
+    component_dynamics* Dynamics = GetDynamicsComponent(World->PickedEntity.EntityID);
+    if(Dynamics)
+    {
+      // TODO(Jakob Hariz): Set up a positional constraitnt between mouse Point and Point Object Space
+      v3 Up, Right, Forward;
+      component_camera* Camera = GetActiveCamera();
+      Assert(Camera);
+      GetCameraDirections(Camera, &Up, &Right, &Forward);
+      ray Ray = GetRayFromCamera(Camera, V2(GlobalGameState->Input->MouseX, GlobalGameState->Input->MouseY));
+      r32 t = RaycastPlane(Ray.Origin, Ray.Direction, World->PickedEntity.Point, -Forward);
+      World->PickedEntity.MousePointOnPlane = Ray.Origin + t*Ray.Direction;
+
+      // WS = WorldSpace
+      // OS = ObjectSpace
+      v3 MousePoint_WS = World->PickedEntity.MousePointOnPlane;
+      v3 ObjectPoint_OS = World->PickedEntity.PointObjectSpace;
+      v3 ObjectPoint_WS = V3(Spatial->ModelMatrix * V4(ObjectPoint_OS));
+      v3 ra = ObjectPoint_OS - Spatial->Position;
+      v3 R = (MousePoint_WS - ObjectPoint_WS);
+      v3 Normal = -Normalize(R);
+      r32 Length = Norm(R);
+      r32 ScaleFactor = 0.1f;
+      v3 Velocity = ScaleFactor * Normal;;
+
+      m3 M_Inv[4]{};
+
+      r32 ma = Dynamics->Mass;
+
+      M_Inv[0] =  M3(1/ma,0,0,
+                     0,1/ma,0,
+                     0,0,1/ma);
+      M_Inv[1] = Dynamics->I_inv;
+      M_Inv[2] = {};
+      M_Inv[3] = {};
+
+      v3 Jacobian[4]{};
+      v3 InvMJ[4]{};
+
+      CreatePositionalJacobianConstraint(V3(0,0,0), ra, Normal, M_Inv, Jacobian, InvMJ);
+
+      r32 AccumulatedLambda = 0;
+      for (u32 i = 0; i < SLOVER_ITERATIONS; ++i)
+      {
+        v3 V[4] = {};
+        if(Dynamics)
+        {
+          V[0] = Dynamics->LinearVelocity;
+          V[1] = Dynamics->AngularVelocity;
+        }
+
+        v3 ContactPointDiff  = R;
+        r32 PenetrationDepth = 0;
+
+        r32 Restitution = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, Normal, SLOP);
+        r32 Baumgarte = getBaumgarteCoefficient(World->dtForFrame, BAUMGARTE_COEFFICIENT, Length*ScaleFactor, SLOP);
+        r32 Lambda = GetLambda( V, Jacobian, InvMJ, Baumgarte+  Restitution, 0);
+        r32 OldCumulativeLambda = AccumulatedLambda;
+        AccumulatedLambda += Lambda;
+        r32 LambdaDiff = AccumulatedLambda - OldCumulativeLambda;
+
+        v3 DeltaV[4] = {};
+        ScaleV12(LambdaDiff, InvMJ, DeltaV);
+
+        if(Abs(LambdaDiff) > 0)
+        {
+          Dynamics->LinearVelocity  += DeltaV[0];
+          Dynamics->AngularVelocity += DeltaV[1];
+        }
+      }
+    }
+  }
+}
+
 void InitiateContactVelocityConstraints(contact_manifold* Manifold)
 {
   while(Manifold)
@@ -485,6 +588,8 @@ void SpatialSystemUpdate( world* World )
     }
     END_BLOCK(SolveConstraints);
   }
+
+  CastRay(GlobalGameState->Input, World);
 
   IntegrateVelocities(World->dtForFrame);
   IntegratePositions(World->dtForFrame);

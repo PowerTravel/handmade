@@ -643,21 +643,6 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   {
     ColliderSystemUpdate(World);
     SpatialSystemUpdate(World);
-
-    b32 MouseClicked = Input->MouseButton[PlatformMouseButton_Left].EndedDown;
-    v2 MousePos = V2(Input->MouseX,Input->MouseY);
-    if(MouseClicked)
-    {
-      game_window_size WindowSize = GameGetWindowSize();
-
-      ScopedTransaction(EM);
-      component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
-      Assert(Next(EM, ComponentList));
-      component_camera* Camera = (component_camera*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CAMERA);
-
-      ray Ray = GetRayFromCamera(Camera, MousePos);
-      World->CastedRay = RayCast( GlobalGameState->TransientArena, &World->BroadPhaseTree, Ray.Origin, Ray.Direction);
-    }
   }
   CameraSystemUpdate(World);
   SpriteAnimationSystemUpdate(World);

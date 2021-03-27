@@ -39,6 +39,17 @@ ray GetRayFromCamera(component_camera* Camera, v2 MousePos)
   return Result;
 }
 
+void GetCameraDirections(component_camera* Camera, v3* Up, v3* Right, v3* Forward)
+{
+  m4 V_Inv = Transpose(RigidInverse(Camera->V));
+  if (Right)
+    *Right = V3(V_Inv.r0);
+  if(Up)
+    *Up = V3(V_Inv.r1);
+  if(Forward)
+    *Forward = V3(V_Inv.r2);
+}
+
 component_camera* GetActiveCamera()
 {
   Assert(GlobalGameState->World->ActiveCamera);
