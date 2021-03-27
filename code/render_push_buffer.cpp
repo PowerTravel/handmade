@@ -380,6 +380,14 @@ void FillRenderPushBuffer(world* World)
     }
   }
 
+  {
+    if(World->PickedEntity.Active)
+    {
+      component_spatial* Spatial = GetSpatialComponent(World->PickedEntity.EntityID);
+      v3 ObjectPoint_WS = V3(Spatial->ModelMatrix * V4(World->PickedEntity.PointObjectSpace));
+      PushLine(RenderGroup, ObjectPoint_WS, World->PickedEntity.MousePointOnPlane , CameraPosition, 0.1, "red");
+    }
+  }
 
 #if SHOW_COLLIDER
   {
