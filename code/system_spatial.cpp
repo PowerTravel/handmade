@@ -251,10 +251,10 @@ SolveNonPenetrationConstraints(r32 dtForFrame, contact_manifold* FirstManifold)
       r32 Restitution       = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, ContactNormal, SLOP);
       r32 Baumgarte         = getBaumgarteCoefficient(dtForFrame, BAUMGARTE_COEFFICIENT,  PenetrationDepth, SLOP);
       r32 Lambda            = GetLambda( V, Cache->J, Cache->InvMJ, Baumgarte, Restitution);
-      r32 OldCumulativeLambda = Cache->AccumulatedLambda;
-      Cache->AccumulatedLambda += Lambda;
-      Cache->AccumulatedLambda = Maximum(0, Cache->AccumulatedLambda);
-      r32 LambdaDiff = Cache->AccumulatedLambda - OldCumulativeLambda;
+
+      r32 NewLambda = Maximum(Cache->AccumulatedLambda + Lambda, 0);
+      r32 LambdaDiff = NewLambda - Cache->AccumulatedLambda;
+      Cache->AccumulatedLambda = NewLambda;
 
       v3 DeltaV[4] = {};
       ScaleV12(LambdaDiff, Cache->InvMJ, DeltaV);
@@ -312,14 +312,13 @@ SolveFrictionalConstraints( contact_manifold* FirstManifold )
 
       r32 LambdaN1 = GetLambda( V, Cache->Jn1, Cache->InvMJn1, 0, 0);
       r32 LambdaN2 = GetLambda( V, Cache->Jn2, Cache->InvMJn2, 0, 0);
+      LambdaN1 = Clamp(Cache->AccumulatedLambdaN1 + LambdaN1, -ClampRange, ClampRange);
+      LambdaN2 = Clamp(Cache->AccumulatedLambdaN2 + LambdaN2, -ClampRange, ClampRange);
+      r32 LambdaDiffN1 = LambdaN1 - Cache->AccumulatedLambdaN1;
+      r32 LambdaDiffN2 = LambdaN2 - Cache->AccumulatedLambdaN2;
 
-      r32 OldCumulativeLambdaN1 = Cache->AccumulatedLambdaN1;
-      r32 OldCumulativeLambdaN2 = Cache->AccumulatedLambdaN2;
-      Cache->AccumulatedLambdaN1 = Clamp(Cache->AccumulatedLambdaN1 + LambdaN1, -ClampRange, ClampRange);
-      Cache->AccumulatedLambdaN2 = Clamp(Cache->AccumulatedLambdaN2 + LambdaN2, -ClampRange, ClampRange);
-
-      r32 LambdaDiffN1 = Cache->AccumulatedLambdaN1 - OldCumulativeLambdaN1;
-      r32 LambdaDiffN2 = Cache->AccumulatedLambdaN2 - OldCumulativeLambdaN2;
+      Cache->AccumulatedLambdaN1 = LambdaN1;
+      Cache->AccumulatedLambdaN2 = LambdaN2;
 
       v3 DeltaV1[4] = {};
       v3 DeltaV2[4] = {};
