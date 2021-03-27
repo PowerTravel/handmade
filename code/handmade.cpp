@@ -190,6 +190,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   r32 FieldOfView =  90;
   SetCameraComponent(Camera, FieldOfView, AspectRatio );
   LookAt(Camera, 1*V3(0,3,8), V3(0,3,0));
+  GameState->World->ActiveCamera = Camera;
 
   component_controller* Controller = GetControllerComponent(ControllableCamera);
   Controller->Controller = GetController(Input, 0);

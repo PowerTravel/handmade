@@ -22,6 +22,7 @@ struct world
 
   tile_map     TileMap;
 
+  component_camera* ActiveCamera;
   raycast_result CastedRay;
 
   aabb_tree BroadPhaseTree;

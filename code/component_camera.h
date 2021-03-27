@@ -39,6 +39,11 @@ ray GetRayFromCamera(component_camera* Camera, v2 MousePos)
   return Result;
 }
 
+component_camera* GetActiveCamera()
+{
+  Assert(GlobalGameState->World->ActiveCamera);
+  return GlobalGameState->World->ActiveCamera;
+}
 
 void TranslateCamera( component_camera* Camera, const v3& DeltaP  )
 {
