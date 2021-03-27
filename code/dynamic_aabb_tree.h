@@ -11,6 +11,7 @@ struct raycast_result
   v3 RayDirection;
   v3 HitNormal;
   v3 Intersection;
+  v3 IntersectionObjectSpace;
   b32 Hit;
   u32 EntityID;
   r32 Distance;
