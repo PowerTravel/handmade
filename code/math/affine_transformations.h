@@ -106,6 +106,20 @@ QuaternionAsMatrix( const v4& Quaternion )
   return M4(r_1,r_2,r_3,r_4);
 }
 
+inline v4 VectorToPureQuaternion(const v3& Vector)
+{
+  v4 Result = V4(Vector,0);
+  return Result;
+}
+
+inline v3
+RotateQuaternion( const v4& Quaternion, const v3& Vector)
+{
+  v4 PureQuaternion = VectorToPureQuaternion(Vector);
+  v4 Result = QuaternionMultiplication(PureQuaternion, Quaternion);
+  Result = QuaternionMultiplication( QuaternionConjugate(Quaternion), Result);
+  return V3(Result);
+}
 
 inline v4
 RotateQuaternion( const r32 Angle, const v4& Axis )
