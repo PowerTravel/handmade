@@ -16,7 +16,7 @@
 #define SLOVER_ITERATIONS 24
 
 
-internal inline void ScaleV12( r32 Scal, v3* V, v3* Result )
+internal inline void ScaleV12( r32 Scal, v3 const * V, v3* Result )
 {
   Result[0] = V[0]*Scal;
   Result[1] = V[1]*Scal;
@@ -24,7 +24,7 @@ internal inline void ScaleV12( r32 Scal, v3* V, v3* Result )
   Result[3] = V[3]*Scal;
 }
 
-internal inline void MultiplyDiagonalM12V12( m3* M, v3* V, v3* Result )
+internal inline void MultiplyDiagonalM12V12( m3 const * M, v3 const * V, v3* Result )
 {
   Result[0] = M[0] * V[0];
   Result[1] = M[1] * V[1];
@@ -65,67 +65,66 @@ internal r32 GetLambda(  v3 V[], v3 J[], v3 InvMJ[], r32 BaumgarteCoefficient, r
   return Result;
 }
 
+void CreatePositionalJacobianConstraint(v3 const & ra, v3 const & rb,
+                                        v3 const & Normal,
+                                        m3 const * M_Inv,
+                                        v3* J, v3* InvMJ)
+{
+  J[0] = -Normal;
+  J[1] = -CrossProduct(ra, Normal);
+  J[2] = Normal;
+  J[3] = CrossProduct(rb, Normal);
+  MultiplyDiagonalM12V12(M_Inv, J, InvMJ);
+}
 
-contact_data_cache CreateDataCashe( contact_data Contact, component_spatial* SpatialA, component_spatial* SpatialB,
-  component_dynamics* DynamicsA, component_dynamics* DynamicsB, component_collider* ColliderA, component_collider* ColliderB)
+// Normal points from ContactPoint A to ContactPoint B
+// TangentOne Cross TangentTwo = Normal
+// Normals and tangents are ofcourse in World Space [WS]
+inline contact_data_cache
+CreateDataCashe(v3 ContactPoint_A_WS, v3 ObjectCenter_A_WS,
+                v3 ContactPoint_B_WS, v3 ObjectCenter_B_WS,
+                v3 Normal, v3 TangentOne, v3 TangentTwo,
+                r32 MassA, r32 MassB, m3 I_Inv_A, m3 I_Inv_B)
 {
   contact_data_cache CachedData = {};
-  const v3& ra = Contact.A_ContactWorldSpace - SpatialA->Position;
-  const v3& rb = Contact.B_ContactWorldSpace - SpatialB->Position;
-  const v3& n  = Contact.ContactNormal;
-  const v3& n1 = Contact.TangentNormalOne;
-  const v3& n2 = Contact.TangentNormalTwo;
-  const v3 cross = CrossProduct(n1,n2);
-  // Todo: Solve stationary objects with stationary constraint?
-  r32 ma = R32Max;
-  r32 mb = R32Max;
-  m3 InvA = {};
-  if (DynamicsA)
-  {
-    ma = DynamicsA->Mass;
-    m3 RotMat = M3(QuaternionAsMatrix(SpatialA->Rotation));
-    InvA = DynamicsA->I_inv;
-  }
+  const v3& ra = ContactPoint_A_WS - ObjectCenter_A_WS;
+  const v3& rb = ContactPoint_B_WS - ObjectCenter_B_WS;
 
-  m3 InvB = {};
-  if (DynamicsB)
-  {
-    mb = DynamicsB->Mass;
-    m3 RotMat = M3(QuaternionAsMatrix(SpatialB->Rotation));
-    InvB = DynamicsB->I_inv;
-  }
+  r32 ma = MassA;
+  r32 mb = MassB;
 
-  m3 InvM[4] = {};
-  InvM[0] =  M3(1/ma,0,0,
-                0,1/ma,0,
-                0,0,1/ma);
-  InvM[1] = InvA;
-  InvM[2] =  M3(1/mb,0,0,
-                0,1/mb,0,
-                0,0,1/mb);
-  InvM[3] = InvB;
+  m3 M_Inv[4] = {};
+  M_Inv[0] =  M3(1/ma,0,0,
+                 0,1/ma,0,
+                 0,0,1/ma);
+  M_Inv[1] = I_Inv_A;
+  M_Inv[2] =  M3(1/mb,0,0,
+                 0,1/mb,0,
+                 0,0,1/mb);
+  M_Inv[3] = I_Inv_B;
 
-  CachedData.J[0] = -n;
-  CachedData.J[1] = -CrossProduct(ra, n);
-  CachedData.J[2] = n;
-  CachedData.J[3] = CrossProduct(rb, n);
-  MultiplyDiagonalM12V12(InvM, CachedData.J, CachedData.InvMJ);
-
-  CachedData.Jn1[0] = -n1;
-  CachedData.Jn1[1] = -CrossProduct(ra, n1);
-  CachedData.Jn1[2] = n1;
-  CachedData.Jn1[3] = CrossProduct(rb, n1);
-  MultiplyDiagonalM12V12(InvM, CachedData.Jn1, CachedData.InvMJn1);
-
-  CachedData.Jn2[0] = -n2;
-  CachedData.Jn2[1] = -CrossProduct(ra, n2);
-  CachedData.Jn2[2] = n2;
-  CachedData.Jn2[3] = CrossProduct(rb, n2);
-  MultiplyDiagonalM12V12(InvM, CachedData.Jn2, CachedData.InvMJn2);
+  CreatePositionalJacobianConstraint(ra, rb, Normal, M_Inv, CachedData.J, CachedData.InvMJ);
+  CreatePositionalJacobianConstraint(ra, rb, TangentOne, M_Inv, CachedData.Jn1, CachedData.InvMJn1);
+  CreatePositionalJacobianConstraint(ra, rb, TangentTwo, M_Inv, CachedData.Jn2, CachedData.InvMJn2);
 
   return CachedData;
 }
 
+inline contact_data_cache
+CreateDataCashe( contact_data Contact, component_spatial* SpatialA, component_spatial* SpatialB,
+                component_dynamics* DynamicsA, component_dynamics* DynamicsB, component_collider* ColliderA, component_collider* ColliderB)
+{
+  m3 Empty{};
+  contact_data_cache CachedData = CreateDataCashe(Contact.A_ContactWorldSpace, SpatialA->Position,
+                                                  Contact.B_ContactWorldSpace, SpatialB->Position,
+                                                  Contact.ContactNormal,Contact.TangentNormalOne,
+                                                  Contact.TangentNormalTwo,
+                                                  DynamicsA ? DynamicsA->Mass : R32Max,
+                                                  DynamicsB ? DynamicsB->Mass : R32Max,
+                                                  DynamicsA ? DynamicsA->I_inv : Empty,
+                                                  DynamicsB ? DynamicsB->I_inv : Empty);
+  return CachedData;
+}
 
 internal void DoWarmStarting( contact_manifold* FirstManifold  )
 {
