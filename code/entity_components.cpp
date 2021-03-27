@@ -323,6 +323,7 @@ component_result* GetComponentsOfType(entity_manager* EM, u32 ComponentFlags)
   filtered_components* FilteredEntry = Result->FilteredArray;
   while (ReturnList)
   {
+    Result->EntityCount += ReturnList->Entry.Count;
     *FilteredEntry++ = ReturnList->Entry;
     ReturnList = ReturnList->Next;
   }

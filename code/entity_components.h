@@ -236,6 +236,7 @@ struct component_result
   u32 Types;
   b32 Begun;
 
+  u32 EntityCount;
   u32 ArrayCount;
   u32 ArrayIndex;
   u32 ComponentIndex;
