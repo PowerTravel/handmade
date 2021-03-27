@@ -8,9 +8,9 @@
 
 #define WARM_STARTING_FRACTION 1.0f
 
-#define FRICTIONAL_COEFFICIENT 0.2f
-#define BAUMGARTE_COEFFICIENT  0.3f
-#define RESTITUTION_COEFFICIENT 0.f
+#define FRICTIONAL_COEFFICIENT 0.5f
+#define BAUMGARTE_COEFFICIENT  0.2f
+#define RESTITUTION_COEFFICIENT 0.0f
 #define SLOP 0.01f
 
 #define SLOVER_ITERATIONS 24
@@ -545,6 +545,204 @@ void CastRay(game_input* GameInput, world* World )
   }
 }
 
+
+
+struct distance_constraint
+{
+  v3 RA;
+  v3 RB;
+  v3 U;
+
+  r32 Mass;
+  r32 Impulse;
+};
+
+distance_constraint InitiateDistanceConstraint(component_spatial * SpatialA,
+                                               component_spatial * SpatialB,
+                                               component_dynamics* DynamicsA,
+                                               component_dynamics* DynamicsB)
+{
+  distance_constraint Result = {};
+
+  world* world = GlobalGameState->World;
+
+  b32 Hard = true;
+  r32 HardLength = 0.5;
+  r32 SoftMinLength = 0.25;
+  r32 SoftMaxLength = 0.75;
+
+  // NOTE(Jakob): Global Constraint Settings
+  r32 LinearSlop = 0.01;
+
+  // NOTE(Jakob): Constraint Definition
+  v3 LocalAnchorA = V3(1,1,1);
+  v3 LocalAnchorB = V3(0,0,0);
+
+  // Rigid Range
+  r32 Length = Maximum( HardLength, LinearSlop);
+  // Soft Range
+  r32 MinLenght = Maximum(Hard ? HardLength : SoftMinLength, LinearSlop);
+  r32 MaxLength = Maximum(Hard ? HardLength : SoftMaxLength, LinearSlop);
+  r32 Stiffness = 0.1;
+  r32 Damping = 0.1;
+
+  r32 Gamma = 0;
+  r32 Bias = 0;
+  r32 Impulse = 0;
+  r32 LowerImpulse = 0;
+  r32 UpperImpulse = 0;
+  r32 CurrentLength = 0;
+
+  r32 SoftMass = 0;
+
+  // End of Constraint Definition
+
+  v3 LocalCenterA = ToLocal(SpatialA);
+  r32 InvMassA = 1.0f/DynamicsA->Mass;
+  m3 InvIA = DynamicsA->I_inv;
+  v3 CenterA = SpatialA->Position;
+  v4 RotA = SpatialA->Rotation; // NOTE(Jakob): Quaternion
+  //v3 LinearVelocityA = Velocities[0];
+  //v3 AngularVelocityA = Velocities[1];
+
+
+  v3 LocalCenterB = ToLocal(SpatialB);
+  r32 InvMassB = 1.0f/DynamicsB->Mass;
+  m3 InvIB = DynamicsB->I_inv;
+  v3 CenterB = SpatialB->Position;
+  v4 RotB = SpatialB->Rotation;
+  //v3 LinearVelocityB = Velocities[2];
+  //v3 AngularVelocityB = Velocities[3];
+
+  Result.RA = ToGlobal(SpatialA, LocalAnchorA - LocalCenterA);
+  Result.RB = ToGlobal(SpatialB, LocalAnchorB - LocalCenterB);
+  Result.U = CenterB + Result.RB - CenterA - Result.RA;
+
+  // NOTE(Jakob): Handle Singularity
+  CurrentLength = Norm(Result.U);
+  if(CurrentLength > LinearSlop)
+  {
+    Result.U *= 1.0f/Length;
+  }else{
+
+    Result.U = {};
+    Result.Mass = 0;
+    Result.Impulse = 0;
+    LowerImpulse = 0;
+    UpperImpulse = 0;
+  }
+
+  v3 CrossAU = CrossProduct(Result.RA,Result.U);
+  v3 CrossBU = CrossProduct(Result.RB,Result.U);
+  float InvMass = InvMassA + InvIA * CrossAU * CrossAU + InvMassB + InvIB * CrossBU * CrossBU;
+  Result.Mass = InvMass != 0.0f ? 1.0f/InvMass : 0.0f;
+
+  if(Stiffness > 0.0f && MinLenght < MaxLength)
+
+  {
+    // Implement Later, Try hard range first
+    INVALID_CODE_PATH;
+    // Soft
+    r32 C = CurrentLength - Length;
+    r32 d = Damping;
+    r32 k = Stiffness;
+
+    float h = GlobalGameState->World->dtForFrame;
+
+  }else{
+    Gamma = 0;
+    Bias = 0;
+    SoftMass = 0;
+  }
+
+  float DoWarmStarting = false;
+  if(DoWarmStarting)
+  {
+    // Scale the impulse to support a variable time step.
+    //Impulse *= data.step.dtRatio;
+		//LowerImpulse *= data.step.dtRatio;
+		//UpperImpulse *= data.step.dtRatio;
+
+		//b2Vec2 P = (m_impulse + m_lowerImpulse - m_upperImpulse) * m_u;
+		//vA -= m_invMassA * P;
+		//wA -= m_invIA * b2Cross(m_rA, P);
+		//vB += m_invMassB * P;
+		//wB += m_invIB * b2Cross(m_rB, P);
+  }
+  else
+  {
+    Result.Impulse = 0;
+  }
+
+  return Result;
+}
+
+void SolveVelocityConstraints(component_dynamics* DynamicsA, component_dynamics* DynamicsB,  distance_constraint DistanceConstraint)
+{
+
+  r32 MinLenght = 1;
+  r32 MaxLength = 0;
+  if(MinLenght < MaxLength)
+  {
+    // Soft Constraint
+  }
+  else
+  {
+    v3 VelOfPointA =  DynamicsA->LinearVelocity + CrossProduct(DynamicsA->AngularVelocity, DistanceConstraint.RA);
+    v3 VelOfPointB =  DynamicsB->LinearVelocity + CrossProduct(DynamicsB->AngularVelocity, DistanceConstraint.RB);
+    r32 CDot = DistanceConstraint.U * (VelOfPointB - VelOfPointA);
+
+    r32 Impulse = -DistanceConstraint.Mass * CDot;
+    DistanceConstraint.Impulse += Impulse;
+
+    v3 P = Impulse * DistanceConstraint.U;
+    DynamicsA->LinearVelocity  -= (1.0f/DynamicsA->Mass) * P;
+    DynamicsA->AngularVelocity -= DynamicsA->I_inv *CrossProduct(DistanceConstraint.RA, P);
+    DynamicsB->LinearVelocity  += (1.0f/DynamicsB->Mass) * P;
+    DynamicsB->AngularVelocity += DynamicsB->I_inv *CrossProduct(DistanceConstraint.RB, P);
+  }
+}
+
+void SolveDistanceVelocityConstraint()
+{
+
+  ScopedTransaction(GlobalGameState->EntityManager);
+  component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_DYNAMICS);
+
+  component_spatial* SpatialA = 0;
+  component_dynamics* DynamicsA = 0;
+
+  while(Next(GlobalGameState->EntityManager , ComponentList))
+  {
+    SpatialA = (component_spatial*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_SPATIAL);
+    DynamicsA = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_DYNAMICS);
+  }
+  Assert(SpatialA && DynamicsA);
+
+  component_spatial SpatialB{};
+  SpatialB.Scale = V3(1,1,1);
+  SpatialB.ModelMatrix = M4Identity();
+  SpatialB.Position = V3(0,0,0);
+  SpatialB.Rotation = V4(0,0,0,1);
+
+  component_dynamics DynamicsB = {};
+  DynamicsB.LinearVelocity = V3(0,0,0);
+  DynamicsB.AngularVelocity = V3(0,0,0);
+  DynamicsB.ExternalForce = V3(0,0,0);
+  DynamicsB.Mass = R32Max;
+  DynamicsB.I= M3(R32Max, 0,0,
+                  0,R32Max,0,
+                  0,0,R32Max);
+  DynamicsB.I_inv = {};
+
+  distance_constraint D = InitiateDistanceConstraint
+    (SpatialA, &SpatialB, DynamicsA, &DynamicsB);
+  SolveVelocityConstraints(DynamicsA,&DynamicsB, D);
+  //SolvePositionalConstraints(DynamicsA,&DynamicsB, D);
+
+}
+
+
 void InitiateContactVelocityConstraints(contact_manifold* Manifold)
 {
   while(Manifold)
@@ -568,6 +766,159 @@ void InitiateContactVelocityConstraints(contact_manifold* Manifold)
   }
 }
 
+// Revolute Joint
+// https://github.com/erincatto/box2d/blob/master/src/dynamics/b2_revolute_joint.cpp
+
+void InitiateJointVelocityConstraints2(joint_constraint* Joint)
+{
+  Joint->Impulse = 0;
+  Joint->AxialMass = 0;
+
+  Joint->LowerImpulse = 0;
+  Joint->UpperImpulse = 0;
+
+  Joint->RotationAngle = 0;
+
+  // Distance Constraint
+  Joint->EnableLimit = false;
+  Joint->LowerAngle = 0;
+  Joint->UpperAngle = 0;
+
+  // Motor Constraint
+  Joint->MotorImpulse = 0;
+  Joint->EnableMotor = false;
+  Joint->MaxMotorTorque = 0;
+  Joint->MotorSpeed = 0;
+
+
+  component_spatial * SA = GetSpatialComponent(Joint->EntityA);
+  component_spatial * SB = GetSpatialComponent(Joint->EntityB);
+  component_dynamics * DA = GetDynamicsComponent(Joint->EntityA);
+  component_dynamics * DB = GetDynamicsComponent(Joint->EntityB);
+
+  Joint->mA = R32Max;
+  Joint->IA_inv = {};
+  v3 VA = {};
+  v3 WA = {};
+  if(DA)
+  {
+    Joint->mA = DA->Mass;
+    Joint->IA_inv = DA->I_inv;
+    VA = DA->LinearVelocity;
+    WA = DA->AngularVelocity;
+  }
+
+  Joint->mB = R32Max;
+  Joint->IB_inv = {};
+  v3 VB = {};
+  v3 WB = {};
+  if (DB)
+  {
+    Joint->mB = DB->Mass;
+    Joint->IB_inv = DB->I_inv;
+    VB = DB->LinearVelocity;
+    WB = DB->AngularVelocity;
+  }
+
+  v4 RA = SA->Rotation;
+  v4 RB = SB->Rotation;
+
+  Joint->rA = RotateQuaternion(RA, Joint->LocalAnchorA - Joint->LocalCenterA);
+  Joint->rB = RotateQuaternion(RB, Joint->LocalAnchorB - Joint->LocalCenterB);
+
+  r32 mA_inv = 1.f / Joint->mA;
+  r32 mB_inv = 1.f / Joint->mB;
+
+
+}
+
+void InitiateContactVelocityConstraints()
+  {
+    Joint->Impulse = 0;
+    Joint->AxialMass = 0;
+
+    Joint->LowerImpulse = 0;
+    Joint->UpperImpulse = 0;
+
+    Joint->RotationAngle = 0;
+
+    // Distance Constraint
+    Joint->EnableLimit = false;
+    Joint->LowerAngle = 0;
+    Joint->UpperAngle = 0;
+
+    // Motor Constraint
+    Joint->MotorImpulse = 0;
+    Joint->EnableMotor = false;
+    Joint->MaxMotorTorque = 0;
+    Joint->MotorSpeed = 0;
+
+
+    component_spatial * SA = GetSpatialComponent(Joint->EntityA);
+    component_spatial * SB = GetSpatialComponent(Joint->EntityB);
+    component_dynamics * DA = GetDynamicsComponent(Joint->EntityA);
+    component_dynamics * DB = GetDynamicsComponent(Joint->EntityB);
+
+    Joint->mA = R32Max;
+    Joint->IA_inv = {};
+    v3 VA = {};
+    v3 WA = {};
+    if(DA)
+    {
+      Joint->mA = DA->Mass;
+      Joint->IA_inv = DA->I_inv;
+      VA = DA->LinearVelocity;
+      WA = DA->AngularVelocity;
+    }
+
+    Joint->mB = R32Max;
+    Joint->IB_inv = {};
+    v3 VB = {};
+    v3 WB = {};
+    if (DB)
+    {
+      Joint->mB = DB->Mass;
+      Joint->IB_inv = DB->I_inv;
+      VB = DB->LinearVelocity;
+      WB = DB->AngularVelocity;
+    }
+
+  v3 d = SB->Position - SA->Position;
+  v3 dHat = Normalize(d);
+
+    v4 RA = SA->Rotation;
+    v4 RB = SB->Rotation;
+
+  v3 rA =  RotateQuaternion(RA, Joint->LocalAnchorA - Joint->LocalCenterA);
+  v3 rB =  RotateQuaternion(RB, Joint->LocalAnchorB - Joint->LocalCenterB);
+  Joint->rA = rA;
+  Joint->rB = rB;
+
+
+  v3 Jacobian[4]= {};
+  Jacobian[0] = -d;
+  Jacobian[1] = -CrossProduct(rA,dHat);
+  Jacobian[2] =  d;
+  Jacobian[2] =  CrossProduct(rB,dHat);;
+
+  m3 InvMass[4] = {};
+  r32 OneOverMassA = DA ? 1.f/DA->Mass : 0;
+  r32 OneOverMassB = DB ? 1.f/DB->Mass : 0;
+  InvMass[0] = OneOverMassA * M3Identity();
+  InvMass[0] = OneOverMassB * M3Identity();
+
+    r32 mA_inv = 1.f / Joint->mA;
+    r32 mB_inv = 1.f / Joint->mB;
+
+
+
+  }
+
+void SolveJointVelocityConstraints(joint_constraint* Joint)
+{
+
+}
+
 void SpatialSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
@@ -581,6 +932,7 @@ void SpatialSystemUpdate( world* World )
     BEGIN_BLOCK(SolveConstraints);
     for (u32 i = 0; i < SLOVER_ITERATIONS; ++i)
     {
+      SolveJointVelocityConstraints(&World->Joint);
       // NOTE(Jakob): Solve Frictional constraints first because non-penetration is more important
       SolveFrictionalConstraints(WorldContacts->FirstManifold);
       SolveNonPenetrationConstraints(World->dtForFrame, WorldContacts->FirstManifold);
