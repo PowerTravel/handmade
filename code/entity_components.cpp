@@ -385,13 +385,6 @@ entity_manager* CreateEntityManager( )
   u32 LightChunkCount = 10;
   u32 ControllerChunkCount = 4;
   u32 EntityChunkCount = 128;
-
-  // Test to see if chunksizes work
-  CameraChunkCount = 4;
-  LightChunkCount = 4;
-  ControllerChunkCount = 4;
-  EntityChunkCount = 4;
-
   Result->ComponentCount = IndexOfLeastSignificantSetBit(COMPONENT_FLAG_FINAL);
   Result->Components = PushArray( &Result->Arena, Result->ComponentCount, component_list);
   Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_CAMERA)] = ComponentList(COMPONENT_FLAG_CAMERA, sizeof(component_camera), CameraChunkCount, COMPONENT_FLAG_NONE);
