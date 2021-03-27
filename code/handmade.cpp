@@ -77,6 +77,7 @@ game_memory* DebugGlobalMemory = 0;
 #include "entity_components.cpp"
 #include "system_controller.cpp"
 #include "system_sprite_animation.cpp"
+#include "system_collider.cpp"
 #include "system_spatial.cpp"
 #include "system_camera.cpp"
 #include "assets.cpp"
@@ -639,6 +640,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   World->AdvanceOneFrame = true;
   if(World->AdvanceOneFrame)
   {
+    ColliderSystemUpdate(World);
     SpatialSystemUpdate(World);
 
     b32 MouseClicked = Input->MouseButton[PlatformMouseButton_Left].EndedDown;
