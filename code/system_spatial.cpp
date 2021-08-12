@@ -58,7 +58,7 @@ internal r32 GetLambda(  v3 V[], v3 J[], v3 InvMJ[], r32 Bias)
 {
   r32 Numerator   = -(DotProductV12xV12( J, V) + Bias);
   r32 Denominator =   DotProductV12xV12( J, InvMJ);
-
+  
   r32 Result = Numerator / Denominator;
   return Result;
 }
@@ -87,7 +87,7 @@ CreateDataCashe(v3 ContactPoint_A_WS, v3 ObjectCenter_A_WS,
   contact_data_cache CachedData = {};
   const v3& ra = ContactPoint_A_WS - ObjectCenter_A_WS;
   const v3& rb = ContactPoint_B_WS - ObjectCenter_B_WS;
-
+  
   r32 ma = MassA;
   r32 mb = MassB;
   m3 M_Inv[4] = {};
@@ -99,11 +99,11 @@ CreateDataCashe(v3 ContactPoint_A_WS, v3 ObjectCenter_A_WS,
                  0,1/mb,0,
                  0,0,1/mb);
   M_Inv[3] = I_Inv_B;
-
+  
   CreatePositionalJacobianConstraint(ra, rb, Normal, M_Inv, CachedData.J, CachedData.InvMJ);
   CreatePositionalJacobianConstraint(ra, rb, TangentOne, M_Inv, CachedData.Jn1, CachedData.InvMJn1);
   CreatePositionalJacobianConstraint(ra, rb, TangentTwo, M_Inv, CachedData.Jn2, CachedData.InvMJn2);
-
+  
   return CachedData;
 }
 
@@ -115,7 +115,7 @@ void GetVelocityVector(component_dynamics * DA, component_dynamics * DB, v3* Vel
     Velocity[0] = DA->LinearVelocity;
     Velocity[1] = DA->AngularVelocity;
   }
-
+  
   if (DB)
   {
     Velocity[2] = DB->LinearVelocity;
@@ -130,7 +130,7 @@ void AddVelocityVector(component_dynamics * DA, component_dynamics * DB, v3* Del
     DA->LinearVelocity += DeltaVelocity[0];
     DA->AngularVelocity += DeltaVelocity[1];
   }
-
+  
   if (DB)
   {
     DB->LinearVelocity += DeltaVelocity[2];
@@ -163,7 +163,7 @@ internal void DoWarmStarting( contact_manifold* FirstManifold  )
   {
     vector_list<contact_data>* Contacts = &Manifold->Contacts;
     contact_data* Contact = Contacts->First( );
-
+    
     // Warm starting
     while(Contact)
     {
@@ -173,7 +173,7 @@ internal void DoWarmStarting( contact_manifold* FirstManifold  )
         v3 DeltaV[4] = {};
         v3 DeltaV1[4] = {};
         v3 DeltaV2[4] = {};
-
+        
         contact_data_cache* Cache = &Contact->Cache;
         ScaleV12(WarmStartingFraction * Cache->AccumulatedLambda,   Cache->InvMJ,   DeltaV);
         ScaleV12(WarmStartingFraction * Cache->AccumulatedLambdaN1, Cache->InvMJn1, DeltaV);
@@ -181,7 +181,7 @@ internal void DoWarmStarting( contact_manifold* FirstManifold  )
         Cache->AccumulatedLambda = 0;
         Cache->AccumulatedLambdaN1 = 0;
         Cache->AccumulatedLambdaN2 = 0;
-
+        
         component_dynamics* DynamicsA = GetDynamicsComponent(Manifold->EntityIDA);
         component_dynamics* DynamicsB = GetDynamicsComponent(Manifold->EntityIDB);
         v3 DeltaVTot[4] = {
@@ -203,16 +203,16 @@ internal void DoWarmStarting( contact_manifold* FirstManifold  )
 inline void IntegrateVelocities( r32 dt )
 {
   TIMED_FUNCTION();
-
+  
   BeginScopedEntityManagerMemory();
-
+  
   component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_DYNAMICS);
   while(Next(GlobalGameState->EntityManager, ComponentList))
   {
     component_spatial*  S = GetSpatialComponent(ComponentList);
     component_collider* C = GetColliderComponent(ComponentList);
     component_dynamics* D = GetDynamicsComponent(ComponentList);
-
+    
     // Forward euler
     // TODO(Jakob): Investigate other more stable integration methods
     v3 Gravity = V3(0,-9.82,0);
@@ -220,13 +220,13 @@ inline void IntegrateVelocities( r32 dt )
     v3 LinearImpulse = dt * ExternalForce;
     v3 DeltaV_Linear = LinearImpulse/D->Mass;
     D->LinearVelocity += DeltaV_Linear;
-
+    
     m3 RotMat = M3(QuaternionAsMatrix( S->Rotation ));
     m3 RotMat_Inv = Transpose(RotMat);
-
+    
     v3 ExternalTorqueWorldCoord = V3(0,0,0);
     v3 AngularImpulseWorldCoord = dt * ExternalTorqueWorldCoord;
-
+    
 #if USE_ANGULAR_VEL_OBJECT_SPACE
     // If objects angular velocity vector is given in object-coordinates
     v3 DeltaV_Angular = D->I_inv * RotMat_Inv * AngularImpulseWorldCoord;
@@ -234,7 +234,7 @@ inline void IntegrateVelocities( r32 dt )
     // If objects angular velocity vector is given in world-coordinates
     v3 DeltaV_Angular = RotMat * D->I_inv * RotMat_Inv * AngularImpulseWorldCoord;
 #endif
-
+    
     D->AngularVelocity += DeltaV_Angular;
   }
 }
@@ -251,38 +251,38 @@ SolveNonPenetrationConstraints(r32 dtForFrame, contact_manifold* FirstManifold)
     component_spatial* SpatialB = GetSpatialComponent(Manifold->EntityIDB);
     component_dynamics* DynamicsA = GetDynamicsComponent(Manifold->EntityIDA);
     component_dynamics* DynamicsB = GetDynamicsComponent(Manifold->EntityIDB);
-
+    
     vector_list<contact_data>* Contacts = &Manifold->Contacts;
     contact_data* Contact = Contacts->First();
     while(Contact)
     {
       v3 V[4] = {};
       GetVelocityVector(DynamicsA, DynamicsB, V);
-
+      
       contact_data_cache* Cache = &Contact->Cache;
-
+      
       v3 ContactNormal     = Contact->ContactNormal;
       v3 ContactPointDiff  = V3(SpatialA->ModelMatrix * V4(Contact->A_ContactModelSpace,1)) -
         V3(SpatialB->ModelMatrix * V4(Contact->B_ContactModelSpace,1));
       r32 PenetrationDepth = ContactPointDiff * ContactNormal;
-
+      
       r32 Restitution       = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, ContactNormal, SLOP);
       r32 Baumgarte         = getBaumgarteCoefficient(dtForFrame, BAUMGARTE_COEFFICIENT,  PenetrationDepth, SLOP);
       r32 Bias = Baumgarte + Restitution;
       r32 Lambda            = GetLambda( V, Cache->J, Cache->InvMJ, Bias);
-
+      
       r32 NewLambda = Maximum(Cache->AccumulatedLambda + Lambda, 0);
       r32 LambdaDiff = NewLambda - Cache->AccumulatedLambda;
       Cache->AccumulatedLambda = NewLambda;
-
-
+      
+      
       if(LambdaDiff > 0)
       {
         v3 DeltaV[4] = {};
         ScaleV12(LambdaDiff, Cache->InvMJ, DeltaV);
         AddVelocityVector(DynamicsA, DynamicsB, DeltaV);
       }
-
+      
       Contact = Contacts->Next(Contact);
     }
     Manifold = Manifold->Next;
@@ -305,28 +305,28 @@ SolveFrictionalConstraints( contact_manifold* FirstManifold )
     {
       v3 V[4] = {};
       GetVelocityVector(DynamicsA, DynamicsB, V);
-
+      
       contact_data_cache* Cache = &Contact->Cache;
-
+      
       r32 Kf = FRICTIONAL_COEFFICIENT;
       r32 ClampRange = Kf * Cache->AccumulatedLambda;
-
+      
       r32 LambdaN1 = GetLambda( V, Cache->Jn1, Cache->InvMJn1, 0);
       r32 LambdaN2 = GetLambda( V, Cache->Jn2, Cache->InvMJn2, 0);
       LambdaN1 = Clamp(Cache->AccumulatedLambdaN1 + LambdaN1, -ClampRange, ClampRange);
       LambdaN2 = Clamp(Cache->AccumulatedLambdaN2 + LambdaN2, -ClampRange, ClampRange);
       r32 LambdaDiffN1 = LambdaN1 - Cache->AccumulatedLambdaN1;
       r32 LambdaDiffN2 = LambdaN2 - Cache->AccumulatedLambdaN2;
-
+      
       Cache->AccumulatedLambdaN1 = LambdaN1;
       Cache->AccumulatedLambdaN2 = LambdaN2;
-
+      
       v3 DeltaV1[4] = {};
       v3 DeltaV2[4] = {};
-
+      
       ScaleV12(LambdaDiffN1, Cache->InvMJn1, DeltaV1);
       ScaleV12(LambdaDiffN2, Cache->InvMJn2, DeltaV2);
-
+      
       if (!(Equals(Abs(LambdaDiffN1),0) && Equals(Abs(LambdaDiffN2),0)))
       {
         v3 DeltaV[4] = {
@@ -337,7 +337,7 @@ SolveFrictionalConstraints( contact_manifold* FirstManifold )
         };
         AddVelocityVector(DynamicsA, DynamicsB, DeltaV);
       }
-
+      
       Contact = Contacts->Next(Contact);
     }
     Manifold = Manifold->Next;
@@ -404,17 +404,17 @@ inline void
 TimestepVelocityForwardEuler(const r32 DeltaTime, const v3 LinearVelocity, const v3 AngularVelocity, component_spatial* c )
 {
   c->Position += DeltaTime*LinearVelocity;
-
+  
   const v4 q0 = c->Rotation;
   r32 Angle = DeltaTime * Norm(AngularVelocity);
   v3 Axis = Normalize(AngularVelocity);
-
+  
 #if USE_ANGULAR_VEL_OBJECT_SPACE
   v4 DeltaQ = RotateQuaternion( Angle , Axis );
 #else
   v4 DeltaQ = QuaternionMultiplication( c->Rotation, QuaternionMultiplication( RotateQuaternion( Angle , Axis ) , QuaternionInverse(c->Rotation)));
 #endif
-
+  
   c->Rotation = QuaternionMultiplication(DeltaQ, c->Rotation);
 }
 
@@ -422,7 +422,7 @@ inline internal void
 IntegratePositions(r32 dtForFrame)
 {
   TIMED_FUNCTION();
-
+  
   BeginScopedEntityManagerMemory();
   component_result* Components = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_DYNAMICS);
   while(Next(GlobalGameState->EntityManager,Components))
@@ -440,7 +440,7 @@ IntegratePositions(r32 dtForFrame)
   }
 }
 
-void CastRay(game_input* GameInput, world* World )
+void CastRay(game_input* GameInput, world* World ) 
 {
   b32 MouseClicked = GameInput->MouseButton[PlatformMouseButton_Left].EndedDown;
   v2 MousePos = V2(GameInput->MouseX,GameInput->MouseY);
@@ -452,10 +452,10 @@ void CastRay(game_input* GameInput, world* World )
     component_result* Components = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
     Assert(Next(EM, Components));
     component_camera* Camera = GetCameraComponent(Components);
-
+    
     ray Ray = GetRayFromCamera(Camera, MousePos);
     World->CastedRay = RayCast(GlobalGameState->TransientArena, &World->BroadPhaseTree, Ray.Origin, Ray.Direction);
-
+    
     if(World->CastedRay.Hit)
     {
       World->PickedEntity.Active = true;
@@ -466,13 +466,18 @@ void CastRay(game_input* GameInput, world* World )
       World->PickedEntity = {};
     }
   }
+}
 
+void SetupPickedConstraint(world* World)
+{
+  b32 Valid = false;
   if(World->PickedEntity.Active)
   {
     component_spatial* Spatial = GetSpatialComponent(World->PickedEntity.EntityID);
     component_dynamics* Dynamics = GetDynamicsComponent(World->PickedEntity.EntityID);
     if(Dynamics)
     {
+      Valid = true;
       // TODO(Jakob Hariz): Set up a positional constraitnt between mouse Point and Point Object Space
       v3 Up, Right, Forward;
       component_camera* Camera = GetActiveCamera();
@@ -481,68 +486,57 @@ void CastRay(game_input* GameInput, world* World )
       ray Ray = GetRayFromCamera(Camera, V2(GlobalGameState->Input->MouseX, GlobalGameState->Input->MouseY));
       r32 t = RaycastPlane(Ray.Origin, Ray.Direction, World->PickedEntity.Point, -Forward);
       World->PickedEntity.MousePointOnPlane = Ray.Origin + t*Ray.Direction;
-
+      
       // WS = WorldSpace
       // OS = ObjectSpace
-      v3 MousePoint_WS = World->PickedEntity.MousePointOnPlane;
-      v3 ObjectPoint_OS = World->PickedEntity.PointObjectSpace;
-      v3 ObjectPoint_WS = V3(Spatial->ModelMatrix * V4(ObjectPoint_OS));
-      v3 ra = ObjectPoint_OS - Spatial->Position;
-      v3 R = (MousePoint_WS - ObjectPoint_WS);
-      v3 Normal = -Normalize(R);
-      r32 Length = Norm(R);
-      r32 ScaleFactor = 0.1f;
-      v3 Velocity = ScaleFactor * Normal;;
-
-      m3 M_Inv[4]{};
-
-      r32 ma = Dynamics->Mass;
-
-      M_Inv[0] =  M3(1/ma,0,0,
-                     0,1/ma,0,
-                     0,0,1/ma);
-      M_Inv[1] = Dynamics->I_inv;
-      M_Inv[2] = {};
-      M_Inv[3] = {};
-
-      v3 Jacobian[4]{};
-      v3 InvMJ[4]{};
-
-      CreatePositionalJacobianConstraint(V3(0,0,0), ra, Normal, M_Inv, Jacobian, InvMJ);
-
-      r32 AccumulatedLambda = 0;
-      for (u32 i = 0; i < SLOVER_ITERATIONS; ++i)
-      {
-        v3 V[4] = {};
-        if(Dynamics)
-        {
-          V[0] = Dynamics->LinearVelocity;
-          V[1] = Dynamics->AngularVelocity;
-        }
-
-        v3 ContactPointDiff  = R;
-        r32 PenetrationDepth = 0;
-
-        r32 Restitution = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, Normal, SLOP);
-        r32 Baumgarte = getBaumgarteCoefficient(World->dtForFrame, BAUMGARTE_COEFFICIENT, Length*ScaleFactor, SLOP);
-        r32 Bias = Baumgarte + Restitution;
-        r32 Lambda = GetLambda( V, Jacobian, InvMJ, Bias);
-        r32 OldCumulativeLambda = AccumulatedLambda;
-        AccumulatedLambda += Lambda;
-        r32 LambdaDiff = AccumulatedLambda - OldCumulativeLambda;
-
-        v3 DeltaV[4] = {};
-        ScaleV12(LambdaDiff, InvMJ, DeltaV);
-
-        if(Abs(LambdaDiff) > 0)
-        {
-          Dynamics->LinearVelocity  += DeltaV[0];
-          Dynamics->AngularVelocity += DeltaV[1];
-        }
-      }
+      
+      World->Mouse.EntityA = 0;
+      World->Mouse.EntityB = World->PickedEntity.EntityID;
+      
+      World->Mouse.LocalAnchorA = V3(0,0,0);
+      World->Mouse.LocalAnchorB = World->PickedEntity.PointObjectSpace;
+      World->Mouse.LocalCenterA = V3(0,0,0);
+      World->Mouse.LocalCenterB = ToLocal(Spatial, Spatial->Position);
+      
+      m3 Empty = {};
+      World->Mouse.InvMass[0] = {};
+      World->Mouse.InvMass[1] = {};
+      World->Mouse.InvMass[2] = (1.f/Dynamics->Mass) * M3Identity();
+      World->Mouse.InvMass[3] = Dynamics->I_inv;
     }
   }
+  
+  if(!Valid)
+  {
+    World->Mouse = {};
+  }
 }
+
+void InitiateJointVelocityConstraints(component_spatial  * SA, component_spatial  * SB,
+                                      component_dynamics * DA, component_dynamics * DB,
+                                      joint_constraint* Joint);
+
+void InitiateMousePickingVelocityConstraint(world* World)
+{
+  if(World->Mouse.EntityB)
+  {
+    component_spatial SA = component_spatial();
+    
+    SA.Position = World->PickedEntity.MousePointOnPlane;
+    SA.ModelMatrix = GetTranslationMatrix(World->PickedEntity.MousePointOnPlane);
+    component_spatial  * SB = GetSpatialComponent(World->Mouse.EntityB);
+    
+    component_dynamics * DB = GetDynamicsComponent(World->Mouse.EntityB);
+    
+    component_dynamics DA = {};
+    DA.Mass = FLT_MAX;
+    DA.I = DA.Mass * M3Identity();
+    DA.I_inv = {};
+    
+    InitiateJointVelocityConstraints(&SA, SB, &DA, DB, &World->Mouse);
+  }
+}
+
 
 joint_constraint CreateJointConstraint(u32 EntityA, v3 LocalAnchorA, u32 EntityB, v3 LocalAnchorB, v3 GlobalRotationAxis)
 {
@@ -553,10 +547,10 @@ joint_constraint CreateJointConstraint(u32 EntityA, v3 LocalAnchorA, u32 EntityB
   Joint.LocalAnchorB = LocalAnchorB;
   component_spatial* A = GetSpatialComponent(EntityA);
   component_spatial* B = GetSpatialComponent(EntityB);
-
+  
   Joint.LocalCenterA = ToLocal(A,A->Position);
   Joint.LocalCenterB = ToLocal(B,B->Position);
-
+  
   component_dynamics* DA = GetDynamicsComponent(EntityA);
   component_dynamics* DB = GetDynamicsComponent(EntityB);
   m3 Empty = {};
@@ -564,7 +558,7 @@ joint_constraint CreateJointConstraint(u32 EntityA, v3 LocalAnchorA, u32 EntityB
   Joint.InvMass[1] =  DA ? DA->I_inv : Empty;
   Joint.InvMass[2] = (DB ? (1.f/DB->Mass) : 0) * M3Identity();
   Joint.InvMass[3] =  DB ? DB->I_inv : Empty;
-
+  
   return Joint;
 }
 
@@ -575,11 +569,11 @@ void InitiateContactVelocityConstraints(contact_manifold* Manifold)
     component_spatial* SpatialA = GetSpatialComponent(Manifold->EntityIDA);
     component_collider* ColliderA = GetColliderComponent(Manifold->EntityIDA);
     component_dynamics* DynamicsA = GetDynamicsComponent(Manifold->EntityIDA);
-
+    
     component_spatial* SpatialB = GetSpatialComponent(Manifold->EntityIDB);
     component_collider* ColliderB = GetColliderComponent(Manifold->EntityIDB);
     component_dynamics* DynamicsB = GetDynamicsComponent(Manifold->EntityIDB);
-
+    
     vector_list<contact_data> Contacts = Manifold->Contacts;
     contact_data* Contact = Contacts.First();
     while(Contact)
@@ -592,26 +586,23 @@ void InitiateContactVelocityConstraints(contact_manifold* Manifold)
 }
 
 // https://github.com/erincatto/box2d/blob/master/src/dynamics/b2_revolute_joint.cpp
-void InitiateJointVelocityConstraints(joint_constraint* Joint)
+void InitiateJointVelocityConstraints(component_spatial  * SA, component_spatial  * SB,
+                                      component_dynamics * DA, component_dynamics * DB,
+                                      joint_constraint* Joint)
 {
-  component_spatial  * SA = GetSpatialComponent(Joint->EntityA);
-  component_spatial  * SB = GetSpatialComponent(Joint->EntityB);
-  component_dynamics * DA = GetDynamicsComponent(Joint->EntityA);
-  component_dynamics * DB = GetDynamicsComponent(Joint->EntityB);
-
   v3 Velocity[4] = {};
   GetVelocityVector(DA, DB, Velocity);
-
+  
   v4 RA = SA->Rotation;
   v4 RB = SB->Rotation;
-
+  
   v3 rA = RotateQuaternion(RA, Joint->LocalAnchorA - Joint->LocalCenterA);
   v3 rB = RotateQuaternion(RB, Joint->LocalAnchorB - Joint->LocalCenterB);
   Joint->rA = rA;
   Joint->rB = rB;
-
+  
   Joint->d = ToGlobal(SB, Joint->LocalAnchorB) - ToGlobal(SA, Joint->LocalAnchorA);
-
+  
   if(Norm(Joint->d)>SLOP)
   {
     v3 d = Normalize(Joint->d);
@@ -620,34 +611,60 @@ void InitiateJointVelocityConstraints(joint_constraint* Joint)
     Joint->Jacobian[2] =  d;
     Joint->Jacobian[3] =  CrossProduct(rB,d);
   }
-
+  
   MultiplyDiagonalM12V12(Joint->InvMass, Joint->Jacobian, Joint->InvMJ);
-
+  
   v3 DeltaVelocity[4] = {};
   ScaleV12(Joint->Lambda, Joint->InvMJ, DeltaVelocity);
   AddVelocityVector(DA, DB, DeltaVelocity);
 }
 
-void SolveJointVelocityConstraints(joint_constraint* Joint, r32 dt)
+void InitiateJointVelocityConstraints(joint_constraint* Joint)
+{
+  component_spatial  * SA = GetSpatialComponent(Joint->EntityA);
+  component_spatial  * SB = GetSpatialComponent(Joint->EntityB);
+  component_dynamics * DA = GetDynamicsComponent(Joint->EntityA);
+  component_dynamics * DB = GetDynamicsComponent(Joint->EntityB);
+  InitiateJointVelocityConstraints(SA, SB, DA, DB, Joint);
+}
+
+void SolveMouseJointVelocityConstraints(component_dynamics * DA, component_dynamics * DB,
+                                        joint_constraint* Joint, r32 dt)
 {
   if(Norm(Joint->d) > SLOP)
   {
-    component_dynamics * DA = GetDynamicsComponent(Joint->EntityA);
-    component_dynamics * DB = GetDynamicsComponent(Joint->EntityB);
-
     v3 Velocity[4] = {};
     GetVelocityVector(DA, DB, Velocity);
-
+    
     r32 BaumBias = (Norm(Joint->d)-SLOP)/dt;
     r32 Lambda = GetLambda(Velocity, Joint->Jacobian, Joint->InvMJ, BaumBias );
     r32 NewLambda = Joint->Lambda + Lambda;
     r32 LambdaDiff = NewLambda - Joint->Lambda;
     Joint->Lambda = NewLambda;
-
+    
     v3 DeltaV[4] = {};
     ScaleV12(LambdaDiff, Joint->InvMJ, DeltaV);
     AddVelocityVector(DA,DB,DeltaV);
-    }
+  }
+}
+
+void SolveJointVelocityConstraints(joint_constraint* Joint, r32 dt)
+{
+  component_dynamics * DA = GetDynamicsComponent(Joint->EntityA);
+  component_dynamics * DB = GetDynamicsComponent(Joint->EntityB);
+  SolveMouseJointVelocityConstraints(DA, DB, Joint, dt);
+}
+
+void SolveMouseVelocityConstraints(joint_constraint* Joint, r32 dt)
+{
+  component_dynamics * DB = GetDynamicsComponent(Joint->EntityB);
+  
+  component_dynamics DA = {};
+  DA.Mass = FLT_MAX;
+  DA.I = DA.Mass * M3Identity();
+  DA.I_inv = {};
+  
+  SolveMouseJointVelocityConstraints(&DA, DB, Joint, dt);
 }
 
 /*c
@@ -663,31 +680,32 @@ plot( sin(time()+x), cos(time()-x-pi/2) );
 void SpatialSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
-
+  
   world_contact_chunk* WorldContacts =  World->ContactManifolds;
   r32 dt = World->dtForFrame;
   IntegrateVelocities(dt);
-
+  
   InitiateJointVelocityConstraints(&World->Joint);
-
+  
   InitiateContactVelocityConstraints(WorldContacts->FirstManifold);
-
+  
   CastRay(GlobalGameState->Input, World);
-
+  SetupPickedConstraint(World);
+  InitiateMousePickingVelocityConstraint(World);
+  
   DoWarmStarting(WorldContacts->FirstManifold);
-
+  
   BEGIN_BLOCK(SolveConstraints);
   for (u32 i = 0; i < SLOVER_ITERATIONS; ++i)
   {
     // NOTE(Jakob): Solve Frictional constraints first because non-penetration is more important
+    SolveMouseVelocityConstraints(&World->Mouse, dt);
     SolveJointVelocityConstraints(&World->Joint, dt);
     SolveFrictionalConstraints(WorldContacts->FirstManifold);
     SolveNonPenetrationConstraints(dt, WorldContacts->FirstManifold);
   }
   END_BLOCK(SolveConstraints);
-
-  Platform.DEBUGPrint("%f \n", World->Joint.Lambda);
-
+  
   IntegratePositions(dt);
-
+  
 }

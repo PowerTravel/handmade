@@ -6,6 +6,8 @@ struct gjk_simplex;
 struct entity;
 struct memory_arena;
 
+// https://dyn4j.org/2010/07/point-to-point-constraint/
+
 struct joint_constraint
 {
   u32 EntityA;
@@ -14,16 +16,16 @@ struct joint_constraint
   v3 LocalAnchorB;
   v3 LocalCenterA;
   v3 LocalCenterB;
-
+  
   v3 rA;
   v3 rB;
-
-    v3 d;
-    v3 InvMJ[4];
+  
+  v3 d;
+  v3 InvMJ[4];
   v3 Jacobian[4];
   m3 InvMass[4];
   r32 Lambda;
-  };
+};
 
 struct contact_data_cache
 {
