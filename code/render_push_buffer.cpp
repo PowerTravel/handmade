@@ -74,7 +74,7 @@ r32 GetTextLineHeightSize(u32 FontSize)
 r32 GetTextWidth(const c8* String, u32 FontSize)
 {
   stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
-  
+
   game_window_size WindowSize = GameGetWindowSize();
   const r32 PixelSize = 1.f / WindowSize.HeightPx;
 
@@ -86,13 +86,13 @@ r32 GetTextWidth(const c8* String, u32 FontSize)
     ++String;
   }
   r32 Result = PixelSize*Width;
-  return Result;  
+  return Result;
 }
 
 rect2f GetTextSize(r32 x, r32 y, const c8* String, u32 FontSize)
 {
   stb_font_map* FontMap = GetFontMap(GlobalGameState->AssetManager, FontSize);
-  
+
   game_window_size WindowSize = GameGetWindowSize();
   const r32 ScreenScaleFactor = 1.f / WindowSize.HeightPx;
 
@@ -252,6 +252,39 @@ PushBoxFrame(render_group* RenderGroup, m4 M, aabb3f AABB, v3 CameraPosition, r3
 
 }
 
+
+void PushArrow(render_group* RenderGroup, v3 Start, v3 Vector, c8* Color)
+{
+  v4 Q = GetRotation( V3(1,0,0), Vector);
+  const m4 ObjRotation = GetRotationMatrix(Q);
+
+  r32 Length = Norm(Vector);
+  m4 M = GetScaleMatrix(V4(Length, 0.05, 0.05, 1));
+  Translate(V4(Length/2.f,0,0,1), M);
+  M = ObjRotation * M;
+  Translate(V4(Start), M);
+
+  push_buffer_header* Header = PushNewHeader(RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK);
+  entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
+  GetHandle(GlobalGameState->AssetManager,"voxel", &Body->Object);
+  GetHandle(GlobalGameState->AssetManager, Color, &Body->Material);
+
+  Body->M = M;
+  Body->NM = Transpose(RigidInverse(Body->M));
+}
+
+void PushCube(render_group* RenderGroup, v3 Position, r32 Scale, c8* Color)
+{
+  push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK );
+  entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
+  GetHandle(GlobalGameState->AssetManager, "voxel", &Body->Object);
+  GetHandle(GlobalGameState->AssetManager, Color, &Body->Material);
+
+  const m4 ScaleMatrix = GetScaleMatrix(V4(Scale,Scale,Scale,1));
+  Body->M = GetTranslationMatrix( V4(Position,1))*ScaleMatrix;
+  Body->NM = Transpose(RigidInverse(Body->M));
+}
+
 void FillRenderPushBuffer(world* World)
 {
   render_group* RenderGroup = GlobalGameState->RenderCommands->RenderGroup;
@@ -265,7 +298,7 @@ void FillRenderPushBuffer(world* World)
 
   v3 CameraPosition = {};
   {
-    ScopedTransaction(EM);
+    BeginScopedEntityManagerMemory();
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
     while(Next(EM, ComponentList))
     {
@@ -277,7 +310,7 @@ void FillRenderPushBuffer(world* World)
   }
 
   {
-    ScopedTransaction(EM);
+    BeginScopedEntityManagerMemory();
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_LIGHT | COMPONENT_FLAG_SPATIAL);
     while(Next(EM, ComponentList))
     {
@@ -293,7 +326,7 @@ void FillRenderPushBuffer(world* World)
   }
 
   {
-    ScopedTransaction(EM);
+    BeginScopedEntityManagerMemory();
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_RENDER | COMPONENT_FLAG_SPATIAL);
     while(Next(EM, ComponentList))
     {
@@ -317,7 +350,7 @@ void FillRenderPushBuffer(world* World)
     }
   }
 
-  { 
+  {
     if( World->CastedRay.Hit)
     {
       PushLine(RenderGroup, World->CastedRay.RayOrigin, World->CastedRay.Intersection, CameraPosition, 0.2, "green");
@@ -329,56 +362,57 @@ void FillRenderPushBuffer(world* World)
     }
   }
 
+  // NOTE(Jakob): Debug drawings
+  #if 0
   {
-    ScopedTransaction(EM);
+    joint_constraint Joint = World->Joint;
+    component_spatial* SpatA = GetSpatialComponent(Joint.EntityA);
+    component_spatial* SpatB = GetSpatialComponent(Joint.EntityB);
+    v3 PositionA = SpatA->Position + V3(0,2,0);
+    v3 PositionB = SpatB->Position + V3(0,2,0);
+    PushArrow(RenderGroup, PositionA, Joint.Lambda * Joint.Jacobian[0], "red");
+    PushArrow(RenderGroup, PositionB, Joint.Lambda * Joint.Jacobian[2], "blue");
+  }
+  #endif
+  {
+
+      joint_constraint* J = &World->Joint;
+      component_spatial* A =  GetSpatialComponent(J->EntityA);
+      v3 CenterA = ToGlobal(A, J->LocalCenterA);
+    v3 AnchorA = ToGlobal(A, J->LocalAnchorA);
+    v3 LineA = AnchorA-CenterA;
+
+
+    component_spatial* B =  GetSpatialComponent(J->EntityB);
+    v3 CenterB = ToGlobal(B, J->LocalCenterB);
+    v3 AnchorB = ToGlobal(B, J->LocalAnchorB);
+    v3 LineB = AnchorB-CenterB;
+
+
+    PushCube(RenderGroup, CenterA, 0.15, "blue");
+    PushCube(RenderGroup, AnchorA, 0.15, "green");
+    PushArrow(RenderGroup, CenterA, J->rA, "red");
+
+    PushCube(RenderGroup, CenterB, 0.15, "blue");
+    PushCube(RenderGroup, AnchorB, 0.15, "green");
+    PushArrow(RenderGroup, CenterB, J->rB, "red");
+
+    PushArrow(RenderGroup, AnchorA, AnchorB - AnchorA, "white");
+    PushArrow(RenderGroup, AnchorA, J->Lambda * J->Jacobian[0], "red");
+    PushArrow(RenderGroup, AnchorB, J->Lambda * J->Jacobian[2], "blue");
+  }
+  {
+    BeginScopedEntityManagerMemory();
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_DYNAMICS);
     while(Next(EM, ComponentList))
     {
-      component_spatial* VelSpatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
-      component_dynamics* VelDynamics = (component_dynamics*) GetComponent(EM, ComponentList, COMPONENT_FLAG_DYNAMICS);
-      {
-        v4 Q = GetRotation( V3(1,0,0), VelDynamics->LinearVelocity);
-        const m4 ObjRotation = GetRotationMatrix(Q);
-        r32 Speed = Norm(VelDynamics->LinearVelocity);
-        
-        m4 M  = GetScaleMatrix(V4(Speed, 0.05, 0.05, 1));
-        Translate(V4(Speed/2,0,0,1), M);
-        M = ObjRotation * M;
-        Translate(V4(VelSpatial->Position) + V4(0,2,0,1), M);
+      component_spatial* VelSpatial = GetSpatialComponent(ComponentList);
+      component_dynamics* VelDynamics = GetDynamicsComponent(ComponentList);
 
-        push_buffer_header* VelocityHeader = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK);
-        entry_type_render_asset* VelocityBody = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-        GetHandle(AM,"voxel", &VelocityBody->Object);
-        GetHandle(AM, "red", &VelocityBody->Material);
-
-        VelocityBody->M = M;
-        VelocityBody->NM = Transpose(RigidInverse(VelocityBody->M));
-      }
-
-      {
-        r32 Speed = Norm(VelDynamics->AngularVelocity);
-        v4 Q = GetRotation( V3(1,0,0), VelDynamics->AngularVelocity);
-        #if USE_ANGULAR_VEL_OBJECT_SPACE
-        const m4 ObjRotation =  GetRotationMatrix(QuaternionMultiplication(Q,VelSpatial->Rotation));
-        #else
-        const m4 ObjRotation = GetRotationMatrix(Q);
-        #endif
-
-        m4 M  = GetScaleMatrix(V4(Speed, 0.05, 0.05, 1));
-        Translate(V4(Speed/2,0,0,1), M);
-        M = ObjRotation * M;
-        Translate(V4(VelSpatial->Position) + V4(0,2,0,1), M);
-
-        push_buffer_header* WorldArrowHeader = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK);
-        entry_type_render_asset* WoldArrowBody = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-        GetHandle(AM,"voxel", &WoldArrowBody->Object);
-        GetHandle(AM, "blue", &WoldArrowBody->Material);
-        WoldArrowBody->M = M;
-        WoldArrowBody->NM = Transpose(RigidInverse(WoldArrowBody->M));
-      }
-
-    }
-  }
+      // NOTE(Jakob): Draw linear and angular velocity arrow
+      v3 Position = VelSpatial->Position + V3(0,2,0);
+      //PushArrow(RenderGroup, Position+ V4(0,2,0,1), VelDynamics->LinearVelocity, "red" );
+      //PushArrow(RenderGroup, Position+ V4(0,2,0,1), VelDynamics->AngularVelocity, "blue");
 
   {
     if(World->PickedEntity.Active)
@@ -387,16 +421,18 @@ void FillRenderPushBuffer(world* World)
       v3 ObjectPoint_WS = V3(Spatial->ModelMatrix * V4(World->PickedEntity.PointObjectSpace));
       PushLine(RenderGroup, ObjectPoint_WS, World->PickedEntity.MousePointOnPlane , CameraPosition, 0.1, "red");
     }
+      }
+    }
   }
 
 #if SHOW_COLLIDER
   {
-    ScopedTransaction(EM);
+    BeginScopedEntityManagerMemory();
     component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_COLLIDER);
     while(Next(EM, ComponentList))
     {
-      component_spatial* Spatial = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
-      component_collider* Collider = (component_collider*) GetComponent(EM, ComponentList, COMPONENT_FLAG_COLLIDER);
+      component_spatial* Spatial =GetSpatialComponent(ComponentList);
+      component_collider* Collider = GetColliderComponent( ComponentList);
       m4 M = Spatial->ModelMatrix;
       aabb3f AABB = Collider->AABB;
       r32 LineThickness = 0.03;
@@ -414,34 +450,8 @@ void FillRenderPushBuffer(world* World)
     contact_data* Contact = Manifold->Contacts.First();
     while(Contact)
     {
-      {
-        push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK );
-
-
-        entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-        GetHandle(AM,"voxel", &Body->Object);
-        GetHandle(AM, "blue", &Body->Material);
-        component_spatial* Spatial = (component_spatial*) GetComponent(EM, Manifold->EntityIDA, COMPONENT_FLAG_SPATIAL);
-        const m4 Rotation = GetRotationMatrix(Spatial->Rotation);
-        const m4 Translation = GetTranslationMatrix(Spatial->Position);
-        const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
-        Body->M = GetTranslationMatrix( V4(Contact->A_ContactWorldSpace,1))*Scale;
-        Body->NM = Transpose(RigidInverse(Body->M));
-      }
-      {
-        push_buffer_header* Header = PushNewHeader( RenderGroup, render_buffer_entry_type::RENDER_ASSET, RENDER_STATE_FILL | RENDER_STATE_CULL_BACK );
-
-        entry_type_render_asset* Body = PushStruct(&RenderGroup->Arena, entry_type_render_asset);
-        GetHandle(AM, "voxel", &Body->Object);
-        GetHandle(AM, "white", &Body->Material);
-
-        component_spatial* Spatial = (component_spatial*) GetComponent(EM, Manifold->EntityIDB, COMPONENT_FLAG_SPATIAL);
-        const m4 Rotation = GetRotationMatrix(Spatial->Rotation);
-        const m4 Translation = GetTranslationMatrix(Spatial->Position);
-        const m4 Scale = GetScaleMatrix(V4(0.1,0.1,0.1,1));
-        Body->M = GetTranslationMatrix( V4(Contact->B_ContactWorldSpace,1))*Scale;
-        Body->NM = Transpose(RigidInverse(Body->M));
-      }
+        PushCube(RenderGroup, Contact->A_ContactWorldSpace, 0.1, "blue");
+        PushCube(RenderGroup, Contact->B_ContactWorldSpace, 0.1, "white");
       Contact = Manifold->Contacts.Next(Contact);
     }
     Manifold = Manifold->Next;

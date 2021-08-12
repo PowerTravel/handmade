@@ -400,7 +400,7 @@ aabb_tree BuildBroadPhaseTree()
   TIMED_FUNCTION();
   aabb_tree Result = {};
   memory_arena* TransientArena = GlobalGameState->TransientArena;
-  ScopedTransaction(GlobalGameState->EntityManager);
+  BeginScopedEntityManagerMemory();
   component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_COLLIDER);
   while(Next(GlobalGameState->EntityManager, ComponentList))
   {

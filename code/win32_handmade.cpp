@@ -62,12 +62,12 @@ typedef DIRECT_SOUND_CREATE(direct_sound_create );
 DEBUG_PLATFORM_EXECUTE_SYSTEM_COMMAND(DEBUGExecuteSystemCommand)
 {
   debug_executing_process Result = {};
-  
+
   STARTUPINFO StartupInfo = {};
   StartupInfo.cb = sizeof(StartupInfo);
   StartupInfo.dwFlags = STARTF_USESHOWWINDOW;
   StartupInfo.wShowWindow = SW_HIDE;
-  
+
   PROCESS_INFORMATION ProcessInfo = {};
   if(CreateProcess(Command,
                    CommandLine,
@@ -938,7 +938,7 @@ Win32ProcessKeyboard(win32_state* aState,  keyboard_input*  OldKeyboardControlle
 
         b32 AltKeyWasDown   = ( Message.lParam & (1 << 29));
         b32 ShiftKeyWasDown = ( GetKeyState(VK_SHIFT) & (1 << 15));
-        
+
         if(WasDown != IsDown)
         {
           switch(VKCode)
@@ -1169,7 +1169,7 @@ Win32ProcessKeyboard(win32_state* aState,  keyboard_input*  OldKeyboardControlle
             ////case VK_OEM_CLEAR:   {}break; // 0xFE  OemClr
 //            case VK__none_:      {}break; // 0xFF  no VK mapping
             default: DEBUGPrint("INVALID %d\n", VKCode); break;
-                
+
           }
         }
         if(IsDown)
@@ -1847,7 +1847,7 @@ WinMain(  HINSTANCE Instance,
 #if HANDMADE_INTERNAL
   DEBUGGlobalShowCursor = true;
 #endif
-  
+
   WNDCLASSA WindowClass = {};
   WindowClass.style = CS_HREDRAW|CS_VREDRAW;//|CS_OWNDC;
   WindowClass.lpfnWndProc = MainWindowCallback;
@@ -1877,7 +1877,7 @@ WinMain(  HINSTANCE Instance,
     {
       game_render_commands RenderCommands = {};
       GlobalRenderCommands = &RenderCommands;
-      
+
       HDC DeviceContext;
       RenderCommands.OpenGL = Win32InitOpenGL(WindowHandle, &DeviceContext);
       win32_window_dimension Dimension = Win32GetWindowDimension(WindowHandle);
@@ -2078,7 +2078,7 @@ WinMain(  HINSTANCE Instance,
         NewInput->MouseDX = NewInput->MouseX - OldInput->MouseX;
         NewInput->MouseDY = NewInput->MouseY - OldInput->MouseY;
         NewInput->MouseDZ = NewInput->MouseZ - OldInput->MouseZ;
-
+        NewInput->dt = TargetSecondsPerFrame;
 
         DWORD WinButtonID[PlatformMouseButton_Count] =
         {
@@ -2350,7 +2350,7 @@ WinMain(  HINSTANCE Instance,
 #endif
 
           r32 FrameMarkerSecondsElapsed = 0;
-          NewInput->dt = TargetSecondsPerFrame;
+
 
 #if HANDMADE_INTERNAL
           BEGIN_BLOCK(DebugCollation);

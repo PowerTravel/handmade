@@ -90,7 +90,7 @@ PushBitmapData(game_asset_manager* AssetManager, c8* Key, u32 Width, u32 Height,
   midx MemorySize = Width * Height * BPP / 8;
   if(PixelData)
   {
-    Bitmap->Pixels = PushCopy(&AssetManager->AssetArena, MemorySize, PixelData);  
+    Bitmap->Pixels = PushCopy(&AssetManager->AssetArena, MemorySize, PixelData);
   }else{
     Bitmap->Pixels = PushSize(&AssetManager->AssetArena, MemorySize);
   }
@@ -146,7 +146,7 @@ PushMaterialData(game_asset_manager* AssetManager, c8* Key, material SrcMaterial
   material* DstMaterial = AllocateMaterial(AssetManager, Index);
   *DstMaterial = SrcMaterial;
 }
-  
+
 void GetHandle(game_asset_manager* AssetManager, char* Key, bitmap_handle* Handle)
 {
   Assert(Key && Handle);

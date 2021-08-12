@@ -143,9 +143,9 @@ void FlyingCameraController( world* World, component_controller* Controller, com
         v4 WorldDownCamCoord = Camera->V * V4(0,-1,0,0);
         RotateCamera( Camera, da, V3( WorldDownCamCoord ) );
         hasMoved = true;
-      }  
+      }
     }
- 
+
     if(Keyboard->Key_N.EndedDown)
     {
       World->AdvanceOneFrame = true;
@@ -158,7 +158,7 @@ void FlyingCameraController( world* World, component_controller* Controller, com
     spaceToggle = Keyboard->Key_SPACE.EndedDown;
 
 
-    
+
     if(Input->RightTrigger.EndedDown || Keyboard->Key_W.EndedDown)
     {
       TranslateCamera(Camera, V3(0,0,-dr));
@@ -251,25 +251,26 @@ void HeroController( component_controller*  Controller,
 void ControllerSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
+
   entity_manager* EM = GlobalGameState->EntityManager;
-  ScopedTransaction(EM);
-  component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
-  while(Next(EM, ComponentList))
+  BeginScopedEntityManagerMemory();
+  component_result* Components = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
+  while(Next(EM, Components))
   {
-    component_controller* Controller = (component_controller*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CONTROLLER);
+    component_controller* Controller = GetControllerComponent(Components);
     switch (Controller->Type)
     {
       case ControllerType_FlyingCamera:
       {
         World->AdvanceOneFrame = false;
-        component_camera* Camera   = (component_camera*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CAMERA);
+        component_camera* Camera   = GetCameraComponent(Components);
         FlyingCameraController(World, Controller, Camera);
       }break;
       case ControllerType_Hero:
       {
-        component_spatial*     Spatial  = (component_spatial*) GetComponent(EM, ComponentList, COMPONENT_FLAG_SPATIAL);
-        component_dynamics*    Dynamics = (component_dynamics*) GetComponent(EM, ComponentList, COMPONENT_FLAG_DYNAMICS);
-        component_camera*      Camera   = (component_camera*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CAMERA);
+        component_spatial*  Spatial = GetSpatialComponent(Components);
+        component_dynamics*    Dynamics = GetDynamicsComponent(Components);
+        component_camera*      Camera   = GetCameraComponent(Components);
         HeroController(Controller, Spatial, Dynamics, Camera);
       }break;
     }

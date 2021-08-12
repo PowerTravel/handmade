@@ -22,7 +22,7 @@ void UpdateViewMatrixAngularMovement(  component_camera* Camera )
 void CameraSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
-  ScopedTransaction(GlobalGameState->EntityManager);
+  BeginScopedEntityManagerMemory();
   component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_CAMERA);
   while( Next(GlobalGameState->EntityManager, ComponentList) )
   {

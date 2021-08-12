@@ -34,6 +34,9 @@ struct world
   component_camera* ActiveCamera;
   raycast_result CastedRay;
   picked_entity PickedEntity;
+  joint_constraint Joint;
+
+
   aabb_tree BroadPhaseTree;
   world_contact_chunk* ContactManifolds;
 };

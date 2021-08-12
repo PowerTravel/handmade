@@ -7,7 +7,7 @@ void SpriteAnimationSystemUpdate(world* World)
   TIMED_FUNCTION();
   entity_manager* EM = GlobalGameState->EntityManager;
 
-  ScopedTransaction(EM);
+  BeginScopedEntityManagerMemory();
   component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_SPRITE_ANIMATION);
   while(Next(EM, ComponentList))
   {
@@ -55,7 +55,7 @@ void SpriteAnimationSystemUpdate(world* World)
       local_persist u32 Timer = 0;
 
       if(Timer%100 == 0)
-      { 
+      {
         r32 r = GetRandomReal(Timer);
         r32 interval = 1.f/4.f;
         if(r < interval)

@@ -1,4 +1,4 @@
-/* 
+/*
 
   Random stuff
 
@@ -79,6 +79,7 @@ game_memory* DebugGlobalMemory = 0;
 #include "system_sprite_animation.cpp"
 #include "system_collider.cpp"
 #include "system_spatial.cpp"
+//#include "Spatial2.cpp"
 #include "system_camera.cpp"
 #include "assets.cpp"
 #include "asset_loading.cpp"
@@ -147,6 +148,48 @@ world* CreateWorld( u32 MaxNrManifolds )
   return World;
 }
 
+u32 CreateCube(entity_manager* EM, game_asset_manager* AssetManager, v3 Position, r32 RotAngle, v3 RotAxis, r32 Scale, v3 LinearVelocity, v3 AngularVelocity, r32 Mass)
+{
+
+  bitmap_handle BitmapHandle;
+  object_handle ObjectHandle;
+  material_handle MaterialHandle;
+  GetHandle( AssetManager, "cube1",   &ObjectHandle );
+  GetHandle( AssetManager, "cube",    &MaterialHandle );
+  GetHandle( AssetManager, "cube_kd", &BitmapHandle );
+
+  u32 CubeEntity = NewEntity( EM );
+  NewComponents( EM, CubeEntity,
+                COMPONENT_FLAG_RENDER   |
+                COMPONENT_FLAG_SPATIAL  |
+                COMPONENT_FLAG_COLLIDER |
+                COMPONENT_FLAG_DYNAMICS);
+
+  component_render* CubeRender = GetRenderComponent(CubeEntity);
+  CubeRender->Object = ObjectHandle;
+  CubeRender->Bitmap = BitmapHandle;
+  CubeRender->Material = MaterialHandle;
+
+  component_spatial* CubeSpatial = GetSpatialComponent(CubeEntity);
+  CubeSpatial->Position = Position;
+  CubeSpatial->Rotation = RotateQuaternion( RotAngle, RotAxis );
+  CubeSpatial->Scale = V3(Scale, Scale, Scale);
+  UpdateModelMatrix(CubeSpatial);
+
+  component_collider* CubeCollider = GetColliderComponent(CubeEntity);
+  CubeCollider->Object = ObjectHandle;
+  CubeCollider->AABB = GetMeshAABB(AssetManager, ObjectHandle);
+
+  component_dynamics* CubeDynamics = GetDynamicsComponent(CubeEntity);
+  CubeDynamics->LinearVelocity  = LinearVelocity;
+  CubeDynamics->AngularVelocity = AngularVelocity;
+  CubeDynamics->Mass = Mass;
+
+  CalculateInertialTensor(CubeSpatial, CubeCollider, CubeDynamics);
+
+  return CubeEntity;
+}
+
 void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 {
   world* World = GameState->World;
@@ -167,7 +210,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   }
 
   {
-    ScopedTransaction(GlobalGameState->EntityManager);
+    BeginScopedEntityManagerMemory();
     component_result* Result = GetComponentsOfType(EM, COMPONENT_FLAG_COLLIDER | COMPONENT_FLAG_CAMERA);
     while(Next(EM, Result))
     {
@@ -213,6 +256,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   GetHandle(AssetManager, "red_plastic", &LightRender->Material);
   GetHandle(AssetManager, "null",  &LightRender->Bitmap);
 
+  #if 0
 
 #define state6
 #if defined(state1)
@@ -249,7 +293,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
   r32 ySpace = 6;
   r32 xzSpace = 1.2;
   s32 iarr[] = {-0,1};
-  s32 jarr[] = {-1,-0};
+  s32 jarr[] = {-0,1};
   s32 karr[] = {-0,1};
 #else
   // BUG: If qubes are sliiightly rotated the contact-generation spazzes out (contact normals are zero)
@@ -278,6 +322,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     {
       for (s32 k = karr[0]; k < karr[1]; ++k)
       {
+
         u32 CubeEntity = NewEntity( EM );
         NewComponents( EM, CubeEntity,
           COMPONENT_FLAG_RENDER   |
@@ -306,9 +351,26 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
         CubeDynamics->Mass = mass;
 
         CalculateInertialTensor(CubeSpatial, CubeCollider, CubeDynamics);
+
       }
     }
   }
+#else
+
+  u32 Cube1 = CreateCube(EM, AssetManager, V3(0,0,0), 0.f, V3(0,1,0), 1.f,
+                           V3(3,0,0), V3(0,0,0), 10);
+  u32 Cube2 = CreateCube(EM, AssetManager, V3(-2,2,0), 0.f, V3(0,1,0), 1.f,
+                           V3(0,0,0), V3(0,0,0), 10);
+
+  World->Joint = CreateJointConstraint(Cube1,
+                                         ToLocal(GetSpatialComponent(Cube1), V3(0,2,0)),
+                                       Cube2,
+                                         ToLocal(GetSpatialComponent(Cube2), V3(0,2,0)),
+                                         V3(0,0,1)); // Global Rotation Angle
+
+  #endif
+
+
 
   u32 FloorEntity = NewEntity( EM );
   NewComponents( EM, FloorEntity,
@@ -323,6 +385,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
 
   component_spatial* FloorSpatial = GetSpatialComponent(FloorEntity);
   FloorSpatial->Position = V3( 0,-2, 0);
+  FloorSpatial->Rotation = V4( 0,0, 0, 1);
   FloorSpatial->Scale = V3( 118, 1, 118);
   UpdateModelMatrix(FloorSpatial);
 
@@ -346,7 +409,7 @@ void CreateCollisionTestScene(game_state* GameState, game_input* Input)
     u32 PixelData = (Blue << 0) | (Green << 8) | (Red << 16) | Alpha << 24;
     *Pixels++ = PixelData;
   }
-#if 1
+#if 0
   u32 Teapot = NewEntity( EM );
   NewComponents( EM, Teapot,
     COMPONENT_FLAG_RENDER   |
@@ -484,7 +547,7 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
     Assert(!RenderCommands->LightsGroup);
     Assert(!RenderCommands->RenderGroup);
     Assert(!RenderCommands->OverlayGroup);
-   
+
     RenderCommands->LightsGroup = InitiateRenderGroup();
     RenderCommands->RenderGroup = InitiateRenderGroup();
     RenderCommands->OverlayGroup = InitiateRenderGroup();
@@ -492,7 +555,7 @@ void InitiateGame(game_memory* Memory, game_render_commands* RenderCommands, gam
 
   Assert(RenderCommands->LightsGroup);
   Assert(RenderCommands->RenderGroup);
-  Assert(RenderCommands->OverlayGroup);  
+  Assert(RenderCommands->OverlayGroup);
 }
 
 #include "function_pointer_pool.h"
@@ -514,10 +577,10 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
 
   EndTemporaryMemory(GlobalGameState->TransientTempMem);
   GlobalGameState->TransientTempMem = BeginTemporaryMemory(GlobalGameState->TransientArena);
- 
+
   if(Input->ExecutableReloaded)
   {
-    ReinitiatePool();  
+    ReinitiatePool();
   }
 
 
@@ -559,7 +622,7 @@ void BeginFrame(game_memory* Memory, game_render_commands* RenderCommands, game_
 
 rect2f PlotToBitmap( bitmap* Bitmap, r32 ChartXMin, r32 ChartXMax, r32 ChartYMin, r32 ChartYMax, r32 XValue, r32 YValue, s32 LineSize, v4 Color)
 {
-  if(XValue < ChartXMin || XValue >= ChartXMax || 
+  if(XValue < ChartXMin || XValue >= ChartXMax ||
      YValue < ChartYMin || YValue >= ChartYMax)
   {
     return {};
@@ -638,7 +701,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
   entity_manager* EM = GlobalGameState->EntityManager;
   ControllerSystemUpdate(World);
-  World->AdvanceOneFrame = true;
+  //World->AdvanceOneFrame = true;
   if(World->AdvanceOneFrame)
   {
     ColliderSystemUpdate(World);
@@ -648,7 +711,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   SpriteAnimationSystemUpdate(World);
   if(World->AdvanceOneFrame)
   {
-    World->GlobalTimeSec += Input->dt;  
+    World->GlobalTimeSec += Input->dt;
   }
 #if 1
   bitmap_handle Plot;
@@ -656,11 +719,11 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
   bitmap* PlotBitMap = GetAsset(GlobalGameState->AssetManager, Plot);
 
 
-  ScopedTransaction(EM);
+  BeginScopedEntityManagerMemory();
   component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_DYNAMICS);
   rect2f UpdatedRegion {};
   u32 PointSize = 1;
-  
+
   r32 Ek = 0;
   r32 Er = 0;
   r32 Ep = 0;
@@ -671,7 +734,7 @@ extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 
     Ek += Dynamics->Mass *(Dynamics->LinearVelocity * Dynamics->LinearVelocity) * 0.5f;
     Er += Dynamics->Mass *(Dynamics->AngularVelocity * Dynamics->AngularVelocity) * 0.5f;
-    Ep += Dynamics->Mass * 9.82f * (Spatial->Position.Y+1); 
+    Ep += Dynamics->Mass * 9.82f * (Spatial->Position.Y+1);
   }
 
   v2 Cursor = V2(0,0);

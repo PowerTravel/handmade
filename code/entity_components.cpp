@@ -387,14 +387,14 @@ entity_manager* CreateEntityManager( )
   u32 EntityChunkCount = 128;
   Result->ComponentCount = IndexOfLeastSignificantSetBit(COMPONENT_FLAG_FINAL);
   Result->Components = PushArray( &Result->Arena, Result->ComponentCount, component_list);
-  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_CAMERA)] = ComponentList(COMPONENT_FLAG_CAMERA, sizeof(component_camera), CameraChunkCount, COMPONENT_FLAG_NONE);
-  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_LIGHT)] = ComponentList(COMPONENT_FLAG_LIGHT, sizeof(component_light), LightChunkCount, COMPONENT_FLAG_SPATIAL),
-  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_CONTROLLER)] = ComponentList(COMPONENT_FLAG_CONTROLLER, sizeof(component_controller), ControllerChunkCount, COMPONENT_FLAG_NONE);
-  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_SPATIAL)] = ComponentList(COMPONENT_FLAG_SPATIAL, sizeof(component_spatial), EntityChunkCount, COMPONENT_FLAG_NONE);
-  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_COLLIDER)] = ComponentList(COMPONENT_FLAG_COLLIDER, sizeof(component_collider), EntityChunkCount, COMPONENT_FLAG_SPATIAL);
-  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_DYNAMICS)] = ComponentList(COMPONENT_FLAG_DYNAMICS, sizeof(component_dynamics), EntityChunkCount, COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_COLLIDER);
-  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_RENDER)] = ComponentList(COMPONENT_FLAG_RENDER, sizeof(component_render), EntityChunkCount, COMPONENT_FLAG_NONE);
-  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_SPRITE_ANIMATION)] = ComponentList(COMPONENT_FLAG_SPRITE_ANIMATION, sizeof(component_sprite_animation), EntityChunkCount, COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_RENDER);
+  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_CAMERA)] = CreateComponentList(COMPONENT_FLAG_CAMERA, sizeof(component_camera), CameraChunkCount, COMPONENT_FLAG_NONE);
+  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_LIGHT)] = CreateComponentList(COMPONENT_FLAG_LIGHT, sizeof(component_light), LightChunkCount, COMPONENT_FLAG_SPATIAL),
+  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_CONTROLLER)] = CreateComponentList(COMPONENT_FLAG_CONTROLLER, sizeof(component_controller), ControllerChunkCount, COMPONENT_FLAG_NONE);
+  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_SPATIAL)] = CreateComponentList(COMPONENT_FLAG_SPATIAL, sizeof(component_spatial), EntityChunkCount, COMPONENT_FLAG_NONE);
+  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_COLLIDER)] = CreateComponentList(COMPONENT_FLAG_COLLIDER, sizeof(component_collider), EntityChunkCount, COMPONENT_FLAG_SPATIAL);
+  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_DYNAMICS)] = CreateComponentList(COMPONENT_FLAG_DYNAMICS, sizeof(component_dynamics), EntityChunkCount, COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_COLLIDER);
+  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_RENDER)] = CreateComponentList(COMPONENT_FLAG_RENDER, sizeof(component_render), EntityChunkCount, COMPONENT_FLAG_NONE);
+  Result->Components[IndexOfLeastSignificantSetBit(COMPONENT_FLAG_SPRITE_ANIMATION)] = CreateComponentList(COMPONENT_FLAG_SPRITE_ANIMATION, sizeof(component_sprite_animation), EntityChunkCount, COMPONENT_FLAG_SPATIAL | COMPONENT_FLAG_RENDER);
 
   Result->EntityCount = 0;
   Result->EntityChunkCount = 1;

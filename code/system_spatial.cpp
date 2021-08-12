@@ -8,8 +8,8 @@
 
 #define WARM_STARTING_FRACTION 1.0f
 
-#define FRICTIONAL_COEFFICIENT 0.5f
-#define BAUMGARTE_COEFFICIENT  0.2f
+#define FRICTIONAL_COEFFICIENT 0.2f
+#define BAUMGARTE_COEFFICIENT  0.4f
 #define RESTITUTION_COEFFICIENT 0.0f
 #define SLOP 0.01f
 
@@ -23,7 +23,6 @@ internal inline void ScaleV12( r32 Scal, v3 const * V, v3* Result )
   Result[2] = V[2]*Scal;
   Result[3] = V[3]*Scal;
 }
-
 internal inline void MultiplyDiagonalM12V12( m3 const * M, v3 const * V, v3* Result )
 {
   Result[0] = M[0] * V[0];
@@ -55,9 +54,8 @@ getRestitutionCoefficient(v3 V[], r32 Scalar, v3 Normal, r32 Slop)
   return Restitution;
 }
 
-internal r32 GetLambda(  v3 V[], v3 J[], v3 InvMJ[], r32 BaumgarteCoefficient, r32 RestitutionCoefficient)
+internal r32 GetLambda(  v3 V[], v3 J[], v3 InvMJ[], r32 Bias)
 {
-  r32 Bias = BaumgarteCoefficient + RestitutionCoefficient;
   r32 Numerator   = -(DotProductV12xV12( J, V) + Bias);
   r32 Denominator =   DotProductV12xV12( J, InvMJ);
 
@@ -92,7 +90,6 @@ CreateDataCashe(v3 ContactPoint_A_WS, v3 ObjectCenter_A_WS,
 
   r32 ma = MassA;
   r32 mb = MassB;
-
   m3 M_Inv[4] = {};
   M_Inv[0] =  M3(1/ma,0,0,
                  0,1/ma,0,
@@ -109,6 +106,38 @@ CreateDataCashe(v3 ContactPoint_A_WS, v3 ObjectCenter_A_WS,
 
   return CachedData;
 }
+
+
+void GetVelocityVector(component_dynamics * DA, component_dynamics * DB, v3* Velocity)
+{
+  if (DA)
+  {
+    Velocity[0] = DA->LinearVelocity;
+    Velocity[1] = DA->AngularVelocity;
+  }
+
+  if (DB)
+  {
+    Velocity[2] = DB->LinearVelocity;
+    Velocity[3] = DB->AngularVelocity;
+  }
+}
+
+void AddVelocityVector(component_dynamics * DA, component_dynamics * DB, v3* DeltaVelocity)
+{
+  if (DA)
+  {
+    DA->LinearVelocity += DeltaVelocity[0];
+    DA->AngularVelocity += DeltaVelocity[1];
+  }
+
+  if (DB)
+  {
+    DB->LinearVelocity += DeltaVelocity[2];
+    DB->AngularVelocity += DeltaVelocity[3];
+  }
+}
+
 
 inline contact_data_cache
 CreateDataCashe( contact_data Contact, component_spatial* SpatialA, component_spatial* SpatialB,
@@ -133,7 +162,7 @@ internal void DoWarmStarting( contact_manifold* FirstManifold  )
   while (Manifold)
   {
     vector_list<contact_data>* Contacts = &Manifold->Contacts;
-    contact_data* Contact = Contacts->First();
+    contact_data* Contact = Contacts->First( );
 
     // Warm starting
     while(Contact)
@@ -153,18 +182,15 @@ internal void DoWarmStarting( contact_manifold* FirstManifold  )
         Cache->AccumulatedLambdaN1 = 0;
         Cache->AccumulatedLambdaN2 = 0;
 
-        component_dynamics* DynamicsA = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->EntityIDA, COMPONENT_FLAG_DYNAMICS);
-        component_dynamics* DynamicsB = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, Manifold->EntityIDB, COMPONENT_FLAG_DYNAMICS);
-        if(DynamicsA)
-        {
-          DynamicsA->LinearVelocity  += (DeltaV[0] + DeltaV1[0] + DeltaV2[0]);
-          DynamicsA->AngularVelocity += (DeltaV[1] + DeltaV1[1] + DeltaV2[1]);
-        }
-        if(DynamicsB)
-        {
-          DynamicsB->LinearVelocity  += (DeltaV[2] + DeltaV1[2] + DeltaV2[2]);
-          DynamicsB->AngularVelocity += (DeltaV[3] + DeltaV1[3] + DeltaV2[3]);
-        }
+        component_dynamics* DynamicsA = GetDynamicsComponent(Manifold->EntityIDA);
+        component_dynamics* DynamicsB = GetDynamicsComponent(Manifold->EntityIDB);
+        v3 DeltaVTot[4] = {
+          DeltaV[0] + DeltaV1[0] + DeltaV2[0],
+          DeltaV[1] + DeltaV1[1] + DeltaV2[1],
+          DeltaV[2] + DeltaV1[2] + DeltaV2[2],
+          DeltaV[3] + DeltaV1[3] + DeltaV2[3]
+        };
+        AddVelocityVector(DynamicsA, DynamicsB, DeltaVTot);
       }
       Contact = Contacts->Next(Contact);
     }
@@ -172,21 +198,23 @@ internal void DoWarmStarting( contact_manifold* FirstManifold  )
   }
 }
 
+// NOTE(Jakob):
+
 inline void IntegrateVelocities( r32 dt )
 {
   TIMED_FUNCTION();
 
-  ScopedTransaction(GlobalGameState->EntityManager);
+  BeginScopedEntityManagerMemory();
 
   component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_DYNAMICS);
   while(Next(GlobalGameState->EntityManager, ComponentList))
   {
-    component_spatial*   S = (component_spatial*) GetComponent(GlobalGameState->EntityManager,  ComponentList, COMPONENT_FLAG_SPATIAL);
-    component_collider*  C = (component_collider*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_COLLIDER);
-    component_dynamics*  D = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_DYNAMICS);
+    component_spatial*  S = GetSpatialComponent(ComponentList);
+    component_collider* C = GetColliderComponent(ComponentList);
+    component_dynamics* D = GetDynamicsComponent(ComponentList);
 
     // Forward euler
-    // TODO: Investigate other more stable integration methods
+    // TODO(Jakob): Investigate other more stable integration methods
     v3 Gravity = V3(0,-9.82,0);
     v3 ExternalForce = Gravity*D->Mass;
     v3 LinearImpulse = dt * ExternalForce;
@@ -199,18 +227,17 @@ inline void IntegrateVelocities( r32 dt )
     v3 ExternalTorqueWorldCoord = V3(0,0,0);
     v3 AngularImpulseWorldCoord = dt * ExternalTorqueWorldCoord;
 
-    #if USE_ANGULAR_VEL_OBJECT_SPACE
+#if USE_ANGULAR_VEL_OBJECT_SPACE
     // If objects angular velocity vector is given in object-coordinates
     v3 DeltaV_Angular = D->I_inv * RotMat_Inv * AngularImpulseWorldCoord;
-    #else
+#else
     // If objects angular velocity vector is given in world-coordinates
     v3 DeltaV_Angular = RotMat * D->I_inv * RotMat_Inv * AngularImpulseWorldCoord;
-    #endif
+#endif
 
     D->AngularVelocity += DeltaV_Angular;
   }
 }
-
 
 internal void
 SolveNonPenetrationConstraints(r32 dtForFrame, contact_manifold* FirstManifold)
@@ -230,47 +257,30 @@ SolveNonPenetrationConstraints(r32 dtForFrame, contact_manifold* FirstManifold)
     while(Contact)
     {
       v3 V[4] = {};
-      if(DynamicsA)
-      {
-        V[0] = DynamicsA->LinearVelocity;
-        V[1] = DynamicsA->AngularVelocity;
-      }
-      if(DynamicsB)
-      {
-        V[2] = DynamicsB->LinearVelocity;
-        V[3] = DynamicsB->AngularVelocity;
-      }
+      GetVelocityVector(DynamicsA, DynamicsB, V);
 
       contact_data_cache* Cache = &Contact->Cache;
 
       v3 ContactNormal     = Contact->ContactNormal;
       v3 ContactPointDiff  = V3(SpatialA->ModelMatrix * V4(Contact->A_ContactModelSpace,1)) -
-                             V3(SpatialB->ModelMatrix * V4(Contact->B_ContactModelSpace,1));
+        V3(SpatialB->ModelMatrix * V4(Contact->B_ContactModelSpace,1));
       r32 PenetrationDepth = ContactPointDiff * ContactNormal;
 
       r32 Restitution       = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, ContactNormal, SLOP);
       r32 Baumgarte         = getBaumgarteCoefficient(dtForFrame, BAUMGARTE_COEFFICIENT,  PenetrationDepth, SLOP);
-      r32 Lambda            = GetLambda( V, Cache->J, Cache->InvMJ, Baumgarte, Restitution);
+      r32 Bias = Baumgarte + Restitution;
+      r32 Lambda            = GetLambda( V, Cache->J, Cache->InvMJ, Bias);
 
       r32 NewLambda = Maximum(Cache->AccumulatedLambda + Lambda, 0);
       r32 LambdaDiff = NewLambda - Cache->AccumulatedLambda;
       Cache->AccumulatedLambda = NewLambda;
 
-      v3 DeltaV[4] = {};
-      ScaleV12(LambdaDiff, Cache->InvMJ, DeltaV);
 
       if(LambdaDiff > 0)
       {
-        if(DynamicsA)
-        {
-          DynamicsA->LinearVelocity  += DeltaV[0];
-          DynamicsA->AngularVelocity += DeltaV[1];
-        }
-        if(DynamicsB)
-        {
-          DynamicsB->LinearVelocity  += DeltaV[2];
-          DynamicsB->AngularVelocity += DeltaV[3];
-        }
+        v3 DeltaV[4] = {};
+        ScaleV12(LambdaDiff, Cache->InvMJ, DeltaV);
+        AddVelocityVector(DynamicsA, DynamicsB, DeltaV);
       }
 
       Contact = Contacts->Next(Contact);
@@ -294,24 +304,15 @@ SolveFrictionalConstraints( contact_manifold* FirstManifold )
     while(Contact)
     {
       v3 V[4] = {};
-      if(DynamicsA)
-      {
-        V[0] = DynamicsA->LinearVelocity;
-        V[1] = DynamicsA->AngularVelocity;
-      }
-      if(DynamicsB)
-      {
-        V[2] = DynamicsB->LinearVelocity;
-        V[3] = DynamicsB->AngularVelocity;
-      }
+      GetVelocityVector(DynamicsA, DynamicsB, V);
 
       contact_data_cache* Cache = &Contact->Cache;
 
       r32 Kf = FRICTIONAL_COEFFICIENT;
       r32 ClampRange = Kf * Cache->AccumulatedLambda;
 
-      r32 LambdaN1 = GetLambda( V, Cache->Jn1, Cache->InvMJn1, 0, 0);
-      r32 LambdaN2 = GetLambda( V, Cache->Jn2, Cache->InvMJn2, 0, 0);
+      r32 LambdaN1 = GetLambda( V, Cache->Jn1, Cache->InvMJn1, 0);
+      r32 LambdaN2 = GetLambda( V, Cache->Jn2, Cache->InvMJn2, 0);
       LambdaN1 = Clamp(Cache->AccumulatedLambdaN1 + LambdaN1, -ClampRange, ClampRange);
       LambdaN2 = Clamp(Cache->AccumulatedLambdaN2 + LambdaN2, -ClampRange, ClampRange);
       r32 LambdaDiffN1 = LambdaN1 - Cache->AccumulatedLambdaN1;
@@ -328,16 +329,13 @@ SolveFrictionalConstraints( contact_manifold* FirstManifold )
 
       if (!(Equals(Abs(LambdaDiffN1),0) && Equals(Abs(LambdaDiffN2),0)))
       {
-        if(DynamicsA)
-        {
-          DynamicsA->LinearVelocity  += (DeltaV1[0] + DeltaV2[0]);
-          DynamicsA->AngularVelocity += (DeltaV1[1] + DeltaV2[1]);
-        }
-        if(DynamicsB)
-        {
-          DynamicsB->LinearVelocity  += (DeltaV1[2] + DeltaV2[2]);
-          DynamicsB->AngularVelocity += (DeltaV1[3] + DeltaV2[3]);
-        }
+        v3 DeltaV[4] = {
+          (DeltaV1[0] + DeltaV2[0]),
+          (DeltaV1[1] + DeltaV2[1]),
+          (DeltaV1[2] + DeltaV2[2]),
+          (DeltaV1[3] + DeltaV2[3])
+        };
+        AddVelocityVector(DynamicsA, DynamicsB, DeltaV);
       }
 
       Contact = Contacts->Next(Contact);
@@ -360,7 +358,7 @@ inline void
 TimestepVelocityRungeKutta4(const r32 DeltaTime, const v3 LinearVelocity, const v3 AngularVelocity, component_spatial* c )
 {
   Assert(c);
-  #if 1
+#if 1
   // Note, This is wrong, why is it working?
   {
     auto dfdt_Lin = []( const v3& LinearVelocity )
@@ -373,7 +371,7 @@ TimestepVelocityRungeKutta4(const r32 DeltaTime, const v3 LinearVelocity, const 
     v3 k4 = dfdt_Lin(LinearVelocity + DeltaTime*k4);
     c->Position += (1/6.f) * DeltaTime * (k1 + 2*k2 + 2*k3 + k4);
   }
-  #else
+#else
   {
     auto dfdt_Lin = [LinearVelocity]( v3 p )
     {
@@ -385,7 +383,7 @@ TimestepVelocityRungeKutta4(const r32 DeltaTime, const v3 LinearVelocity, const 
     v3 k4 = dfdt_Lin(c->Position + DeltaTime*k4);
     c->Position += (1/6.f) * DeltaTime * (k1 + 2*k2 + 2*k3 + k4);
   }
-  #endif
+#endif
   {
     auto dfdt_Rot = [&AngularVelocity]( const v4& Rotation )
     {
@@ -402,42 +400,42 @@ TimestepVelocityRungeKutta4(const r32 DeltaTime, const v3 LinearVelocity, const 
   }
 }
 
- inline void
- TimestepVelocityForwardEuler(const r32 DeltaTime, const v3 LinearVelocity, const v3 AngularVelocity, component_spatial* c )
- {
+inline void
+TimestepVelocityForwardEuler(const r32 DeltaTime, const v3 LinearVelocity, const v3 AngularVelocity, component_spatial* c )
+{
   c->Position += DeltaTime*LinearVelocity;
 
   const v4 q0 = c->Rotation;
   r32 Angle = DeltaTime * Norm(AngularVelocity);
   v3 Axis = Normalize(AngularVelocity);
 
-  #if USE_ANGULAR_VEL_OBJECT_SPACE
+#if USE_ANGULAR_VEL_OBJECT_SPACE
   v4 DeltaQ = RotateQuaternion( Angle , Axis );
-  #else
+#else
   v4 DeltaQ = QuaternionMultiplication( c->Rotation, QuaternionMultiplication( RotateQuaternion( Angle , Axis ) , QuaternionInverse(c->Rotation)));
-  #endif
+#endif
 
   c->Rotation = QuaternionMultiplication(DeltaQ, c->Rotation);
- }
+}
 
 inline internal void
 IntegratePositions(r32 dtForFrame)
 {
   TIMED_FUNCTION();
 
-  ScopedTransaction(GlobalGameState->EntityManager);
-  component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_DYNAMICS);
-  while(Next(GlobalGameState->EntityManager,ComponentList))
+  BeginScopedEntityManagerMemory();
+  component_result* Components = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_DYNAMICS);
+  while(Next(GlobalGameState->EntityManager,Components))
   {
-    component_spatial* S = GetSpatialComponent(ComponentList);
-    component_dynamics* D = GetDynamicsComponent(ComponentList);
-    #if 1
+    component_spatial* S = GetSpatialComponent(Components);
+    component_dynamics* D = GetDynamicsComponent(Components);
+#if 1
     TimestepVelocityForwardEuler( dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
     S->Rotation = Normalize(S->Rotation);
-    #else
+#else
     TimestepVelocityRungeKutta4( dtForFrame, D->LinearVelocity, D->AngularVelocity, S );
     S->Rotation = Normalize(S->Rotation);
-    #endif
+#endif
     UpdateModelMatrix(S);
   }
 }
@@ -450,10 +448,10 @@ void CastRay(game_input* GameInput, world* World )
   {
     game_window_size WindowSize = GameGetWindowSize();
     entity_manager* EM = GlobalGameState->EntityManager;
-    ScopedTransaction(EM);
-    component_result* ComponentList = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
-    Assert(Next(EM, ComponentList));
-    component_camera* Camera = (component_camera*) GetComponent(EM, ComponentList, COMPONENT_FLAG_CAMERA);
+    BeginScopedEntityManagerMemory();
+    component_result* Components = GetComponentsOfType(EM, COMPONENT_FLAG_CAMERA);
+    Assert(Next(EM, Components));
+    component_camera* Camera = GetCameraComponent(Components);
 
     ray Ray = GetRayFromCamera(Camera, MousePos);
     World->CastedRay = RayCast(GlobalGameState->TransientArena, &World->BroadPhaseTree, Ray.Origin, Ray.Direction);
@@ -527,7 +525,8 @@ void CastRay(game_input* GameInput, world* World )
 
         r32 Restitution = getRestitutionCoefficient(V, RESTITUTION_COEFFICIENT, Normal, SLOP);
         r32 Baumgarte = getBaumgarteCoefficient(World->dtForFrame, BAUMGARTE_COEFFICIENT, Length*ScaleFactor, SLOP);
-        r32 Lambda = GetLambda( V, Jacobian, InvMJ, Baumgarte+  Restitution, 0);
+        r32 Bias = Baumgarte + Restitution;
+        r32 Lambda = GetLambda( V, Jacobian, InvMJ, Bias);
         r32 OldCumulativeLambda = AccumulatedLambda;
         AccumulatedLambda += Lambda;
         r32 LambdaDiff = AccumulatedLambda - OldCumulativeLambda;
@@ -545,203 +544,29 @@ void CastRay(game_input* GameInput, world* World )
   }
 }
 
-
-
-struct distance_constraint
+joint_constraint CreateJointConstraint(u32 EntityA, v3 LocalAnchorA, u32 EntityB, v3 LocalAnchorB, v3 GlobalRotationAxis)
 {
-  v3 RA;
-  v3 RB;
-  v3 U;
+  joint_constraint Joint = {};
+  Joint.EntityA = EntityA;
+  Joint.EntityB = EntityB;
+  Joint.LocalAnchorA = LocalAnchorA;
+  Joint.LocalAnchorB = LocalAnchorB;
+  component_spatial* A = GetSpatialComponent(EntityA);
+  component_spatial* B = GetSpatialComponent(EntityB);
 
-  r32 Mass;
-  r32 Impulse;
-};
+  Joint.LocalCenterA = ToLocal(A,A->Position);
+  Joint.LocalCenterB = ToLocal(B,B->Position);
 
-distance_constraint InitiateDistanceConstraint(component_spatial * SpatialA,
-                                               component_spatial * SpatialB,
-                                               component_dynamics* DynamicsA,
-                                               component_dynamics* DynamicsB)
-{
-  distance_constraint Result = {};
+  component_dynamics* DA = GetDynamicsComponent(EntityA);
+  component_dynamics* DB = GetDynamicsComponent(EntityB);
+  m3 Empty = {};
+  Joint.InvMass[0] = (DA ? (1.f/DA->Mass) : 0) * M3Identity();
+  Joint.InvMass[1] =  DA ? DA->I_inv : Empty;
+  Joint.InvMass[2] = (DB ? (1.f/DB->Mass) : 0) * M3Identity();
+  Joint.InvMass[3] =  DB ? DB->I_inv : Empty;
 
-  world* world = GlobalGameState->World;
-
-  b32 Hard = true;
-  r32 HardLength = 0.5;
-  r32 SoftMinLength = 0.25;
-  r32 SoftMaxLength = 0.75;
-
-  // NOTE(Jakob): Global Constraint Settings
-  r32 LinearSlop = 0.01;
-
-  // NOTE(Jakob): Constraint Definition
-  v3 LocalAnchorA = V3(1,1,1);
-  v3 LocalAnchorB = V3(0,0,0);
-
-  // Rigid Range
-  r32 Length = Maximum( HardLength, LinearSlop);
-  // Soft Range
-  r32 MinLenght = Maximum(Hard ? HardLength : SoftMinLength, LinearSlop);
-  r32 MaxLength = Maximum(Hard ? HardLength : SoftMaxLength, LinearSlop);
-  r32 Stiffness = 0.1;
-  r32 Damping = 0.1;
-
-  r32 Gamma = 0;
-  r32 Bias = 0;
-  r32 Impulse = 0;
-  r32 LowerImpulse = 0;
-  r32 UpperImpulse = 0;
-  r32 CurrentLength = 0;
-
-  r32 SoftMass = 0;
-
-  // End of Constraint Definition
-
-  v3 LocalCenterA = ToLocal(SpatialA);
-  r32 InvMassA = 1.0f/DynamicsA->Mass;
-  m3 InvIA = DynamicsA->I_inv;
-  v3 CenterA = SpatialA->Position;
-  v4 RotA = SpatialA->Rotation; // NOTE(Jakob): Quaternion
-  //v3 LinearVelocityA = Velocities[0];
-  //v3 AngularVelocityA = Velocities[1];
-
-
-  v3 LocalCenterB = ToLocal(SpatialB);
-  r32 InvMassB = 1.0f/DynamicsB->Mass;
-  m3 InvIB = DynamicsB->I_inv;
-  v3 CenterB = SpatialB->Position;
-  v4 RotB = SpatialB->Rotation;
-  //v3 LinearVelocityB = Velocities[2];
-  //v3 AngularVelocityB = Velocities[3];
-
-  Result.RA = ToGlobal(SpatialA, LocalAnchorA - LocalCenterA);
-  Result.RB = ToGlobal(SpatialB, LocalAnchorB - LocalCenterB);
-  Result.U = CenterB + Result.RB - CenterA - Result.RA;
-
-  // NOTE(Jakob): Handle Singularity
-  CurrentLength = Norm(Result.U);
-  if(CurrentLength > LinearSlop)
-  {
-    Result.U *= 1.0f/Length;
-  }else{
-
-    Result.U = {};
-    Result.Mass = 0;
-    Result.Impulse = 0;
-    LowerImpulse = 0;
-    UpperImpulse = 0;
-  }
-
-  v3 CrossAU = CrossProduct(Result.RA,Result.U);
-  v3 CrossBU = CrossProduct(Result.RB,Result.U);
-  float InvMass = InvMassA + InvIA * CrossAU * CrossAU + InvMassB + InvIB * CrossBU * CrossBU;
-  Result.Mass = InvMass != 0.0f ? 1.0f/InvMass : 0.0f;
-
-  if(Stiffness > 0.0f && MinLenght < MaxLength)
-
-  {
-    // Implement Later, Try hard range first
-    INVALID_CODE_PATH;
-    // Soft
-    r32 C = CurrentLength - Length;
-    r32 d = Damping;
-    r32 k = Stiffness;
-
-    float h = GlobalGameState->World->dtForFrame;
-
-  }else{
-    Gamma = 0;
-    Bias = 0;
-    SoftMass = 0;
-  }
-
-  float DoWarmStarting = false;
-  if(DoWarmStarting)
-  {
-    // Scale the impulse to support a variable time step.
-    //Impulse *= data.step.dtRatio;
-		//LowerImpulse *= data.step.dtRatio;
-		//UpperImpulse *= data.step.dtRatio;
-
-		//b2Vec2 P = (m_impulse + m_lowerImpulse - m_upperImpulse) * m_u;
-		//vA -= m_invMassA * P;
-		//wA -= m_invIA * b2Cross(m_rA, P);
-		//vB += m_invMassB * P;
-		//wB += m_invIB * b2Cross(m_rB, P);
-  }
-  else
-  {
-    Result.Impulse = 0;
-  }
-
-  return Result;
+  return Joint;
 }
-
-void SolveVelocityConstraints(component_dynamics* DynamicsA, component_dynamics* DynamicsB,  distance_constraint DistanceConstraint)
-{
-
-  r32 MinLenght = 1;
-  r32 MaxLength = 0;
-  if(MinLenght < MaxLength)
-  {
-    // Soft Constraint
-  }
-  else
-  {
-    v3 VelOfPointA =  DynamicsA->LinearVelocity + CrossProduct(DynamicsA->AngularVelocity, DistanceConstraint.RA);
-    v3 VelOfPointB =  DynamicsB->LinearVelocity + CrossProduct(DynamicsB->AngularVelocity, DistanceConstraint.RB);
-    r32 CDot = DistanceConstraint.U * (VelOfPointB - VelOfPointA);
-
-    r32 Impulse = -DistanceConstraint.Mass * CDot;
-    DistanceConstraint.Impulse += Impulse;
-
-    v3 P = Impulse * DistanceConstraint.U;
-    DynamicsA->LinearVelocity  -= (1.0f/DynamicsA->Mass) * P;
-    DynamicsA->AngularVelocity -= DynamicsA->I_inv *CrossProduct(DistanceConstraint.RA, P);
-    DynamicsB->LinearVelocity  += (1.0f/DynamicsB->Mass) * P;
-    DynamicsB->AngularVelocity += DynamicsB->I_inv *CrossProduct(DistanceConstraint.RB, P);
-  }
-}
-
-void SolveDistanceVelocityConstraint()
-{
-
-  ScopedTransaction(GlobalGameState->EntityManager);
-  component_result* ComponentList = GetComponentsOfType(GlobalGameState->EntityManager, COMPONENT_FLAG_DYNAMICS);
-
-  component_spatial* SpatialA = 0;
-  component_dynamics* DynamicsA = 0;
-
-  while(Next(GlobalGameState->EntityManager , ComponentList))
-  {
-    SpatialA = (component_spatial*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_SPATIAL);
-    DynamicsA = (component_dynamics*) GetComponent(GlobalGameState->EntityManager, ComponentList, COMPONENT_FLAG_DYNAMICS);
-  }
-  Assert(SpatialA && DynamicsA);
-
-  component_spatial SpatialB{};
-  SpatialB.Scale = V3(1,1,1);
-  SpatialB.ModelMatrix = M4Identity();
-  SpatialB.Position = V3(0,0,0);
-  SpatialB.Rotation = V4(0,0,0,1);
-
-  component_dynamics DynamicsB = {};
-  DynamicsB.LinearVelocity = V3(0,0,0);
-  DynamicsB.AngularVelocity = V3(0,0,0);
-  DynamicsB.ExternalForce = V3(0,0,0);
-  DynamicsB.Mass = R32Max;
-  DynamicsB.I= M3(R32Max, 0,0,
-                  0,R32Max,0,
-                  0,0,R32Max);
-  DynamicsB.I_inv = {};
-
-  distance_constraint D = InitiateDistanceConstraint
-    (SpatialA, &SpatialB, DynamicsA, &DynamicsB);
-  SolveVelocityConstraints(DynamicsA,&DynamicsB, D);
-  //SolvePositionalConstraints(DynamicsA,&DynamicsB, D);
-
-}
-
 
 void InitiateContactVelocityConstraints(contact_manifold* Manifold)
 {
@@ -766,183 +591,103 @@ void InitiateContactVelocityConstraints(contact_manifold* Manifold)
   }
 }
 
-// Revolute Joint
 // https://github.com/erincatto/box2d/blob/master/src/dynamics/b2_revolute_joint.cpp
-
-void InitiateJointVelocityConstraints2(joint_constraint* Joint)
+void InitiateJointVelocityConstraints(joint_constraint* Joint)
 {
-  Joint->Impulse = 0;
-  Joint->AxialMass = 0;
-
-  Joint->LowerImpulse = 0;
-  Joint->UpperImpulse = 0;
-
-  Joint->RotationAngle = 0;
-
-  // Distance Constraint
-  Joint->EnableLimit = false;
-  Joint->LowerAngle = 0;
-  Joint->UpperAngle = 0;
-
-  // Motor Constraint
-  Joint->MotorImpulse = 0;
-  Joint->EnableMotor = false;
-  Joint->MaxMotorTorque = 0;
-  Joint->MotorSpeed = 0;
-
-
-  component_spatial * SA = GetSpatialComponent(Joint->EntityA);
-  component_spatial * SB = GetSpatialComponent(Joint->EntityB);
+  component_spatial  * SA = GetSpatialComponent(Joint->EntityA);
+  component_spatial  * SB = GetSpatialComponent(Joint->EntityB);
   component_dynamics * DA = GetDynamicsComponent(Joint->EntityA);
   component_dynamics * DB = GetDynamicsComponent(Joint->EntityB);
 
-  Joint->mA = R32Max;
-  Joint->IA_inv = {};
-  v3 VA = {};
-  v3 WA = {};
-  if(DA)
-  {
-    Joint->mA = DA->Mass;
-    Joint->IA_inv = DA->I_inv;
-    VA = DA->LinearVelocity;
-    WA = DA->AngularVelocity;
-  }
-
-  Joint->mB = R32Max;
-  Joint->IB_inv = {};
-  v3 VB = {};
-  v3 WB = {};
-  if (DB)
-  {
-    Joint->mB = DB->Mass;
-    Joint->IB_inv = DB->I_inv;
-    VB = DB->LinearVelocity;
-    WB = DB->AngularVelocity;
-  }
+  v3 Velocity[4] = {};
+  GetVelocityVector(DA, DB, Velocity);
 
   v4 RA = SA->Rotation;
   v4 RB = SB->Rotation;
 
-  Joint->rA = RotateQuaternion(RA, Joint->LocalAnchorA - Joint->LocalCenterA);
-  Joint->rB = RotateQuaternion(RB, Joint->LocalAnchorB - Joint->LocalCenterB);
-
-  r32 mA_inv = 1.f / Joint->mA;
-  r32 mB_inv = 1.f / Joint->mB;
-
-
-}
-
-void InitiateContactVelocityConstraints()
-  {
-    Joint->Impulse = 0;
-    Joint->AxialMass = 0;
-
-    Joint->LowerImpulse = 0;
-    Joint->UpperImpulse = 0;
-
-    Joint->RotationAngle = 0;
-
-    // Distance Constraint
-    Joint->EnableLimit = false;
-    Joint->LowerAngle = 0;
-    Joint->UpperAngle = 0;
-
-    // Motor Constraint
-    Joint->MotorImpulse = 0;
-    Joint->EnableMotor = false;
-    Joint->MaxMotorTorque = 0;
-    Joint->MotorSpeed = 0;
-
-
-    component_spatial * SA = GetSpatialComponent(Joint->EntityA);
-    component_spatial * SB = GetSpatialComponent(Joint->EntityB);
-    component_dynamics * DA = GetDynamicsComponent(Joint->EntityA);
-    component_dynamics * DB = GetDynamicsComponent(Joint->EntityB);
-
-    Joint->mA = R32Max;
-    Joint->IA_inv = {};
-    v3 VA = {};
-    v3 WA = {};
-    if(DA)
-    {
-      Joint->mA = DA->Mass;
-      Joint->IA_inv = DA->I_inv;
-      VA = DA->LinearVelocity;
-      WA = DA->AngularVelocity;
-    }
-
-    Joint->mB = R32Max;
-    Joint->IB_inv = {};
-    v3 VB = {};
-    v3 WB = {};
-    if (DB)
-    {
-      Joint->mB = DB->Mass;
-      Joint->IB_inv = DB->I_inv;
-      VB = DB->LinearVelocity;
-      WB = DB->AngularVelocity;
-    }
-
-  v3 d = SB->Position - SA->Position;
-  v3 dHat = Normalize(d);
-
-    v4 RA = SA->Rotation;
-    v4 RB = SB->Rotation;
-
-  v3 rA =  RotateQuaternion(RA, Joint->LocalAnchorA - Joint->LocalCenterA);
-  v3 rB =  RotateQuaternion(RB, Joint->LocalAnchorB - Joint->LocalCenterB);
+  v3 rA = RotateQuaternion(RA, Joint->LocalAnchorA - Joint->LocalCenterA);
+  v3 rB = RotateQuaternion(RB, Joint->LocalAnchorB - Joint->LocalCenterB);
   Joint->rA = rA;
   Joint->rB = rB;
 
+  Joint->d = ToGlobal(SB, Joint->LocalAnchorB) - ToGlobal(SA, Joint->LocalAnchorA);
 
-  v3 Jacobian[4]= {};
-  Jacobian[0] = -d;
-  Jacobian[1] = -CrossProduct(rA,dHat);
-  Jacobian[2] =  d;
-  Jacobian[2] =  CrossProduct(rB,dHat);;
-
-  m3 InvMass[4] = {};
-  r32 OneOverMassA = DA ? 1.f/DA->Mass : 0;
-  r32 OneOverMassB = DB ? 1.f/DB->Mass : 0;
-  InvMass[0] = OneOverMassA * M3Identity();
-  InvMass[0] = OneOverMassB * M3Identity();
-
-    r32 mA_inv = 1.f / Joint->mA;
-    r32 mB_inv = 1.f / Joint->mB;
-
-
-
+  if(Norm(Joint->d)>SLOP)
+  {
+    v3 d = Normalize(Joint->d);
+    Joint->Jacobian[0] = -d;
+    Joint->Jacobian[1] = -CrossProduct(rA,d);
+    Joint->Jacobian[2] =  d;
+    Joint->Jacobian[3] =  CrossProduct(rB,d);
   }
 
-void SolveJointVelocityConstraints(joint_constraint* Joint)
-{
+  MultiplyDiagonalM12V12(Joint->InvMass, Joint->Jacobian, Joint->InvMJ);
 
+  v3 DeltaVelocity[4] = {};
+  ScaleV12(Joint->Lambda, Joint->InvMJ, DeltaVelocity);
+  AddVelocityVector(DA, DB, DeltaVelocity);
 }
+
+void SolveJointVelocityConstraints(joint_constraint* Joint, r32 dt)
+{
+  if(Norm(Joint->d) > SLOP)
+  {
+    component_dynamics * DA = GetDynamicsComponent(Joint->EntityA);
+    component_dynamics * DB = GetDynamicsComponent(Joint->EntityB);
+
+    v3 Velocity[4] = {};
+    GetVelocityVector(DA, DB, Velocity);
+
+    r32 BaumBias = (Norm(Joint->d)-SLOP)/dt;
+    r32 Lambda = GetLambda(Velocity, Joint->Jacobian, Joint->InvMJ, BaumBias );
+    r32 NewLambda = Joint->Lambda + Lambda;
+    r32 LambdaDiff = NewLambda - Joint->Lambda;
+    Joint->Lambda = NewLambda;
+
+    v3 DeltaV[4] = {};
+    ScaleV12(LambdaDiff, Joint->InvMJ, DeltaV);
+    AddVelocityVector(DA,DB,DeltaV);
+    }
+}
+
+/*c
+plot_function_samples(100);
+plot_title('My Plot');
+plot_xaxis('x', -4,4);
+plot_yaxis('y', -4,4);
+plot(sin(time()-x));
+plot( sin(time()+x), cos(time()-x-pi/2) );
+
+*/
 
 void SpatialSystemUpdate( world* World )
 {
   TIMED_FUNCTION();
 
   world_contact_chunk* WorldContacts =  World->ContactManifolds;
-  if(WorldContacts->FirstManifold)
-  {
-    InitiateContactVelocityConstraints(WorldContacts->FirstManifold);
-    DoWarmStarting(WorldContacts->FirstManifold);
+  r32 dt = World->dtForFrame;
+  IntegrateVelocities(dt);
 
-    BEGIN_BLOCK(SolveConstraints);
-    for (u32 i = 0; i < SLOVER_ITERATIONS; ++i)
-    {
-      SolveJointVelocityConstraints(&World->Joint);
-      // NOTE(Jakob): Solve Frictional constraints first because non-penetration is more important
-      SolveFrictionalConstraints(WorldContacts->FirstManifold);
-      SolveNonPenetrationConstraints(World->dtForFrame, WorldContacts->FirstManifold);
-    }
-    END_BLOCK(SolveConstraints);
-  }
+  InitiateJointVelocityConstraints(&World->Joint);
+
+  InitiateContactVelocityConstraints(WorldContacts->FirstManifold);
 
   CastRay(GlobalGameState->Input, World);
 
-  IntegrateVelocities(World->dtForFrame);
-  IntegratePositions(World->dtForFrame);
+  DoWarmStarting(WorldContacts->FirstManifold);
+
+  BEGIN_BLOCK(SolveConstraints);
+  for (u32 i = 0; i < SLOVER_ITERATIONS; ++i)
+  {
+    // NOTE(Jakob): Solve Frictional constraints first because non-penetration is more important
+    SolveJointVelocityConstraints(&World->Joint, dt);
+    SolveFrictionalConstraints(WorldContacts->FirstManifold);
+    SolveNonPenetrationConstraints(dt, WorldContacts->FirstManifold);
+  }
+  END_BLOCK(SolveConstraints);
+
+  Platform.DEBUGPrint("%f \n", World->Joint.Lambda);
+
+  IntegratePositions(dt);
 
 }

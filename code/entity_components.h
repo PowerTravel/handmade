@@ -180,7 +180,7 @@ struct component_list
   em_chunk* First;
 };
 
-component_list ComponentList(u32 Flag, midx ComponentSize, midx ChunkComponentCount, u32 Requires)
+component_list CreateComponentList(u32 Flag, midx ComponentSize, midx ChunkComponentCount, u32 Requires)
 {
   component_list Result = {};
   Result.Type = Flag;
@@ -220,7 +220,7 @@ void EndTransactions(entity_manager* EM)
   CheckArena(&EM->Arena);
 }
 
-#define ScopedTransaction(EntityManager) scoped_temporary_memory ScopedMemory_ = scoped_temporary_memory(&(EntityManager)->Arena)
+#define BeginScopedEntityManagerMemory() scoped_temporary_memory ScopedMemory_ = scoped_temporary_memory(&(GlobalGameState->EntityManager)->Arena)
 
 struct filtered_components
 {

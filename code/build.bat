@@ -23,13 +23,13 @@ REM cl %CommonCompilerFlags% ..\handmade\code\win32_handmade.cpp  /link -subsyst
 REM 64-bit build
 REM Optimization switches -O2
 del *.pdb > NUL 2> NUL
-echo create lock file
-echo WAITING FOR PDB > lock.tmp
+REM echo create lock file
+REM echo WAITING FOR PDB > lock.tmp
 REM start /WAIT
 cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=0 ..\handmade\code\handmade.cpp -Fmhandmade.map -MTd -LD /link -incremental:no -opt:ref  %CommonLinkerFlags% -PDB:handmade_%random%.pdb -EXPORT:GameUpdateAndRender -EXPORT:GameGetSoundSamples -EXPORT:DEBUGGameFrameEnd
 set LastError=%ERRORLEVEL%
 REM timeout /t 4
-echo del lock file
+REM echo del lock file
 del lock.tmp
 cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=1 ..\handmade\code\win32_handmade.cpp -Fmwin32_handmade.map /link %CommonLinkerFlags%
 
