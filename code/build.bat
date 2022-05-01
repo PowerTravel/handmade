@@ -24,7 +24,7 @@ REM 64-bit build
 REM Optimization switches -O2
 del *.pdb > NUL 2> NUL
 REM echo create lock file
-REM echo WAITING FOR PDB > lock.tmp
+echo WAITING FOR PDB > lock.tmp
 REM start /WAIT
 cl %CommonCompilerFlags% -DTRANSLATION_UNIT_INDEX=0 ..\handmade\code\handmade.cpp -Fmhandmade.map -MTd -LD /link -incremental:no -opt:ref  %CommonLinkerFlags% -PDB:handmade_%random%.pdb -EXPORT:GameUpdateAndRender -EXPORT:GameGetSoundSamples -EXPORT:DEBUGGameFrameEnd
 set LastError=%ERRORLEVEL%
